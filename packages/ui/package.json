@@ -1,0 +1,30 @@
+{
+  "name": "@agent-lanes/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent Lanes design-system primitives, written in React Native and rendered through react-native-web.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@agent-lanes/tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-native": "^0.87.1",
+    "react-native-web": "^0.21.3"
+  },
+  "peerDependencies": {
+    "react": "^19.2.3",
+    "react-native": "*"
+  }
+}

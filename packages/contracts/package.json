@@ -1,0 +1,18 @@
+{
+  "name": "@agent-lanes/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "IPC channel names, zod schemas and the Result type shared by the main process and the renderer.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./names": "./src/names.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
+}
