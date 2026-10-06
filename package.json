@@ -1,0 +1,35 @@
+{
+  "name": "agent-lanes",
+  "private": true,
+  "description": "Desktop board for running Claude Code agents against Azure DevOps work items, one git worktree per ticket.",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @agent-lanes/desktop dev",
+    "start": "pnpm --filter @agent-lanes/desktop start",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint && pnpm lint:fsd",
+    "lint:fsd": "steiger ./apps/desktop/src/renderer",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "pnpm --filter @agent-lanes/desktop e2e",
+    "package": "pnpm --filter @agent-lanes/desktop package",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@feature-sliced/steiger-plugin": "^0.8.0",
+    "@types/node": "^24.9.0",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.0.0",
+    "steiger": "^0.7.0",
+    "turbo": "^2.11.7",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}
