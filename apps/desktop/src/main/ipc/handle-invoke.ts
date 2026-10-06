@@ -12,8 +12,11 @@ export type InvokeHandler<C extends InvokeChannel> = (
   request: InvokeRequest<C>,
 ) => Promise<Result<InvokeResponse<C>>> | Result<InvokeResponse<C>>;
 
+/** Handlers for a subset of channels, e.g. one domain's (`HandlersFor<'ado:listSprints' | …>`). */
+export type HandlersFor<C extends InvokeChannel> = { [K in C]: InvokeHandler<K> };
+
 /** One handler per channel; the mapped type fails the build when a channel has none. */
-export type InvokeHandlers = { [C in InvokeChannel]: InvokeHandler<C> };
+export type InvokeHandlers = HandlersFor<InvokeChannel>;
 
 /**
  * Validates the request against its contract, runs the handler, validates the response,

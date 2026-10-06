@@ -4,10 +4,13 @@ This is the build plan for a feature-complete Agent Lanes, and the place its pro
 It is derived from the design brief (`docs/design/DESIGN.md`, cited as `§n` and `Rn`) and the seven
 artboards in `docs/design/screens/`. 126 tickets in 14 epics take the app from an empty folder to a
 packaged Windows installer. 13 are done (the Electron environment, typed IPC, the token package and
-GlassPanel), 1 is in progress and 4 are blocked on open questions.
+GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 
-- **Status values:** `todo` · `in-progress` · `blocked` · `done`. The status board in §2 is the only
-  place status lives; ticket bodies don't repeat it.
+- **Status values:** `todo` · `in-progress` · `blocked` · `done` · `partial` (merged, with acceptance
+  criteria still open; they stay unchecked in the ticket body with a note). The status board in §2
+  is the only place status lives; ticket bodies don't repeat it.
+- **Parallel build:** tickets are being built by one sub-agent each, on their own branch, and merged
+  into `main` by an integrator. The rules are in §7.
 - **Sizes:** S ≤ ½ day · M 1–2 days · L 3–5 days.
 - **Picking work:** take the lowest-numbered `todo` ticket whose dependencies are all `done`, unless
   a milestone says otherwise. Open the cited design sections and artboard before starting.
@@ -41,7 +44,7 @@ GlassPanel), 1 is in progress and 4 are blocked on open questions.
 | AL-005 | Unit test harness | E0 | S | AL-003 | done |
 | AL-006 | E2E harness (Playwright for Electron) | E0 | S | AL-002 | done |
 | AL-007 | Packaging (electron-builder, NSIS) | E0 | M | AL-002 | in-progress |
-| AL-008 | CI pipeline | E0 | S | AL-004, AL-005, AL-006 | blocked (Q6) |
+| AL-008 | CI pipeline | E0 | S | AL-004, AL-005, AL-006 | todo |
 | AL-009 | Agent docs: CLAUDE.md, design copy, this plan | E0 | S | — | done |
 | AL-010 | Result type and error codes | E1 | S | AL-001 | done |
 | AL-011 | Invoke channels: contracts, router, validation, trusted sender | E1 | S | AL-010 | done |
@@ -99,7 +102,7 @@ GlassPanel), 1 is in progress and 4 are blocked on open questions.
 | AL-106 | Live model and effort change | E6 | M | AL-100 | todo |
 | AL-107 | Sub-agent tracking | E6 | M | AL-102 | todo |
 | AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | todo |
-| AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | blocked (Q9) |
+| AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | todo |
 | AL-110 | Crash recovery | E6 | M | AL-100, AL-101 | todo |
 | AL-111 | Concurrency cap and Queued lane | E6 | S | AL-100 | todo |
 | AL-112 | Build result as next-turn context | E6 | S | AL-100, AL-132 | todo |
@@ -223,8 +226,8 @@ GlassPanel), 1 is in progress and 4 are blocked on open questions.
 - **Tests:** manual install on a clean Windows VM; record result in Change log.
 
 #### AL-008 · CI pipeline
-- **Design:** §5 · **Depends on:** AL-004, AL-005, AL-006 · **Blocked by:** Q6 (CI host)
-- **Scope:** Pipeline YAML for the chosen host running `pnpm install --frozen-lockfile`, `pnpm verify`, and `pnpm e2e` on a Windows agent (Electron needs a desktop session; use `xvfb-run` if a Linux agent is used). Cache the pnpm store and the Electron download.
+- **Design:** §5 · **Depends on:** AL-004, AL-005, AL-006 · **Host:** GitHub Actions (Decision D17)
+- **Scope:** `.github/workflows/ci.yml` running `pnpm install --frozen-lockfile`, `pnpm verify`, and `pnpm e2e` on a Windows agent (Electron needs a desktop session; use `xvfb-run` if a Linux agent is used). Cache the pnpm store and the Electron download.
 - **Acceptance criteria:**
   - [ ] Every PR runs typecheck, lint, Steiger, unit tests, build and e2e.
   - [ ] Failing Steiger or a layer-rule violation fails the build.
@@ -253,7 +256,7 @@ All main ↔ renderer traffic goes through channels declared in `packages/contra
   - [x] Adding a channel name without a schema or a handler fails `pnpm typecheck`.
   - [x] A request or response that breaks its schema returns `VALIDATION` / `INTERNAL`.
   - [x] Calls from any other frame (e.g. the Claude Design view) are refused.
-- **How to add a channel:** name in `names.ts` → contract in `schemas.ts` → handler in `src/main/ipc/handlers.ts` (or the owning service) → client hook in the renderer slice that needs it.
+- **How to add a channel:** name in `packages/contracts/src/domains/<domain>.names.ts` → contract in `domains/<domain>.schemas.ts` → handler in the domain's `createXHandlers` factory under `apps/desktop/src/main/<domain>/` (registered once in `src/main/ipc/handlers.ts`) → client hook in the renderer slice that needs it.
 
 #### AL-012 · Event channels: main → renderer push
 - **Design:** §6 Live events · **Depends on:** AL-011
@@ -660,7 +663,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
   - [ ] A failing server turns the pill amber with the server name on hover.
 
 #### AL-109 · Permission policy for headless sessions
-- **Design:** §4 (headless sessions), Q9 · **Depends on:** AL-100 · **Blocked by:** Q9
+- **Design:** §4 (headless sessions), Q9 · **Depends on:** AL-100 · **Policy:** the proposed default (Decision D18), configurable in settings
 - **Scope:** Choose `permissionMode` and an allow-list (proposal: `acceptEdits`, plus Bash allow-list for git read commands, build and test commands of the repo); everything else goes through `canUseTool`, which raises "Needs you · permission" on the card with Allow once / Allow for this ticket / Deny.
 - **Acceptance criteria:**
   - [ ] No session ever blocks on an invisible prompt.
@@ -1100,6 +1103,9 @@ implementation agent, mid-run if needed.
 | D14 | The web entry imports `AppRegistry` from react-native-web, typed by a local `.d.ts` | RN's types model native `RootTag`; `@types/react-native-web` exports interfaces only | 2026-10-07 |
 | D15 | App ID `au.com.companionsystems.agentlanes`; NSIS per-user installer; Windows x64 first | Team platform | 2026-10-07 |
 | D16 | Design hand-off sends a short user turn and the agent pulls the full spec with `agent_lanes.get_design_spec`, then calls `ack_design_spec` | Keeps large artboard payloads out of the prompt and gives the UI an acknowledgement for "Used · 14:01" | 2026-10-07 |
+| D17 | CI runs on GitHub Actions (answers Q6) | The repo now lives at github.com/KyleRichards94/ClaudeLanes | 2026-10-07 |
+| D18 | Headless permission policy for the first build: `acceptEdits`, plus a Bash allow-list of git read commands and the repo's detected build and test commands; anything else asks through `canUseTool` ("Needs you · permission"). Editable in settings (provisional answer to Q9) | Lets AL-109 proceed; the user can tighten or loosen it later | 2026-10-07 |
+| D19 | IPC channels and main-process handlers are split per domain (`contracts/src/domains/*`, `src/main/<domain>/handlers.ts`, composition root `src/main/services.ts`) | ~110 parallel branches would otherwise collide on two files | 2026-10-07 |
 
 ---
 
@@ -1112,10 +1118,10 @@ implementation agent, mid-run if needed.
 | Q3 | Native mobile companion in scope, or desktop only? (design) | D4, D13 | Desktop only |
 | Q4 | Claude credentials: API key per user, or each developer's Claude Code login? (design) | AL-044 | Support both; prefer the existing login |
 | Q5 | Maximum concurrent agents per machine for the team's hardware (design) | AL-111 | 3 per repo, adjustable |
-| Q6 | CI host: Azure Pipelines (team standard) or GitHub Actions (this folder sits under GitHub/)? | AL-008 | Azure Pipelines |
+| Q6 | ~~CI host~~ Answered: GitHub Actions (D17) | — | — |
 | Q7 | Code-signing certificate for the Windows installer: which, and who holds it? | AL-224 | — |
 | Q8 | Company process puts shared apps in `ai-tools/tools/<name>/`; Kyle's unmigrated `ticket-tracker` covers similar ground. Keep this repo standalone, or move it there and retire `ticket-tracker`? | AL-226 | Decide before the first teammate install |
-| Q9 | What may a headless agent run without asking? | AL-109 | `acceptEdits` + git read, build and test commands; everything else asks |
+| Q9 | What may a headless agent run without asking? | — (built with the default, D18) | `acceptEdits` + git read, build and test commands; everything else asks |
 | Q10 | ADO doesn't tell a PAT its own expiry. Ask for the expiry date when saving (optional), or don't show it? | AL-043 | Optional expiry field; warn 7 days before |
 | Q11 | R11 "talk to the design section": Claude Design's own chat in the embedded canvas, an in-app design thread backed by a per-ticket design agent, or both? | AL-196 | Both: canvas chat in webview mode, in-app design thread in MCP-link mode |
 | Q12 | What can Claude Design expose programmatically (artboard list, source, selection, chat)? | AL-190–AL-197 | Answered by spike AL-190 |
@@ -1128,3 +1134,47 @@ implementation agent, mid-run if needed.
 |---|---|
 | 2026-10-07 | Plan created from the design doc (rev 14) and its seven artboards. Added R11 (Kyle, hard requirement): design section usable at any stage, approve & ship design to the implementation agent at any time → epic E11 rewritten around it (AL-191, AL-196–AL-200). |
 | 2026-10-07 | Environment prepared: pnpm/Turborepo monorepo, electron-vite 5 + Electron 44, React 19 + react-native-web 0.21 + React Compiler, typed IPC with zod, tokens package, GlassPanel, ESLint + Steiger, Vitest (45 tests), Playwright smoke e2e (3 tests, isolated profile). Done: AL-001–AL-006, AL-009–AL-011, AL-013, AL-014, AL-020, AL-022. AL-007 in progress (config only). |
+| 2026-10-07 | Repo pushed to github.com/KyleRichards94/ClaudeLanes. Prepared for the parallel build: IPC contracts and main handlers split per domain (D19), composition root `src/main/services.ts`, quit waits for `disposeServices`. Q6 answered (GitHub Actions, D17); Q9 built with the default (D18); AL-008 and AL-109 unblocked. Rules in §7. |
+
+---
+
+## 7. Parallel build rules
+
+One sub-agent builds each ticket. An agent starts as soon as every ticket it depends on is merged
+into `main`. Up to 8 build at once (this machine's RAM and disk), plus one integrator that merges.
+
+**Ticket agent**
+
+1. Branch and worktree off `main`:
+   `git worktree add -b feature/AL-xxx-<slug> C:/Users/Kyle.Richards/al/AL-xxx main`. Work only there.
+2. Setup: `pnpm install`. For e2e, reuse the main checkout's Electron binary instead of downloading
+   another: copy `node_modules/electron/path.txt` from the main checkout and set
+   `ELECTRON_OVERRIDE_DIST_PATH=<main checkout>/node_modules/electron/dist`.
+3. Build only this ticket. Reuse code already merged; if something from another ticket is missing,
+   build the smallest piece needed and report it.
+4. Shared registration points get lines added, never rewritten: `packages/contracts/src/domains/*`,
+   `apps/desktop/src/main/services.ts`, `apps/desktop/src/main/ipc/handlers.ts` (one line per
+   domain), `packages/ui/src/index.ts`, `apps/desktop/src/renderer/app/**` wiring.
+5. Don't edit `docs/TICKETS.md` or `docs/design/*`. Decisions, unmet criteria and follow-ups go in
+   the agent's result; the integrator records them.
+6. No real credentials and no calls to real Azure DevOps, claude.ai or the Claude API: fakes and MSW.
+7. Before committing: `pnpm typecheck`, `pnpm lint` and `pnpm test` green, plus `pnpm e2e` when
+   `apps/desktop` changed.
+8. Commit as `AL-xxx: <summary>` with the Co-Authored-By trailer, then push the branch.
+
+**Integrator** (one at a time, in the main checkout)
+
+1. Merge finished branches into `main` with `git merge --no-ff`, in the order they finished.
+2. Conflicts: registration files keep both sides; `pnpm-lock.yaml` takes `main`'s version, then
+   `pnpm install` after the merges and the regenerated lockfile is committed.
+3. `pnpm verify` and `pnpm e2e` on `main`. Small integration breaks are fixed on `main`
+   (`Integrate AL-xxx: …`). A merge that can't be made green is reverted and the ticket goes back to
+   its agent with the reason (one retry).
+4. Update §2 status (`done` or `partial`), tick met criteria in the ticket body, add reported
+   decisions to §4 and a Change log line, commit, `git push origin main`.
+5. Remove merged worktrees. Branches stay on GitHub.
+
+**Ordering:** dependencies from §2, plus three rules. Every ticket with UI (AL-046, AL-047, AL-135,
+AL-142–AL-146, AL-160–AL-165, AL-170–AL-181, AL-192–AL-197, AL-199, AL-200, AL-210, AL-211) also
+waits for the primitives AL-023–AL-031, so screens don't grow their own buttons and pills. AL-220
+runs last. AL-223 waits for all of E8–E11. AL-224 and AL-226 wait for Kyle (Q7, Q8).

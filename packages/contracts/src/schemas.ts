@@ -1,29 +1,45 @@
 import { z } from 'zod';
+import type { InvokeContract } from './contract';
+import { adoEventContracts, adoInvokeContracts } from './domains/ado.schemas';
+import { agentEventContracts, agentInvokeContracts } from './domains/agent.schemas';
+import { appEventContracts, appInvokeContracts } from './domains/app.schemas';
+import { buildEventContracts, buildInvokeContracts } from './domains/build.schemas';
+import { connectionsEventContracts, connectionsInvokeContracts } from './domains/connections.schemas';
+import { designEventContracts, designInvokeContracts } from './domains/design.schemas';
+import { gitEventContracts, gitInvokeContracts } from './domains/git.schemas';
+import { reposEventContracts, reposInvokeContracts } from './domains/repos.schemas';
+import { settingsEventContracts, settingsInvokeContracts } from './domains/settings.schemas';
+import { ticketsEventContracts, ticketsInvokeContracts } from './domains/tickets.schemas';
 import type { EventChannel, InvokeChannel } from './names';
 import { ERROR_CODES } from './result';
 
-export const AppInfoSchema = z.object({
-  name: z.string(),
-  version: z.string(),
-  platform: z.string(),
-  versions: z.object({
-    electron: z.string(),
-    chrome: z.string(),
-    node: z.string(),
-  }),
-});
-export type AppInfo = z.infer<typeof AppInfoSchema>;
-
-interface InvokeContract {
-  request: z.ZodType;
-  response: z.ZodType;
-}
-
+/** Every invoke contract, by channel. Domains own their entries in `domains/<domain>.schemas.ts`. */
 export const invokeContracts = {
-  'app:getInfo': { request: z.undefined(), response: AppInfoSchema },
+  ...appInvokeContracts,
+  ...settingsInvokeContracts,
+  ...connectionsInvokeContracts,
+  ...adoInvokeContracts,
+  ...reposInvokeContracts,
+  ...gitInvokeContracts,
+  ...ticketsInvokeContracts,
+  ...agentInvokeContracts,
+  ...buildInvokeContracts,
+  ...designInvokeContracts,
 } as const satisfies Record<InvokeChannel, InvokeContract>;
 
-export const eventContracts = {} as const satisfies Record<EventChannel, z.ZodType>;
+/** Every event payload schema, by channel. */
+export const eventContracts = {
+  ...appEventContracts,
+  ...settingsEventContracts,
+  ...connectionsEventContracts,
+  ...adoEventContracts,
+  ...reposEventContracts,
+  ...gitEventContracts,
+  ...ticketsEventContracts,
+  ...agentEventContracts,
+  ...buildEventContracts,
+  ...designEventContracts,
+} as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeContracts)[C]['request']>;
 export type InvokeResponse<C extends InvokeChannel> = z.output<(typeof invokeContracts)[C]['response']>;
