@@ -3,6 +3,7 @@ import { BrowserWindow, app, shell } from 'electron';
 import { color } from '@agent-lanes/tokens';
 import { createInvokeHandlers } from './ipc/handlers';
 import { registerInvokeHandlers, type RendererLocation } from './ipc/router';
+import { createServices, disposeServices, type Services } from './services';
 
 const APP_ID = 'au.com.companionsystems.agentlanes';
 
@@ -17,6 +18,7 @@ const userDataOverride = process.env['AGENT_LANES_USER_DATA_DIR'];
 if (userDataOverride) app.setPath('userData', userDataOverride);
 
 let mainWindow: BrowserWindow | null = null;
+let services: Services | null = null;
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -66,7 +68,8 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(() => {
     app.setAppUserModelId(APP_ID);
-    registerInvokeHandlers(createInvokeHandlers(), renderer);
+    services = createServices({ appDataDir: app.getPath('userData') });
+    registerInvokeHandlers(createInvokeHandlers(services), renderer);
     mainWindow = createMainWindow();
 
     app.on('activate', () => {
@@ -76,5 +79,16 @@ if (!app.requestSingleInstanceLock()) {
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
+  });
+
+  // Hold the first quit until services have stopped their child processes, then quit for real.
+  let disposed = false;
+  app.on('before-quit', (event) => {
+    if (disposed || !services) return;
+    event.preventDefault();
+    void disposeServices(services).finally(() => {
+      disposed = true;
+      setImmediate(() => app.quit());
+    });
   });
 }

@@ -1,19 +1,15 @@
-import { app } from 'electron';
-import { ok } from '@agent-lanes/contracts';
+import { createAppHandlers } from '../app/handlers';
+import type { Services } from '../services';
 import type { InvokeHandlers } from './handle-invoke';
 
-export function createInvokeHandlers(): InvokeHandlers {
+/**
+ * Every IPC handler, one factory per domain. A domain adds its line here once its channels exist
+ * in packages/contracts; `InvokeHandlers` fails the build until every channel has a handler.
+ * Keep one line per domain so parallel tickets don't collide.
+ */
+export function createInvokeHandlers(services: Services): InvokeHandlers {
+  void services;
   return {
-    'app:getInfo': () =>
-      ok({
-        name: app.getName(),
-        version: app.getVersion(),
-        platform: process.platform,
-        versions: {
-          electron: process.versions.electron,
-          chrome: process.versions.chrome,
-          node: process.versions.node,
-        },
-      }),
+    ...createAppHandlers(),
   };
 }

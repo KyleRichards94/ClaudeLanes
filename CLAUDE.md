@@ -37,10 +37,12 @@ against Azure DevOps work items at once, one git worktree per ticket.
 - **Main process owns every secret, child process and external call.** The renderer never imports
   `electron`, `node:*`, `@agent-lanes/ado-client` or the Agent SDK; it calls `invoke()` from
   `@/shared/api`. Tokens never cross IPC; only status does.
-- **Every IPC channel is declared in `packages/contracts`:** its name in `names.ts`, its zod
-  request/response in `schemas.ts`. Handlers return `Result<T>` (`ok` / `err(code, …)`) and
-  never throw across IPC. Add a channel in contracts first; the `InvokeHandlers` type then forces a
-  main handler.
+- **Every IPC channel is declared in `packages/contracts/src/domains/`:** its name in
+  `<domain>.names.ts` (zod-free, the preload imports it), its zod request/response or event payload in
+  `<domain>.schemas.ts`. Handlers return `Result<T>` (`ok` / `err(code, …)`) and never throw across
+  IPC. The domain's `createXHandlers()` lives in `src/main/<domain>/handlers.ts`, its service is
+  created in `src/main/services.ts`, and `src/main/ipc/handlers.ts` spreads one factory per domain;
+  `InvokeHandlers` fails the build until every channel has a handler.
 - **Renderer follows Feature-Sliced Design:** `app → processes → pages → features → entities →
   shared`, imports only downward, slices are imported through their `index.ts`, and same-layer
   slices never import each other. Use `@/layer/slice` aliases across slices, relative paths inside.
