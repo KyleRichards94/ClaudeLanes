@@ -1,0 +1,22 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState, type ReactNode } from 'react';
+
+const SIXTY_SECONDS = 60_000;
+
+/** Server state defaults from design §6: refetch on focus, and every 60 s while the board is open. */
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: true,
+        staleTime: SIXTY_SECONDS,
+        retry: 1,
+      },
+    },
+  });
+}
+
+export function AppProviders({ children }: { children: ReactNode }) {
+  const [queryClient] = useState(createQueryClient);
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+}
