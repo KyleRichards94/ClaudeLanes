@@ -1,0 +1,19 @@
+node_modules/
+out/
+dist/
+release/
+coverage/
+.turbo/
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+
+# Playwright
+test-results/
+playwright-report/
+
+# Local-only editor and agent state
+.vscode/*
+!.vscode/extensions.json
+.claude/settings.local.json

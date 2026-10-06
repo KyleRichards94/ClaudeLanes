@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 10 blocks dependency install scripts unless listed here.
+# electron downloads its binary in postinstall; esbuild fetches its platform binary.
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+
+# Squirrel installer support pulled in by electron-builder; we package with NSIS.
+ignoredBuiltDependencies:
+  - electron-winstaller
