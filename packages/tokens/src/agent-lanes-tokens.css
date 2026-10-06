@@ -1,0 +1,46 @@
+/*
+ * Agent Lanes design tokens (design §11). Mirrors src/index.ts.
+ * Glass recipe adapted from "Pure CSS Glassmorphism Liquid Glass UI Kit"
+ * by Margarita-the-solid on CodePen.
+ */
+:root {
+  --al-bg: #f4f7fb;
+  --al-surface: #ffffff;
+  --al-ink: #0f1b2d;
+  --al-muted: #5b6b82;
+  --al-line: #e2e8f0;
+  --al-claude: #5b4bc4;
+  --al-claude-tint: #eeebff;
+  --al-claude-text: #4a3bb0;
+  --al-ado: #0369a1;
+  --al-ado-tint: #e0f2fe;
+  --al-ok: #059669;
+  --al-attention: #d97706;
+  --al-danger: #b91c1c;
+  --al-sky-glow: #38bdf8;
+
+  --al-glass-fill-min: rgba(255, 255, 255, 0.62);
+  --al-glass-fill-max: rgba(255, 255, 255, 0.72);
+  --al-blur-sm: 8px;
+  --al-blur-md: 18px;
+  --al-blur-xl: 40px;
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --al-glass-border: rgba(255, 255, 255, 0.7);
+
+  --al-radius-chip: 8px;
+  --al-radius-control: 12px;
+  --al-radius-card: 16px;
+  --al-radius-panel: 20px;
+  --al-radius-modal: 28px;
+  --al-radius-pill: 999px;
+
+  --al-font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+  --al-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --al-shadow-card: 0 1px 2px rgba(15, 27, 45, 0.04), 0 8px 24px rgba(15, 27, 45, 0.06);
+  --al-shadow-lifted: 0 2px 4px rgba(15, 27, 45, 0.06), 0 16px 40px rgba(15, 27, 45, 0.1);
+
+  --al-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --al-duration-fast: 150ms;
+  --al-duration-slow: 220ms;
+}

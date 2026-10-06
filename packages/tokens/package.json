@@ -1,0 +1,15 @@
+{
+  "name": "@agent-lanes/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent Lanes design tokens as TypeScript (React Native styles) and CSS variables (Electron chrome, webviews).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent-lanes-tokens.css": "./src/agent-lanes-tokens.css"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src"
+  }
+}
