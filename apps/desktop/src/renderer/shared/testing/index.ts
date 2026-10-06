@@ -1,0 +1,1 @@
+export { installFakeBridge } from './bridge';

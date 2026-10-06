@@ -1,0 +1,22 @@
+# Packaging config (ticket AL-007). Windows first; macOS/Linux targets come later.
+appId: au.com.companionsystems.agentlanes
+productName: Agent Lanes
+directories:
+  output: release/${version}
+  buildResources: build
+files:
+  - out/**
+  - package.json
+# The Agent SDK launches its native `claude` binary from disk, so it cannot live inside app.asar.
+asarUnpack:
+  - "**/node_modules/@anthropic-ai/claude-agent-sdk*/**"
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true

@@ -1,0 +1,46 @@
+import {
+  err,
+  invokeContracts,
+  ok,
+  type InvokeChannel,
+  type InvokeRequest,
+  type InvokeResponse,
+  type Result,
+} from '@agent-lanes/contracts';
+
+export type InvokeHandler<C extends InvokeChannel> = (
+  request: InvokeRequest<C>,
+) => Promise<Result<InvokeResponse<C>>> | Result<InvokeResponse<C>>;
+
+/** One handler per channel; the mapped type fails the build when a channel has none. */
+export type InvokeHandlers = { [C in InvokeChannel]: InvokeHandler<C> };
+
+/**
+ * Validates the request against its contract, runs the handler, validates the response,
+ * and turns any throw into an INTERNAL error so only Result values cross IPC (design §12).
+ */
+export async function handleInvoke<C extends InvokeChannel>(
+  channel: C,
+  raw: unknown,
+  handler: InvokeHandler<C>,
+): Promise<Result<InvokeResponse<C>>> {
+  const contract = invokeContracts[channel];
+  const request = contract.request.safeParse(raw);
+  if (!request.success) {
+    return err('VALIDATION', `Invalid request for ${channel}`, request.error.issues);
+  }
+
+  try {
+    const result = await handler(request.data as InvokeRequest<C>);
+    if (!result.ok) return result;
+
+    const response = contract.response.safeParse(result.data);
+    if (!response.success) {
+      return err('INTERNAL', `Handler for ${channel} returned an invalid response`, response.error.issues);
+    }
+    return ok(response.data as InvokeResponse<C>);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    return err('INTERNAL', `${channel} failed: ${message}`);
+  }
+}
