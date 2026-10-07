@@ -69,6 +69,16 @@ describe('ConnectionsModal (AL-046)', () => {
     expect(within(dialog()).getByRole('button', { name: 'Close' })).toBeTruthy();
   });
 
+  it('warns, without blocking, when an on-premises organisation uses plain http', () => {
+    setup();
+    act(() => openConnections());
+
+    type('ado-org-url', 'https://dev.azure.com/Hicora');
+    expect(screen.queryByText(/token is sent unencrypted/)).toBeNull();
+    type('ado-org-url', 'http://devops:8090/CompanionSystems');
+    expect(screen.getByText('Plain http: the token is sent unencrypted. Use it only on a trusted internal network.')).toBeTruthy();
+  });
+
   it('keeps Save disabled until the draft row has passed Test connection, then saves without keeping the token', async () => {
     const connections = setup();
     act(() => openConnections());

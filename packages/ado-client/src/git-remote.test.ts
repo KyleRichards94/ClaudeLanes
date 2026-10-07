@@ -17,6 +17,7 @@ describe('parseAdoGitRemote', () => {
     ['SSH to visualstudio.com', 'contoso@vs-ssh.visualstudio.com:v3/contoso/Web/Portal', 'https://contoso.visualstudio.com', 'Web', 'Portal'],
     ['Azure DevOps Server under /tfs', 'https://ado.example.com/tfs/DefaultCollection/Web/_git/Portal', 'https://ado.example.com/tfs/DefaultCollection', 'Web', 'Portal'],
     ['Azure DevOps Server at the root', 'https://ado.example.com/Main/Web/_git/Portal', 'https://ado.example.com/Main', 'Web', 'Portal'],
+    ['Azure DevOps Server over plain http', 'http://devops:8090/CompanionSystems/OnSite/_git/OnSite', 'http://devops:8090/CompanionSystems', 'OnSite', 'OnSite'],
   ])('reads %s', (_case, remote, orgUrl, project, repository) => {
     expect(parseAdoGitRemote(remote)).toEqual({ ok: true, data: { orgUrl, project, repository } });
   });
@@ -29,7 +30,7 @@ describe('parseAdoGitRemote', () => {
     ['nothing after _git', 'https://dev.azure.com/contoso/Web/_git/'],
     ['extra path after the repo', 'https://dev.azure.com/contoso/Web/_git/Portal/pullrequest/5'],
     ['too many segments on dev.azure.com', 'https://dev.azure.com/contoso/Web/extra/_git/Portal'],
-    ['plain http to a server', 'http://ado.example.com/tfs/Main/Web/_git/Portal'],
+    ['plain http to Azure DevOps Services', 'http://dev.azure.com/contoso/Web/_git/Portal'],
     ['a server remote without a project', 'https://ado.example.com/Main/_git/Portal'],
     ['a malformed escape', 'https://dev.azure.com/contoso/We%zzb/_git/Portal'],
     ['an empty string', ''],
