@@ -15,3 +15,5 @@ export {
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
 export { ticketRecordQueryKey, useTicketRecord } from './tickets';
 export { useWorkItem, workItemQueryKey } from './work-item';
+export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
+export { useDesignCanvasSlot } from './design-view';

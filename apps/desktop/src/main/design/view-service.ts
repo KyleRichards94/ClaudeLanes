@@ -62,6 +62,8 @@ export interface DesignViewServiceOptions {
   emit: Emit;
   /** Live views kept at once; the least recently opened one beyond this is closed. Default 3. */
   maxLiveViews?: number;
+  /** Told every change `design:view` reports, e.g. to remember the canvas page a ticket was left on (AL-193). */
+  onChange?: (view: DesignViewState, closed: boolean) => void;
 }
 
 export interface DesignViewService {
@@ -109,6 +111,7 @@ export function createDesignViewService(options: DesignViewServiceOptions): Desi
 
   function publish(entry: Entry, closed = false): void {
     emit('design:view', { ...state(entry), closed });
+    options.onChange?.(state(entry), closed);
   }
 
   function applyBounds(entry: Entry): void {

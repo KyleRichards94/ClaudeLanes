@@ -27,7 +27,7 @@ function renderPage(record: TicketRecord | null, extra: Record<string, unknown> 
   const bridge = installFakeBridge({
     'tickets:get': { ok: true, data: { record } },
     'design:getView': { ok: true, data: { view: null } },
-    'design:open': { ok: true, data: { ticketId: '71273', status: 'loading', url: null, visible: true } },
+    'design:openCanvas': { ok: true, data: { ticketId: '71273', status: 'loading', url: null, visible: true } },
     'design:hide': { ok: true, data: { found: true } },
     'design:setBounds': { ok: true, data: { found: true } },
     'design:reload': { ok: true, data: { found: true } },
@@ -91,17 +91,17 @@ describe('DesignTabPage', () => {
       agentTickets.load([]);
       const { bridge } = renderPage(linkedRecord({ stage }));
       expect(await screen.findByTestId('design-canvas-slot')).toBeTruthy();
-      await waitFor(() => expect(calls(bridge, 'design:open')).toHaveLength(1));
+      await waitFor(() => expect(calls(bridge, 'design:openCanvas')).toHaveLength(1));
       expect(screen.getByRole('tab', { name: 'Claude Design' })).toBeTruthy();
       expect(screen.getByTestId('design-side-panel')).toBeTruthy();
       cleanup();
     }
   });
 
-  it('opens the linked canvas where the view last was, over the placeholder', async () => {
+  it('asks main to open the linked canvas over the placeholder', async () => {
     const { bridge } = renderPage(linkedRecord());
     await screen.findByTestId('design-canvas-slot');
-    await waitFor(() => expect(calls(bridge, 'design:open')).toEqual([expect.objectContaining({ ticketId: '71273', url: LAST_URL })]));
+    await waitFor(() => expect(calls(bridge, 'design:openCanvas')).toEqual([expect.objectContaining({ ticketId: '71273' })]));
     expect(screen.getByTestId('design-canvas-label').textContent).toBe('claude.ai/design · 71273 canvas');
   });
 
@@ -132,11 +132,56 @@ describe('DesignTabPage', () => {
     open.mockRestore();
   });
 
-  it('says when no canvas is linked and opens no view', async () => {
+  it('offers to link a canvas when none is linked, and opens no view', async () => {
     const { bridge } = renderPage(fakeTicketRecord());
-    expect(await screen.findByTestId('design-no-canvas')).toBeTruthy();
+    expect(await screen.findByTestId('link-canvas-form')).toBeTruthy();
     expect(screen.getByTestId('design-canvas-label').textContent).toBe('No canvas linked');
-    expect(calls(bridge, 'design:open')).toEqual([]);
+    expect(calls(bridge, 'design:openCanvas')).toEqual([]);
+  });
+
+  it('refuses a link that is not a canvas before sending it', async () => {
+    const { bridge } = renderPage(fakeTicketRecord());
+    fireEvent.change(await screen.findByTestId('link-canvas-url'), { target: { value: 'https://claude.ai/chat/abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Link canvas' }));
+
+    expect(await screen.findByText(/isn't a Claude Design canvas link/)).toBeTruthy();
+    expect(calls(bridge, 'design:linkCanvas')).toEqual([]);
+  });
+
+  it('links a pasted canvas and shows it', async () => {
+    const { bridge } = renderPage(fakeTicketRecord(), {
+      'design:linkCanvas': { ok: true, data: { canvas: CANVAS, lastViewUrl: null, specs: [] } },
+    });
+    fireEvent.change(await screen.findByTestId('link-canvas-url'), { target: { value: 'claude.ai/design/p/p-71273' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Link canvas' }));
+
+    expect(await screen.findByTestId('design-canvas-slot')).toBeTruthy();
+    expect(calls(bridge, 'design:linkCanvas')).toEqual([{ ticketId: '71273', url: 'claude.ai/design/p/p-71273' }]);
+    await waitFor(() => expect(calls(bridge, 'design:openCanvas')).toHaveLength(1));
+  });
+
+  it('shows what main says when it refuses a link', async () => {
+    renderPage(fakeTicketRecord(), { 'design:linkCanvas': { ok: false, code: 'VALIDATION', message: 'There is no ticket 71273' } });
+    fireEvent.change(await screen.findByTestId('link-canvas-url'), { target: { value: CANVAS.url } });
+    fireEvent.click(screen.getByRole('button', { name: 'Link canvas' }));
+    expect(await screen.findByText('There is no ticket 71273')).toBeTruthy();
+  });
+
+  it('changes or unlinks a linked canvas', async () => {
+    const { bridge } = renderPage(linkedRecord(), {
+      'design:unlinkCanvas': { ok: true, data: { canvas: null, lastViewUrl: null, specs: [] } },
+    });
+    await screen.findByTestId('design-canvas-slot');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change canvas' }));
+    expect(screen.queryByTestId('design-canvas-slot')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByTestId('design-canvas-slot')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change canvas' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unlink canvas' }));
+    await waitFor(() => expect(calls(bridge, 'design:unlinkCanvas')).toEqual([{ ticketId: '71273' }]));
+    expect(await screen.findByRole('heading', { name: 'Link a Claude Design canvas' })).toBeTruthy();
   });
 
   it('lists shipped specs with Sent, Used and Superseded, and the design system file', async () => {

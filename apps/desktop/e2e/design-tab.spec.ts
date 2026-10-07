@@ -5,7 +5,7 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import { E2E_TICKET_START, e2eTicketRecord, seedTicketRecords } from './support/ticket-records';
 
 /**
- * AL-192: the Claude Design tab page in the real app. No canvas is linked here, so no view loads and
+ * AL-192: the Claude Design tab page in the real app. No canvas is linked here (the link form shows), so no view loads and
  * nothing is sent to claude.ai.
  */
 
@@ -58,7 +58,7 @@ test('shows the compact header, the tab bar, the browser bar and the side panel'
   await expect(page.getByText('Opus · XHigh')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Claude Design' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('design-canvas-label')).toHaveText('No canvas linked');
-  await expect(page.getByTestId('design-no-canvas')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Link a Claude Design canvas' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Attached to this ticket' })).toBeVisible();
 
   // The side panel sits right of the canvas, as on artboard 4.

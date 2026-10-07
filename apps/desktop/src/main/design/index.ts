@@ -10,3 +10,4 @@ export {
   type DesignViewServiceOptions,
   type ViewRect,
 } from './view-service';
+export { createDesignCanvasLinks, isCanvasPage, type DesignCanvasLinks, type DesignCanvasLinksOptions } from './canvas-links';
