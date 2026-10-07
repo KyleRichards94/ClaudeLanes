@@ -51,22 +51,49 @@
   --al-tone-claude-wash: #f6f5ff;
   --al-tone-claude-band: #eeebff;
   --al-tone-claude-text: #4a3bb0;
+  --al-tone-claude-dot: #5b4bc4;
   --al-tone-ado-wash: #f0f9ff;
   --al-tone-ado-band: #e0f2fe;
   --al-tone-ado-text: #0369a1;
   --al-tone-ado-fill: #38bdf8;
+  --al-tone-ado-dot: #0369a1;
   --al-tone-attention-border: #fcd34d;
   --al-tone-attention-band: #fef3c7;
   --al-tone-attention-text: #92400e;
+  --al-tone-attention-dot: #d97706;
   --al-tone-danger-border: #fecaca;
   --al-tone-danger-wash: #fef2f2;
   --al-tone-danger-band: #fee2e2;
   --al-tone-danger-text: #991b1b;
   --al-tone-danger-fill: #f87171;
+  --al-tone-danger-dot: #b91c1c;
   --al-tone-ok-wash: #ecfdf5;
   --al-tone-ok-band: #d1fae5;
   --al-tone-ok-text: #047857;
   --al-tone-ok-fill: #10b981;
+  --al-tone-ok-dot: #059669;
+  --al-tone-neutral-band: #f1f5f9;
+  --al-tone-neutral-text: #475569;
+  --al-tone-neutral-dot: #94a3b8;
   --al-progress-gradient: linear-gradient(90deg, #5b4bc4, #38bdf8);
   --al-muted-opacity: 0.75;
+}
+
+/* Selection controls (SegmentedControl, Switch) from artboards 2 and 3. Mirrors src/selection.ts. */
+:root {
+  --al-selection-track: #eef2f7;
+  --al-selection-label: #475569;
+  --al-selection-switch-off: #cbd5e1;
+  --al-selection-thumb-shadow: 0 1px 2px rgba(15, 27, 45, 0.1), 0 1px 3px rgba(15, 27, 45, 0.08);
+  --al-selection-pill-shadow: 0 2px 8px rgba(91, 75, 196, 0.28);
+  --al-selection-disabled-opacity: 0.5;
+}
+
+/* Buttons and controls from the "Design tokens" artboard. Mirrors src/controls.ts. */
+:root {
+  --al-control-ink: #334155;
+  --al-control-primary-shadow: 0 6px 16px rgba(91, 75, 196, 0.28);
+  --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 75, 196, 0.34);
+  --al-control-pressed-filter: brightness(0.94);
+  --al-control-disabled-opacity: 0.5;
 }

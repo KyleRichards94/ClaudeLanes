@@ -6,6 +6,8 @@ import {
   ConnectionSummarySchema,
   MASKED_TOKEN_BULLETS,
   MaskedTokenSchema,
+  missingScopesOf,
+  REQUIRED_ADO_SCOPE_ACCESS,
   TestConnectionRequestSchema,
   type ConnectionSummary,
 } from './connections.schemas';
@@ -112,5 +114,49 @@ describe('connections contracts (AL-042)', () => {
     expect(TestConnectionRequestSchema.safeParse({ draft: { kind: 'claude', mode: 'login' } }).success).toBe(true);
     expect(TestConnectionRequestSchema.safeParse({ id: 'ado:contoso', draft: { kind: 'claude', mode: 'login' } }).success).toBe(false);
     expect(TestConnectionRequestSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('ADO connection test results (AL-043)', () => {
+  const result = {
+    status: 'ok',
+    identity: 'Kyle Richards',
+    message: null,
+    missingScopes: ['build'],
+    scopes: [
+      { scope: 'work-items', access: 'read', status: 'granted' },
+      { scope: 'work-items', access: 'write', status: 'unverified' },
+      { scope: 'code', access: 'read', status: 'granted' },
+      { scope: 'code', access: 'write', status: 'unverified' },
+      { scope: 'build', access: 'read', status: 'missing' },
+    ],
+    projects: ['Hicora', 'OnSite Companion'],
+    testedAt: '2026-10-07T03:00:00.000Z',
+  } as const;
+
+  it('carry the scope checks and the projects for the Default project dropdown', () => {
+    expect(invokeContracts['connections:test'].response.parse(result)).toEqual(result);
+    expect(invokeContracts['connections:test'].response.parse({ ...result, projects: null, scopes: [] })).toMatchObject({ projects: null });
+  });
+
+  it('refuse an unknown scope status', () => {
+    const bad = { ...result, scopes: [{ scope: 'build', access: 'read', status: 'maybe' }] };
+    expect(invokeContracts['connections:test'].response.safeParse(bad).success).toBe(false);
+  });
+
+  it('list the required areas and access in chip order', () => {
+    expect(REQUIRED_ADO_SCOPE_ACCESS.map(({ scope, access }) => `${scope}:${access}`)).toEqual([
+      'work-items:read',
+      'work-items:write',
+      'code:read',
+      'code:write',
+      'build:read',
+    ]);
+  });
+
+  it('count an area as missing when any of its access is', () => {
+    expect(missingScopesOf(result.scopes)).toEqual(['build']);
+    expect(missingScopesOf([{ scope: 'code', status: 'missing' }, { scope: 'work-items', status: 'missing' }])).toEqual(['work-items', 'code']);
+    expect(missingScopesOf([{ scope: 'code', status: 'unverified' }])).toEqual([]);
   });
 });
