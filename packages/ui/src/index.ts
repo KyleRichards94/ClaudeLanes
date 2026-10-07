@@ -9,3 +9,4 @@ export { StatusBadge, badgeStatuses, statusLabel, type BadgeStatus, type StatusB
 export { IdChip, type IdChipProps } from './IdChip';
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption, type SegmentedTone, type SegmentedVariant } from './SegmentedControl';
 export { Switch, type SwitchProps, type SwitchStateText } from './Switch';
+export { Button, buttonSizes, buttonVariants, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
