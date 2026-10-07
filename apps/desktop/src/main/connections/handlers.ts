@@ -13,5 +13,6 @@ export function createConnectionsHandlers(connections: ConnectionsService): Hand
     'connections:save': (draft) => connections.save(draft),
     'connections:replace': (request) => connections.replace(request),
     'connections:remove': ({ id }) => connections.remove(id),
+    'connections:detectClaude': () => connections.detectClaudeLogin(),
   };
 }
