@@ -93,6 +93,40 @@ export const OpenDesignCanvasRequestSchema = z.object({
 });
 export type OpenDesignCanvasRequest = z.infer<typeof OpenDesignCanvasRequestSchema>;
 
+// ── Artboards (AL-195, D117, D118) ──────────────────────────────────────────────────────────────────
+
+/** Pixel size of an artboard ("1440×900"); null when the canvas does not say. */
+const ArtboardSideSchema = z.int().positive().max(100_000).nullable();
+
+/** One artboard of a canvas, read through the design session ("JobControl · desktop", 1440×900). */
+export const DesignArtboardSchema = z.object({
+  /** Stable within the canvas: the artboard's file path in the Design project or artifact. */
+  id: z.string().min(1).max(1024),
+  name: z.string().min(1).max(300),
+  width: ArtboardSideSchema,
+  height: ArtboardSideSchema,
+});
+export type DesignArtboard = z.infer<typeof DesignArtboardSchema>;
+
+export const DESIGN_ARTBOARD_LIMIT = 500;
+
+/**
+ * `design:listArtboards`: the linked canvas's artboards. `no-canvas` when none is linked;
+ * `unavailable` when the Claude login can't reach Claude Design (no claude.ai login, no Design
+ * consent, or the org has it off, D119), with a reason for the user.
+ */
+export const DesignArtboardListSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ok'),
+    artboards: z.array(DesignArtboardSchema).max(DESIGN_ARTBOARD_LIMIT),
+    /** When main read them (ms since the epoch). */
+    readAt: z.int().nonnegative(),
+  }),
+  z.object({ status: z.literal('no-canvas') }),
+  z.object({ status: z.literal('unavailable'), reason: z.string().min(1).max(1000) }),
+]);
+export type DesignArtboardList = z.infer<typeof DesignArtboardListSchema>;
+
 export const designInvokeContracts = {
   'design:open': { request: OpenDesignViewRequestSchema, response: DesignViewStateSchema },
   'design:setBounds': { request: SetDesignViewBoundsRequestSchema, response: DesignViewFoundResponseSchema },
@@ -110,6 +144,8 @@ export const designInvokeContracts = {
    * view loads the record's last canvas URL, so it reopens on the same artboard after a restart (AL-193).
    */
   'design:openCanvas': { request: OpenDesignCanvasRequestSchema, response: DesignViewStateSchema },
+  /** Reads the linked canvas's artboards through a short design session (AL-195, D118). */
+  'design:listArtboards': { request: DesignViewTicketRequestSchema, response: DesignArtboardListSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**

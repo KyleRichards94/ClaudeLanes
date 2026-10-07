@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { fakeClaudeEnv, writeFakeClaudeState } from './support/fake-claude-code';
 import { startFakeClaudeSite } from './support/fake-claude-site';
 import { e2eTicketRecord, seedTicketRecords } from './support/ticket-records';
 
@@ -21,6 +22,8 @@ test.beforeAll(async () => {
   userDataDir = mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-embed-mode-'));
   const canvas = { kind: 'design-project' as const, id: 'signed-out', url: 'https://claude.ai/design/p/signed-out' };
   seedTicketRecords(userDataDir, [e2eTicketRecord({ design: { canvas, lastViewUrl: null, specs: [] } })]);
+  // The artboard list's design session starts this fake, never the real claude binary (AL-195).
+  writeFakeClaudeState(join(userDataDir, 'fake-claude.json'), { login: null });
 });
 
 test.afterAll(async () => {
@@ -32,7 +35,7 @@ test.afterAll(async () => {
 async function launch(): Promise<Page> {
   app = await electron.launch({
     args: [join(__dirname, '..')],
-    env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir, AGENT_LANES_DESIGN_TEST_ORIGIN: site.origin },
+    env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir, AGENT_LANES_DESIGN_TEST_ORIGIN: site.origin, ...fakeClaudeEnv(join(userDataDir, 'fake-claude.json')) },
   });
   const page = await app.firstWindow();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1440, 960));
