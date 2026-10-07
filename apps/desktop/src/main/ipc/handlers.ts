@@ -1,5 +1,6 @@
 import { createAppHandlers } from '../app/handlers';
 import type { Services } from '../services';
+import { createSettingsHandlers } from '../settings/handlers';
 import type { InvokeHandlers } from './handle-invoke';
 
 /**
@@ -11,5 +12,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
   void services;
   return {
     ...createAppHandlers(),
+    ...createSettingsHandlers(services.settings),
   };
 }

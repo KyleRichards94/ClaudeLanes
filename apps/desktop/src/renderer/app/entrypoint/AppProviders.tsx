@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
+import { UiPrefsGate } from './UiPrefsGate';
 
 const SIXTY_SECONDS = 60_000;
 
@@ -18,5 +19,9 @@ function createQueryClient() {
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createQueryClient);
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <UiPrefsGate>{children}</UiPrefsGate>
+    </QueryClientProvider>
+  );
 }
