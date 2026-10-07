@@ -170,6 +170,11 @@ export const TicketRecordSchema = z
   });
 export type TicketRecord = z.infer<typeof TicketRecordSchema>;
 
-export const ticketsInvokeContracts = {} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
+/** `tickets:list`: every ticket record, oldest first, so the board shows its cards after a start (AL-143; AL-090 reconciles them). */
+export const TicketRecordListSchema = z.array(TicketRecordSchema);
+
+export const ticketsInvokeContracts = {
+  'tickets:list': { request: z.undefined(), response: TicketRecordListSchema },
+} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const ticketsEventContracts = {} as const satisfies Record<(typeof TICKETS_EVENT_CHANNELS)[number], z.ZodType>;
