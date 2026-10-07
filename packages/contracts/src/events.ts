@@ -19,10 +19,19 @@ export const EventTimeSchema = z
   .default(() => Date.now());
 
 /**
- * An Agent Lanes ticket's id, which also names its record file (AL-101) and worktree folder (AL-083).
- * Kept to a non-empty string until those tickets pin the format (AL-082 naming).
+ * Ticket id format: lowercase ASCII words joined by single dashes, the way AL-082 names worktree
+ * folders (`71273`, `nt-20261007-fix-login`). Never a Windows device name (`con`, `nul`, `com1`, …),
+ * which no file or folder can use, and never a path: no dots, slashes or spaces.
  */
-export const TicketIdSchema = z.string().min(1);
+export const TICKET_ID_PATTERN = /^(?!(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const TICKET_ID_MAX_LENGTH = 64;
+
+/**
+ * An Agent Lanes ticket's id, which also names its record file (`<ticketId>.json`, AL-101) and its
+ * worktree folder (AL-083): the work item id, or the `nt-<yyyymmdd>-<slug>` name of a ticket
+ * without one (AL-082).
+ */
+export const TicketIdSchema = z.string().min(1).max(TICKET_ID_MAX_LENGTH).regex(TICKET_ID_PATTERN);
 export type TicketId = z.infer<typeof TicketIdSchema>;
 
 /** Events that are not about one ticket (`toast`, `connections:changed`). */

@@ -13,6 +13,7 @@ import { LOG_DIRECTORY_NAME, createLogger, type Logger } from './logging';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
+import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -42,6 +43,8 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
+  readonly tickets: TicketRecordStore;
 }
 
 export interface ServiceOptions {
@@ -83,6 +86,10 @@ export function createServices(options: ServiceOptions): Services {
   };
   // Queue transitions reach the renderer as `build:queued` (AL-012).
   buildQueue.subscribe((event) => options.emit('build:queued', event));
+  const tickets = createTicketRecordStore({
+    rootDir: ticketsRootDir(options.appDataDir),
+    warn: (message) => log.child('tickets').warn(message),
+  });
 
   const git = createGitService();
 
@@ -120,6 +127,7 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    tickets,
   };
 }
 
@@ -127,6 +135,8 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   void services;
   await services.buildQueue.dispose();
+  // After the queue, so a build that finished while stopping is still saved to its ticket.
+  await services.tickets.dispose();
   // Closes the canvas views and flushes the claude.ai sign-in cookies to disk (D112).
   await services.designView.dispose();
 }
