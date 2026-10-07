@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import { color, radius, space } from '@agent-lanes/tokens';
-import { Button, GlassPanel, Text } from '@agent-lanes/ui';
-import { useAppInfo } from '@/shared/api';
-import { openConnections } from '@/shared/model';
+import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
+import { useAppInfo, useRepos } from '@/shared/api';
+import { openConnections, useUiPrefs } from '@/shared/model';
 
 /**
  * Walking-skeleton board: proves react-native-web, tokens, glass and typed IPC end to end.
@@ -10,6 +10,9 @@ import { openConnections } from '@/shared/model';
  */
 export function BoardPage() {
   const appInfo = useAppInfo();
+  const repos = useRepos();
+  const lastRepo = useUiPrefs((state) => state.lastRepo);
+  const repo = repos.data?.find((candidate) => candidate.path === lastRepo);
 
   return (
     <View style={styles.page}>
@@ -22,6 +25,8 @@ export function BoardPage() {
         <Text variant="display" size="lg">
           Agent Lanes
         </Text>
+        {/* The repo first run picked (AL-047); AL-142 turns this into the Repo dropdown. */}
+        {repo ? <Pill tone="neutral" size="md" label={repo.name} testID="board-repo" /> : null}
         <View style={styles.spacer} />
         {/* Selectable so the version line can be copied into a bug report. */}
         <Text variant="mono" color={color.muted} selectable testID="runtime-info">
