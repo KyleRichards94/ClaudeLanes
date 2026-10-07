@@ -8,6 +8,7 @@ import {
   selectTicket,
   selectTicketCount,
   selectTicketTotal,
+  selectWorkItemLanes,
 } from './selectors';
 import { createAgentTicketStore, type AgentTicketStore } from './store';
 
@@ -166,6 +167,8 @@ describe('agent ticket store', () => {
     expect(selectLaneNeedsYouTicketIds(state, 'code-review')).toEqual(['71301']);
     expect(selectLaneNeedsYouTicketIds(state, 'implementing')).toEqual([]);
     expect(selectTicketTotal(state)).toBe(7);
+    // The New agent ticket picker's running work items (AL-161): every ticket but the Done one.
+    expect(selectWorkItemLanes(state)).toEqual({ 71330: 'queued', 71322: 'planning', 71288: 'implementing', 71273: 'implementing', 71301: 'code-review', 71310: 'qa' });
   });
 
   it('routes every action to its ticket', () => {

@@ -26,6 +26,7 @@ export {
   selectTicket,
   selectTicketCount,
   selectTicketTotal,
+  selectWorkItemLanes,
   type AgentTicketCount,
 } from './model/selectors';
 export {
@@ -35,6 +36,7 @@ export {
   useLaneNeedsYouCount,
   useLaneNeedsYouTicketIds,
   useLaneTicketIds,
+  useWorkItemLanes,
 } from './model/hooks';
 export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
 export {

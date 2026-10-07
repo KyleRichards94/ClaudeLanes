@@ -2,8 +2,10 @@ import { defaultSettings, type Settings } from '@agent-lanes/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { installFakeSettings } from '@/shared/testing';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { adoFixture } from '@agent-lanes/contracts/testing';
+import { agentTickets } from '@/entities/agent-ticket';
+import { fakeTicketRecord, installFakeSettings } from '@/shared/testing';
 import type { NewTicketRequest } from '../model/form';
 import { NewTicketModal } from './NewTicketModal';
 
@@ -14,8 +16,11 @@ function settings(): Settings {
   return { ...base, defaults: { ...base.defaults, model: 'sonnet', effort: 'high', skills: ['code-review'] } };
 }
 
-async function renderModal(onLaunch: (request: NewTicketRequest) => void | Promise<void> = vi.fn()) {
-  installFakeSettings(settings());
+async function renderModal(
+  onLaunch: (request: NewTicketRequest) => void | Promise<void> = vi.fn(),
+  replies: Parameters<typeof installFakeSettings>[1] = {},
+) {
+  installFakeSettings(settings(), replies);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // The app has read the settings before anyone opens the modal.
   await client.prefetchQuery({ queryKey: ['settings'], queryFn: () => settings() });
@@ -117,5 +122,74 @@ describe('NewTicketModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalled();
     expect(onLaunch).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewTicketModal work item picker (AL-161)', () => {
+  const fixture = adoFixture();
+  const sprintItems = fixture.workItems.slice(0, 4);
+  const adoReplies = {
+    'ado:listSprints': { ok: true, data: fixture.sprints },
+    'ado:listWorkItems': { ok: true, data: sprintItems },
+    'ado:searchWorkItems': { ok: true, data: fixture.workItems.filter((item) => item.id === 71400) },
+  };
+
+  afterEach(() => agentTickets.load([]));
+
+  it('lists the sprint as radio rows and launches with the picked work item', async () => {
+    const onLaunch = vi.fn(async () => undefined);
+    await renderModal(onLaunch, adoReplies);
+
+    expect(await screen.findByRole('radio', { name: 'Sprint 42' })).toBeTruthy();
+    const row = await screen.findByRole('radio', { name: '#71273 Cutover frmJobControl to Blazor, Story · Active' });
+    expect(screen.getByRole('radio', { name: '#71330 Asset register paging slow above 5k rows, Bug · New' })).toBeTruthy();
+    expect(screen.getByText('Optional')).toBeTruthy();
+
+    fireEvent.click(row);
+    expect(row.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText(/Linked to #71273\./)).toBeTruthy();
+
+    // Typing filters the sprint's rows straight away.
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search by ID or title' }), { target: { value: 'roster' } });
+    expect(screen.queryByRole('radio', { name: /^#71273/ })).toBeNull();
+    expect(screen.getByRole('radio', { name: /^#71341 Roster view/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Launch agent' }));
+    await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(onLaunch).toHaveBeenCalledWith(expect.objectContaining({ workItem: { id: 71273, title: 'Cutover frmJobControl to Blazor', type: 'User Story', state: 'Active' } }));
+  });
+
+  it('searches Azure DevOps once typing pauses', async () => {
+    await renderModal(vi.fn(), adoReplies);
+    fireEvent.click(await screen.findByRole('radio', { name: 'Search' }));
+    expect(screen.getByText('Type a work item id or part of its title to search Azure DevOps.')).toBeTruthy();
+
+    const field = screen.getByRole('searchbox', { name: 'Search by ID or title' });
+    fireEvent.change(field, { target: { value: 'job' } });
+    fireEvent.change(field, { target: { value: 'job cost' } });
+    expect(await screen.findByRole('radio', { name: '#71400 Job costing tab, Story · New' })).toBeTruthy();
+    const searches = vi.mocked(window.agentLanes.invoke).mock.calls.filter(([channel]) => channel === 'ado:searchWorkItems');
+    expect(searches).toEqual([['ado:searchWorkItems', { query: 'job cost' }]]);
+  });
+
+  it('shows the lane instead of a radio for a work item an agent is already on', async () => {
+    agentTickets.load([fakeTicketRecord({ id: '71273', stage: 'implementing' })]);
+    await renderModal(vi.fn(), adoReplies);
+
+    await screen.findByRole('radio', { name: /^#71330/ });
+    expect(screen.queryByRole('radio', { name: /^#71273/ })).toBeNull();
+    expect(screen.getByLabelText('#71273 Cutover frmJobControl to Blazor, Story · Active, already running in Implementing')).toBeTruthy();
+    expect(screen.getByTestId('work-item-71273-lane').textContent).toBe('Implementing');
+  });
+
+  it('hides the Azure DevOps list and search for No ticket', async () => {
+    await renderModal(vi.fn(), adoReplies);
+    await screen.findByRole('radio', { name: /^#71273/ });
+    fireEvent.click(screen.getByRole('radio', { name: 'No ticket' }));
+
+    expect(screen.queryByTestId('work-item-picker')).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search by ID or title' })).toBeNull();
+    expect(screen.getByTestId('no-ticket-note').textContent).toContain('nt-');
+    expect(screen.getByText(/No work item linked\./)).toBeTruthy();
   });
 });
