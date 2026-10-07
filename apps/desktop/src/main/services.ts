@@ -1,9 +1,11 @@
 import { join } from 'node:path';
-import { safeStorage } from 'electron';
+import { safeStorage, type BrowserWindow } from 'electron';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
+import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
+import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
@@ -38,6 +40,8 @@ export interface Services {
   readonly diagnostics: Diagnostics;
   /** ADO orgs, Claude and MCP servers in `<userData>/connections.json`, their tokens in `secrets` (AL-042). */
   readonly connections: ConnectionsService;
+  /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
+  readonly designView: DesignViewService;
 }
 
 export interface ServiceOptions {
@@ -47,6 +51,10 @@ export interface ServiceOptions {
   emit: Emit;
   /** The app log; index.ts creates it before anything else so start-up problems are logged. */
   log?: Logger;
+  /** The main window the design views are drawn in (AL-191); undefined while there is none. */
+  mainWindow?: () => BrowserWindow | null | undefined;
+  /** Extra origin the design view treats as claude.ai: the e2e fake site, unpackaged builds only (AL-191). */
+  designTestOrigin?: string;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -94,6 +102,13 @@ export function createServices(options: ServiceOptions): Services {
     warn: (message) => log.child('connections').warn(message),
   });
 
+  const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
+  const designView = createDesignViewService({
+    platform: createElectronDesignPlatform({ window: options.mainWindow ?? (() => undefined), policy: designPolicy }),
+    policy: designPolicy,
+    emit: options.emit,
+  });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -104,6 +119,7 @@ export function createServices(options: ServiceOptions): Services {
     log,
     diagnostics,
     connections,
+    designView,
   };
 }
 
@@ -111,4 +127,6 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   void services;
   await services.buildQueue.dispose();
+  // Closes the canvas views and flushes the claude.ai sign-in cookies to disk (D112).
+  await services.designView.dispose();
 }
