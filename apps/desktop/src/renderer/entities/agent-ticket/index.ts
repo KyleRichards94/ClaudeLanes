@@ -35,3 +35,5 @@ export {
   type AgentTicketCardViewProps,
 } from './ui/AgentTicketCard';
 export { cardView, clockTime, needsYouLabel, type CardActivityTone, type CardState, type CardView } from './ui/card-view';
+export { TICKET_FEED_LIMIT, createTicketFeed, ticketFeedOf, type TicketFeed, type TicketFeedEvent, type TicketFeedState } from './model/feed';
+export { useLiveFeed, useLiveTicketCount } from './model/live-hooks';

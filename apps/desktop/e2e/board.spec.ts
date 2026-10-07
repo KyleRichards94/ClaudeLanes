@@ -115,3 +115,30 @@ test('keeps a lane collapsed after a restart', async () => {
   await expect(page.getByRole('button', { name: 'Planning, 1 ticket. Expand lane' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Done · merged this sprint, 0 tickets\. Expand lane$/ })).toBeVisible();
 });
+
+test('shows the live dock at the bottom, fed by events from main', async () => {
+  const page = await launch();
+  const dock = page.getByTestId('live-dock');
+  await expect(dock.getByText('Live', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('live-dock-builds')).toHaveText('Builds 0');
+  await expect(page.getByTestId('live-dock-sub-agents')).toHaveText('Sub-agents 0');
+
+  const box = await dock.boundingBox();
+  expect(box && Math.round(box.y + box.height)).toBe(960 - 24);
+
+  // A build starting in main reaches the dock through `build:queued` and the agent ticket store.
+  await app?.evaluate(({ BrowserWindow }, at) => {
+    BrowserWindow.getAllWindows()[0]?.webContents.mainFrame.send('build:queued', {
+      jobId: 'job-1',
+      ticketId: '71273',
+      kind: 'build',
+      state: 'running',
+      position: null,
+      queuedAt: at,
+      startedAt: at,
+      finishedAt: null,
+      at,
+    });
+  }, START + 100);
+  await expect(page.getByTestId('live-dock-builds')).toHaveText('Builds 1');
+});

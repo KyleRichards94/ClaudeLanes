@@ -4,10 +4,12 @@ import { GlassPanel, Text } from '@agent-lanes/ui';
 import { useAppInfo } from '@/shared/api';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardLanes } from './BoardLanes';
+import { LiveDock } from './LiveDock';
 
 /**
  * The agent board (artboard 1). The header is still the walking skeleton's until AL-142; the lanes
- * (AL-143) show every ticket record loaded into the agent ticket store.
+ * (AL-143) show every ticket record loaded into the agent ticket store, and the live dock (AL-145)
+ * sits under them.
  */
 export function BoardPage() {
   const appInfo = useAppInfo();
@@ -42,6 +44,9 @@ export function BoardPage() {
 
         <BoardLanes />
       </ScrollView>
+      <View style={styles.dock}>
+        <LiveDock />
+      </View>
     </View>
   );
 }
@@ -52,6 +57,11 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+  },
+  // The dock stays at the bottom while the lanes scroll (artboard 1).
+  dock: {
+    paddingHorizontal: space.xl,
+    paddingBottom: space.xl,
   },
   content: {
     padding: space.xl,
