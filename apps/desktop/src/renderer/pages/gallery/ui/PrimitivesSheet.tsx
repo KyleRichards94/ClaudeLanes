@@ -29,7 +29,16 @@ import {
   toastTones,
   type TabItem,
 } from '@agent-lanes/ui';
+import { WorkItemChip } from '@/entities/ado-work-item';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
+
+/** One work item per state category, for the WorkItemChip samples (AL-066). */
+const workItemSamples = [
+  { id: 71273, title: 'Cutover frmJobControl to Blazor', type: 'User Story', state: 'Active', stateCategory: 'in-progress' },
+  { id: 71330, title: 'Job filter keeps its state', type: 'Bug', state: 'New', stateCategory: 'proposed' },
+  { id: 71335, title: 'Grid paging in the job list', type: 'Task', state: 'Resolved', stateCategory: 'resolved' },
+  { id: 71341, title: 'Remove the legacy job form', type: 'User Story', state: 'Closed', stateCategory: 'completed' },
+] as const;
 
 const variantSamples: Record<(typeof textVariants)[number], string> = {
   display: 'Agent board',
@@ -239,6 +248,12 @@ export function PrimitivesSheet() {
         <TabPanel idPrefix="gallery-drill-in" value={drillInTab}>
           <Text variant="meta">{`Showing the ${drillInTab} tab.`}</Text>
         </TabPanel>
+      </GalleryBlock>
+
+      <GalleryBlock title="WorkItemChip (entities/ado-work-item)" rule>
+        {workItemSamples.map((item) => (
+          <WorkItemChip key={item.id} item={item} testID={`gallery-work-item-${item.id}`} />
+        ))}
       </GalleryBlock>
 
       <GalleryBlock title="Toast" rule>

@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, shell } from 'electron';
 import { color } from '@agent-lanes/tokens';
+import { watchWindowVisibility } from './app/window-visibility';
 import { createEmitter, type EventFrame } from './ipc/emit';
 import { checkGitOnStartup, showGitStartupNotice } from './git';
 import { createInvokeHandlers } from './ipc/handlers';
@@ -124,11 +125,15 @@ if (!app.requestSingleInstanceLock()) {
     });
     registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
     mainWindow = createMainWindow();
+    // AL-066: the renderer polls Azure DevOps only while the window can be seen.
+    watchWindowVisibility(mainWindow, emit);
     // AL-080: warn once, without blocking start-up, when git is missing or older than 2.38.
     void checkGitOnStartup(services.git, (notice) => showGitStartupNotice(mainWindow, notice));
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow();
+      if (BrowserWindow.getAllWindows().length > 0) return;
+      mainWindow = createMainWindow();
+      watchWindowVisibility(mainWindow, emit);
     });
   });
 

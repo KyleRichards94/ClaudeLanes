@@ -147,6 +147,17 @@ export const ToastEventSchema = EventEnvelopeSchema.extend({
 });
 export type ToastEvent = z.infer<typeof ToastEventSchema>;
 
+/**
+ * `app:window` (AL-066): the main window was minimised or hidden (`visible: false`), or restored or
+ * shown again (`visible: true`). The renderer stops polling Azure DevOps while it is not visible and
+ * refetches when it comes back (design §6); the page's own visibility can't be trusted for this.
+ */
+export const WindowVisibilityEventSchema = EventEnvelopeSchema.extend({
+  visible: z.boolean(),
+});
+export type WindowVisibilityEvent = z.infer<typeof WindowVisibilityEventSchema>;
+
 export const appEventContracts = {
   toast: ToastEventSchema,
+  'app:window': WindowVisibilityEventSchema,
 } as const satisfies Record<(typeof APP_EVENT_CHANNELS)[number], z.ZodType>;
