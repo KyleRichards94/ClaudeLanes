@@ -116,6 +116,13 @@ export const McpRemoteTransportSchema = z.object({
 export const McpTransportSchema = z.discriminatedUnion('type', [McpStdioTransportSchema, McpRemoteTransportSchema]);
 export type McpTransport = z.infer<typeof McpTransportSchema>;
 
+/** The most tool names a test reports for one MCP server (AL-045); a server with more lists the first ones. */
+export const MCP_TOOLS_LIMIT = 256;
+/** A tool an MCP server listed when it was tested (MCP: 1–128 characters). */
+export const McpToolNameSchema = z.string().min(1).max(128);
+/** What "Test" found an MCP server offering: tool names in the server's order (AL-045). */
+export const McpToolListSchema = z.array(McpToolNameSchema).max(MCP_TOOLS_LIMIT);
+
 // ---------------------------------------------------------------------------------------------
 // Rows: what `connections:list`, `connections:save` and `connections:replace` return.
 
@@ -163,6 +170,14 @@ export type ClaudeConnectionSummary = z.infer<typeof ClaudeConnectionSummarySche
 export const McpConnectionSummarySchema = ConnectionRowSchema.extend({
   kind: z.literal('mcp'),
   transport: McpTransportSchema,
+  /** Tools the last passing test listed (AL-045); absent until a test passes. */
+  tools: McpToolListSchema.optional(),
+  /**
+   * Set on the built-in Azure DevOps MCP server that comes with each connected organisation
+   * (AL-045, AL-108): the `ado:<org>` connection whose PAT it uses. It can't be replaced or removed
+   * on its own; it goes when the organisation does. Absent for servers the user added.
+   */
+  builtInFor: ConnectionIdSchema.optional(),
 });
 export type McpConnectionSummary = z.infer<typeof McpConnectionSummarySchema>;
 
@@ -263,6 +278,8 @@ export const ConnectionTestResultSchema = z.object({
    */
   projects: z.array(z.string().min(1)).nullable(),
   testedAt: z.iso.datetime(),
+  /** MCP only (AL-045): the tools the server listed; absent when the test failed or for other kinds. */
+  tools: McpToolListSchema.optional(),
 });
 export type ConnectionTestResult = z.infer<typeof ConnectionTestResultSchema>;
 

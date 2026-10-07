@@ -6,6 +6,7 @@ import {
   ConnectionDraftSchema,
   ConnectionIdSchema,
   ConnectionSummarySchema,
+  MCP_TOOLS_LIMIT,
   ReplaceConnectionRequestSchema,
   TestConnectionRequestSchema,
   err,
@@ -22,8 +23,10 @@ import {
 } from '@agent-lanes/contracts';
 import type { Emit } from '../ipc/emit';
 import { SecretStoreError, type SecretStore } from '../secrets';
+import type { AdoMcpServerFactory, BuiltInMcpServer } from './ado-mcp';
 import { applyScopeEvidence, sameScopeChecks, scopeEvidence, type AdoResponseNote } from './ado-scopes';
 import type { ConnectionsFile } from './connections-file';
+import { ADO_SESSION_SERVER_NAME, RESERVED_SESSION_SERVER_NAMES, toMcpSessionConfig, uniqueSessionName, type McpSessionConfig } from './mcp-session';
 import {
   CONNECTIONS_FILE_VERSION,
   isConnectionSecretId,
@@ -51,7 +54,10 @@ export type ReplaceConnectionInput = z.input<typeof ReplaceConnectionRequestSche
  * Everything the IPC handlers return is a status row: the token shows as `••••••••7Fq2` at most.
  */
 export interface ConnectionsService {
-  /** Every connection: ADO organisations by name, then Claude, then MCP servers by name. */
+  /**
+   * Every connection: ADO organisations by name, then Claude, then MCP servers: the built-in Azure
+   * DevOps server of each organisation first (AL-045), then the user's by name.
+   */
   list(): Promise<ConnectionSummary[]>;
   get(id: string): Promise<ConnectionSummary | undefined>;
   /**
@@ -88,6 +94,18 @@ export interface ConnectionsService {
    * row and emits `connections:changed`. Other answers, a 401 included (AL-048), change nothing.
    */
   noteAdoResponse(id: string, response: AdoResponseNote): Promise<void>;
+  /**
+   * Main process only (AL-108): the MCP servers a new agent session starts, keyed by the name the
+   * session knows each by, with tokens put in their env var or header (AL-045). The user's servers,
+   * plus the built-in Azure DevOps server for `adoConnectionId` (the work item's organisation) under
+   * `azure-devops`. A server whose token can't be read is left out and listed in `unavailable`.
+   */
+  sessionMcpServers(options?: { adoConnectionId?: string }): Promise<SessionMcpServers>;
+}
+
+export interface SessionMcpServers {
+  servers: Record<string, McpSessionConfig>;
+  unavailable: Array<{ id: string; name: string; reason: string }>;
 }
 
 export interface ConnectionsServiceOptions {
@@ -96,6 +114,14 @@ export interface ConnectionsServiceOptions {
   emit: Emit;
   /** One per kind; AL-043–AL-045 provide them. A kind without one can be saved but not tested. */
   testers?: ConnectionTesters;
+  /**
+   * The built-in MCP server an ADO organisation brings (AL-045: the official Azure DevOps server,
+   * `adoMcpServerFor`). It is listed as an MCP row of its own and tested with the MCP tester. None
+   * when absent.
+   */
+  adoMcpServer?: AdoMcpServerFactory;
+  /** For the session commands (`cmd /c` for `.cmd` shims on Windows); defaults to `process.platform`. */
+  platform?: NodeJS.Platform;
   /** Finds the Claude Code login (AL-044); without it, `detectClaudeLogin` says it isn't available. Must not throw. */
   detectClaudeLogin?: () => Promise<ClaudeLoginDetection>;
   now?: () => Date;
@@ -119,17 +145,31 @@ const KIND_LABEL: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude
 const KIND_ORDER: Record<ConnectionKind, number> = { ado: 0, claude: 1, mcp: 2 };
 
 type DraftTester = (draft: ConnectionDraft, signal: AbortSignal) => Promise<ConnectionTestOutcome>;
+type AdoRecord = Extract<StoredConnection, { kind: 'ado' }>;
+
+/** A built-in MCP server (AL-045): derived from a saved ADO organisation, never stored on its own. */
+interface BuiltInEntry {
+  id: string;
+  ado: AdoRecord;
+  server: BuiltInMcpServer;
+}
 
 export function createConnectionsService(options: ConnectionsServiceOptions): ConnectionsService {
   const { file, secrets, emit } = options;
   const testers = options.testers ?? {};
   const now = options.now ?? (() => new Date());
   const warn = options.warn ?? ((message: string) => console.warn(`[connections] ${message}`));
+  const platform = options.platform ?? process.platform;
 
   let records: StoredConnection[] = [];
   /** False while connections.json can't be read (locked, or from a newer app): saving would overwrite it. */
   let writable = true;
   const draftTests = new Map<string, { result: ConnectionTestResult; expires: number }>();
+  /**
+   * Last test of each built-in MCP server, in memory: it shows until the app restarts or the
+   * organisation's token is replaced (the record's `updatedAt` changes). Sessions report live status (AL-108).
+   */
+  const builtInTests = new Map<string, { adoUpdatedAt: string; result: ConnectionTestResult }>();
 
   // Every read and change runs in order behind start-up, so nobody sees records half-way through a save.
   let queue: Promise<unknown> = start();
@@ -274,7 +314,7 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
   }
 
   function newId(draft: ConnectionDraft): string {
-    const taken = new Set(records.map((record) => record.id));
+    const taken = new Set([...records.map((record) => record.id), ...builtIns().map((entry) => entry.id)]);
     if (draft.kind === 'claude') return CLAUDE_CONNECTION_ID;
     return draft.kind === 'ado' ? uniqueId('ado', orgNameFromUrl(draft.orgUrl), taken) : uniqueId('mcp', draft.name, taken);
   }
@@ -325,8 +365,81 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       case 'claude':
         return { ...common, kind: 'claude', name: 'Claude', mode: draft.mode };
       case 'mcp':
-        return { ...common, kind: 'mcp', name: draft.name, transport: draft.transport };
+        return { ...common, kind: 'mcp', name: draft.name, transport: draft.transport, ...(test?.tools ? { tools: test.tools } : {}) };
     }
+  }
+
+  // ---- built-in MCP servers (AL-045) ----------------------------------------------------------
+
+  /** One per saved ADO organisation the factory serves, with an id no user server has. */
+  function builtIns(): BuiltInEntry[] {
+    const factory = options.adoMcpServer;
+    if (!factory) return [];
+    const taken = new Set(records.filter((record) => record.kind === 'mcp').map((record) => record.id));
+    const entries: BuiltInEntry[] = [];
+    const orgs = records.filter((record): record is AdoRecord => record.kind === 'ado').sort((a, b) => (a.id < b.id ? -1 : 1));
+    for (const ado of orgs) {
+      const server = factory(ado.orgUrl);
+      if (!server) continue;
+      const base = `mcp:ado.${ado.id.slice('ado:'.length)}`;
+      let id = base;
+      for (let n = 2; taken.has(id); n += 1) id = `${base}-${n}`;
+      taken.add(id);
+      entries.push({ id, ado, server });
+    }
+    return entries;
+  }
+
+  function findBuiltIn(id: string): BuiltInEntry | undefined {
+    return builtIns().find((entry) => entry.id === id);
+  }
+
+  /** A user MCP server may not take a built-in server's name. */
+  function builtInNamed(draft: ConnectionDraft): BuiltInEntry | undefined {
+    if (draft.kind !== 'mcp') return undefined;
+    return builtIns().find((entry) => entry.server.name.toLowerCase() === draft.name.toLowerCase());
+  }
+
+  function builtInRefusal(entry: BuiltInEntry, action: string): Err {
+    return err('VALIDATION', `${entry.server.name} comes with the ${entry.ado.name} organisation, so it can't be ${action} on its own.`, {
+      id: entry.id,
+      builtInFor: entry.ado.id,
+    });
+  }
+
+  /** The built-in server's row: the organisation's token and dates, the server's own test outcome. */
+  function builtInSummary(entry: BuiltInEntry, canRead: (secretId: string) => boolean): ConnectionSummary {
+    const cached = builtInTests.get(entry.id);
+    const test = cached && cached.adoUpdatedAt === entry.ado.updatedAt ? cached.result : undefined;
+    const row = toSummary(
+      {
+        kind: 'mcp',
+        id: entry.id,
+        name: entry.server.name,
+        transport: entry.server.transport,
+        ...(test?.tools ? { tools: test.tools } : {}),
+        secretId: entry.ado.secretId,
+        identity: test?.identity ?? null,
+        maskedToken: entry.ado.maskedToken,
+        expiresAt: entry.ado.expiresAt,
+        status: test?.status ?? 'untested',
+        statusMessage: test?.message ?? null,
+        lastTestedAt: test?.testedAt ?? null,
+        createdAt: entry.ado.createdAt,
+        updatedAt: entry.ado.updatedAt,
+      },
+      canRead,
+    );
+    return ConnectionSummarySchema.parse({ ...row, builtInFor: entry.ado.id });
+  }
+
+  /** The rows with the built-in servers first among the MCP servers. */
+  function withBuiltIns(rows: ConnectionSummary[], canRead: (secretId: string) => boolean): ConnectionSummary[] {
+    const extra = builtIns().map((entry) => builtInSummary(entry, canRead));
+    if (extra.length === 0) return rows;
+    const firstMcp = rows.findIndex((row) => row.kind === 'mcp');
+    const at = firstMcp === -1 ? rows.length : firstMcp;
+    return [...rows.slice(0, at), ...extra, ...rows.slice(at)];
   }
 
   async function readable(): Promise<(secretId: string) => boolean> {
@@ -407,7 +520,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     return entry && entry.expires > now().getTime() ? entry.result : undefined;
   }
 
-  async function runTest(draft: ConnectionDraft): Promise<Result<ConnectionTestResult>> {
+  /** `alsoScrub`: other forms of the token the tester was given (the PAT behind a built-in server's credential). */
+  async function runTest(draft: ConnectionDraft, alsoScrub: string[] = []): Promise<Result<ConnectionTestResult>> {
     const tester = testers[draft.kind] as DraftTester | undefined;
     if (!tester) return err('INTERNAL', `Testing ${KIND_LABEL[draft.kind]} connections isn't available in this version yet.`);
 
@@ -417,7 +531,7 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     } catch (cause) {
       outcome = { status: 'error', identity: null, message: `The test failed: ${describe(cause)}` };
     }
-    const token = [tokenOf(draft)];
+    const token = [tokenOf(draft), ...alsoScrub];
     const passed = outcome.status === 'ok';
     const ado = draft.kind === 'ado';
     const scopes = ado ? [...(outcome.scopes ?? [])] : [];
@@ -429,7 +543,30 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       scopes,
       projects: ado && passed && outcome.projects ? outcome.projects.map((name) => scrubSecrets(name, token)) : null,
       testedAt: now().toISOString(),
+      ...(draft.kind === 'mcp' && passed && outcome.tools ? { tools: toolNames(outcome.tools, token) } : {}),
     });
+  }
+
+  /** A built-in server tested with its organisation's PAT; the row keeps the outcome until restart. */
+  async function testBuiltIn(id: string): Promise<Result<ConnectionTestResult>> {
+    const entry = await exclusive(async () => findBuiltIn(id));
+    if (!entry) return notFound(id);
+    const pat = entry.ado.secretId ? await secrets.get(entry.ado.secretId) : undefined;
+    if (pat === undefined) {
+      return ok({ status: 'error', identity: null, message: RECONNECT_MESSAGE, missingScopes: [], scopes: [], projects: null, testedAt: now().toISOString() });
+    }
+    const draft: ConnectionDraft = { kind: 'mcp', name: entry.server.name, transport: entry.server.transport, token: entry.server.tokenFromPat(pat) };
+    const result = await runTest(draft, [pat]);
+    if (!result.ok) return result;
+
+    await exclusive(async () => {
+      const current = findRecord(entry.ado.id);
+      // The organisation was replaced or removed while the test ran.
+      if (!current || current.updatedAt !== entry.ado.updatedAt) return;
+      builtInTests.set(id, { adoUpdatedAt: entry.ado.updatedAt, result: result.data });
+      changed();
+    });
+    return result;
   }
 
   /** The saved connection as a draft with its token, or undefined when the token can't be read. */
@@ -456,13 +593,18 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       statusMessage: result.message,
       lastTestedAt: result.testedAt,
     };
+    if (record.kind === 'mcp') {
+      // Tools are what the latest test listed; a failed test lists none.
+      const { tools: _previous, ...rest } = record;
+      return result.tools ? { ...rest, ...tested, tools: result.tools } : { ...rest, ...tested };
+    }
     // A new test settles the scopes again: write access goes back to "verified on first write".
     return record.kind === 'ado' ? { ...record, ...tested, missingScopes: result.missingScopes, scopes: result.scopes } : { ...record, ...tested };
   }
 
   async function testSaved(id: string): Promise<Result<ConnectionTestResult>> {
     const record = await exclusive(async () => findRecord(id));
-    if (!record) return notFound(id);
+    if (!record) return testBuiltIn(id);
     const draft = await draftFromRecord(record);
     if (!draft) {
       return ok({ status: 'error', identity: null, message: RECONNECT_MESSAGE, missingScopes: [], scopes: [], projects: null, testedAt: now().toISOString() });
@@ -491,13 +633,15 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     list: () =>
       exclusive(async () => {
         const canRead = await readable();
-        return [...records].sort(compareRecords).map((record) => toSummary(record, canRead));
+        return withBuiltIns([...records].sort(compareRecords).map((record) => toSummary(record, canRead)), canRead);
       }),
 
     get: (id) =>
       exclusive(async () => {
         const record = findRecord(id);
-        return record ? summarize(record) : undefined;
+        if (record) return summarize(record);
+        const builtIn = findBuiltIn(id);
+        return builtIn ? builtInSummary(builtIn, await readable()) : undefined;
       }),
 
     async test(input) {
@@ -524,6 +668,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         if (duplicate) {
           return err('VALIDATION', `${duplicate.name} is already connected; use Replace to change it.`, { id: duplicate.id });
         }
+        const builtIn = builtInNamed(draft);
+        if (builtIn) return err('VALIDATION', `${builtIn.server.name} is a built-in server; give this one another name.`, { id: builtIn.id });
 
         const id = newId(draft);
         const token = tokenOf(draft);
@@ -551,7 +697,10 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         const request = ReplaceConnectionRequestSchema.safeParse(input);
         if (!request.success) return err('VALIDATION', 'Invalid connection replacement', request.error.issues);
         const existing = findRecord(request.data.id);
-        if (!existing) return notFound(request.data.id);
+        if (!existing) {
+          const builtIn = findBuiltIn(request.data.id);
+          return builtIn ? builtInRefusal(builtIn, 'replaced') : notFound(request.data.id);
+        }
         const parsed = parseDraft(request.data.draft);
         if (!parsed.ok) return parsed;
         const draft = parsed.data;
@@ -562,6 +711,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         if (duplicate) {
           return err('VALIDATION', `${duplicate.name} is already connected as another connection.`, { id: duplicate.id });
         }
+        const builtIn = builtInNamed(draft);
+        if (builtIn) return err('VALIDATION', `${builtIn.server.name} is a built-in server; give this one another name.`, { id: builtIn.id });
 
         const token = tokenOf(draft);
         const secretId = token === undefined ? null : (existing.secretId ?? secretIdFor(existing.id, draft));
@@ -595,7 +746,10 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         const blocked = ensureWritable();
         if (blocked) return blocked;
         const existing = findRecord(valid.data);
-        if (!existing) return ok({ id: valid.data, removed: false });
+        if (!existing) {
+          const builtIn = findBuiltIn(valid.data);
+          return builtIn ? builtInRefusal(builtIn, 'removed') : ok({ id: valid.data, removed: false });
+        }
 
         // The token goes first: if that fails, nothing has changed and the user can try again.
         if (existing.secretId !== null) {
@@ -627,6 +781,32 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return apiKey === undefined ? {} : { [ANTHROPIC_API_KEY_ENV]: apiKey };
       }),
 
+    sessionMcpServers: (request = {}) =>
+      exclusive(async (): Promise<SessionMcpServers> => {
+        const servers: Record<string, McpSessionConfig> = {};
+        const unavailable: SessionMcpServers['unavailable'] = [];
+        const taken = new Set<string>(RESERVED_SESSION_SERVER_NAMES);
+
+        const builtIn = request.adoConnectionId ? builtIns().find((entry) => entry.ado.id === request.adoConnectionId) : undefined;
+        if (builtIn) {
+          const pat = builtIn.ado.secretId ? await secrets.get(builtIn.ado.secretId) : undefined;
+          if (pat === undefined) unavailable.push({ id: builtIn.id, name: builtIn.server.name, reason: RECONNECT_MESSAGE });
+          else servers[ADO_SESSION_SERVER_NAME] = toMcpSessionConfig(builtIn.server.transport, builtIn.server.tokenFromPat(pat), platform);
+        }
+
+        for (const record of [...records].sort(compareRecords)) {
+          if (record.kind !== 'mcp') continue;
+          const token = record.secretId ? await secrets.get(record.secretId) : undefined;
+          if (record.secretId && token === undefined) {
+            unavailable.push({ id: record.id, name: record.name, reason: RECONNECT_MESSAGE });
+            continue;
+          }
+          const name = uniqueSessionName(record.id.slice('mcp:'.length), taken);
+          taken.add(name);
+          servers[name] = toMcpSessionConfig(record.transport, token, platform);
+        }
+        return { servers, unavailable };
+      }),
     async detectClaudeLogin() {
       if (!options.detectClaudeLogin) return err('INTERNAL', "Looking for a Claude Code login isn't available in this version yet.");
       try {
@@ -653,6 +833,14 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         changed();
       }),
   };
+}
+
+/** Tool names as the contract takes them: scrubbed, non-empty, at most 128 characters, at most MCP_TOOLS_LIMIT. */
+function toolNames(tools: string[], tokens: ReadonlyArray<string | undefined>): string[] {
+  return tools
+    .map((name) => scrubSecrets(name, tokens).slice(0, 128))
+    .filter((name) => name.length > 0)
+    .slice(0, MCP_TOOLS_LIMIT);
 }
 
 /** The token a draft carries, if any. */

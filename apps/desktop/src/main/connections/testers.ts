@@ -14,6 +14,8 @@ export interface ConnectionTestOutcome {
   scopes?: AdoScopeCheck[];
   /** ADO only (AL-043): project names for the Default project dropdown; null when they couldn't be listed. */
   projects?: string[] | null;
+  /** MCP only (AL-045): names of the tools the server listed. */
+  tools?: string[];
 }
 
 /**

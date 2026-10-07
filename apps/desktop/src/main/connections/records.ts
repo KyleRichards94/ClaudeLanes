@@ -31,7 +31,8 @@ export const StoredConnectionSchema = z.discriminatedUnion('kind', [
     scopes: z.array(AdoScopeCheckSchema).default([]),
   }),
   ClaudeConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
-  McpConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
+  // Built-in MCP servers (AL-045) are derived from the ADO connections when listing, never stored.
+  McpConnectionSummarySchema.omit({ needsReconnect: true, builtInFor: true }).extend(secretRef),
 ]);
 export type StoredConnection = z.infer<typeof StoredConnectionSchema>;
 
