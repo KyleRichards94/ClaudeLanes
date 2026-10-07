@@ -1,8 +1,13 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, configure, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
 import { installFakeSettings } from '@/shared/testing';
 import { App } from './index';
+
+// The first test pays the cold load of the lazy board page (lanes, cards); under the full parallel
+// suite that can outlast findBy's 1 s default, as in AppRouter.test.tsx.
+vi.setConfig({ testTimeout: 30_000 });
+configure({ asyncUtilTimeout: 15_000 });
 
 function setHash(hash: string) {
   window.history.replaceState(null, '', hash || window.location.pathname);

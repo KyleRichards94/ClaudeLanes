@@ -51,8 +51,18 @@ export const RepoSettingsSchema = z.object({
   /** Run command override; null uses the detected command (§10, AL-130). */
   runCommand: z.string().min(1).nullable(),
   maxConcurrentAgents: z.int().min(1).max(MAX_CONCURRENT_AGENTS_LIMIT),
+  /**
+   * Post stage comments to this repo's work items (design §7 "ADO write-back", AL-146, AL-115).
+   * Optional so repos saved before AL-146 stay valid; leaving it out means on (`repoAdoWriteBack`).
+   */
+  adoWriteBack: z.boolean().optional(),
 });
 export type RepoSettings = z.infer<typeof RepoSettingsSchema>;
+
+/** Whether the repo's tickets write stage comments back to ADO; on unless the user turned it off. */
+export function repoAdoWriteBack(repo: RepoSettings): boolean {
+  return repo.adoWriteBack ?? true;
+}
 
 export const ReposSchema = z
   .array(RepoSettingsSchema)
