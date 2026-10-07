@@ -17,7 +17,7 @@ export {
   type QueryValue,
 } from './client';
 export { isAdoErrorDetails, type AdoErrorDetails, type AdoErrorKind } from './errors';
-export { normalizeOrgUrl } from './org-url';
+export { isInsecureOrgUrl, normalizeOrgUrl } from './org-url';
 export { adoPath } from './path';
 export { DEFAULT_RETRY_POLICY, parseRetryAfter, type RetryPolicy } from './retry';
 export { listSprints, listTeams, TEAMS_PAGE_SIZE, type ListSprintsOptions, type SprintCallOptions, type TeamScope } from './sprints';
