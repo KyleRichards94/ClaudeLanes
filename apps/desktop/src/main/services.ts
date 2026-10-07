@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
+import { createGitService, type GitService } from './git';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 
 /**
@@ -14,6 +15,8 @@ export interface Services {
   readonly appDataDir: string;
   /** Encrypted tokens (AL-040). Main-only: hand it to other services; no IPC channel returns a secret. */
   readonly secrets: SecretStore;
+  /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
+  readonly git: GitService;
 }
 
 export interface ServiceOptions {
@@ -28,9 +31,12 @@ export function createServices(options: ServiceOptions): Services {
     safeStorage: options.safeStorage ?? safeStorage,
   });
 
+  const git = createGitService();
+
   return {
     appDataDir: options.appDataDir,
     secrets,
+    git,
   };
 }
 
