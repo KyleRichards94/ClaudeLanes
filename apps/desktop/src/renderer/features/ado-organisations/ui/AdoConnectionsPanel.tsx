@@ -14,6 +14,14 @@ import { ConnectionForm, ConnectionRow, RemoveConnectionButton, TestOutcome, con
 import { useRemoveConnection, useTestConnection } from '@/shared/api';
 import type { AdoDraft } from '../model/use-ado-draft';
 
+/** Help under the URL field for an on-premises server without TLS: allowed, but said out loud. */
+export const PLAIN_HTTP_WARNING = 'Plain http: the token is sent unencrypted. Use it only on a trusted internal network.';
+
+/** True when the typed organisation URL is plain http. The main process decides what it accepts. */
+export function usesPlainHttp(orgUrl: string): boolean {
+  return /^\s*http:\/\//i.test(orgUrl);
+}
+
 /** Help under the token field (artboard 5). */
 export const PAT_HELP =
   'Needs Work Items (read & write), Code (read & write) and Build (read). Create one in Azure DevOps under User settings › Personal access tokens.';
@@ -112,6 +120,7 @@ export function AdoConnectionsPanel({ draft, rows, target, request, now = new Da
             onChangeText={draft.setOrgUrl}
             inputMode="url"
             autoComplete="off"
+            help={usesPlainHttp(draft.orgUrl) ? PLAIN_HTTP_WARNING : undefined}
             style={styles.half}
             testID="ado-org-url"
           />
