@@ -135,6 +135,8 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
 
   const orgUrl = org.data;
   const orgBase = new URL(orgUrl);
+  // Azure DevOps Server only speaks the REST versions of its release (2020 → 6.x); learnt from its errors.
+  const versions = createApiVersionNegotiator();
   const authorization = `Basic ${btoa(`:${pat}`)}`;
   const redact: Redactor = createRedactor(pat, authorization);
   const sleep = options.sleep ?? abortableSleep;
@@ -180,7 +182,7 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
       if (value === undefined || value === null) continue;
       url.searchParams.set(key, Array.isArray(value) ? value.join(',') : String(value));
     }
-    if (!url.searchParams.has('api-version')) url.searchParams.set('api-version', call.apiVersion ?? ADO_API_VERSION);
+    if (!url.searchParams.has('api-version')) url.searchParams.set('api-version', versions.effective(call.apiVersion ?? ADO_API_VERSION));
     return ok(url);
   }
 
@@ -215,8 +217,9 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
     const built = buildUrl(request.path, request);
     if (!built.ok) return built;
 
-    const url = built.data.toString();
+    let url = built.data.toString();
     const where = `${built.data.origin}${built.data.pathname}`;
+    let versionRetries = 0;
     const attemptTimeoutMs = request.timeoutMs ?? timeoutMs;
     const headers: Record<string, string> = {
       Authorization: authorization,
@@ -294,6 +297,17 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
       if (status === 203 || (status >= 200 && status < 300 && isHtml)) {
         log({ ...entry, status, level: 'error', message: `${method} ${where} → ${status} sign-in page` });
         return loginPageError({ ...failure, where });
+      }
+      if (status === 400 && versionRetries < 2) {
+        const sent = built.data.searchParams.get('api-version') ?? '';
+        const next = versions.learn(sent, text);
+        if (next && next !== sent) {
+          versionRetries += 1;
+          log({ ...entry, status, level: 'warn', message: `${method} ${where} → 400, the server does not take api-version ${sent}; retrying with ${next}` });
+          built.data.searchParams.set('api-version', next);
+          url = built.data.toString();
+          continue;
+        }
       }
       if (status < 200 || status >= 300) {
         log({ ...entry, status, level: 'error', message: `${method} ${where} → ${status}` });
@@ -382,6 +396,60 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
   };
 
   return ok(Object.freeze(client));
+}
+
+const OUT_OF_RANGE = /latest REST API version this server supports is (\d+\.\d+)/i;
+const PREVIEW_REQUIRED = /-preview flag must be supplied|is under preview/i;
+
+function baseVersion(version: string): string {
+  return version.split('-')[0] ?? version;
+}
+
+function isPreview(version: string): boolean {
+  return /-preview/i.test(version);
+}
+
+/** Orders `major.minor` versions numerically. */
+function compareVersions(a: string, b: string): number {
+  const [aMajor = 0, aMinor = 0] = a.split('.').map(Number);
+  const [bMajor = 0, bMinor = 0] = b.split('.').map(Number);
+  return aMajor - bMajor || aMinor - bMinor;
+}
+
+/**
+ * Per-organisation `api-version` negotiation. The client asks for REST 7.1; an Azure DevOps Server
+ * answers 400 "…the latest REST API version this server supports is 6.1" or "…under preview. The
+ * -preview flag must be supplied". `learn` reads those answers and returns the version to retry with;
+ * `effective` applies what was learnt to every later call, so only the first call pays the retry.
+ * Preview revisions (`7.1-preview.4`) drop to the server's plain `-preview`, which takes its latest.
+ */
+export function createApiVersionNegotiator() {
+  let ceiling: string | undefined;
+  const previewOnly = new Set<string>();
+
+  function effective(requested: string): string {
+    let version = requested;
+    if (ceiling && compareVersions(baseVersion(version), ceiling) > 0) {
+      version = isPreview(version) ? `${ceiling}-preview` : ceiling;
+    }
+    if (!isPreview(version) && previewOnly.has(baseVersion(version))) version = `${baseVersion(version)}-preview`;
+    return version;
+  }
+
+  function learn(sent: string, body: string): string | undefined {
+    const range = OUT_OF_RANGE.exec(body);
+    if (range?.[1]) {
+      if (!ceiling || compareVersions(range[1], ceiling) < 0) ceiling = range[1];
+      return effective(sent);
+    }
+    if (PREVIEW_REQUIRED.test(body) && !isPreview(sent)) {
+      previewOnly.add(baseVersion(sent));
+      return effective(sent);
+    }
+    return undefined;
+  }
+
+  return { effective, learn };
 }
 
 function isPositive(value: number): boolean {
