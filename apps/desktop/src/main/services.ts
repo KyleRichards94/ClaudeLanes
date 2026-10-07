@@ -29,6 +29,7 @@ import { createSettingsService, type SettingsService } from './settings/service'
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
+import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -72,6 +73,8 @@ export interface Services {
   readonly worktrees: TicketWorktreeService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
+  /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
+  readonly mergeToMain: MergeToMainService;
 }
 
 export interface ServiceOptions {
@@ -125,6 +128,7 @@ export function createServices(options: ServiceOptions): Services {
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
   const branches = createBranchStatusService({ git, tickets });
+  const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge') });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -178,6 +182,7 @@ export function createServices(options: ServiceOptions): Services {
     claude,
     worktrees,
     branches,
+    mergeToMain,
   };
 }
 

@@ -33,3 +33,4 @@ export {
   type BranchStatusServiceOptions,
   type SubagentActivity,
 } from './branch-status';
+export { createMergeToMainService, qaPassed, type MergeToMainService, type MergeToMainServiceOptions } from './merge-to-main';

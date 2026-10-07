@@ -28,3 +28,9 @@ export {
 } from './model/selectors';
 export { useAgentTicket, useAgentTicketCount, useLaneNeedsYouCount, useLaneTicketIds } from './model/hooks';
 export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
+export {
+  mergeToMainPreviewQueryKey,
+  mergedActivityText,
+  useMergeToMain,
+  useMergeToMainPreview,
+} from './api/merge-to-main';

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketIdSchema } from '../events';
 import type { GIT_EVENT_CHANNELS, GIT_INVOKE_CHANNELS } from './git.names';
+import { TicketRecordSchema } from './tickets.schemas';
 
 // ── Branch status (AL-085, artboard 3 Sub-branches "4 ahead · Ready") ───────────────────────────
 
@@ -67,9 +68,67 @@ export const BranchStatusSchema = z.object({
 });
 export type BranchStatus = z.infer<typeof BranchStatusSchema>;
 
+// ── Merge worktree → main (AL-087, design §9 step 5, R9, §13) ───────────────────────────────────
+//
+// Merges the ticket branch into its base branch with `--no-ff` and pushes the base to origin. Error
+// Results carry `details.reason`:
+// - GIT_DIRTY `worktree-dirty`: the ticket worktree has uncommitted changes (`details.files`).
+// - GIT_DIRTY `base-checkout-dirty`: the checkout that has the base branch checked out (usually the
+//   repo's main checkout) has staged or unstaged changes (`details.files`, `details.worktreePath`).
+// - MERGE_CONFLICT `conflict`: the merge would conflict (`details.files`); nothing was changed.
+// - VALIDATION `ticket-not-found`, `qa-not-passed` (send `acceptQaWarning`), `worktree-missing`,
+//   `branch-missing`, `base-not-found`, `base-diverged` (local base and origin's have both moved on).
+// - INTERNAL `fetch-failed`, `push-failed` (the merge is kept locally; trying again only pushes),
+//   `git-failed`.
+
+/** What the confirm modal names and warns about. */
+export const MergeToMainPreviewSchema = z.object({
+  ticketId: TicketIdSchema,
+  /** The ticket branch, e.g. `71273-cutover-job-control`. */
+  source: z.string().min(1),
+  /** The base branch it merges into, e.g. `main`. */
+  target: z.string().min(1),
+  /** The repo's main checkout. */
+  repo: z.string().min(1),
+  /** QA passed: the ticket went through QA and on to Create PR or Done. The modal warns when false. */
+  qaPassed: z.boolean(),
+  /** The ticket worktree; a dirty one cannot be merged. */
+  worktree: WorktreeStateSchema,
+  /** Commits on the ticket branch not on the base; null when either branch is missing. */
+  ahead: CountSchema.nullable(),
+  /** The ticket branch is already part of the base: merging only pushes and moves the card. */
+  alreadyMerged: z.boolean(),
+});
+export type MergeToMainPreview = z.infer<typeof MergeToMainPreviewSchema>;
+
+export const MergeToMainRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  /** The user confirmed the merge in the modal. */
+  confirmed: z.literal(true),
+  /** The user saw the "QA has not passed" warning and merges anyway. */
+  acceptQaWarning: z.boolean().optional(),
+});
+export type MergeToMainRequest = z.infer<typeof MergeToMainRequestSchema>;
+
+export const MergeToMainResultSchema = z.object({
+  /** The ticket record, now in Done. */
+  record: TicketRecordSchema,
+  /** The base branch merged into. */
+  target: z.string().min(1),
+  /** The merge commit; null when the ticket branch was already part of the base. */
+  mergeCommit: z.string().min(1).nullable(),
+  /** False when the repo has no origin remote, so there was nothing to push to. */
+  pushed: z.boolean(),
+  /** When the card entered Done ("Merged into main · 15:20"). */
+  mergedAt: z.int().nonnegative(),
+});
+export type MergeToMainResult = z.infer<typeof MergeToMainResultSchema>;
+
 export const gitInvokeContracts = {
   /** `VALIDATION` with `details.reason: 'ticket-not-found'` for an unknown ticket. */
   'branches:status': { request: TicketRefRequestSchema, response: BranchStatusSchema },
+  'git:mergeToMainPreview': { request: TicketRefRequestSchema, response: MergeToMainPreviewSchema },
+  'git:mergeToMain': { request: MergeToMainRequestSchema, response: MergeToMainResultSchema },
 } as const satisfies Record<(typeof GIT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const gitEventContracts = {} as const satisfies Record<(typeof GIT_EVENT_CHANNELS)[number], z.ZodType>;
