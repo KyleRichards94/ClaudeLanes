@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { color, font, fontSize, fontWeight, radius, space, tone } from '@agent-lanes/tokens';
-import { Card, Icon, type IconName } from '@agent-lanes/ui';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { Card, Icon, Text, type IconName } from '@agent-lanes/ui';
 import { copyDiagnostics } from '@/shared/api';
 
 export interface ErrorFallbackProps {
@@ -39,13 +39,13 @@ export function ErrorFallback({ label, error, onRetry, variant = 'inline', testI
           <Icon name="alert" color={color.danger} size={18} />
         </View>
         <View style={styles.content}>
-          <Text role="heading" aria-level={2} style={styles.title}>
+          <Text variant="title" size="lg" role="heading" aria-level={2}>
             Something went wrong in {label}
           </Text>
-          <Text style={styles.hint}>
+          <Text variant="meta" size="md">
             {onRetry ? 'Retry to load it again. ' : ''}If it keeps happening, copy the diagnostics into a bug report.
           </Text>
-          <Text selectable style={styles.error} testID={`${testID}-error`}>
+          <Text variant="mono" color={tone.danger.text} selectable style={styles.error} testID={`${testID}-error`}>
             {error.name && error.name !== 'Error' ? `${error.name}: ` : ''}
             {error.message || 'No message'}
           </Text>
@@ -59,7 +59,7 @@ export function ErrorFallback({ label, error, onRetry, variant = 'inline', testI
               onPress={() => void onCopy()}
             />
           </View>
-          <Text aria-live="polite" style={[styles.status, copy.kind === 'failed' ? styles.statusFailed : styles.statusOk]}>
+          <Text variant="meta" color={copy.kind === 'failed' ? tone.danger.text : tone.ok.text} aria-live="polite" style={styles.status}>
             {copy.kind === 'copied'
               ? 'Diagnostics copied to the clipboard, with tokens left out.'
               : copy.kind === 'failed'
@@ -96,7 +96,7 @@ function ActionButton({ kind, label, icon, disabled = false, onPress }: ActionBu
       style={({ pressed }) => [styles.button, buttonStyles[kind], pressed && styles.pressed, disabled && styles.disabled]}
     >
       {icon ? <Icon name={icon} color={textColor} size={14} /> : null}
-      <Text style={[styles.buttonText, { color: textColor }]}>{label}</Text>
+      <Text variant="title" color={textColor}>{label}</Text>
     </Pressable>
   );
 }
@@ -130,28 +130,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: space.sm,
   },
-  title: {
-    color: color.ink,
-    fontFamily: font.sans,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.heading,
-  },
-  hint: {
-    color: color.muted,
-    fontFamily: font.sans,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.body,
-    lineHeight: 20,
-  },
   error: {
-    color: tone.danger.text,
     backgroundColor: tone.danger.wash,
     borderRadius: radius.chip,
     paddingHorizontal: space.sm,
     paddingVertical: space.xs + 2,
-    fontFamily: font.mono,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.mono,
   },
   actions: {
     flexDirection: 'row',
@@ -168,11 +151,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     borderWidth: 1,
   },
-  buttonText: {
-    fontFamily: font.sans,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.heading,
-  },
   pressed: {
     opacity: 0.85,
   },
@@ -181,15 +159,6 @@ const styles = StyleSheet.create({
   },
   status: {
     minHeight: 18,
-    fontFamily: font.sans,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.body,
-  },
-  statusOk: {
-    color: tone.ok.text,
-  },
-  statusFailed: {
-    color: tone.danger.text,
   },
 });
 
