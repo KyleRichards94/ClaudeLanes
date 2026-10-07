@@ -1,9 +1,22 @@
 /**
- * Typed Azure DevOps REST client (design §7). Implemented under tickets AL-040 to AL-045
- * in docs/TICKETS.md. Runs only in the Electron main process: it takes a PAT and must
- * never be imported by the renderer.
+ * Typed Azure DevOps REST client (design §7). Core under AL-060; sprints, work items, write-back
+ * and pull requests (AL-061–AL-064) build on `createAdoClient`. Runs only in the Electron main
+ * process: it takes a PAT and must never be imported by the renderer.
  */
-export const ADO_API_VERSION = '7.1';
-
-/** Scopes a PAT needs (design §8): Work Items (read & write), Code (read & write), Build (read). */
-export const REQUIRED_PAT_SCOPES = ['vso.work_write', 'vso.code_write', 'vso.build'] as const;
+export { ADO_API_VERSION, DEFAULT_MAX_PAGES, DEFAULT_TIMEOUT_MS, REQUIRED_PAT_SCOPES } from './constants';
+export {
+  createAdoClient,
+  type AdoCallOptions,
+  type AdoClient,
+  type AdoClientOptions,
+  type AdoListOptions,
+  type AdoLogEntry,
+  type AdoRequest,
+  type FetchLike,
+  type HttpMethod,
+  type QueryValue,
+} from './client';
+export { isAdoErrorDetails, type AdoErrorDetails, type AdoErrorKind } from './errors';
+export { normalizeOrgUrl } from './org-url';
+export { adoPath } from './path';
+export { DEFAULT_RETRY_POLICY, parseRetryAfter, type RetryPolicy } from './retry';
