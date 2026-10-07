@@ -20,3 +20,13 @@ export { isAdoErrorDetails, type AdoErrorDetails, type AdoErrorKind } from './er
 export { normalizeOrgUrl } from './org-url';
 export { adoPath } from './path';
 export { DEFAULT_RETRY_POLICY, parseRetryAfter, type RetryPolicy } from './retry';
+export {
+  addWorkItemComment,
+  COMMENTS_API_VERSION,
+  COMMENTS_PAGE_SIZE,
+  listWorkItemComments,
+  setWorkItemState,
+  type SetWorkItemStateOptions,
+  type WorkItemRef,
+  type WriteBackCallOptions,
+} from './write-back';
