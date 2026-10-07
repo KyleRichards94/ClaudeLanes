@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
+import { TicketDesignSchema } from './tickets.schemas';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
 
@@ -73,6 +74,25 @@ export type DesignViewFoundResponse = z.infer<typeof DesignViewFoundResponseSche
 export const GetDesignViewResponseSchema = z.object({ view: DesignViewStateSchema.nullable() });
 export type GetDesignViewResponse = z.infer<typeof GetDesignViewResponseSchema>;
 
+// ── Linking a canvas to a ticket (AL-193, D122) ─────────────────────────────────────────────────────
+
+/**
+ * `design:linkCanvas`: links the ticket to the Claude Design canvas a pasted link names. Main reads
+ * it with `parseDesignCanvasUrl` and refuses anything that is not a canvas link (`VALIDATION`).
+ */
+export const LinkDesignCanvasRequestSchema = z.object({
+  ticketId: TicketIdSchema,
+  url: z.string().trim().min(1).max(2048),
+});
+export type LinkDesignCanvasRequest = z.infer<typeof LinkDesignCanvasRequestSchema>;
+
+/** `design:openCanvas`: shows the ticket's linked canvas over the placeholder, on the page it was last left on. */
+export const OpenDesignCanvasRequestSchema = z.object({
+  ticketId: TicketIdSchema,
+  bounds: DesignViewBoundsSchema.optional(),
+});
+export type OpenDesignCanvasRequest = z.infer<typeof OpenDesignCanvasRequestSchema>;
+
 export const designInvokeContracts = {
   'design:open': { request: OpenDesignViewRequestSchema, response: DesignViewStateSchema },
   'design:setBounds': { request: SetDesignViewBoundsRequestSchema, response: DesignViewFoundResponseSchema },
@@ -81,6 +101,15 @@ export const designInvokeContracts = {
   'design:getView': { request: DesignViewTicketRequestSchema, response: GetDesignViewResponseSchema },
   /** Reloads the page the ticket's view shows (the design tab's reload button, AL-192). */
   'design:reload': { request: DesignViewTicketRequestSchema, response: DesignViewFoundResponseSchema },
+  /** The ticket record's design after linking (AL-193). */
+  'design:linkCanvas': { request: LinkDesignCanvasRequestSchema, response: TicketDesignSchema },
+  /** The ticket record's design after unlinking; the canvas view is closed (AL-193). */
+  'design:unlinkCanvas': { request: DesignViewTicketRequestSchema, response: TicketDesignSchema },
+  /**
+   * Opens the linked canvas where the user left it: a live view is shown as it is; otherwise a new
+   * view loads the record's last canvas URL, so it reopens on the same artboard after a restart (AL-193).
+   */
+  'design:openCanvas': { request: OpenDesignCanvasRequestSchema, response: DesignViewStateSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**

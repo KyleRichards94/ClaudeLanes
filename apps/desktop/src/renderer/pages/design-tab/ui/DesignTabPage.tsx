@@ -1,14 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Text } from '@agent-lanes/ui';
 import { agentTickets, ticketFromRecord, useAgentTicket } from '@/entities/agent-ticket';
-import { invoke, useDesignViewSlot, useTicketRecord } from '@/shared/api';
+import { invoke, useDesignCanvasSlot, useTicketRecord } from '@/shared/api';
 import { setDesignViewState, useDesignViewState, useEmbedMode } from '@/shared/model';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { BrowserBar } from './BrowserBar';
 import { DesignHeader } from './DesignHeader';
+import { LinkCanvasForm } from './LinkCanvasForm';
 import { AttachedSection } from './SideSection';
 
 export interface DesignTabPageProps {
@@ -29,6 +30,7 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
   const ticket = live ?? (record ? ticketFromRecord(record) : undefined);
   const mode = useEmbedMode(ticketId);
   const view = useDesignViewState(ticketId);
+  const [changing, setChanging] = useState(false);
 
   useEffect(() => {
     if (record && !agentTickets.getState().byId.has(record.id)) agentTickets.upsert(record);
@@ -46,7 +48,8 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
   }, [ticketId]);
 
   const canvas = record?.design.canvas ?? null;
-  const canvasUrl = canvas ? (record?.design.lastViewUrl ?? canvas.url) : null;
+  // "Open in Claude ↗": the canvas page the view shows now, else the one it was last left on, else the canvas (AL-193).
+  const openUrl = canvas ? (view?.url?.startsWith(canvas.url) ? view.url : (record?.design.lastViewUrl ?? canvas.url)) : null;
 
   return (
     <View style={styles.page} testID="design-tab-page">
@@ -59,11 +62,19 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
             label={canvas ? `claude.ai/design · ${ticketId} canvas` : null}
             mode={mode}
             status={view?.status}
-            onReload={mode === 'webview' && view ? () => void invoke('design:reload', { ticketId }) : undefined}
-            onOpenExternal={canvasUrl ? () => void Linking.openURL(canvasUrl) : undefined}
+            onReload={mode === 'webview' && view && !changing ? () => void invoke('design:reload', { ticketId }) : undefined}
+            onOpenExternal={openUrl ? () => void Linking.openURL(openUrl) : undefined}
+            onChangeCanvas={canvas && !changing ? () => setChanging(true) : undefined}
           />
           <ErrorBoundary name="design:canvas" label="the canvas">
-            <CanvasArea ticketId={ticketId} record={record} loading={recordQuery.isPending} webview={mode === 'webview'} url={canvasUrl} />
+            <CanvasArea
+              ticketId={ticketId}
+              record={record}
+              loading={recordQuery.isPending}
+              webview={mode === 'webview'}
+              changing={changing}
+              onChanged={() => setChanging(false)}
+            />
           </ErrorBoundary>
         </View>
 
@@ -80,10 +91,12 @@ interface CanvasAreaProps {
   record: TicketRecord | undefined;
   loading: boolean;
   webview: boolean;
-  url: string | null;
+  /** The user is replacing or unlinking the linked canvas. */
+  changing: boolean;
+  onChanged: () => void;
 }
 
-function CanvasArea({ ticketId, record, loading, webview, url }: CanvasAreaProps) {
+function CanvasArea({ ticketId, record, loading, webview, changing, onChanged }: CanvasAreaProps) {
   if (loading) {
     return (
       <View style={styles.empty} aria-busy>
@@ -102,25 +115,16 @@ function CanvasArea({ ticketId, record, loading, webview, url }: CanvasAreaProps
       </View>
     );
   }
-  if (!url) {
-    return (
-      <View style={styles.empty} testID="design-no-canvas">
-        <Text variant="title" size="lg">
-          No canvas linked yet
-        </Text>
-        <Text variant="meta" size="md">
-          Link this ticket to a Claude Design canvas to see it here beside the agent.
-        </Text>
-      </View>
-    );
-  }
+  const canvas = record.design.canvas;
+  // The placeholder unmounts while the form shows, which hides the live view without closing it.
+  if (!canvas || changing) return <LinkCanvasForm ticketId={ticketId} current={canvas?.url} onDone={onChanged} />;
   if (!webview) return null;
-  return <CanvasSlot ticketId={ticketId} url={url} />;
+  return <CanvasSlot ticketId={ticketId} canvasUrl={canvas.url} />;
 }
 
-/** The placeholder main draws the live canvas view over (AL-191). */
-function CanvasSlot({ ticketId, url }: { ticketId: string; url: string }) {
-  const slot = useDesignViewSlot(ticketId, url);
+/** The placeholder main draws the live canvas view over, opened where it was left (AL-191, AL-193). */
+function CanvasSlot({ ticketId, canvasUrl }: { ticketId: string; canvasUrl: string }) {
+  const slot = useDesignCanvasSlot(ticketId, canvasUrl);
   return <View ref={slot} style={styles.slot} testID="design-canvas-slot" />;
 }
 

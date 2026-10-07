@@ -13,6 +13,8 @@ export interface BrowserBarProps {
   onReload?: () => void;
   /** Opens the canvas in Claude in the OS browser; omitted when no canvas is linked. */
   onOpenExternal?: () => void;
+  /** Shows the link form to replace or unlink the canvas (AL-193); omitted when there is nothing to change. */
+  onChangeCanvas?: () => void;
 }
 
 const STATUS_PILLS: Record<DesignViewStatus, { label: string; tone: PillTone }> = {
@@ -29,7 +31,7 @@ export function statusPill(mode: EmbedMode, status: DesignViewStatus | undefined
 }
 
 /** The browser-like bar over the canvas (artboard 4): dots, the canvas label, status, reload and pop-out. */
-export function BrowserBar({ label, mode, status, onReload, onOpenExternal }: BrowserBarProps) {
+export function BrowserBar({ label, mode, status, onReload, onOpenExternal, onChangeCanvas }: BrowserBarProps) {
   const pill = label ? statusPill(mode, status) : null;
 
   return (
@@ -45,6 +47,7 @@ export function BrowserBar({ label, mode, status, onReload, onOpenExternal }: Br
         </Text>
       </View>
       {pill ? <Pill label={pill.label} tone={pill.tone} size="md" testID="design-view-status" /> : null}
+      {onChangeCanvas ? <Button label="Change canvas" size="sm" onPress={onChangeCanvas} testID="design-change-canvas" /> : null}
       <Button label="Reload canvas" icon="refresh" iconOnly size="sm" disabled={!onReload} onPress={onReload} testID="design-reload" />
       <Button
         label="Open in Claude"

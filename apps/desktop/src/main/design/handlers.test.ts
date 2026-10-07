@@ -2,6 +2,7 @@ import { ok } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createDesignHandlers } from './handlers';
+import type { DesignCanvasLinks } from './canvas-links';
 import type { DesignViewService } from './view-service';
 
 const VIEW = { ticketId: '71273', status: 'signed-in' as const, url: 'https://claude.ai/design/p/a', visible: true };
@@ -19,10 +20,33 @@ function fakeService(): DesignViewService {
   };
 }
 
+const DESIGN = { canvas: { kind: 'design-project' as const, id: 'a', url: 'https://claude.ai/design/p/a' }, lastViewUrl: null, specs: [] };
+
+function fakeCanvases(): DesignCanvasLinks {
+  return {
+    link: vi.fn(async () => ok(DESIGN)),
+    unlink: vi.fn(async () => ok({ ...DESIGN, canvas: null })),
+    open: vi.fn(async () => ok(VIEW)),
+    noteView: vi.fn(),
+  };
+}
+
 describe('design IPC handlers', () => {
+  it('design:linkCanvas, design:unlinkCanvas and design:openCanvas go to the canvas links', async () => {
+    const designCanvases = fakeCanvases();
+    const handlers = createDesignHandlers({ designView: fakeService(), designCanvases });
+    const bounds = { x: 1, y: 2, width: 3, height: 4 };
+
+    expect(await handleInvoke('design:linkCanvas', { ticketId: '71273', url: ' https://claude.ai/design/p/a ' }, handlers['design:linkCanvas'])).toEqual(ok(DESIGN));
+    expect(designCanvases.link).toHaveBeenCalledWith('71273', 'https://claude.ai/design/p/a');
+    expect(await handleInvoke('design:unlinkCanvas', { ticketId: '71273' }, handlers['design:unlinkCanvas'])).toEqual(ok({ ...DESIGN, canvas: null }));
+    expect(await handleInvoke('design:openCanvas', { ticketId: '71273', bounds }, handlers['design:openCanvas'])).toEqual(ok(VIEW));
+    expect(designCanvases.open).toHaveBeenCalledWith('71273', bounds);
+  });
+
   it('design:open passes the ticket, URL and bounds to the service', async () => {
     const designView = fakeService();
-    const handlers = createDesignHandlers({ designView });
+    const handlers = createDesignHandlers({ designView, designCanvases: fakeCanvases() });
     const bounds = { x: 1, y: 2, width: 3, height: 4 };
 
     const result = await handleInvoke('design:open', { ticketId: '71273', url: VIEW.url, bounds }, handlers['design:open']);
@@ -33,7 +57,7 @@ describe('design IPC handlers', () => {
 
   it('design:open refuses a request that is not a URL before reaching the service', async () => {
     const designView = fakeService();
-    const handlers = createDesignHandlers({ designView });
+    const handlers = createDesignHandlers({ designView, designCanvases: fakeCanvases() });
 
     const result = await handleInvoke('design:open', { ticketId: '71273', url: 'claude.ai/design' }, handlers['design:open']);
 
@@ -42,7 +66,7 @@ describe('design IPC handlers', () => {
   });
 
   it('design:setBounds refuses negative sizes', async () => {
-    const handlers = createDesignHandlers({ designView: fakeService() });
+    const handlers = createDesignHandlers({ designView: fakeService(), designCanvases: fakeCanvases() });
     const result = await handleInvoke(
       'design:setBounds',
       { ticketId: '71273', bounds: { x: 0, y: 0, width: -1, height: 10 } },
@@ -52,7 +76,7 @@ describe('design IPC handlers', () => {
   });
 
   it('design:setBounds, design:hide and design:close report whether the ticket had a view', async () => {
-    const handlers = createDesignHandlers({ designView: fakeService() });
+    const handlers = createDesignHandlers({ designView: fakeService(), designCanvases: fakeCanvases() });
     const bounds = { x: 0, y: 0, width: 10, height: 10 };
 
     expect(await handleInvoke('design:setBounds', { ticketId: '71273', bounds }, handlers['design:setBounds'])).toEqual(ok({ found: true }));
@@ -62,7 +86,7 @@ describe('design IPC handlers', () => {
   });
 
   it('design:getView returns null when the ticket has no live view', async () => {
-    const handlers = createDesignHandlers({ designView: fakeService() });
+    const handlers = createDesignHandlers({ designView: fakeService(), designCanvases: fakeCanvases() });
     expect(await handleInvoke('design:getView', { ticketId: '71273' }, handlers['design:getView'])).toEqual(ok({ view: null }));
   });
 });
