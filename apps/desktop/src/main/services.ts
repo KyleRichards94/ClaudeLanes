@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import { app, safeStorage, type BrowserWindow } from 'electron';
 import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
-import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
+import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
+import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
@@ -72,6 +73,8 @@ export interface Services {
   readonly worktrees: TicketWorktreeService;
   /** One Claude Agent SDK session per ticket, in its worktree (AL-100). Main-only: holds the session processes. */
   readonly sessions: SessionManager;
+  /** Each ticket's normalised output (`agent:output`) and the buffer `agent:getTranscript` backfills from (AL-102). */
+  readonly transcripts: TranscriptService;
 }
 
 export interface ServiceOptions {
@@ -160,6 +163,14 @@ export function createServices(options: ServiceOptions): Services {
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
   const sessions = createSessionManager({ claude, connections, tickets, emit: options.emit, log: log.child('agent') });
+  const transcripts = createTranscriptService({
+    sessions,
+    tickets,
+    emit: options.emit,
+    // Output from before a restart is read back from the saved session (AL-102).
+    history: async (sessionId, dir) => (await loadClaudeSdk()).getSessionMessages(sessionId, { dir }),
+    log: log.child('agent'),
+  });
 
   return {
     appDataDir: options.appDataDir,
@@ -179,6 +190,7 @@ export function createServices(options: ServiceOptions): Services {
     claude,
     worktrees,
     sessions,
+    transcripts,
   };
 }
 
@@ -187,6 +199,7 @@ export async function disposeServices(services: Services): Promise<void> {
   void services;
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  services.transcripts.dispose();
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();

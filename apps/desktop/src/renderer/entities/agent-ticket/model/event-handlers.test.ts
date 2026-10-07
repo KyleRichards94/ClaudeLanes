@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeTicketRecord } from '@/shared/testing';
+import { fakeOutputEvent, fakeTicketRecord } from '@/shared/testing';
 import { agentTicketEventHandlers, createAgentTicketEventHandlers } from './event-handlers';
 import { selectTicket } from './selectors';
 import { createAgentTicketStore } from './store';
@@ -20,7 +20,7 @@ describe('agent ticket event handlers', () => {
   it('commits a frame of agent:output as one store update', () => {
     const { store, commits, handlers } = setup();
 
-    handlers['agent:output']?.(Array.from({ length: 1000 }, (_, at) => ({ ticketId: '71273', at })));
+    handlers['agent:output']?.(Array.from({ length: 1000 }, (_, at) => fakeOutputEvent('71273', at)));
 
     expect(commits).toHaveBeenCalledOnce();
     expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(999);
@@ -43,7 +43,7 @@ describe('agent ticket event handlers', () => {
 
   it('ignores events for tickets the board has not loaded', () => {
     const { commits, handlers } = setup();
-    handlers['agent:output']?.([{ ticketId: '99999', at: 1 }]);
+    handlers['agent:output']?.([fakeOutputEvent('99999', 1)]);
     handlers['build:queued']?.({
       ticketId: '99999',
       jobId: 'job-9',
