@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
-import { DEFAULT_BUILD_CONCURRENCY, createJobQueue, type JobQueue } from './build';
+import { createJobQueue, type JobQueue } from './build';
 import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
@@ -39,13 +39,27 @@ export function createServices(options: ServiceOptions): Services {
     safeStorage: options.safeStorage ?? safeStorage,
   });
 
+  const settingsStore = createSettingsService({ file: createElectronSettingsFile(options.appDataDir) });
+  // Concurrency follows the `buildQueueSize` setting (AL-041), read at each scheduling decision.
+  const buildQueue = createJobQueue({ concurrency: () => settingsStore.get().buildQueueSize });
+  const settings: SettingsService = {
+    get: () => settingsStore.get(),
+    update(patch) {
+      const result = settingsStore.update(patch);
+      // A larger queue size starts waiting jobs straight away.
+      if (result.ok) buildQueue.refresh();
+      return result;
+    },
+  };
+  // Queue transitions reach the renderer as `build:queued` (AL-012).
+  buildQueue.subscribe((event) => options.emit('build:queued', event));
+
   return {
     appDataDir: options.appDataDir,
     secrets,
     emit: options.emit,
-    settings: createSettingsService({ file: createElectronSettingsFile(options.appDataDir) }),
-    // AL-041 swaps the default for the `buildQueueSize` setting (and calls `buildQueue.refresh()` when it changes).
-    buildQueue: createJobQueue({ concurrency: () => DEFAULT_BUILD_CONCURRENCY }),
+    settings,
+    buildQueue,
   };
 }
 
