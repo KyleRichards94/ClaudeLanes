@@ -106,7 +106,14 @@ if (!app.requestSingleInstanceLock()) {
       strict: !app.isPackaged,
       log: (message, issues) => eventsLog.error(message, issues),
     });
-    services = createServices({ appDataDir: app.getPath('userData'), emit, log });
+    services = createServices({
+      appDataDir: app.getPath('userData'),
+      emit,
+      log,
+      mainWindow: () => mainWindow,
+      // e2e points the design view at a local fake claude.ai (AL-191); never honoured in the installed app.
+      designTestOrigin: app.isPackaged ? undefined : process.env['AGENT_LANES_DESIGN_TEST_ORIGIN'],
+    });
     registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
     mainWindow = createMainWindow();
     // AL-080: warn once, without blocking start-up, when git is missing or older than 2.38.

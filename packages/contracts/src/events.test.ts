@@ -16,6 +16,7 @@ describe('event contracts', () => {
         'build:queued', // AL-131
         'connections:changed',
         'design:spec',
+        'design:view', // AL-191
         'run:status',
         'toast',
       ].sort(),

@@ -1,6 +1,7 @@
 import { createAppHandlers } from '../app/handlers';
 import { createBuildHandlers } from '../build/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
+import { createDesignHandlers } from '../design/handlers';
 import { createDiagnosticsHandlers } from '../diagnostics/handlers';
 import type { Services } from '../services';
 import { createSettingsHandlers } from '../settings/handlers';
@@ -19,5 +20,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createBuildHandlers(services),
     ...createDiagnosticsHandlers(services),
     ...createConnectionsHandlers(services.connections),
+    ...createDesignHandlers(services),
   };
 }
