@@ -1,4 +1,5 @@
 import { createAdoHandlers } from '../ado/handlers';
+import { createAgentHandlers } from '../agent/handlers';
 import { createAppHandlers } from '../app/handlers';
 import { createBuildHandlers } from '../build/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
@@ -27,6 +28,7 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createDesignHandlers(services),
     ...createAdoHandlers(services.ado),
     ...createReposHandlers(services),
+    ...createAgentHandlers(services),
     ...createGitHandlers(services),
     ...createTicketsHandlers(services),
   };
