@@ -1,10 +1,10 @@
-import { BoardPage } from '@/pages/board';
 import { AppProviders } from './entrypoint/AppProviders';
+import { AppRouter } from './routing';
 
 export function App() {
   return (
     <AppProviders>
-      <BoardPage />
+      <AppRouter />
     </AppProviders>
   );
 }

@@ -16,6 +16,15 @@ const workspacePackages = [
 /** react-native-web resolves `*.web.*` platform files first (design §13: web-only code lives in *.web.tsx). */
 const webExtensions = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'];
 
+/** A page slice's public API (`src/renderer/pages/<slice>/index.ts`), the module each lazy page chunk starts from. */
+const pageEntry = /[\\/]src[\\/]renderer[\\/]pages[\\/]([^\\/]+)[\\/]index\.tsx?$/;
+
+/** Lazily loaded pages (AL-140) get `page-<slice>` chunk names; Rollup would call them all `index`. */
+function chunkFileName(chunk: { facadeModuleId: string | null }): string {
+  const page = chunk.facadeModuleId ? pageEntry.exec(chunk.facadeModuleId)?.[1] : undefined;
+  return page ? `assets/page-${page}-[hash].js` : 'assets/[name]-[hash].js';
+}
+
 export default defineConfig(({ command }) => ({
   main: {
     build: {
@@ -49,6 +58,9 @@ export default defineConfig(({ command }) => ({
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
+        output: {
+          chunkFileNames: chunkFileName,
+        },
       },
     },
     plugins: [

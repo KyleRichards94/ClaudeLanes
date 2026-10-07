@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { RouterProvider } from '@/shared/routing';
+import { connectRouterToWindow, createAppRouter } from '../routing';
 
 const SIXTY_SECONDS = 60_000;
 
@@ -18,5 +20,12 @@ function createQueryClient() {
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createQueryClient);
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  const [router] = useState(() => createAppRouter());
+  useEffect(() => connectRouterToWindow(router), [router]);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router}>{children}</RouterProvider>
+    </QueryClientProvider>
+  );
 }
