@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { skillCommand } from '@agent-lanes/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTicketRecordStore, type TicketRecordStore } from '../tickets';
 import { createMemoryRecordFs, createTempDir, newTicketInput } from '../tickets/testing';
@@ -123,5 +124,21 @@ describe('session manager with the real Agent SDK', () => {
       expect(ids[0]).not.toBe(ids[1]);
     },
     TIMEOUT * 3,
+  );
+
+  it(
+    'delivers a skill chip to Claude Code as the typed slash command (AL-105)',
+    async () => {
+      await sessions.start({ ticketId: '71273', jobDescription: 'job for 71273' });
+      await eventually(() => sessions.status('71273').state === 'idle', TIMEOUT);
+
+      expect(sessions.send('71273', { text: skillCommand('code-review') })).toEqual({ ok: true, data: { held: false } });
+      await eventually(() => sessions.status('71273').state === 'idle', TIMEOUT);
+      await sessions.stop('71273');
+
+      const started = await startIn((await tickets.get('71273'))?.worktreePath);
+      expect(started?.prompts).toEqual([expect.stringContaining('job for 71273'), '/code-review']);
+    },
+    TIMEOUT * 2,
   );
 });

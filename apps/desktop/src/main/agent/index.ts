@@ -4,6 +4,7 @@ export { createInputQueue, type InputQueue } from './input-queue';
 export {
   CLAUDE_KEY_UNREADABLE_MESSAGE,
   CLAUDE_NOT_CONNECTED_MESSAGE,
+  RESUME_MESSAGE,
   SESSION_ENDED_MESSAGE,
   createSessionManager,
   sessionOptions,
