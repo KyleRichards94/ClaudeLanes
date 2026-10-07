@@ -3,6 +3,7 @@ import { safeStorage } from 'electron';
 import { createJobQueue, type JobQueue } from './build';
 import type { Emit } from './ipc/emit';
 import { createGitService, type GitService } from './git';
+import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from './repos';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
@@ -27,6 +28,8 @@ export interface Services {
   readonly buildQueue: JobQueue;
   /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
   readonly git: GitService;
+  /** Registered repos in settings, added through the native folder picker (AL-081). */
+  readonly repos: RepoRegistry;
 }
 
 export interface ServiceOptions {
@@ -58,6 +61,7 @@ export function createServices(options: ServiceOptions): Services {
   buildQueue.subscribe((event) => options.emit('build:queued', event));
 
   const git = createGitService();
+  const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
 
   return {
     appDataDir: options.appDataDir,
@@ -66,6 +70,7 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     buildQueue,
     git,
+    repos,
   };
 }
 
