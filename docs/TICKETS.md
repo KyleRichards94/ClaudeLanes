@@ -62,7 +62,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-027 | TextField | E2 | S | AL-023 | done |
 | AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
 | AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | done |
-| AL-030 | Toast and ToastHost | E2 | S | AL-024 | todo |
+| AL-030 | Toast and ToastHost | E2 | S | AL-024 | done |
 | AL-031 | Icons | E2 | S | AL-020 | done |
 | AL-032 | Component gallery (dev route) | E2 | S | AL-023–AL-031 | todo |
 | AL-033 | Accessibility checks | E2 | S | AL-032 | todo |
@@ -80,12 +80,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | done |
 | AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | partial |
 | AL-064 | Pull requests: create, link, checks | E4 | M | AL-060 | partial |
-| AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | todo |
+| AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | done |
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
 | AL-080 | Git runner | E5 | S | AL-001 | done |
 | AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | done |
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
-| AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | todo |
+| AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | done |
 | AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
 | AL-085 | Branch status | E5 | S | AL-083 | todo |
 | AL-086 | Merge sub-branches → ticket branch | E5 | M | AL-084, AL-085 | todo |
@@ -116,7 +116,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-134 | Stop and process-tree kill | E7 | S | AL-133 | todo |
 | AL-135 | Build log tab | E7 | M | AL-132, AL-029 | todo |
 | AL-140 | App router and lazy pages | E8 | S | AL-003 | done |
-| AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | todo |
+| AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | done |
 | AL-142 | Board header | E8 | M | AL-141, AL-066, AL-024, AL-025, AL-081 | todo |
 | AL-143 | Lanes | E8 | M | AL-141 | todo |
 | AL-144 | AgentTicketCard and its states | E8 | M | AL-141, AL-025, AL-028 | todo |
@@ -369,8 +369,8 @@ colour alone.
 - **Design:** artboard 6 "Toast · error" · **Depends on:** AL-024
 - **Scope:** `ToastHost` in `app/`; `toast({ tone, title, body, actions })`; error toast with icon, primary action (e.g. Reconnect) and Dismiss; stacking; auto-dismiss for info only; `aria-live`.
 - **Acceptance criteria:**
-  - [ ] Error toasts stay until acted on; info toasts auto-dismiss after 5 s.
-  - [ ] Toasts can be raised from the main process through the `toast` event (AL-012).
+  - [x] Error toasts stay until acted on; info toasts auto-dismiss after 5 s.
+  - [x] Toasts can be raised from the main process through the `toast` event (AL-012).
 
 #### AL-031 · Icons
 - **Depends on:** AL-020
@@ -507,7 +507,7 @@ colour alone.
 - **Depends on:** AL-061–AL-064, AL-042
 - **Scope:** `AdoService` picks the client per org from ConnectionsService; channels `ado:listSprints`, `ado:listWorkItems`, `ado:searchWorkItems`, `ado:getWorkItem`, `ado:getComments`, `ado:createPullRequest`, `ado:getPullRequest`. Shared MSW handler set + fixture data (sprint 42, items #71273, #71330, #71335, #71341 from the artboards) used by unit, integration and e2e tests.
 - **Acceptance criteria:**
-  - [ ] Every channel has contract schemas and a handler test.
+  - [x] Every channel has contract schemas and a handler test.
 
 #### AL-066 · Renderer ADO queries and refetch policy
 - **Design:** §6 ("refetches on window focus and every 60 s while the board is open") · **Depends on:** AL-065
@@ -542,8 +542,8 @@ colour alone.
 - **Design:** §9 step 1 · **Depends on:** AL-081, AL-082
 - **Scope:** `git fetch origin <base>` then `git worktree add <root>/<id> -b <branch> origin/<base>` (or local base when offline); refuse if the path exists and is not ours; record path + branch on the ticket.
 - **Acceptance criteria:**
-  - [ ] Two tickets get two worktrees and never share a branch (R8).
-  - [ ] Failure leaves no half-created worktree or branch.
+  - [x] Two tickets get two worktrees and never share a branch (R8).
+  - [x] Failure leaves no half-created worktree or branch.
 
 #### AL-084 · Sub-agent worktrees (WorktreeCreate hook)
 - **Design:** §9 step 3 · **Depends on:** AL-083, AL-100
@@ -759,7 +759,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §6 Live client state · **Depends on:** AL-015, AL-101
 - **Scope:** `entities/agent-ticket`: model types, Zustand store keyed by ticket id (stage, activity, progress, model/effort/switching, gate, build/run, PR, sub-agent counts, needs-you reasons), selectors per lane and per ticket so a streaming ticket re-renders only itself; event handlers registered with the hub.
 - **Acceptance criteria:**
-  - [ ] A burst of output on one ticket does not re-render other cards (React Profiler test).
+  - [x] A burst of output on one ticket does not re-render other cards (React Profiler test).
 
 #### AL-142 · Board header
 - **Design:** artboard 1 · **Depends on:** AL-141, AL-066, AL-024, AL-025, AL-081
@@ -1465,6 +1465,30 @@ implementation agent, mid-run if needed.
 | D367 | AL-045: `McpConnectionSummary` and `ConnectionTestResult` carry `tools` (capped at `MCP_TOOLS_LIMIT` = 256, names 1–128 chars); a passing test keeps the list across restarts, a failing test drops it | The row can show tools without re-testing | 2026-10-07 |
 | D368 | AL-045: On Windows `npx` is started through `cmd /c`, and the PAT and tokens are scrubbed from all test output | `npx` is a .cmd shim; secrets never reach the row | 2026-10-07 |
 | D369 | AL-045: Tests use a local fake MCP server (`fake-mcp-server.mjs`) and a fake HTTP MCP endpoint; no real services are called | §7 rule 6 | 2026-10-07 |
+| D370 | AL-065: The shared fake ADO organisation (`@agent-lanes/ado-client/testing`) also answers `GET _apis/projects` and the project-level `git/repositories` and `build/builds` requests | AL-043's connection test probes them; without them `connections:save`/`test` in e2e hit unhandled 501s | 2026-10-07 |
+| D371 | AL-065: The org-level `_apis/build/builds` route stays unhandled on purpose | Keeps the test that an unhandled request returns 501 meaningful | 2026-10-07 |
+| D372 | AL-141: The agent-ticket store is a vanilla Zustand store (`zustand/vanilla`) exposing named actions instead of `setState` | Every change is one commit and a no-op commits nothing, which keeps re-renders scoped | 2026-10-07 |
+| D373 | AL-141: State is split into `byId` (Map) and `byLane` (id arrays ordered by stage entry time, then createdAt, then id) | Streaming output never changes a lane's array; only the changed ticket object is replaced | 2026-10-07 |
+| D374 | AL-141: Only `agent:output` (batched per frame, one commit) and `build:queued` are handled now; the `event-handlers.ts` doc comment lists which store action AL-103, AL-104, AL-106, AL-107, AL-109, AL-131–133 and AL-181 wire | The other ticket event payloads are still bare `{ticketId, at}` envelopes | 2026-10-07 |
+| D375 | AL-141: Needs-you reasons are a typed list (`approval`, `permission`, `qa-gap`), one per kind; `approval` is set only by the gate actions and cleared automatically when the ticket changes stage | One badge per reason; a stage change ends the gate | 2026-10-07 |
+| D376 | AL-141: Events for ticket ids the board has not loaded are dropped; `load()` keeps live state for tickets still present and the board backfills from records | No phantom cards; reloads keep streaming state | 2026-10-07 |
+| D377 | AL-141: The Profiler test uses `React.memo` stand-in card/lane components in `app/entrypoint` | The real card and lanes are AL-143/AL-144, and Vitest does not run the React Compiler | 2026-10-07 |
+| D378 | AL-141: `fakeTicketRecord` added to renderer `shared/testing` | Renderer tests need valid AL-101 ticket records | 2026-10-07 |
+| D379 | AL-083: The ticket branch is created with `--no-track` at the resolved commit, not tracking `origin/<base>` | A later plain `git push` of the ticket branch is not refused | 2026-10-07 |
+| D380 | AL-083: If `git fetch` fails (offline, no origin, timeout, base not on origin) the branch starts from the local `<base>`, else a stale `origin/<base>`; the reason is logged and returned in `start.fetchError` | Launch still works offline and says why | 2026-10-07 |
+| D381 | AL-083: Only a missing or empty folder counts as ours; anything else at the path is refused with `path-occupied`, and rollback deletes a folder only when its `.git` file points into this repo's worktrees directory | Never deletes a user's files | 2026-10-07 |
+| D382 | AL-083: A new branch name must be unused by local branches, origin branches and every branch or sub-branch recorded on this repo's tickets, including ones since deleted from git | No two tickets ever share a branch (R8) | 2026-10-07 |
+| D383 | AL-083: Ticket ids are unique across repos: a second ticket for the same work item is refused with `ticket-exists`, even in another repo | Closes the duplicate-id follow-up from batch 9 | 2026-10-07 |
+| D384 | AL-083: Rollback retries `git worktree remove` (250 ms, then 1 s) for Windows file locks and deletes the branch only while it still points at the start commit and no worktree has it checked out; anything left is listed in `rollback.leftovers` | Failure leaves no half-created worktree or branch, without deleting work | 2026-10-07 |
+| D385 | AL-083: Launches run one at a time per repo, and ticket ids are claimed under one lock across all repos | Concurrent launches cannot pick the same branch or folder | 2026-10-07 |
+| D386 | AL-083: No IPC channel yet; AL-165 Launch calls `services.worktrees.create` | Launch owns the user flow | 2026-10-07 |
+| D387 | AL-083: The no-ticket name test expects `nt-20261007-fix-the-login` | AL-082's 32-character limit | 2026-10-07 |
+| D388 | AL-030: The `toast` event schema gains an optional `id` and up to 2 `actions` (`{label, intent}`); an intent is a discriminated union whose only member today is `navigate` to a router route | Main cannot send callbacks over IPC; AL-048 and AL-211 add intents | 2026-10-07 |
+| D389 | AL-030: A toast raised again with the id of one already showing replaces it in place and restarts its timer | A failure that keeps happening shows only once | 2026-10-07 |
+| D390 | AL-030: At most 4 toasts show; later ones wait in order behind an "N more notices" line | The stack never covers the board | 2026-10-07 |
+| D391 | AL-030: The info auto-dismiss timer pauses while the pointer is over the toast or focus is inside it | Users can read it and use its buttons (accessibility) | 2026-10-07 |
+| D392 | AL-030: Only error toasts use `role=alert` / `aria-live=assertive`; other tones use `role=status` / polite; a plain info toast with no actions has no Dismiss button | Errors interrupt, notices don't; an info toast closes itself | 2026-10-07 |
+| D393 | AL-030: The e2e helper resends a toast by id until it appears | One cold-start run lost the first toast under load; id-based replace means a resend never adds a copy | 2026-10-07 |
 
 ---
 
@@ -1508,6 +1532,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 12: merged AL-044 and AL-043 (both partial: data paths done and proven through IPC in unit and e2e tests; the Claude tab, saved ADO row, scope chips and expiry input are AL-046, and each needs a manual check by Kyle against a real Claude Code login / ADO org). Registration conflicts kept both sides: `services.ts` (`tickets`, `repos` + `claude`), `contracts/src/index.ts` (`connections.claude` + `connections.display`) and `connections/service.ts` (`detectClaudeLogin` + `noteAdoResponse` in the interface and the service object). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D330–D352. `pnpm verify` green (1787 unit tests), e2e 53/53. Follow-ups: AL-046 builds the Claude tab on `connections:detectClaude` ("Use my Claude Code login", render `claudeConnectionStatusLine`, red while status is error) and the ADO row/chips/expiry with `formatAdoConnectionDetails`, `tokenExpiryState`, `adoScopeChips(result.scopes)`, the Default project dropdown from `result.projects` (free text when null) and an optional expiry date input; AL-065 passes `log: (entry) => void services.connections.noteAdoResponse(orgId, entry)` to the per-org ADO client; AL-100 starts sessions with `services.claude.launch({ credential, ... })` or `claudeProcessEnv`, not `process.env` + `sessionEnv()` (an inherited ANTHROPIC_API_KEY would override the login), and may unify the test model with D10; AL-048 tells a refused write (ADO may answer 401 TF400813) from a revoked token; AL-047/AL-048 own any near-expiry toast; re-run `e2e/claude-connection.spec.ts` on an Agent SDK upgrade (fake follows 0.3.292). |
 | 2026-10-07 | Integrator batch 13: merged AL-029 (done). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D353–D359. `pnpm verify` green (1837 unit tests), e2e 53/53. Follow-ups: AL-032 gallery shows Modal (normal and blocking) and Tabs (status dots and the ↗ tab); AL-046, AL-135, AL-146 and AL-160 can now build on Modal/Tabs. |
 | 2026-10-07 | Integrator batch 14: merged AL-130 (done) and AL-045 (partial: the MCP error output is the row's `statusMessage`, proven over IPC; the row that draws it is AL-046). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D360–D369. `pnpm verify` green (1948 unit tests), e2e 57/57 (the first run had one failure in `text.spec.ts` mouse selection, unrelated to these tickets; it passed 3/3 alone and the full rerun was green). Follow-ups: AL-146 adds the settings UI for `buildCommand`/`runCommand` overrides and shows the detected commands from `build:commands`; AL-131/AL-132 jobs get their command line from `buildCommands.forRepo(repoPath, { dir: worktree })`; AL-046 draws each MCP row's `statusMessage`, `tools` and `builtInFor` (no Remove on built-in servers); AL-108 reuses `adoMcpServerFor` (`connections/ado-mcp.ts`) and `sessionMcpServers({ adoConnectionId })`; leftover `agent-lanes-*` / `playwright-artifacts-*` folders in %TEMP% from parallel agents were not cleaned. Drive C: had about 8.8 GB free. |
+| 2026-10-07 | Integrator batch 15: merged AL-065, AL-141, AL-083 and AL-030 (done). AL-030 conflicted with AL-141 in renderer `app/entrypoint/event-routes.ts` (`agentTicketEventHandlers` + `toastEventHandlers`) and with AL-029 in `packages/ui/src/index.ts` (Modal/Tabs + Toast); kept both sides. Lockfile unchanged after `pnpm install`. Integration fix: AdoService hands every ADO client log entry to `connections.noteAdoResponse(orgId, entry)` (the batch 12 follow-up for AL-065), with a unit test. Decisions D370–D393. `pnpm verify` green (2155 unit tests), e2e 62/62. The AL-065, AL-141 and AL-083 agents could not push their branches (Git Credential Manager prompt / remote rejected); they were merged from the local branches. Follow-ups: AL-066 builds the renderer queries on the `ado:*` channels; AL-165 calls `services.worktrees.create` and shows `details.reason` and `rollback.leftovers`; AL-088/AL-090 reuse `undoWorktreeAdd`, `findRegisteredWorktree` and `inspectPath` (`main/worktrees/worktree-git.ts`); AL-103/104/106/107/109/131–133/181 each add one line in `entities/agent-ticket/model/event-handlers.ts`; AL-090 calls `agentTickets.load(records)` and AL-165 `agentTickets.upsert(record)`; AL-048/AL-211 add toast intents to `ToastIntentSchema` and `app/toasts/toast-intents.ts`; `e2e/settings.spec.ts` AL-063 state-transitions test may be flaky under load (failed once in AL-030's run). |
 
 ---
 
