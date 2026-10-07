@@ -118,3 +118,10 @@ test('stage gates answer over IPC and a gate change is saved on the ticket (AL-1
   expect(records.length).toBeGreaterThan(0);
   expect(records.some((record) => record.gates.qa === 'approval')).toBe(true);
 });
+
+test('messages, skill chips and pause are refused with a reason when no session runs (AL-105)', async () => {
+  expect(await invoke(page, 'agent:send', { ticketId: '71273', text: '/code-review' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await invoke(page, 'agent:send', { ticketId: '71273', text: '   ' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await invoke(page, 'agent:pause', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await invoke(page, 'agent:resume', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+});
