@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
+import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
+import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
@@ -21,6 +23,8 @@ export interface Services {
   readonly emit: Emit;
   /** App settings and UI prefs in `<userData>/settings.json` (AL-041). */
   readonly settings: SettingsService;
+  /** ADO orgs, Claude and MCP servers in `<userData>/connections.json`, their tokens in `secrets` (AL-042). */
+  readonly connections: ConnectionsService;
 }
 
 export interface ServiceOptions {
@@ -41,6 +45,12 @@ export function createServices(options: ServiceOptions): Services {
     secrets,
     emit: options.emit,
     settings: createSettingsService({ file: createElectronSettingsFile(options.appDataDir) }),
+    connections: createConnectionsService({
+      file: createElectronConnectionsFile(options.appDataDir),
+      secrets,
+      emit: options.emit,
+      testers: { ado: createAdoConnectionTester() },
+    }),
   };
 }
 
