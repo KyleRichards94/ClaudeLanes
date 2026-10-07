@@ -28,7 +28,7 @@ const ALL_ENABLED = MODELS.map(() => true);
 /**
  * The model cards on artboard 2: Opus "Deepest reasoning", Sonnet "Balanced", Haiku "Fast + light".
  * A radio group with one Tab stop (the selected card); arrow keys, Home and End move the selection,
- * like the SegmentedControl beside it. Each card's model maps to its SDK id through `MODEL_IDS`
+ * like the SegmentedControl beside it. Each card's model maps to its SDK id through `SDK_MODEL_IDS`
  * (Decision D10).
  */
 export function ModelPicker({ value, onChange, testID = 'model-picker' }: ModelPickerProps) {
