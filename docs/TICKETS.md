@@ -43,7 +43,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-004 | Lint: ESLint boundaries + Steiger FSD | E0 | S | AL-003 | done |
 | AL-005 | Unit test harness | E0 | S | AL-003 | done |
 | AL-006 | E2E harness (Playwright for Electron) | E0 | S | AL-002 | done |
-| AL-007 | Packaging (electron-builder, NSIS) | E0 | M | AL-002 | in-progress |
+| AL-007 | Packaging (electron-builder, NSIS) | E0 | M | AL-002 | partial |
 | AL-008 | CI pipeline | E0 | S | AL-004, AL-005, AL-006 | done |
 | AL-009 | Agent docs: CLAUDE.md, design copy, this plan | E0 | S | — | done |
 | AL-010 | Result type and error codes | E1 | S | AL-001 | done |
@@ -84,7 +84,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
 | AL-080 | Git runner | E5 | S | AL-001 | todo |
 | AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | todo |
-| AL-082 | Branch and worktree naming | E5 | S | — | todo |
+| AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | todo |
 | AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
 | AL-085 | Branch status | E5 | S | AL-083 | todo |
@@ -110,7 +110,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-114 | Skill discovery | E6 | S | AL-100 | todo |
 | AL-115 | ADO write-back on stage change | E6 | S | AL-103, AL-063 | todo |
 | AL-130 | Build/run command detection and overrides | E7 | S | AL-081 | todo |
-| AL-131 | Job queue | E7 | S | AL-011 | todo |
+| AL-131 | Job queue | E7 | S | AL-011 | done |
 | AL-132 | Build job and log parsing | E7 | M | AL-130, AL-131, AL-012 | todo |
 | AL-133 | Run job, port and URL | E7 | M | AL-132 | todo |
 | AL-134 | Stop and process-tree kill | E7 | S | AL-133 | todo |
@@ -140,7 +140,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-179 | Diff tab | E10 | M | AL-089, AL-170 | todo |
 | AL-180 | ADO tab | E10 | M | AL-066, AL-170 | todo |
 | AL-181 | Create PR stage | E10 | M | AL-064, AL-104, AL-170 | todo |
-| AL-190 | Spike: Claude Design integration surface | E11 | S | — | todo |
+| AL-190 | Spike: Claude Design integration surface | E11 | S | — | partial |
 | AL-191 | Design view service (WebContentsView) | E11 | L | AL-190, AL-011 | todo |
 | AL-192 | Design tab page | E11 | M | AL-191, AL-140, AL-170 | todo |
 | AL-193 | Link a canvas to a ticket | E11 | S | AL-101, AL-192 | todo |
@@ -220,9 +220,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 - **Design:** §3 ("single installable desktop package") · **Depends on:** AL-002
 - **Scope:** `electron-builder.yml` (done): app ID, NSIS per-user installer, `asarUnpack` for the Agent SDK and its platform binary package. Still to do: app icon (`build/icon.ico`, from the logo mark), verify `pnpm package` output installs and launches, verify the SDK's `claude` binary is found from the unpacked path (set `pathToClaudeCodeExecutable` if not), version stamping from `apps/desktop/package.json`.
 - **Acceptance criteria:**
-  - [ ] `pnpm package` produces `release/<version>/Agent Lanes-<version>-setup.exe`.
-  - [ ] Installed app launches, shows the board, and can start an Agent SDK session (after AL-100).
-  - [ ] Uninstall leaves no files outside the app data folder.
+  - [ ] `pnpm package` produces `release/<version>/Agent Lanes-<version>-setup.exe`. (open: not run, drive C: was full and packaging stopped with ENOSPC; config, icon and pinned Electron are in, `e2e/packaged/packaged-app.spec.ts` checks the file. Run `pnpm e2e:packaged` once there is ~1.2 GB free)
+  - [ ] Installed app launches, shows the board, and can start an Agent SDK session (after AL-100). (open: not run, disk full; `resolveClaudeExecutable` finds the SDK binary in dev and the packaged spec runs it with `--version` from app.asar.unpacked; starting a session needs AL-100)
+  - [ ] Uninstall leaves no files outside the app data folder. (open: not run, disk full; `build/installer.nsh` removes the leftover installer copy, `install.spec.ts` checks it with `AGENT_LANES_INSTALL_TEST=1`; manual install on a clean Windows VM still to do)
 - **Tests:** manual install on a clean Windows VM; record result in Change log.
 
 #### AL-008 · CI pipeline
@@ -536,7 +536,7 @@ colour alone.
 - **Design:** §9, artboard 2 Workspace ("Worktree 71273-cutover-frmjobcontrol-to") · **Depends on:** —
 - **Scope:** Pure function `<id>-<slug>` from the work item title: lowercase ASCII, words joined by `-`, max 32 chars cut on a word boundary where possible, dedupe with `-2`, `-3` against existing branches; no-ticket tickets use `nt-<yyyymmdd>-<slug>`; user can edit the name in the modal, re-validated with `git check-ref-format`. Sub-branches `sub/<ticket-id>-<name>`.
 - **Acceptance criteria:**
-  - [ ] Table-driven tests cover unicode, punctuation, long titles and collisions.
+  - [x] Table-driven tests cover unicode, punctuation, long titles and collisions.
 
 #### AL-083 · Create the ticket worktree
 - **Design:** §9 step 1 · **Depends on:** AL-081, AL-082
@@ -719,7 +719,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §10 ("at most 2 at once by default") · **Depends on:** AL-011
 - **Scope:** FIFO queue with concurrency from settings, per-worktree serialisation (one job per worktree at a time), cancellation, `build:queued` status.
 - **Acceptance criteria:**
-  - [ ] Third concurrent build waits; cancelling a queued job removes it.
+  - [x] Third concurrent build waits; cancelling a queued job removes it.
 
 #### AL-132 · Build job and log parsing
 - **Design:** §10, artboard 6 "Build failed" · **Depends on:** AL-130, AL-131, AL-012
@@ -921,11 +921,13 @@ implementation agent, mid-run if needed.
 - **Design:** §7 Claude Design, §13 risk, Q11, Q12 · **Depends on:** —
 - **Scope (time-boxed, 1 day):** Establish (1) whether claude.ai Design loads and signs in inside a `WebContentsView` with its own session partition; (2) what the Claude Design MCP / deep-link surface offers: list artboards, read an artboard's structure/source, read the user's selection, open a canvas by URL, post a message to the canvas's chat; (3) how a canvas is identified per ticket. Output: a short write-up in Decisions and updated scopes for AL-191–AL-197.
 - **Acceptance criteria:**
-  - [ ] Decision recorded for: embed approach, artboard read path, design-thread path (Q11).
+  - [x] Decision recorded for: embed approach, artboard read path, design-thread path (Q11). (D111–D125)
+  - **Open (manual, Kyle):** load a real claude.ai Design canvas in the view and try Google, email and SSO sign-in, then restart to confirm the session persists; run ClaudeDesign `{operation:'list'}` and `list_files` on a real project to confirm the live operations, how artboards are laid out and whether sizes are available, and that the tool is enabled for the team's org.
 
 #### AL-191 · Design view service (WebContentsView)
 - **Design:** §4 Design view, R10 · **Depends on:** AL-190, AL-011
 - **Scope:** Main `DesignViewService`: one `WebContentsView` per open ticket canvas, partition `persist:claude-design`, attached to the main window and positioned over the renderer's canvas placeholder (bounds from a `ResizeObserver` → `design:setBounds`). Switching tabs or pages **hides** the view and never destroys it, so the canvas and its chat keep their state across stage changes (R11). Navigation allow-list (claude.ai and its auth domains); popups go to the OS browser; no preload, no Node, no access to app IPC (AL-011 trusted-sender check). LRU limit on live views (e.g. 3).
+- **Scope update (AL-190 spike):** Partition `persist:claude-design`, no preload, sandboxed, no custom user agent (D111–D113). Popups to claude.ai and its auth hosts open as child windows in the same partition; all other popups go to `shell.openExternal` (D114). Navigation allow-list: claude.ai plus known auth hosts (enterprise SSO hosts may need adding). Call `cookies.flushStore()` on quit. Detect signed-out by redirects to claude.ai login pages. Reuse the fake-site pattern from `e2e/design-embed.spec.ts` for its e2e.
 - **Acceptance criteria:**
   - [ ] Moving between Output and Claude Design keeps the canvas exactly where it was (scroll, selection, chat draft).
   - [ ] The design view cannot call any app channel (e2e).
@@ -933,6 +935,7 @@ implementation agent, mid-run if needed.
 #### AL-192 · Design tab page
 - **Design:** artboard 4 · **Depends on:** AL-191, AL-140, AL-170
 - **Scope:** `pages/design-tab`: compact ticket header (← Board, #id, title, stage pill "Implementing · 46%", model · effort), tab bar, browser-style bar (URL label "claude.ai/design · 71273 JobControl canvas", "Webview · signed in" pill, reload, pop-out to a separate window), canvas area, side panel with Embed mode, Hand off to agent, Attached to this ticket, and the design thread (AL-196). Reachable from the drill-in tab and directly from the board card.
+- **Scope update (AL-190 spike):** The "Webview · signed in" pill reflects the view's real state (signed in, sign-in needed, sign-in failed); a failure links to MCP-link mode.
 - **Acceptance criteria:**
   - [ ] Matches artboard 4.
   - [ ] Open and usable in every stage, Queued through Done (R11).
@@ -940,18 +943,21 @@ implementation agent, mid-run if needed.
 #### AL-193 · Link a canvas to a ticket
 - **Design:** artboard 4 · **Depends on:** AL-101, AL-192
 - **Scope:** Ticket record holds the canvas URL/id; "Link canvas" accepts a pasted claude.ai Design URL (or picks one if AL-190 finds a listing API); "Open in Claude ↗" deep link.
+- **Scope update (AL-190 spike):** Store a `DesignCanvasRef` (D122) plus the view's last URL (from `did-navigate` / `did-navigate-in-page`) so a reopened canvas lands on the same artboard. Validate pasted links with `parseDesignCanvasUrl`. A listing API exists (ClaudeDesign `list_projects`), so "Link canvas" can also offer a picker through the design session. "Open in Claude ↗" opens the last URL, or `ref.url`, in the OS browser.
 - **Acceptance criteria:**
   - [ ] A linked canvas reopens on the right artboard after an app restart.
 
 #### AL-194 · Embed mode switch and MCP-link fallback
 - **Design:** §7, §13 risk, artboard 4 Embed mode · **Depends on:** AL-190, AL-192
 - **Scope:** Segmented "Webview — Electron WebContentsView" / "MCP link — Open in Claude, sync via MCP"; persisted per ticket; if sign-in fails in the webview, offer MCP link mode with an explanation; in MCP link mode the canvas opens in Claude and selections sync back.
+- **Scope update (AL-190 spike):** MCP-link mode needs the Claude Code claude.ai login (not an API key) plus Design consent (D115); the Claude tab in Connections shows Design access status and how to grant it (`claude /design login`, or claude.ai/design/settings). "Selections sync back" is not possible (no operation reads the selection, D117): dropped; the in-app artboard checklist is used in both modes.
 - **Acceptance criteria:**
   - [ ] Hand-off and the design thread work in both modes.
 
 #### AL-195 · Artboard list and selection
 - **Design:** artboard 4 "Hand off to agent" · **Depends on:** AL-190, AL-192
 - **Scope:** List the canvas's artboards with names and sizes ("JobControl · desktop 1440×900"), checkboxes, synced with the canvas selection where the surface allows; read each artboard's structure/source for the spec (path chosen in AL-190).
+- **Scope update (AL-190 spike):** List artboards with ClaudeDesign `list_files`/`read_file` (for artifact canvases, the Artifact tool's files listing) via the design session with structured output (D118); whether sizes come from file content or `render_preview` needs a real project. Claude Design pushes no events and polling an LLM is too costly: refresh on design-tab focus, a Refresh button, and after each design-thread reply. Proposed criterion wording: "refreshes on tab focus or Refresh after artboards are added or renamed".
 - **Acceptance criteria:**
   - [ ] List refreshes when artboards are added or renamed on the canvas.
 
@@ -962,6 +968,7 @@ implementation agent, mid-run if needed.
   - **MCP-link mode, or when the webview can't sign in:** an in-app Design thread panel (message list + box) backed by a per-ticket **design session** (a separate, lightweight Agent SDK session with the Claude Design MCP tools and the design-system tokens), independent of the lead agent's session (Q11 confirms).
   - Messages in the design thread never go to the implementation agent until shipped (AL-197).
   - Neither side blocks the other: no shared input queue, no shared gate.
+- **Scope update (AL-190 spike):** The design session is an Agent SDK query with `tools` limited to ClaudeDesign (and Artifact for artifact canvases) plus the design-system tokens. Read operations are allowed automatically in `canUseTool`; writes go through `finalize_plan`, approved by the user (D121). Check `system/init` tools for ClaudeDesign and degrade clearly if absent (D119). Webview mode keeps the canvas chat as the thread (D120).
 - **Acceptance criteria:**
   - [ ] While the lead agent is mid-turn in Implementing, the user can send design messages and get replies, and the agent's output keeps streaming.
   - [ ] The design thread is available in every stage, including during Planning.
@@ -975,6 +982,7 @@ implementation agent, mid-run if needed.
   3. Works in every stage: in Planning the plan takes the spec into account; in Implementing the agent adjusts course; in Code review / QA it becomes a review criterion.
   4. Never needs a stage gate and never interrupts a gate the user is deciding.
   5. If the session is queued, paused or lost, the spec is held and delivered first when it runs.
+- **Scope update (AL-190 spike):** The DesignSpec artboard source is ClaudeDesign `read_file` output (plus a `render_preview` image), captured at ship time and stored per D8. Optionally include the relevant design chat via `get_conversation`.
 - **Acceptance criteria:**
   - [ ] Shipping during Implementing reaches the running agent without a restart, and its next output references the spec version.
   - [ ] Shipping during Planning changes the plan the user is asked to approve.
@@ -1168,6 +1176,50 @@ implementation agent, mid-run if needed.
 | D79 | AL-060: The default `fetch` is looked up on `globalThis` at call time, not at client creation | A later-installed fetch (MSW in tests, Electron `net.fetch`) is used | 2026-10-07 |
 | D80 | AL-060: Also exported: `normalizeOrgUrl` (for the Connections form) and an `adoPath` tagged template that URL-encodes project/team names; `ADO_API_VERSION` and `REQUIRED_PAT_SCOPES` moved to `src/constants.ts`, re-exported unchanged | Shared helpers for AL-043 and the E4 endpoint tickets | 2026-10-07 |
 | D81 | AL-060: `msw` ^3.0.2 is a devDependency of `@agent-lanes/ado-client` (msw 3's listen option is `onUnhandledFrame`); `@agent-lanes/contracts` is a dependency for `Result`; `src/testing/msw-server.ts` is test-only, not exported | AL-065 decides whether to export a `./testing` entry | 2026-10-07 |
+| D82 | AL-082: The naming module is pure and lives in `apps/desktop/src/main/git/naming/` (own `index.ts`); no IPC channel, services or registration change | The ticket asks for a pure function; the IPC side needs repos (AL-081) and the git runner (AL-080) | 2026-10-07 |
+| D83 | AL-082: The 32-character limit covers the whole `<id>-<slug>`; a dedupe suffix stays within 32 by dropping words (`71330-asset-register-paging-2`) | Only reading that gives the artboard's `71273-cutover-frmjobcontrol-to` from "Cutover frmJobControl to Blazor" | 2026-10-07 |
+| D84 | AL-082: Sub-branches `sub/<ticket-id>-<slug>`: the limit covers the part after `sub/`, and the slug keeps at least 8 characters after a long no-ticket id | The agent name never disappears | 2026-10-07 |
+| D85 | AL-082: Collision checks ignore case and catch path clashes (`a` vs `a/b`); callers pass local branches plus remote branches with `origin/` stripped | Loose refs are files on a case-insensitive Windows file system | 2026-10-07 |
+| D86 | AL-082: `nameSubAgent` throws `BranchNamingError` (`PARENT_BRANCH_EXISTS`) when the repo has a branch named `sub` | No suffix can work around it | 2026-10-07 |
+| D87 | AL-082: Slugging: NFKD with accent marks removed, a few letters transliterated (ß→ss, æ→ae, ø→o, ł→l, ı→i), apostrophes dropped (don't→dont), other non-ASCII (CJK, Cyrillic, emoji) is a word separator, camelCase stays one word | Matches the design's `frmjobcontrol` | 2026-10-07 |
+| D88 | AL-082: A title with no usable ASCII words slugs to `untitled` (tickets) or `agent` (sub-agents), e.g. `71273-untitled` | Avoids an all-digit branch name git could read as a commit SHA | 2026-10-07 |
+| D89 | AL-082: The no-ticket date uses local time; a no-ticket ticket's worktree folder is its `nt-…` branch name, which is also the ticket id its sub-branches use; a work-item ticket's folder is `<id>` | Design §9 step 1 | 2026-10-07 |
+| D90 | AL-082: `nameSubAgent` returns the sub-branch and its worktree folder `<ticket-id>--<slug>` (AL-084) together | Both always share the same deduped slug | 2026-10-07 |
+| D91 | AL-082: `checkBranchName` (pure port of `git check-ref-format --branch`) also refuses the double quote, `<`, `>` and the pipe character, Windows device names (nul, con, com1, lpt9.txt …), a path part ending in `.`, `.lock` in any case, and a bare `@` | Windows can't create those as ref files; git reads `@` as HEAD | 2026-10-07 |
+| D92 | AL-082: User-edited names are held only to the git/Windows rules and the collision check, not the lowercase 32-character convention; `validateBranchName` runs the pure check before asking git, so git never sees a name starting with `-` or containing `@{` | The ticket only asks for re-validation with check-ref-format; git's answer stays the same in any folder | 2026-10-07 |
+| D93 | AL-082: `createGitCheckRefFormat` calls git through `execFile` (no shell) as a stand-in until AL-080's runner; its `CheckRefFormat` type is injectable | AL-080 swaps in a runner-based implementation | 2026-10-07 |
+| D94 | AL-131: `build:queued` event (job snapshot plus `at`) on every queue transition: queued with position, position moved, running, finished, cancelled | The renderer shows and clears "Queued" from one channel | 2026-10-07 |
+| D95 | AL-131: Invoke channels `build:cancel({ jobId }) → { cancelled }` and `build:listJobs() → { concurrency, jobs }` | Cancel is reachable from the UI; the renderer backfills queue state after a reload, since events drop while no window listens | 2026-10-07 |
+| D96 | AL-131: Queue states are only queued / running / finished / cancelled; pass or fail belongs to AL-132's result; a `run` that throws resolves `{ status: 'error' }` with state `finished` | The queue stays generic | 2026-10-07 |
+| D97 | AL-131: `BuildQueuedEventSchema` declares `ticketId` and `at` itself instead of extending `TicketEventEnvelopeSchema` | AL-012 was not on main when the ticket was built | 2026-10-07 |
+| D98 | AL-131: Concurrency is a getter read at each scheduling decision, plus `refresh()`. At merge the integrator wired it to `settings.buildQueueSize` with a refresh after each successful settings update, and `createServices` emits `build:queued` for every queue event; `DEFAULT_BUILD_CONCURRENCY` (2) stays in `main/build` | AL-041 and AL-012 were already on main | 2026-10-07 |
+| D99 | AL-131: A busy worktree doesn't block the line: later jobs for other worktrees start first and the waiting job keeps its FIFO place | Throughput | 2026-10-07 |
+| D100 | AL-131: A cancelled running job holds its slot and worktree until its `run` settles; `dispose()` aborts everything and waits at most 5 s, called from `disposeServices` | The next job never overlaps a process still dying (AL-134 owns the tree kill); a stuck job can't block quit | 2026-10-07 |
+| D101 | AL-131: Job snapshots over IPC leave out the worktree path; the ticket id identifies the job | Paths stay in main | 2026-10-07 |
+| D102 | AL-007: Electron pinned to exactly 44.6.0 in `apps/desktop/package.json`; Electron upgrades now need an exact version bump | electron-builder only reads an exact version or `apps/desktop/node_modules` (empty with the hoisted layout); `pnpm package` failed with "Electron version is a range" | 2026-10-07 |
+| D103 | AL-007: App icon drawn by `apps/desktop/scripts/app-icon.mts` (`pnpm --filter @agent-lanes/desktop icon`, no image libraries): rounded square with the claude→ado gradient and three white lane bars; writes `build/icon.ico` (16–256 px, BMP up to 48, PNG above) and `build/icon.png`; a test fails if the committed files differ from its output | Regenerable from the tokens | 2026-10-07 |
+| D104 | AL-007: Icon bars are 2/32 thick and snap to whole pixels up to 64 px; sizes from 24 px have a 1/16 margin | The mark stays crisp at taskbar sizes | 2026-10-07 |
+| D105 | AL-007: `src/main/agent/claude-executable.ts`: `resolveClaudeExecutable()` returns `resources/app.asar.unpacked/node_modules/<platform package>/claude(.exe)` when packaged and uses `require.resolve` in dev; AL-100 passes `pathToClaudeCodeExecutable: resolveClaudeExecutable(claudeExecutableLookup(app))` and errors clearly on null | The SDK's own lookup points inside app.asar, which `child_process.spawn` cannot start | 2026-10-07 |
+| D106 | AL-007: `build/installer.nsh` (nsis.include) deletes the installer copy electron-builder leaves at `%LOCALAPPDATA%\@agent-lanesdesktop-updater\installer.exe` after install and on uninstall, then removes that folder if empty; remove it if an auto-updater is added | Otherwise uninstall leaves a file outside the app data folder | 2026-10-07 |
+| D107 | AL-007: Packaged checks use their own Playwright config (`playwright.packaged.config.ts`, `pnpm e2e:packaged`, which runs `pnpm package` first); `pnpm e2e` ignores `e2e/packaged`; the install round trip runs only with `AGENT_LANES_INSTALL_TEST=1` | Packaging takes minutes and ~1 GB; the install creates real shortcuts and an Add/Remove Programs entry | 2026-10-07 |
+| D108 | AL-007: `electron-builder.yml` adds a copyright line, explicit Start menu and desktop shortcuts, `uninstallDisplayName: Agent Lanes` and `deleteAppDataOnUninstall: false` | Uninstall keeps `%APPDATA%\Agent Lanes`; the default name appends the version | 2026-10-07 |
+| D109 | AL-007: The assisted NSIS installer (oneClick false, perMachine false) still offers an "all users" mode with elevation; flagged, not changed | D15 says per-user; a per-user-only installer needs a custom NSIS install-mode override | 2026-10-07 |
+| D110 | AL-007: The Vitest `main` project also runs `apps/desktop/scripts/**/*.test.ts`; `tsconfig.node.json` and the desktop lint script cover `scripts/` and the packaged Playwright config | Tests and lint for the icon script | 2026-10-07 |
+| D111 | AL-190: Embed approach: one `WebContentsView` per canvas in partition `persist:claude-design`, no preload, sandboxed, context-isolated. The e2e probe shows a page sending `X-Frame-Options: DENY` and `frame-ancestors 'none'` loads in the view but fails in an iframe (ERR_BLOCKED_BY_RESPONSE) | The renderer CSP (`default-src 'self'`) would block a claude.ai iframe anyway | 2026-10-07 |
+| D112 | AL-190: Cookies in `persist:claude-design` never reach the app's default session and survive an app restart after `cookies.flushStore()` | A claude.ai sign-in persists without the app storing any credential | 2026-10-07 |
+| D113 | AL-190: No user-agent spoofing (the view's UA contains `AgentLanes/0.1.0 … Electron/44.6.0`), so Google sign-in is expected to be refused in the view; email and SSO sign-in must be tried by hand; on failure the tab offers MCP-link mode (AL-194) | Working around Google's embedded-browser policy is not acceptable | 2026-10-07 |
+| D114 | AL-190: `window.open` popups to claude.ai and its auth hosts open as child windows in the same partition; every other popup goes to the OS browser | A sign-in finished in the OS browser never reaches the view's cookies | 2026-10-07 |
+| D115 | AL-190: The Claude Design MCP surface is the Agent SDK's built-in `ClaudeDesign` tool (`{ operation, arguments }`), calling `https://api.anthropic.com/v1/design/mcp` with the user's claude.ai OAuth login (`user:design:read` / `user:design:write` scopes, one-time Design consent); API-key logins cannot reach it | Read from the installed SDK 0.3.292 (sdk-tools.d.ts and the bundled CLI); nothing was sent to claude.ai | 2026-10-07 |
+| D116 | AL-190: ClaudeDesign operations in SDK 0.3.292. Read: list, list_design_systems, get_claude_design_prompt, list_projects, get_project, list_files, read_file, get_conversation, list_members. Write: render_preview, create_project, put_conversation, finalize_plan, write_files, copy_files, create_support_js, delete_files, add_member, update_member_role, remove_member, update_sharing. The server can add read-only operations, found through `list` | The live list still needs a check with a real login | 2026-10-07 |
+| D117 | AL-190: No operation reads the canvas selection, lists "artboards" as such, or posts into the canvas's live chat (`get_conversation` reads a transcript, `put_conversation` writes one) | Artboard selection for hand-off is always Agent Lanes' own checklist, in both modes | 2026-10-07 |
+| D118 | AL-190: Artboard read path: artboards are files in the Design project, read by a per-ticket design session (Agent SDK, small model, `tools` limited to ClaudeDesign, `outputFormat` json_schema) calling list_files, read_file and render_preview; main never calls `/v1/design` directly with Claude Code's OAuth token | The token belongs to the CLI login, the endpoint is first-party only, and the tool handles consent and write grants | 2026-10-07 |
+| D119 | AL-190: ClaudeDesign availability depends on a claude.ai login, the org policy `allow_design_sync` and a server flag; the app checks for `ClaudeDesign` in the session's `system/init` tools and shows "not available for this Claude login" instead of failing | Degrades clearly | 2026-10-07 |
+| D120 | AL-190: Q11 answered: both. Webview mode uses the canvas's own Claude chat in the live view; MCP-link mode, or a failed webview sign-in, uses an in-app thread backed by a per-ticket design session with the ClaudeDesign tool, separate from the lead agent's session | As proposed in Q11 | 2026-10-07 |
+| D121 | AL-190: Design-session writes go through `finalize_plan` and its `plan_token`; AL-196 surfaces each plan for approval through `canUseTool` | The CLI denies `write_files` without a plan_token in non-interactive sessions | 2026-10-07 |
+| D122 | AL-190: Canvas identity: a ticket stores a `DesignCanvasRef` `{ kind, id, url }` (kind `design-project` or `artifact`), built by `parseDesignCanvasUrl` from `https://claude.ai/design/p/<id>`, `https://claude.ai/artifact/<id>` or `https://claude.ai/code/artifact/<uuid>`; query and fragment are dropped; other hosts, http and malformed ids are refused | The CLI keys Design projects by id and checks project URLs end in `/p/<id>`; the artifact forms are the ones the SDK's Artifact tool documents | 2026-10-07 |
+| D123 | AL-190: Both canvas kinds are supported; Design artifacts are read with the SDK's built-in `Artifact` tool (read, files listing, read path) | The CLI makes most new designs from Design Artifact types rather than standalone Design projects | 2026-10-07 |
+| D124 | AL-190: The canvas schema lives in `packages/contracts/src/domains/design.canvas.ts`, exported with one line in `packages/contracts/src/index.ts`, not in `design.schemas.ts` | Keeps the shared design registration file free for AL-191–AL-199 | 2026-10-07 |
+| D125 | AL-190: `apps/desktop/e2e/design-embed.spec.ts` (3 tests) stays as a standing guard of the Electron behaviour the design view relies on, against a local fake site; no spike write-up file: the findings are D111–D125 and the AL-191–AL-197 scope updates | Never contacts claude.ai (§7 rule 6) | 2026-10-07 |
 
 ---
 
@@ -1185,8 +1237,8 @@ implementation agent, mid-run if needed.
 | Q8 | Company process puts shared apps in `ai-tools/tools/<name>/`; Kyle's unmigrated `ticket-tracker` covers similar ground. Keep this repo standalone, or move it there and retire `ticket-tracker`? | AL-226 | Decide before the first teammate install |
 | Q9 | What may a headless agent run without asking? | — (built with the default, D18) | `acceptEdits` + git read, build and test commands; everything else asks |
 | Q10 | ADO doesn't tell a PAT its own expiry. Ask for the expiry date when saving (optional), or don't show it? | AL-043 | Optional expiry field; warn 7 days before |
-| Q11 | R11 "talk to the design section": Claude Design's own chat in the embedded canvas, an in-app design thread backed by a per-ticket design agent, or both? | AL-196 | Both: canvas chat in webview mode, in-app design thread in MCP-link mode |
-| Q12 | What can Claude Design expose programmatically (artboard list, source, selection, chat)? | AL-190–AL-197 | Answered by spike AL-190 |
+| Q11 | R11 "talk to the design section": Claude Design's own chat in the embedded canvas, an in-app design thread backed by a per-ticket design agent, or both? | AL-196 | Answered by AL-190 (D120): both, canvas chat in webview mode, in-app design thread in MCP-link mode |
+| Q12 | What can Claude Design expose programmatically (artboard list, source, selection, chat)? | AL-190–AL-197 | Answered by spike AL-190 (D115–D118): files, source and previews through the ClaudeDesign tool; no selection or live-chat operations. Live operation list still to confirm with a real login |
 
 ---
 
@@ -1200,6 +1252,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 1: merged AL-040 (partial: the reconnect prompt waits for AL-042/AL-047). Decisions D20–D28. `pnpm verify` green (107 unit tests), e2e 4/4. |
 | 2026-10-07 | Integrator batch 2: merged AL-028, AL-012, AL-008, AL-031 (done) and AL-021 (partial: OFL licences in the packaged app not yet confirmed, waits for AL-007). Two registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit`; `packages/ui/src/index.ts`). Lockfile unchanged after `pnpm install`. Decisions D29–D55. `pnpm verify` green (251 unit tests), lint probes 9/9, e2e 13/13. |
 | 2026-10-07 | Integrator batch 3: merged AL-041 and AL-060 (done). Registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit` + `settings`; renderer `shared/api/index.ts` and `shared/testing/index.ts`); lockfile regenerated (adds electron-store). Decisions D56–D81. `pnpm verify` green (437 unit tests), e2e 17/17. |
+| 2026-10-07 | Integrator batch 4: merged AL-082 and AL-131 (done), AL-007 (partial: `pnpm package`, install and uninstall not run because drive C: was full; icon, pinned Electron, SDK binary resolver, NSIS include and packaged e2e specs are in) and AL-190 (partial: real claude.ai sign-in in the view and the live ClaudeDesign operation list need a manual check by Kyle). AL-131 conflicted with AL-012/AL-041 in `build.names.ts`, `build.schemas.ts`, `services.ts` and `ipc/handlers.ts` (kept both sides); AL-007's Vitest include merged with main's preload include. Integration fix: queue concurrency now reads `settings.buildQueueSize`, settings updates refresh the queue, `build:queued` is emitted, event contract test lists the channel. Lockfile unchanged after `pnpm install`. Decisions D82–D125; AL-190's scope updates written into AL-191–AL-197; Q11/Q12 answered. `pnpm verify` green (631 unit tests), e2e 22/22. Disk C: dropped below 50 MB during the run (typecheck hit an out-of-memory once). |
 
 ---
 
