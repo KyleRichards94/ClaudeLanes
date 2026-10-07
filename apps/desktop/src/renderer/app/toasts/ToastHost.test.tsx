@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { INFO_TOAST_DURATION_MS, clearToasts, getToasts, toast } from '@/shared/model';
+import { INFO_TOAST_DURATION_MS, clearToasts, getConnectionsModal, getToasts, resetConnectionsModal, toast } from '@/shared/model';
 import { RouterProvider, createRouter, routes, selectRoute, type Router } from '@/shared/routing';
 import { installFakeBridge, type FakeBridge } from '@/shared/testing';
 import { startEventHub, stopEventHub } from '../entrypoint/EventHub';
@@ -265,6 +265,24 @@ describe('ToastHost', () => {
       await user.click(within(alert).getByRole('button', { name: 'Open ticket' }));
       expect(selectRoute(router.getState())).toEqual(routes.ticket('71273'));
       expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('opens Connections on the row a Reconnect names (AL-046)', async () => {
+      resetConnectionsModal();
+      const { user } = renderHost();
+      act(() => {
+        bridge.emit('toast', {
+          at: 1,
+          id: 'ado-unauthorized:companionsystems',
+          tone: 'error',
+          title: 'Azure DevOps refused the token',
+          actions: [{ label: 'Reconnect', intent: { type: 'openConnections', connectionId: 'ado:companionsystems' } }],
+        });
+      });
+
+      await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Reconnect' }));
+      expect(getConnectionsModal()).toMatchObject({ open: true, tab: 'ado', target: 'ado:companionsystems' });
+      resetConnectionsModal();
     });
 
     it('auto-dismisses an info toast event after 5 s', () => {

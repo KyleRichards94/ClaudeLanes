@@ -1,7 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import { color, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel, Text } from '@agent-lanes/ui';
+import { Button, GlassPanel, Text } from '@agent-lanes/ui';
 import { useAppInfo } from '@/shared/api';
+import { openConnections } from '@/shared/model';
 
 /**
  * Walking-skeleton board: proves react-native-web, tokens, glass and typed IPC end to end.
@@ -30,6 +31,8 @@ export function BoardPage() {
               ? 'Main process unreachable'
               : 'Connecting…'}
         </Text>
+        {/* Artboard 1's Connections icon button (AL-046); AL-142 builds the rest of the header. */}
+        <Button label="Connections" icon="link" iconOnly onPress={() => openConnections()} testID="open-connections" />
       </GlassPanel>
 
       <Text variant="display" role="heading" aria-level={1}>

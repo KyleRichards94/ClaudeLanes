@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { getConnectionsModal, resetConnectionsModal } from '@/shared/model';
 import { installFakeBridge } from '@/shared/testing';
 import { BoardPage } from './BoardPage';
 
@@ -37,5 +38,16 @@ describe('BoardPage', () => {
     installFakeBridge({ 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'down' } });
     renderPage();
     expect(await screen.findByText('Main process unreachable')).toBeTruthy();
+  });
+});
+
+describe('BoardPage header (AL-046)', () => {
+  it('opens Connections from its Connections button', () => {
+    resetConnectionsModal();
+    installFakeBridge({ 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Connections' }));
+    expect(getConnectionsModal()).toMatchObject({ open: true, tab: 'ado', target: null });
+    resetConnectionsModal();
   });
 });

@@ -23,3 +23,15 @@ export {
   type ToastInput,
   type ToastState,
 } from './toasts';
+export {
+  closeConnections,
+  connectionKindOf,
+  endBlockingConnections,
+  getConnectionsModal,
+  openConnections,
+  resetConnectionsModal,
+  showConnectionsTab,
+  useConnectionsModal,
+  type ConnectionsModalState,
+  type OpenConnectionsOptions,
+} from './connections-modal';
