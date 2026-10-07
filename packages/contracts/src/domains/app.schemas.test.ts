@@ -48,6 +48,16 @@ describe('toast event actions (AL-030)', () => {
     expect(open({ type: 'openConnections', connectionId: 'ADO:Not An Id' })).toBe(false);
   });
 
+  it("carries out an error code's recovery for a ticket or connection (AL-211)", () => {
+    const recover = (intent: unknown) => ToastEventSchema.safeParse({ tone: 'error', title: 'x', actions: [{ label: 'Open build log', intent }] }).success;
+
+    expect(recover({ type: 'recover', code: 'BUILD_FAILED', ticketId: '71273' })).toBe(true);
+    expect(recover({ type: 'recover', code: 'ADO_UNAUTHORIZED', connectionId: 'ado:contoso' })).toBe(true);
+    expect(recover({ type: 'recover', code: 'INTERNAL' })).toBe(true);
+    expect(recover({ type: 'recover', code: 'NOT_A_CODE' })).toBe(false);
+    expect(recover({ type: 'recover', code: 'SESSION_LOST', ticketId: '../x' })).toBe(false);
+  });
+
   it('refuses an unknown intent, an empty or long label, a third action and an empty id', () => {
     const withActions = (actions: unknown) => ToastEventSchema.safeParse({ tone: 'error', title: 'x', actions }).success;
 
