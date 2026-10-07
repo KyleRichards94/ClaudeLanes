@@ -87,12 +87,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | done |
 | AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
-| AL-085 | Branch status | E5 | S | AL-083 | todo |
+| AL-085 | Branch status | E5 | S | AL-083 | done |
 | AL-086 | Merge sub-branches → ticket branch | E5 | M | AL-084, AL-085 | todo |
-| AL-087 | Merge worktree → main | E5 | M | AL-085 | todo |
-| AL-088 | Archive | E5 | M | AL-083 | todo |
-| AL-089 | Diff provider | E5 | S | AL-083 | todo |
-| AL-090 | Start-up reconciliation | E5 | M | AL-083, AL-101 | todo |
+| AL-087 | Merge worktree → main | E5 | M | AL-085 | partial |
+| AL-088 | Archive | E5 | M | AL-083 | done |
+| AL-089 | Diff provider | E5 | S | AL-083 | done |
+| AL-090 | Start-up reconciliation | E5 | M | AL-083, AL-101 | partial |
 | AL-100 | Session manager core | E6 | L | AL-083, AL-044 | todo |
 | AL-101 | Ticket records | E6 | M | AL-041 | done |
 | AL-102 | Output normalisation and transcript buffer | E6 | L | AL-100, AL-012 | todo |
@@ -556,7 +556,7 @@ colour alone.
 - **Design:** artboard 3 Sub-branches ("4 ahead · Ready") · **Depends on:** AL-083
 - **Scope:** `branches:status(ticketId)` → ticket branch vs base, each sub-branch vs ticket branch: ahead/behind, dirty, ready (= clean and its sub-agent finished). Query key `['branches', ticketId]`; refreshed on `agent:subagent` completion and after merges.
 - **Acceptance criteria:**
-  - [ ] A dirty sub-worktree is never "Ready".
+  - [x] A dirty sub-worktree is never "Ready".
 
 #### AL-086 · Merge sub-branches → ticket branch
 - **Design:** §9 step 4, R9 · **Depends on:** AL-084, AL-085
@@ -569,27 +569,27 @@ colour alone.
 - **Design:** §9 step 5, R9, §13 risk, Q1, Q2 · **Depends on:** AL-085
 - **Scope:** Confirm modal naming source and target; warning when QA has not passed; refuse with `GIT_DIRTY` when the worktree has uncommitted changes; merge into the base branch in the main checkout and push; optional block until the PR is approved (setting). Behaviour after Q1 is answered may switch this to "always via PR".
 - **Acceptance criteria:**
-  - [ ] Cannot merge with uncommitted changes.
-  - [ ] Card moves to Done with "Merged into main · 15:20".
+  - [x] Cannot merge with uncommitted changes.
+  - [ ] Card moves to Done with "Merged into main · 15:20". (open: the record and store move to Done and `mergedActivityText` gives the string as the card activity; showing it on the card waits for AL-144 and the confirm modal for AL-174)
 
 #### AL-088 · Archive
 - **Design:** §9 step 6 · **Depends on:** AL-083
 - **Scope:** User-chosen Archive removes the ticket worktree and its sub-worktrees (`git worktree remove`, then prune), optionally deletes merged branches; handles Windows long paths and locked files (retry, report partial removals); ticket record moves to an archive list.
 - **Acceptance criteria:**
-  - [ ] Never runs automatically.
-  - [ ] Refuses when a worktree has unmerged commits unless the user confirms a second time.
+  - [x] Never runs automatically.
+  - [x] Refuses when a worktree has unmerged commits unless the user confirms a second time.
 
 #### AL-089 · Diff provider
 - **Design:** artboard 3 Diff tab · **Depends on:** AL-083
 - **Scope:** `git:diff(ticketId, { against: base | sub-branch })` → files with status and stats, and per-file unified diff on demand (size-capped).
 - **Acceptance criteria:**
-  - [ ] Binary and very large files show a placeholder, not raw content.
+  - [x] Binary and very large files show a placeholder, not raw content.
 
 #### AL-090 · Start-up reconciliation
 - **Design:** §6 last bullet · **Depends on:** AL-083, AL-101
 - **Scope:** On launch, read `git worktree list --porcelain` for each repo and match ticket records; rebuild tickets with their stage, model/effort and session id; flag orphans (record without worktree → "Worktree missing"; worktree under our root without record → offer "Adopt" or "Ignore").
 - **Acceptance criteria:**
-  - [ ] Restarting the app shows the same board as before, with sessions resumable.
+  - [ ] Restarting the app shows the same board as before, with sessions resumable. (open: unit tests and `e2e/reconcile.spec.ts` show identical boards and session ids across restarts and the store is rebuilt; cards drawing the flags wait for AL-143/AL-144 and resuming sessions for AL-110)
 
 ---
 
@@ -1541,6 +1541,29 @@ implementation agent, mid-run if needed.
 | D442 | AL-160: The shell includes simple Model/Effort segmented controls and the Sprint / Search / No ticket control; AL-161–AL-164 plug into marked slots and dispatch into the same reducer | Form and summary work end to end now | 2026-10-07 |
 | D443 | AL-160: A description is required only for "No ticket"; otherwise a picked work item is required | Validation | 2026-10-07 |
 | D444 | AL-160: Interim primary "New agent ticket" button in the skeleton board header | Until AL-142 builds the real header | 2026-10-07 |
+| D445 | AL-085: Ready = worktree present, clean (untracked files count as dirty, ignored files don't), no conflicts, sub-agent not running and the sub-branch exists; a missing worktree or deleted branch is never ready | Nothing un-mergeable is offered | 2026-10-07 |
+| D446 | AL-085: "Sub-agent finished" comes from an injectable `SubagentActivity.isRunning(ticketId, name)`, defaulting to `NO_SUBAGENTS_RUNNING` | The session manager (AL-100/AL-107) isn't merged yet | 2026-10-07 |
+| D447 | AL-085: The renderer refreshes `['branches', ticketId]` on every `agent:subagent` event for the ticket; AppProviders registers `createBranchStatusEventHandlers(queryClient)` through a new `runningEventHub()` export in `app/entrypoint/EventHub.ts` | The event payload doesn't yet say whether the sub-agent completed (AL-107); avoids a second bridge subscription | 2026-10-07 |
+| D448 | AL-085: A status read never fetches and uses AL-080 `status()`, which doesn't take index.lock | Status reads stay cheap and don't block other git work | 2026-10-07 |
+| D449 | AL-087: Q1 follows the proposed default: merge locally and push. The optional "block until the PR is approved" setting isn't built | Adding a settings field would change SettingsSchema and other branches' settings fakes | 2026-10-07 |
+| D450 | AL-087: QA passed = current stage is Create PR or Done, the ticket entered QA at some point, and every stage since the last QA entry is Create PR or Done | A ticket QA sent back has to go through QA again | 2026-10-07 |
+| D451 | AL-087: The checkout with the base checked out must have no staged or unstaged changes (GIT_DIRTY `base-checkout-dirty`; untracked allowed); when no checkout has the base, the merge is built with `merge-tree --write-tree` / `commit-tree` | No working tree is touched unexpectedly | 2026-10-07 |
+| D452 | AL-087: A conflict changes nothing (`merge --abort`, MERGE_CONFLICT with `details.files`); a local base diverged from origin is refused (`base-diverged`), never rewritten | Safe failure | 2026-10-07 |
+| D453 | AL-087: A failed push keeps the local merge and returns INTERNAL `push-failed` without moving the card; rerunning sees the branch already merged and only pushes | Retry is idempotent | 2026-10-07 |
+| D454 | AL-087: Merge commit message is "Merge branch '<ticket>' into <base>" followed by "Work item #id: title" | Traceability to ADO | 2026-10-07 |
+| D455 | AL-087: Merges and archives in one repo share one keyed queue (`repoQueue` in services.ts) | They run one at a time per repo | 2026-10-07 |
+| D456 | AL-088: "Unmerged" = ticket-branch commits not in the base, or sub-branch commits in neither the base nor the ticket branch; uncommitted changes in any worktree also need the second confirmation | Defines what the second confirmation protects | 2026-10-07 |
+| D457 | AL-088: On a partial removal the record stays on the board (status `partial` with leftovers) and Archive can run again; unregistered or missing worktrees count as removed | Locked files and long paths on Windows | 2026-10-07 |
+| D458 | AL-088: The Node rm fallback runs only in a folder whose .git points into this repo's worktrees, and only when the user confirmed discarding or the worktree is clean; the removal function is injectable | Never deletes an unrelated folder | 2026-10-07 |
+| D459 | AL-088: Only branches already in the base are deleted (`deleteMergedBranches`); unmerged branches are always kept, even after `discardUnmerged` | No commit becomes unreachable | 2026-10-07 |
+| D460 | AL-088: The archive list is a separate folder of `<id>-<archivedAt>.json` files at `<userData>/tickets-archive`, not a record field; `isWorktreeFolderOf` in worktree-git.ts is exported | TicketRecordSchema unchanged and ticket ids can be reused | 2026-10-07 |
+| D461 | AL-089: Diffs start at the merge base and include uncommitted work while the worktree exists; if it is gone the branch tip is used and `includesUncommitted` is false | Changes that landed on the base meanwhile don't appear | 2026-10-07 |
+| D462 | AL-089: Untracked files are listed as `untracked`; their diff is built in main as an all-added patch after a NUL-byte binary check and the 256 KiB cap, only for paths git reports untracked and inside the worktree | Covers new files safely | 2026-10-07 |
+| D463 | AL-089: Requested paths must be relative and inside the worktree (VALIDATION `invalid-path`); git runs with `GIT_LITERAL_PATHSPECS=1` | No pathspec magic can be smuggled in | 2026-10-07 |
+| D464 | AL-090: Start-up reconciliation is read-only; nothing is removed or rewritten except by Adopt or Ignore. Missing worktrees are reported in `missingWorktrees` in the query data, not the AgentTicket store type | Other branches' AgentTicket literals keep compiling | 2026-10-07 |
+| D465 | AL-090: An adopted orphan becomes a Queued ticket with ado null, its branch name as title, the repo's base branch and settings defaults; detached worktrees, invalid or taken ids and non-orphans are refused with a VALIDATION reason | Predictable adoption | 2026-10-07 |
+| D466 | AL-090: Repos come from settings plus any repo named in a record; a repo git can't read goes in `unreadableRepos` and its tickets are flagged missing only when their folders are gone | A temporarily unreadable repo doesn't flag every ticket | 2026-10-07 |
+| D467 | AL-090: `e2e/reconcile.spec.ts` registers its repo by writing settings.json between launches | `settings:update` refuses new repos (D305 folder picker) | 2026-10-07 |
 
 ---
 
@@ -1588,6 +1611,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 16: merged AL-133 and AL-134 (done) and AL-132 (partial: build data path done and proven in unit and e2e `build-job.spec.ts`; `buildCardState()` gives "Build failed · 3 errors" and the first error, but no agent card draws it until AL-160s). One registration conflict in `services.ts` (AL-065 `createAdoService` import + AL-133 `shell` import, kept both sides). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D394–D414. `pnpm verify` green (2229 unit tests), e2e 65/65. The first full test run had a Vitest fork crash on start-up (exit 0xC0000409) and the second timed out two `App.test.tsx` routing tests on `findBy`'s 1 s default under load from parallel agents (about 58 node processes); the file passed alone and the third full run was green. Follow-ups: AL-160s card renders `buildCardState(record.lastBuild)` and `runLabel(status)` and updates on `build:finished`/`run:status`; AL-173 Build/Run/Stop buttons call `build:start`/`run:start`/`run:stop`, show `lastBuildLabel()`, click opens `run:openUrl`, backfill with `run:list` after reload; AL-135 consumes `build:log` lines with `level`, filtered by `kind`; AL-112 uses the `build:finished` payload as next-turn context; AL-213 keeps the dispose order (runs, build queue, tickets); AL-146 could show which commands are overrides (no `--urls`); run the POSIX process-group kill on macOS/Linux CI; `App.test.tsx` may want the 15 s `asyncUtilTimeout` that `AppRouter.test.tsx` got in batch 11. |
 | 2026-10-07 | Integrator batch 17: merged AL-210 (partial: page, lane, card and panel boundaries built and tested on stand-ins; every routed page is wrapped in `PageErrorBoundary` keyed by route; the card criterion stays open until real lanes and cards exist). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D415–D419. `pnpm verify` green (2237 unit tests), e2e 65/65. AL-210's agent could not push its branch (Git Credential Manager prompt); it was merged from the local branch. Follow-ups: AL-143 wraps each lane in `LaneErrorBoundary` and AL-144 each `AgentTicketCard` in `TicketErrorBoundary` (keyed by ticket id), then tick AL-210's criterion against the real board; AL-175/AL-177/AL-192 wrap the output panel, sub-agents panel and design view host in `PanelErrorBoundary` (`output`/`subAgents`/`designView`); `React.lazy` caches a rejected chunk import, so Retry after a page chunk fails re-throws unless `pages.ts` recreates the lazy loader on reset. |
 | 2026-10-07 | Integrator batch 18: merged AL-145 and AL-160 (done), AL-143 (partial: lanes, badges, Done strip, cards and dock match artboard 1 at 1440 × 960, but the cards' ADO state text waits for AL-066, live activity for AL-103, and the header and legend for AL-142), AL-144 (partial: every artboard 6 state built and tested through store actions; the gallery is AL-032 and most agent event payloads are not wired until AL-103/AL-104/AL-106/AL-107/AL-109/AL-132) and AL-146 (partial: every setting is editable; opening from the Repo dropdown waits for AL-142). One branch, no conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D420–D444. `pnpm verify` green (2296 unit tests), e2e 70/70. Follow-ups: AL-066/AL-142 pass each card's `adoState`; AL-142 filters lanes by repo and sprint, replaces the skeleton header and the interim Settings / New agent ticket buttons, and opens Settings from the Repo dropdown; AL-090 reconciles records at start-up and AL-165 invalidates `['tickets']` after a launch, then highlights the new card; AL-210 wraps each lane in `LaneErrorBoundary` and each card in `TicketErrorBoundary`; AL-032 shows `AgentTicketCardView` per state; AL-115 respects `repoAdoWriteBack(repo)`; AL-111 reads per-repo `maxConcurrentAgents`; AL-114/AL-162 replace the default-skills text field with chips; AL-161–AL-164 fill the new-ticket modal's slots; AL-200 adds design presence to the card. |
+| 2026-10-07 | Integrator batch 7 (b10): merged AL-085, AL-088 and AL-089 (done), AL-087 (partial: refuses a dirty worktree, merges --no-ff and pushes, record and store go to Done with "Merged into main · HH:MM"; showing it on the card waits for AL-144, the confirm modal for AL-174, the block-until-PR-approved setting for Q1) and AL-090 (partial: `tickets:board` reconciles records with `git worktree list`, Adopt/Ignore orphans, BoardSync loads the board at launch, e2e proves identical boards across restarts; cards drawing "Worktree missing" wait for AL-143/AL-144 and resuming sessions for AL-110). One branch; conflicts with AL-143 in `tickets.names.ts`/`tickets.schemas.ts`/`main/tickets/handlers.ts` (`tickets:list` kept beside the five new channels), `ipc/handlers.ts`, `shared/api/index.ts`, `entities/agent-ticket/index.ts` (kept both sides) and `App.test.tsx` (kept main's 15 s async timeout). Lockfile unchanged after `pnpm install`. Integration fix: `tickets/handlers.test.ts` passes stub archive/reconcile services to the merged `createTicketsHandlers`. Decisions D445–D467. `pnpm verify` green (2374 unit tests), e2e 71/71 on rerun (first run: `toasts.spec.ts` info toast auto-close timed out under load; passed 3/3 alone and in the full rerun). Follow-ups: the board now loads records twice (AL-143 `useBoardTickets` via `tickets:list` and AL-090 `BoardSync` via `tickets:board`, both `agentTickets.load`), so AL-142/AL-143 should switch the board to `useTicketBoard()` and drop one; AL-107 passes sub-agent tracking to `createBranchStatusService({ subagents })` and narrows the `agent:subagent` invalidation to completions; AL-174 needs IpcError to carry `details` for GIT_DIRTY/MERGE_CONFLICT file lists; AL-100/AL-213 stop the session before Archive; the Archive UI and archive list view have no owning ticket; AL-110 resumes sessions from records' sessionId; report `recordIssues` in the UI (AL-101); AL-178 and AL-179 build on `useBranchStatus` and `useTicketDiff`/`useDiffFile`. |
 
 ---
 
