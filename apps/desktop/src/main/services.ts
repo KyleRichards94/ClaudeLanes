@@ -190,6 +190,8 @@ export function createServices(options: ServiceOptions): Services {
 /** Stops child processes and flushes state on quit (AL-213 fills this in). */
 export async function disposeServices(services: Services): Promise<void> {
   void services;
+  // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
+  await services.runs.dispose();
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();

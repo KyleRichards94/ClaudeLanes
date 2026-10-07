@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { BuildLogStream } from '@agent-lanes/contracts';
 import { createLineSplitter } from '../log/lines';
+import { killTree as defaultKillTree, type KillTree } from './kill-tree';
 
 /**
  * Starts a build or run command line in a worktree (AL-132, AL-133). Commands are command lines
@@ -21,7 +22,7 @@ export interface CommandProcess {
   readonly pid: number | undefined;
   /** Settles once the process exited and its output was read. Never rejects. */
   readonly exit: Promise<CommandExit>;
-  /** Stops the process; resolves once the stop was requested. Safe to call after it exited. */
+  /** Ends the process and every process it started (AL-134); resolves once they are gone. Safe after it exited. */
   kill(): Promise<void>;
 }
 
@@ -32,6 +33,8 @@ export interface StartCommandOptions {
   env?: Record<string, string>;
   onLine(stream: BuildLogStream, text: string): void;
   platform?: NodeJS.Platform;
+  /** Ends the process tree on kill (AL-134); tests pass a fake. */
+  killTree?: KillTree;
 }
 
 export type StartCommand = (options: StartCommandOptions) => CommandProcess;
@@ -46,7 +49,7 @@ export const PLAIN_OUTPUT_ENV: Readonly<Record<string, string>> = {
   MSBUILDTERMINALLOGGER: 'off',
 };
 
-export const startCommand: StartCommand = ({ command, cwd, env, onLine, platform = process.platform }) => {
+export const startCommand: StartCommand = ({ command, cwd, env, onLine, platform = process.platform, killTree = defaultKillTree }) => {
   let child: ChildProcess;
   try {
     child = spawn(command, {
@@ -90,8 +93,8 @@ export const startCommand: StartCommand = ({ command, cwd, env, onLine, platform
     pid: child.pid,
     exit,
     kill() {
-      if (child.exitCode === null && child.signalCode === null) child.kill();
-      return Promise.resolve();
+      if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+      return killTree(child.pid, { platform });
     },
   };
 };

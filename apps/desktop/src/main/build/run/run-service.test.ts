@@ -67,11 +67,22 @@ function builtResult(outcome: BuildResult['outcome']): BuildResult {
 function fakeProcesses() {
   const started: StartCommandOptions[] = [];
   const exits: ((exit: CommandExit) => void)[] = [];
+  const kill = vi.fn();
   const start: StartCommand = (options) => {
     started.push(options);
-    return { pid: 100 + started.length, exit: new Promise<CommandExit>((resolve) => exits.push(resolve)), kill: () => Promise.resolve() };
+    const index = started.length - 1;
+    return {
+      pid: 100 + started.length,
+      exit: new Promise<CommandExit>((resolve) => exits.push(resolve)),
+      // Killing the tree ends the shell with an error code, as taskkill /F does.
+      kill: () => {
+        kill(index);
+        exits[index]!({ exitCode: 1, signal: null });
+        return Promise.resolve();
+      },
+    };
   };
-  return { start, started, exits };
+  return { start, started, exits, kill };
 }
 
 function setup(overrides: Partial<RunServiceOptions> & { detected?: DetectedCommands; override?: string | null; stale?: boolean } = {}) {
@@ -116,7 +127,7 @@ describe('run service', () => {
     const { service, processes, builds, statuses, stored } = setup();
 
     const started = await service.start('71273');
-    expect(builds.build).toHaveBeenCalledWith('71273', { kind: 'run' });
+    expect(builds.build).toHaveBeenCalledWith('71273', { kind: 'run', signal: expect.any(AbortSignal) });
     expect(started).toMatchObject({ ok: true, data: { state: 'starting', port: 5080, runKind: 'web', url: null } });
 
     const [options] = processes.started;
@@ -208,5 +219,65 @@ describe('run service', () => {
     const { service } = setup({ buildCommands: { forRepo: () => Promise.resolve(ok({ ...commandsFor(web), run: null })) } });
     await expect(service.start('71273')).resolves.toMatchObject({ ok: false, code: 'VALIDATION', message: expect.stringContaining('no run command') });
     await expect(service.start('nope')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+  });
+});
+
+describe('run service, Stop (AL-134)', () => {
+  it('kills the process tree and reports the run stopped, not failed', async () => {
+    const { service, processes, statuses, stored } = setup({ detected: desktop });
+    await service.start('71273');
+
+    await expect(service.stop('71273')).resolves.toEqual({ ok: true, data: { stopped: true } });
+    expect(processes.kill).toHaveBeenCalledOnce();
+    expect(statuses().map((status) => status.state)).toEqual(['building', 'running', 'stopping', 'stopped']);
+    expect(statuses().at(-1)).toMatchObject({ exitCode: null, message: null });
+    expect(runLabel(statuses().at(-1)!)).toBe('Not running');
+    await vi.waitFor(() => expect(stored().lastRun?.stoppedAt).not.toBeNull());
+
+    await expect(service.stop('71273')).resolves.toEqual({ ok: true, data: { stopped: false } });
+    await expect(service.stop('99999')).resolves.toEqual({ ok: true, data: { stopped: false } });
+  });
+
+  it('releases the port of a web run when it stops', async () => {
+    const ports = { allocate: vi.fn(() => Promise.resolve(5080)), release: vi.fn() };
+    const { service } = setup({ ports });
+    await service.start('71273');
+    await service.stop('71273');
+    expect(ports.release).toHaveBeenCalledWith(5080);
+  });
+
+  it('cancels the build step of a run that is still building and starts nothing', async () => {
+    const { service, processes, builds, statuses } = setup();
+    let buildSignal: AbortSignal | undefined;
+    builds.build.mockImplementationOnce(((_: string, options: { signal?: AbortSignal }) => {
+      buildSignal = options.signal;
+      return new Promise((resolve) => options.signal?.addEventListener('abort', () => resolve(ok(builtResult('cancelled')))));
+    }) as never);
+
+    const starting = service.start('71273');
+    await vi.waitFor(() => expect(buildSignal).toBeDefined());
+    await expect(service.stop('71273')).resolves.toEqual({ ok: true, data: { stopped: true } });
+    await expect(starting).resolves.toMatchObject({ ok: true, data: { state: 'stopped' } });
+    expect(buildSignal!.aborted).toBe(true);
+    expect(processes.started).toHaveLength(0);
+    expect(statuses().at(-1)).toMatchObject({ state: 'stopped' });
+  });
+
+  it('stops every run on quit and refuses new ones', async () => {
+    const { service, processes } = setup({ detected: desktop });
+    await service.start('71273');
+    await service.dispose();
+    expect(processes.kill).toHaveBeenCalledOnce();
+    expect(service.list().every((run) => run.state === 'stopped')).toBe(true);
+    await expect(service.start('71273')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+  });
+
+  it('lets the app quit after the grace period even if a tree will not die', async () => {
+    const processes = fakeProcesses();
+    const stuck: StartCommand = (options) => ({ ...processes.start(options), kill: () => new Promise(() => undefined) });
+    const { service } = setup({ detected: desktop, startCommand: stuck });
+    await service.start('71273');
+    const quitting = service.dispose({ graceMs: 20 });
+    await expect(quitting).resolves.toBeUndefined();
   });
 });
