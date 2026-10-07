@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type { SetupServer } from 'msw/node';
-import { ORG_URL } from './msw-server';
+import { ORG_URL } from './constants';
 
 /**
  * Test-only fake of the Azure DevOps work item endpoints AL-062 uses: WIQL (with a small interpreter
@@ -132,11 +132,22 @@ export interface FakeAdo {
 
 /** Installs the fake's handlers on a test's MSW server and returns its state. */
 export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: FakeWorkItem[]): FakeAdo {
-  const fake: FakeAdo = { items, states: agileStates(), unreadable: new Set(), wiql: [], batches: [], gets: [], stateReads: [], requests: 0 };
+  const fake = createFakeWorkItems(items);
+  server.use(...fakeWorkItemHandlers(fake));
+  return fake;
+}
+
+/** The fake's state for `items`, before any request (AL-065 builds the shared fake organisation on it). */
+export function createFakeWorkItems(items: FakeWorkItem[]): FakeAdo {
+  return { items, states: agileStates(), unreadable: new Set(), wiql: [], batches: [], gets: [], stateReads: [], requests: 0 };
+}
+
+/** The fake's MSW handlers for the organisation at `orgUrl` (default the unit tests' `contoso`). */
+export function fakeWorkItemHandlers(fake: FakeAdo, orgUrl: string = ORG_URL) {
   const byId = (id: number) => (fake.unreadable.has(id) ? undefined : fake.items.find((candidate) => candidate.id === id));
 
-  server.use(
-    http.post(`${ORG_URL}/:project/_apis/wit/wiql`, async ({ request, params }) => {
+  return [
+    http.post(`${orgUrl}/:project/_apis/wit/wiql`, async ({ request, params }) => {
       fake.requests += 1;
       const project = String(params['project']);
       const url = new URL(request.url);
@@ -156,12 +167,12 @@ export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: Fa
         queryType: 'flat',
         queryResultType: 'workItem',
         asOf: '2026-10-07T00:00:00Z',
-        columns: [{ referenceName: 'System.Id', name: 'ID', url: `${ORG_URL}/_apis/wit/fields/System.Id` }],
-        workItems: (top === null ? matches : matches.slice(0, top)).map((match) => ({ id: match.id, url: `${ORG_URL}/_apis/wit/workItems/${match.id}` })),
+        columns: [{ referenceName: 'System.Id', name: 'ID', url: `${orgUrl}/_apis/wit/fields/System.Id` }],
+        workItems: (top === null ? matches : matches.slice(0, top)).map((match) => ({ id: match.id, url: `${orgUrl}/_apis/wit/workItems/${match.id}` })),
       });
     }),
 
-    http.post(`${ORG_URL}/_apis/wit/workitemsbatch`, async ({ request }) => {
+    http.post(`${orgUrl}/_apis/wit/workitemsbatch`, async ({ request }) => {
       fake.requests += 1;
       const body = (await request.json()) as { ids: number[]; fields: string[]; errorPolicy?: string };
       fake.batches.push(body.ids);
@@ -175,10 +186,10 @@ export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: Fa
       if (body.errorPolicy?.toLowerCase() !== 'omit' && value.includes(null)) {
         return HttpResponse.json({ message: 'TF401232: Work item does not exist, or you do not have permissions to read it.' }, { status: 404 });
       }
-      return HttpResponse.json({ count: value.length, value: value.map((found) => found && toAdo(found, body.fields)) });
+      return HttpResponse.json({ count: value.length, value: value.map((found) => found && toAdo(found, body.fields, orgUrl)) });
     }),
 
-    http.get(`${ORG_URL}/_apis/wit/workitems/:id`, ({ request, params }) => {
+    http.get(`${orgUrl}/_apis/wit/workitems/:id`, ({ request, params }) => {
       fake.requests += 1;
       const id = Number(params['id']);
       const fields = (new URL(request.url).searchParams.get('fields') ?? '').split(',').filter(Boolean);
@@ -190,10 +201,10 @@ export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: Fa
           { status: 404 },
         );
       }
-      return HttpResponse.json(toAdo(found, fields.length > 0 ? fields : Object.values(FIELDS).map((field) => field.name)));
+      return HttpResponse.json(toAdo(found, fields.length > 0 ? fields : Object.values(FIELDS).map((field) => field.name), orgUrl));
     }),
 
-    http.get(`${ORG_URL}/:project/_apis/wit/workitemtypes/:type/states`, ({ params }) => {
+    http.get(`${orgUrl}/:project/_apis/wit/workitemtypes/:type/states`, ({ params }) => {
       fake.requests += 1;
       const project = String(params['project']);
       const type = String(params['type']);
@@ -202,12 +213,11 @@ export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: Fa
       if (!states) return HttpResponse.json({ message: `VS402323: Work item type ${type} does not exist.` }, { status: 404 });
       return HttpResponse.json({ count: states.length, value: states.map((state) => ({ ...state, color: '007acc' })) });
     }),
-  );
-  return fake;
+  ];
 }
 
 /** A work item as ADO returns it: only the requested fields that have a value. */
-function toAdo(found: FakeWorkItem, fields: string[]) {
+function toAdo(found: FakeWorkItem, fields: string[], orgUrl: string) {
   const values = Object.fromEntries(
     fields.flatMap((name) => {
       const field = FIELDS[name.toLowerCase()];
@@ -215,7 +225,7 @@ function toAdo(found: FakeWorkItem, fields: string[]) {
       return field && value !== undefined && value !== '' ? [[field.name, value]] : [];
     }),
   );
-  return { id: found.id, rev: 3, fields: values, url: `${ORG_URL}/_apis/wit/workItems/${found.id}` };
+  return { id: found.id, rev: 3, fields: values, url: `${orgUrl}/_apis/wit/workItems/${found.id}` };
 }
 
 // ── A small WIQL interpreter ─────────────────────────────────────────────────────────────────────

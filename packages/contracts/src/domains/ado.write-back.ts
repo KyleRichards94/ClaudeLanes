@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkItemIdSchema } from './ado.schemas';
+import { WorkItemIdSchema } from './ado.ids';
 
 /**
  * Work item write-back (AL-063, design §7 "ADO write-back"): the comments Agent Lanes posts to a

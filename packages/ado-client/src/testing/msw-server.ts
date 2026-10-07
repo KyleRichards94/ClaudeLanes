@@ -1,12 +1,13 @@
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { createAdoClient, type AdoClient, type AdoClientOptions, type AdoLogEntry } from '../client';
+import { ORG_URL } from './constants';
 
 /**
- * Test-only helpers for the ado-client unit tests. Not exported from the package: AL-065 owns the
- * shared MSW handler set and fixtures used across the app.
+ * Test-only helpers for the ado-client unit tests. Not exported from the package; the shared MSW
+ * handler set used across the app is `createFakeAdoOrg` in `./fake-org.ts` (AL-065).
  */
-export const ORG_URL = 'https://dev.azure.com/contoso';
+export { ORG_URL };
 
 /** Shaped like a real 52-character PAT; valid nowhere. */
 export const FAKE_PAT = 'fakepat7q2w9e4r1t6y3u8i5o0p2a7s4d9f1g6h3j8k5l0z2x7c4';

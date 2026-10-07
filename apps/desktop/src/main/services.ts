@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, type BrowserWindow } from 'electron';
+import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
 import { readAppInfo } from './app/app-info';
@@ -57,6 +58,8 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
+  readonly ado: AdoService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
   readonly tickets: TicketRecordStore;
   /** Registered repos in settings, added through the native folder picker (AL-081). */
@@ -147,6 +150,8 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
   });
 
+  const ado = createAdoService({ connections, settings, log: log.child('ado') });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -159,6 +164,7 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    ado,
     tickets,
     repos,
     claude,
