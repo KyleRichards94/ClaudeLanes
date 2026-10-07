@@ -10,3 +10,4 @@ export {
   type TicketRecordStore,
   type TicketRecordStoreOptions,
 } from './record-store';
+export { TICKETS_ARCHIVE_DIR_NAME, createTicketArchive, ticketsArchiveDir, type TicketArchive } from './archive-store';

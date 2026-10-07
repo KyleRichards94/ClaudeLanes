@@ -30,6 +30,9 @@ import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from 
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
+import { createArchiveService, type ArchiveService } from './worktrees/archive';
+import { createKeyedQueue } from './worktrees/keyed-queue';
+import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -75,6 +78,10 @@ export interface Services {
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
   readonly mergeToMain: MergeToMainService;
+  /** Archived tickets in `<userData>/tickets-archive` (AL-088). */
+  readonly ticketArchive: TicketArchive;
+  /** User-chosen Archive: removes the ticket's worktrees and moves its record to the archive list (AL-088). */
+  readonly archive: ArchiveService;
 }
 
 export interface ServiceOptions {
@@ -128,7 +135,11 @@ export function createServices(options: ServiceOptions): Services {
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
   const branches = createBranchStatusService({ git, tickets });
-  const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge') });
+  // Merges and archives in one repo run one at a time.
+  const repoQueue = createKeyedQueue();
+  const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
+  const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
+  const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -183,6 +194,8 @@ export function createServices(options: ServiceOptions): Services {
     worktrees,
     branches,
     mergeToMain,
+    ticketArchive,
+    archive,
   };
 }
 

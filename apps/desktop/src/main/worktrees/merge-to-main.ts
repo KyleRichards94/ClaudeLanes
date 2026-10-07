@@ -13,7 +13,7 @@ import type { GitStatus } from '../git/porcelain';
 import { isSameRepoPath, repoPathKey } from '../repos/repo-paths';
 import type { TicketRecordStore } from '../tickets/record-store';
 import { readWorktreeState, refExists } from './branch-status';
-import { createKeyedQueue } from './keyed-queue';
+import { createKeyedQueue, type KeyedQueue } from './keyed-queue';
 import { fetchBase } from './worktree-git';
 
 /**
@@ -42,6 +42,8 @@ export interface MergeToMainServiceOptions {
   tickets: Pick<TicketRecordStore, 'get' | 'update' | 'flush'>;
   now?: () => number;
   log?: { info(message: string): void; warn(message: string): void };
+  /** Shared with other services that change a repo's branches, so they run one at a time per repo. */
+  queue?: KeyedQueue;
 }
 
 const HEADS = 'refs/heads/';
@@ -102,7 +104,7 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
   const { git, tickets } = options;
   const now = options.now ?? Date.now;
   const log = options.log ?? { info: () => undefined, warn: (message: string) => console.warn(`[merge] ${message}`) };
-  const inRepo = createKeyedQueue();
+  const inRepo = options.queue ?? createKeyedQueue();
 
   async function load(ticketId: string): Promise<TicketRecord> {
     const record = await tickets.get(ticketId);
