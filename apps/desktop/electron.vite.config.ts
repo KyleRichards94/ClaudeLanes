@@ -31,7 +31,7 @@ function chunkFileName(chunk: { facadeModuleId: string | null }): string {
   return page ? `assets/page-${page}-[hash].js` : 'assets/[name]-[hash].js';
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   main: {
     build: {
       externalizeDeps: { exclude: [...workspacePackages, ...esmOnlyMainDeps] },
@@ -57,6 +57,9 @@ export default defineConfig(({ command }) => ({
     },
     define: {
       __DEV__: JSON.stringify(command === 'serve'),
+      // The component gallery (AL-032) is in `pnpm dev` and the e2e gallery build
+      // (`electron-vite build --mode gallery`), never in a production build.
+      __GALLERY__: JSON.stringify(command === 'serve' || mode === 'gallery'),
     },
     optimizeDeps: {
       esbuildOptions: {

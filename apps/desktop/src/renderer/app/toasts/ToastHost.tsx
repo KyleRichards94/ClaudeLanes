@@ -6,6 +6,7 @@ import {
   INFO_TOAST_DURATION_MS,
   autoDismisses,
   dismissToast,
+  openConnections,
   useToasts,
   type ToastActionInput,
   type ToastEntry,
@@ -33,7 +34,7 @@ export function ToastHost() {
   const waiting = toasts.length - visible.length;
 
   function run(entry: ToastEntry, action: ToastActionInput) {
-    const context: ToastIntentContext = { navigate: router.navigate };
+    const context: ToastIntentContext = { navigate: router.navigate, openConnections };
     try {
       if ('onPress' in action) action.onPress();
       else runToastIntent(action.intent, context);

@@ -67,5 +67,10 @@ export const progressGradient = {
   to: '#38BDF8', // color.skyGlow
 } as const;
 
-/** Merged and other finished cards fade back so live work stands out. */
-export const mutedOpacity = 0.75;
+/**
+ * Merged and other finished cards fade back so live work stands out. AL-033: the fade is mostly a
+ * loss of colour (`mutedFilter`, which keeps luminance and so contrast) with a light opacity on top;
+ * the artboard's 0.75 opacity left the card's text at about 3.2:1, under design §11's 4.5:1.
+ */
+export const mutedOpacity = 0.95;
+export const mutedFilter = 'grayscale(0.7)';

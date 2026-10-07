@@ -39,6 +39,15 @@ describe('toast event actions (AL-030)', () => {
     expect(navigate({ name: 'ticket', ticketId: '../secrets' })).toBe(false);
   });
 
+  it('opens the Connections modal, optionally on a saved row (AL-046)', () => {
+    const open = (intent: unknown) => ToastEventSchema.safeParse({ tone: 'error', title: 'x', actions: [{ label: 'Reconnect', intent }] }).success;
+
+    expect(open({ type: 'openConnections', connectionId: 'ado:companionsystems' })).toBe(true);
+    expect(open({ type: 'openConnections', connectionId: 'claude' })).toBe(true);
+    expect(open({ type: 'openConnections' })).toBe(true);
+    expect(open({ type: 'openConnections', connectionId: 'ADO:Not An Id' })).toBe(false);
+  });
+
   it('refuses an unknown intent, an empty or long label, a third action and an empty id', () => {
     const withActions = (actions: unknown) => ToastEventSchema.safeParse({ tone: 'error', title: 'x', actions }).success;
 
