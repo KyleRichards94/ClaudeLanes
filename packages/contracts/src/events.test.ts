@@ -13,6 +13,7 @@ describe('event contracts', () => {
         'agent:status',
         'agent:subagent',
         'build:log',
+        'build:queued', // AL-131
         'connections:changed',
         'design:spec',
         'run:status',
