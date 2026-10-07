@@ -114,8 +114,7 @@ function Row({ label, divided = false, children }: { label: string; divided?: bo
   );
 }
 
-
-/** Read off artboard 2: a bordered 12 px table, 39 px rows, a 110 px label column, mono values. */
+/** Read off artboard 2: a bordered 12 px table, 39 px rows, a 96 px label column, mono values. */
 const styles = StyleSheet.create({
   section: {
     gap: space.md,
