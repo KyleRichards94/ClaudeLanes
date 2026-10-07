@@ -55,4 +55,10 @@ describe('TicketPage', () => {
     fireEvent.click(screen.getByText('Claude Design ↗'));
     expect(selectRoute(router.getState())).toEqual(routes.ticketDesign('71273'));
   });
+
+  it("shows the ticket's build log", () => {
+    renderPage('71273');
+    expect(screen.getByRole('heading', { name: 'Build log' })).toBeTruthy();
+    expect(screen.getByTestId('build-log')).toBeTruthy();
+  });
 });
