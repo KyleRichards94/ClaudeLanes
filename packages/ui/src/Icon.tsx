@@ -15,6 +15,7 @@ import ExternalLink from 'lucide-react-native/icons/external-link';
 import GitBranch from 'lucide-react-native/icons/git-branch';
 import GitMerge from 'lucide-react-native/icons/git-merge';
 import Hammer from 'lucide-react-native/icons/hammer';
+import Info from 'lucide-react-native/icons/info';
 import Link from 'lucide-react-native/icons/link';
 import Lock from 'lucide-react-native/icons/lock';
 import Pause from 'lucide-react-native/icons/pause';
@@ -23,6 +24,7 @@ import Plus from 'lucide-react-native/icons/plus';
 import RotateCw from 'lucide-react-native/icons/rotate-cw';
 import Search from 'lucide-react-native/icons/search';
 import Square from 'lucide-react-native/icons/square';
+import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import X from 'lucide-react-native/icons/x';
 
 interface Glyph {
@@ -59,6 +61,9 @@ const glyphs = {
   close: { component: X },
   lock: { component: Lock },
   alert: { component: CircleAlert },
+  /** Info and warning toasts (AL-030); error toasts use `alert`, as on artboard 6. */
+  info: { component: Info },
+  warning: { component: TriangleAlert },
 } as const satisfies Record<string, Glyph>;
 
 export type IconName = keyof typeof glyphs;
