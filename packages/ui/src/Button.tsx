@@ -23,19 +23,28 @@ export type ButtonSize = 'sm' | 'md';
 export const buttonVariants: readonly ButtonVariant[] = ['primary', 'strong', 'secondary', 'soft', 'danger'];
 export const buttonSizes: readonly ButtonSize[] = ['sm', 'md'];
 
-export interface ButtonProps {
+/** An icon-only button must have its icon. */
+type ButtonIconProps =
+  | {
+      /** Icon before the label, in the label's colour. */
+      icon?: IconName;
+      iconOnly?: false;
+    }
+  | {
+      icon: IconName;
+      /** Shows only `icon` in a square button; `label` stays the accessible name. */
+      iconOnly: true;
+    };
+
+export type ButtonProps = ButtonIconProps & {
   /** The visible label, and the accessible name (also when `iconOnly` hides it). */
   label: string;
   /** Defaults to `secondary`. */
   variant?: ButtonVariant;
   /** Defaults to `md`. */
   size?: ButtonSize;
-  /** Icon before the label, in the label's colour. */
-  icon?: IconName;
-  /** Icon after the label, e.g. the arrow on "Launch agent →". */
+  /** Icon after the label, e.g. the arrow on "Launch agent →". Not shown when `iconOnly`. */
   trailingIcon?: IconName;
-  /** Shows only `icon` in a square button; `label` stays the accessible name. */
-  iconOnly?: boolean;
   /**
    * `center` (default) centres the content. `between` keeps the label at the start and pushes
    * `trailingIcon` to the far edge, as on the drill-in's full-width merge buttons.
@@ -55,7 +64,7 @@ export interface ButtonProps {
   /** Layout around the button (margins, flex, alignSelf, width). */
   style?: StyleProp<ViewStyle>;
   testID?: string;
-}
+};
 
 interface VariantSpec {
   fill: string;

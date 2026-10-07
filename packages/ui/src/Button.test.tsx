@@ -127,6 +127,12 @@ describe('Button', () => {
       expect(surface.minHeight).toBe('44px');
       expect(button.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     });
+
+    it('needs an icon to be icon-only (checked by tsc)', () => {
+      // @ts-expect-error An icon-only button must name its icon.
+      const iconless = <Button iconOnly label="Connections" />;
+      expect(iconless.props.label).toBe('Connections');
+    });
   });
 
   describe('icons', () => {
