@@ -113,6 +113,8 @@ if (!app.requestSingleInstanceLock()) {
       mainWindow: () => mainWindow,
       // e2e points the design view at a local fake claude.ai (AL-191); never honoured in the installed app.
       designTestOrigin: app.isPackaged ? undefined : process.env['AGENT_LANES_DESIGN_TEST_ORIGIN'],
+      // e2e starts a fake `claude` instead of the real one (AL-044); never honoured in the installed app.
+      claudeExecutable: app.isPackaged ? undefined : process.env['AGENT_LANES_CLAUDE_EXECUTABLE'],
     });
     registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
     mainWindow = createMainWindow();
