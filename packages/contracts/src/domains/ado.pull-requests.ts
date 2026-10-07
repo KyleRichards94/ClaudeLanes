@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WorkItemIdSchema } from './ado.schemas';
 
 /**
  * Azure DevOps pull requests for the Create PR stage (AL-064; design §7 "Create PR opens the PR,
@@ -7,14 +8,12 @@ import { z } from 'zod';
  * "PR !10612 · 3 / 4 checks" on the card and moves the ticket to Done once the PR closes.
  */
 
-/** ADO ids (pull requests, work items) are positive 32-bit integers. */
+/** ADO pull request ids are positive 32-bit integers (work items use `WorkItemIdSchema`). */
 const ADO_ID_MAX = 2_147_483_647;
 
 /** A pull request id, shown in ADO as `!10612`. */
 export const PullRequestIdSchema = z.int().min(1).max(ADO_ID_MAX);
 export type PullRequestId = z.infer<typeof PullRequestIdSchema>;
-
-const LinkedWorkItemIdSchema = z.int().min(1).max(ADO_ID_MAX);
 
 /** ADO refuses a longer pull request title. */
 export const PULL_REQUEST_TITLE_MAX = 400;
@@ -91,7 +90,7 @@ export const PullRequestSchema = z.object({
   /** The merge commit ADO last computed; for a completed pull request, the commit that landed. */
   mergeCommitId: z.string().nullable(),
   /** Work items linked to the pull request, ascending. */
-  workItemIds: z.array(LinkedWorkItemIdSchema),
+  workItemIds: z.array(WorkItemIdSchema),
   /** The pull request in the ADO web UI. Only http(s), so it is safe to open externally. */
   webUrl: z.url({ protocol: /^https?$/ }),
 });
@@ -125,7 +124,7 @@ export const CreatePullRequestInputSchema = z
     title: z.string().trim().min(1, 'A pull request needs a title.').max(PULL_REQUEST_TITLE_MAX),
     description: z.string().max(PULL_REQUEST_DESCRIPTION_MAX).optional(),
     /** Linked through `workItemRefs`, then checked and linked again if ADO dropped one. */
-    workItemIds: z.array(LinkedWorkItemIdSchema).max(PULL_REQUEST_WORK_ITEMS_MAX).optional(),
+    workItemIds: z.array(WorkItemIdSchema).max(PULL_REQUEST_WORK_ITEMS_MAX).optional(),
     isDraft: z.boolean().optional(),
   })
   .refine((input) => input.sourceBranch !== input.targetBranch, {

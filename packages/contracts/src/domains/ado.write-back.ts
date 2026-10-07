@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WorkItemIdSchema } from './ado.schemas';
 
 /**
  * Work item write-back (AL-063, design §7 "ADO write-back"): the comments Agent Lanes posts to a
@@ -18,9 +19,6 @@ export const AGENT_LANES_COMMENT_PREFIX = 'Agent Lanes · ';
  * text belongs in the PR description.
  */
 export const WORK_ITEM_COMMENT_MAX_LENGTH = 10_000;
-
-/** ADO work item ids are positive 32-bit integers. */
-const workItemIdSchema = z.int().min(1).max(2_147_483_647);
 
 /** A workflow state name as the work item type defines it (`Active`, `Resolved`, `Done`). */
 export const WorkItemStateNameSchema = z
@@ -42,7 +40,7 @@ export type WorkItemCommentFormat = z.infer<typeof WorkItemCommentFormatSchema>;
 export const WorkItemCommentSchema = z.object({
   /** ADO's comment id, unique within the work item. */
   id: z.int().min(1),
-  workItemId: workItemIdSchema,
+  workItemId: WorkItemIdSchema,
   /**
    * As ADO stores it: HTML (or Markdown, see `format`) written by a person or by the app. Never
    * render it as HTML; the ADO tab sanitises it first (AL-180).
@@ -61,7 +59,7 @@ export type WorkItemComment = z.infer<typeof WorkItemCommentSchema>;
 
 const changedStateSchema = z.object({
   outcome: z.literal('changed'),
-  workItemId: workItemIdSchema,
+  workItemId: WorkItemIdSchema,
   /** The state now, as ADO reports it after the change. */
   state: z.string().min(1),
   previousState: z.string().min(1),
@@ -71,7 +69,7 @@ const changedStateSchema = z.object({
 
 const unchangedStateSchema = z.object({
   outcome: z.literal('unchanged'),
-  workItemId: workItemIdSchema,
+  workItemId: WorkItemIdSchema,
   /** The work item was already in this state, so nothing was written. */
   state: z.string().min(1),
   rev: z.int().min(1),
@@ -88,7 +86,7 @@ export type WorkItemStateChange = z.infer<typeof WorkItemStateChangeSchema>;
 export const WorkItemStateWriteBackSchema = z.discriminatedUnion('outcome', [
   changedStateSchema,
   unchangedStateSchema,
-  z.object({ outcome: z.literal('disabled'), workItemId: workItemIdSchema }),
+  z.object({ outcome: z.literal('disabled'), workItemId: WorkItemIdSchema }),
 ]);
 export type WorkItemStateWriteBack = z.infer<typeof WorkItemStateWriteBackSchema>;
 
