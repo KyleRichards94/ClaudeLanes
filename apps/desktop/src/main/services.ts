@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { safeStorage, type BrowserWindow } from 'electron';
+import { createAdoService, type AdoService } from './ado';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
@@ -42,6 +43,8 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
+  readonly ado: AdoService;
 }
 
 export interface ServiceOptions {
@@ -109,6 +112,8 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
   });
 
+  const ado = createAdoService({ connections, settings, log: log.child('ado') });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -120,6 +125,7 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    ado,
   };
 }
 

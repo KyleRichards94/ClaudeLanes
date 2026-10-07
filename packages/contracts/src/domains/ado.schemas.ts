@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
+import { ConnectionIdSchema } from './connections.schemas';
+import { WorkItemIdSchema } from './ado.ids';
 import type { ADO_EVENT_CHANNELS, ADO_INVOKE_CHANNELS } from './ado.names';
+import {
+  CreatedPullRequestSchema,
+  CreatePullRequestInputSchema,
+  PullRequestRefSchema,
+  PullRequestSnapshotSchema,
+} from './ado.pull-requests';
+import { WorkItemCommentSchema } from './ado.write-back';
 
 // ── Sprints (AL-061) ──────────────────────────────────────────────────────────
 
@@ -83,10 +92,8 @@ export const WORK_ITEM_STATE_CATEGORIES = ['proposed', 'in-progress', 'resolved'
 export const WorkItemStateCategorySchema = z.enum(WORK_ITEM_STATE_CATEGORIES);
 export type WorkItemStateCategory = z.infer<typeof WorkItemStateCategorySchema>;
 
-/** ADO work item ids are positive 32-bit integers. */
-export const WORK_ITEM_ID_MAX = 2_147_483_647;
-export const WorkItemIdSchema = z.int().min(1).max(WORK_ITEM_ID_MAX);
-export type WorkItemId = z.infer<typeof WorkItemIdSchema>;
+// Defined in a leaf file so the PR and write-back DTOs can use it without an import cycle (AL-065).
+export { WORK_ITEM_ID_MAX, WorkItemIdSchema, type WorkItemId } from './ado.ids';
 
 export const WorkItemAssigneeSchema = z.object({
   displayName: z.string(),
@@ -122,8 +129,102 @@ export const WorkItemSchema = z.object({
 });
 export type WorkItem = z.infer<typeof WorkItemSchema>;
 
+// ── Channel requests (AL-065) ────────────────────────────────────────────────
+
+/**
+ * The Azure DevOps organisation a request goes to: its connection id (`ado:contoso`, AL-042). Left
+ * out, the main process uses the first connected organisation, as `connections:list` orders them.
+ * Tokens never travel with a request; main picks the organisation's client from its saved connection.
+ */
+export const AdoOrgIdSchema = ConnectionIdSchema.refine((id) => id.startsWith('ado:'), 'Not an Azure DevOps connection id');
+
+/** Text that goes into a path or a WIQL literal: trimmed, bounded, no control characters. */
+const adoText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .regex(/^[^\p{Cc}]*$/u, 'No control characters');
+
+/** Project name or id. Left out, the organisation's default project from Connections. */
+export const AdoProjectNameSchema = adoText(256);
+
+/** Most characters a work item search may have (the ado-client's `SEARCH_QUERY_MAX_LENGTH`). */
+export const WORK_ITEM_SEARCH_MAX_LENGTH = 256;
+/** Most items one search returns (the ado-client's `SEARCH_TOP_MAX`). */
+export const WORK_ITEM_SEARCH_TOP_MAX = 200;
+
+/** Which organisation and project a request reads; both default as described above. */
+const AdoScopeShape = {
+  org: AdoOrgIdSchema.optional(),
+  project: AdoProjectNameSchema.optional(),
+};
+
+/** `ado:listSprints`: a team's sprints, past, current and future. */
+export const ListSprintsRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** Team name or id. Left out, ADO uses the project's default team. */
+  team: adoText(256).optional(),
+});
+export type ListSprintsRequest = z.infer<typeof ListSprintsRequestSchema>;
+
+/** `ado:listWorkItems`: the stories, bugs and tasks in one sprint, lowest id first. */
+export const ListWorkItemsRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** The sprint's `path` (`OnSite Companion\Sprint 42`), from `ado:listSprints`. */
+  iterationPath: adoText(1_024),
+});
+export type ListWorkItemsRequest = z.infer<typeof ListWorkItemsRequestSchema>;
+
+/** `ado:searchWorkItems`: by id ("71273", "#71273") or part of a title; a blank query finds nothing. */
+export const SearchWorkItemsRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  query: z
+    .string()
+    .trim()
+    .max(WORK_ITEM_SEARCH_MAX_LENGTH)
+    .regex(/^[^\p{Cc}]*$/u, 'No control characters'),
+  /** Most items returned: the exact id match first, then title matches. Default 50. */
+  top: z.int().min(1).max(WORK_ITEM_SEARCH_TOP_MAX).optional(),
+});
+export type SearchWorkItemsRequest = z.infer<typeof SearchWorkItemsRequestSchema>;
+
+/** `ado:getWorkItem`: one work item by id, in any project of the organisation. */
+export const GetWorkItemRequestSchema = z.strictObject({
+  org: AdoOrgIdSchema.optional(),
+  id: WorkItemIdSchema,
+});
+export type GetWorkItemRequest = z.infer<typeof GetWorkItemRequestSchema>;
+
+/** `ado:getComments`: a work item's discussion, oldest first. `project` is the work item's (`WorkItem.project`). */
+export const GetCommentsRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  workItemId: WorkItemIdSchema,
+});
+export type GetCommentsRequest = z.infer<typeof GetCommentsRequestSchema>;
+
+/** `ado:createPullRequest`: the Create PR stage's pull request (AL-064), in an organisation. */
+export const CreatePullRequestRequestSchema = CreatePullRequestInputSchema.safeExtend({ org: AdoOrgIdSchema.optional() });
+export type CreatePullRequestRequest = z.infer<typeof CreatePullRequestRequestSchema>;
+
+/** `ado:getPullRequest`: a pull request and its checks, by the ref the ticket keeps (`pullRequestRef`). */
+export const GetPullRequestRequestSchema = PullRequestRefSchema.extend({ org: AdoOrgIdSchema.optional() }).strict();
+export type GetPullRequestRequest = z.infer<typeof GetPullRequestRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
-export const adoInvokeContracts = {} as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
+export const adoInvokeContracts = {
+  /** Past, current and future sprints, oldest first; `pickSprint` chooses the one to show. */
+  'ado:listSprints': { request: ListSprintsRequestSchema, response: SprintListSchema },
+  'ado:listWorkItems': { request: ListWorkItemsRequestSchema, response: z.array(WorkItemSchema) },
+  'ado:searchWorkItems': { request: SearchWorkItemsRequestSchema, response: z.array(WorkItemSchema) },
+  'ado:getWorkItem': { request: GetWorkItemRequestSchema, response: WorkItemSchema },
+  'ado:getComments': { request: GetCommentsRequestSchema, response: z.array(WorkItemCommentSchema) },
+  /** Idempotent: an active pull request for the same branches is reused (`created: false`). */
+  'ado:createPullRequest': { request: CreatePullRequestRequestSchema, response: CreatedPullRequestSchema },
+  /** The pull request with its checks, for "PR !10612 · 3 / 4 checks" and Done detection. */
+  'ado:getPullRequest': { request: GetPullRequestRequestSchema, response: PullRequestSnapshotSchema },
+} as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;
