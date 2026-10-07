@@ -200,7 +200,7 @@ describe('session manager: two tickets at once', () => {
     expect(a!.options.cwd).not.toBe(b!.options.cwd);
     expect(a!.options.abortController).not.toBe(b!.options.abortController);
 
-    expect(sessions.send('71273', { text: 'only for A' })).toEqual({ ok: true, data: undefined });
+    expect(sessions.send('71273', { text: 'only for A' })).toEqual({ ok: true, data: { held: false } });
     await a!.sentCount(2);
     await eventually(() => sessions.status('71273').state === 'idle');
     expect(a!.sent.map((message) => message.message.content)).toContain('only for A');

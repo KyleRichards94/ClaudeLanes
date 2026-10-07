@@ -27,9 +27,12 @@ import { createInputQueue, type InputQueue } from './input-queue';
  * user turns into its input queue (`send`) and reads its messages until the session ends. Sessions
  * share nothing: each has its own process, queue, abort controller and state, keyed by ticket id.
  *
- * The rest of E6 builds on this surface: `send` (AL-105), `interrupt` (AL-105), `setModel` /
+ * The rest of E6 builds on this surface: `send`, `pause` / `resume` (AL-105), `interrupt`, `setModel` /
  * `setEffort` (AL-106), `stop`, `status`, and `subscribe` for everything that reads the stream
  * (output normalisation AL-102, usage AL-113, sub-agents AL-107).
+ *
+ * Pause (AL-105) interrupts the current turn and holds every message sent afterwards; Resume delivers
+ * them in order (or a "continue" turn when there are none).
  */
 export interface SessionManager {
   /**
@@ -38,8 +41,15 @@ export interface SessionManager {
    * ticket whose session is live returns its status and changes nothing.
    */
   start(request: SessionStartRequest): Promise<Result<AgentSessionStatus>>;
-  /** Queues a user turn on the ticket's live session (D11: `next` waits for the turn, `now` interjects). */
-  send(ticketId: string, message: SessionMessageInput): Result<void>;
+  /**
+   * Queues a user turn on the ticket's live session (D11: `next` waits for the turn, `now` interjects).
+   * While the session is paused the message is held until Resume (`held: true`).
+   */
+  send(ticketId: string, message: SessionMessageInput): Result<{ held: boolean }>;
+  /** Pause (AL-105): interrupts the current turn; messages sent from now on wait for `resume`. */
+  pause(ticketId: string): Promise<Result<AgentSessionStatus>>;
+  /** Resume: delivers the held messages in order, or a "continue" turn when none were sent. */
+  resume(ticketId: string): Result<AgentSessionStatus>;
   /** Stops the current turn; the session stays open for the next message. */
   interrupt(ticketId: string): Promise<Result<void>>;
   /** Saves the model on the ticket and, when its session is live, switches the session to it (D10). */
@@ -111,6 +121,9 @@ interface Session {
   message: string | null;
   /** The app asked the session to end, so the stream ending is not a loss. */
   stopping: boolean;
+  /** Paused by the user (AL-105): turns ending do not make it idle, and messages wait in `held`. */
+  paused: boolean;
+  held: SDKUserMessage[];
   /** Settles when the session's message loop has finished. */
   done: Promise<void>;
 }
@@ -119,8 +132,10 @@ interface Session {
 export const SESSION_ENDED_MESSAGE = 'The Claude Code session ended unexpectedly. The worktree is intact.';
 export const CLAUDE_NOT_CONNECTED_MESSAGE = 'Connect Claude in Connections before starting an agent.';
 export const CLAUDE_KEY_UNREADABLE_MESSAGE = "The saved Claude API key can't be read on this computer. Replace it in Connections.";
+/** The turn Resume sends when nothing was sent while paused (AL-105). */
+export const RESUME_MESSAGE = 'Continue where you left off.';
 
-const LIVE_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle']);
+const LIVE_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
 
 /** The SDK options for a ticket's session (AL-100 scope); `env` and the binary come from the launcher. */
 export function sessionOptions(record: TicketRecord, abortController: AbortController, extras: SessionExtras = {}): Omit<Options, 'pathToClaudeCodeExecutable' | 'env'> {
@@ -197,7 +212,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
   function handle(session: Session, message: SDKMessage): void {
     if (message.type === 'system' && message.subtype === 'init') {
       void rememberSessionId(session, message.session_id);
-    } else if (message.type === 'result') {
+    } else if (message.type === 'result' && !session.paused) {
       setState(session, 'idle');
     }
     for (const listener of listeners) {
@@ -260,6 +275,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       sessionId: record.sessionId,
       message: null,
       stopping: false,
+      paused: false,
+      held: [],
       done: Promise.resolve(),
     };
     // A start for the same ticket may have claimed it while the record was read: that one wins.
@@ -343,9 +360,40 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       if (!found.ok) return found;
       const session = found.data;
       if (!message.text.trim()) return err('VALIDATION', 'The message is empty.');
+      if (session.paused) {
+        session.held.push(userMessage(message));
+        return ok({ held: true });
+      }
       session.input.push(userMessage(message));
       if (session.state === 'idle' && message.shouldQuery !== false) setState(session, 'running');
-      return ok(undefined);
+      return ok({ held: false });
+    },
+
+    async pause(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      const session = found.data;
+      if (session.paused) return ok(statusOf(ticketId, session));
+      session.paused = true;
+      setState(session, 'paused');
+      try {
+        await session.query?.interrupt();
+      } catch (error) {
+        log?.warn(`Could not interrupt ticket ${ticketId} to pause it: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return ok(statusOf(ticketId, session));
+    },
+
+    resume(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      const session = found.data;
+      if (!session.paused) return ok(statusOf(ticketId, session));
+      session.paused = false;
+      const held = session.held.splice(0);
+      for (const message of held.length > 0 ? held : [userMessage({ text: RESUME_MESSAGE })]) session.input.push(message);
+      setState(session, held.length > 0 && held.every((message) => message.shouldQuery === false) ? 'idle' : 'running');
+      return ok(statusOf(ticketId, session));
     },
 
     async interrupt(ticketId) {

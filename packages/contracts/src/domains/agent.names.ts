@@ -5,6 +5,9 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:resolveGate', // AL-104
   'agent:setGate', // AL-104
   'agent:getGate', // AL-104
+  'agent:send', // AL-105
+  'agent:pause', // AL-105
+  'agent:resume', // AL-105
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

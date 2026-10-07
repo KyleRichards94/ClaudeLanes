@@ -13,5 +13,8 @@ export function createAgentHandlers({ sessions, transcripts, stages }: Pick<Serv
     },
     'agent:setGate': ({ ticketId, stage, gate }) => stages.setGate(ticketId, stage, gate),
     'agent:getGate': ({ ticketId }) => ok({ gate: stages.pendingGate(ticketId) }),
+    'agent:send': ({ ticketId, text, priority }) => sessions.send(ticketId, { text, priority: priority ?? 'next' }),
+    'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
+    'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
   };
 }

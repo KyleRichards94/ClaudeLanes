@@ -23,10 +23,11 @@ export const SDK_MODEL_IDS = {
  * - `starting`: `claude` is being started;
  * - `running`: a turn is in progress;
  * - `idle`: the turn ended and the session waits for the next user turn;
+ * - `paused`: the user paused it (AL-105): the turn was interrupted and new messages wait for Resume;
  * - `stopped`: the app closed the session (its process is gone);
  * - `lost`: the session ended without being asked to (crash, process exit); AL-110 recovers it.
  */
-export const AGENT_SESSION_STATES = ['none', 'starting', 'running', 'idle', 'stopped', 'lost'] as const;
+export const AGENT_SESSION_STATES = ['none', 'starting', 'running', 'idle', 'paused', 'stopped', 'lost'] as const;
 export const AgentSessionStateSchema = z.enum(AGENT_SESSION_STATES);
 export type AgentSessionState = z.infer<typeof AgentSessionStateSchema>;
 
@@ -209,12 +210,51 @@ export type SetGateResponse = z.infer<typeof SetGateResponseSchema>;
 /** `agent:getGate`: the gate waiting for the user, for a renderer that reloads while one waits. */
 export const GetGateResponseSchema = z.object({ gate: PendingGateSchema.nullable() });
 
+// ── Messages, skills and pause (AL-105, design §7 Skills, artboard 3 composer) ─────────────────────
+
+/** Longest message the composer sends. */
+export const AGENT_MESSAGE_LIMIT = 20_000;
+
+/** A skill name as Claude Code lists it (`code-review`, `osc-blazor-cutover-invoke`, `plugin:skill`). */
+export const SKILL_NAME_PATTERN = /^[A-Za-z0-9][\w.:-]{0,199}$/;
+
+/**
+ * What a skill chip sends: `/skill-name` as the next user turn, exactly as typed in the terminal, so
+ * Claude Code runs it as a slash command (design §7 Skills).
+ */
+export function skillCommand(skill: string): string {
+  const name = skill.startsWith('/') ? skill.slice(1) : skill;
+  if (!SKILL_NAME_PATTERN.test(name)) throw new Error(`Not a skill name: ${skill}`);
+  return `/${name}`;
+}
+
+/**
+ * `agent:send`: a message from the composer, or a skill chip's `/skill-name`. `next` (default) is
+ * delivered when the current turn ends, without stopping it; `now` ("steer now") at the next tool
+ * boundary (D11).
+ */
+export const SendMessageRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  text: z.string().trim().min(1).max(AGENT_MESSAGE_LIMIT),
+  priority: z.enum(['next', 'now']).optional(),
+});
+export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
+
+/** `held`: the session is paused, so the message waits for Resume. */
+export const SendMessageResponseSchema = z.object({ held: z.boolean() });
+export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
   'agent:resolveGate': { request: ResolveGateRequestSchema, response: ResolveGateResponseSchema },
   'agent:setGate': { request: SetGateRequestSchema, response: SetGateResponseSchema },
   'agent:getGate': { request: AgentTicketRequestSchema, response: GetGateResponseSchema },
+  'agent:send': { request: SendMessageRequestSchema, response: SendMessageResponseSchema },
+  /** Interrupts the turn; later messages wait for Resume. */
+  'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** Delivers the messages held while paused, or a "continue" turn when there are none. */
+  'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -260,7 +300,7 @@ export const AgentGateEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentGateEvent = z.infer<typeof AgentGateEventSchema>;
 
-/** `agent:status`: the session's run state changed (AL-100; queued and paused come with AL-111, AL-105). */
+/** `agent:status`: the session's run state changed (AL-100; paused, AL-105; queued comes with AL-111). */
 export const AgentStatusEventSchema = TicketEventEnvelopeSchema.extend({
   state: AgentSessionStateSchema,
   sessionId: AgentSessionStatusSchema.shape.sessionId,
