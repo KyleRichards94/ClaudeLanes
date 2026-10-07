@@ -10,6 +10,11 @@ files:
 # The Agent SDK launches its native `claude` binary from disk, so it cannot live inside app.asar.
 asarUnpack:
   - "**/node_modules/@anthropic-ai/claude-agent-sdk*/**"
+# Third-party licence notices, installed next to Electron's LICENSE files (AL-021: the SIL OFL
+# licences of the bundled Plus Jakarta Sans and JetBrains Mono fonts).
+extraFiles:
+  - from: licenses
+    to: licenses
 win:
   target:
     - target: nsis
