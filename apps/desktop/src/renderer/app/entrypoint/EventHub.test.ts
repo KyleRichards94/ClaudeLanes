@@ -7,7 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { createStore } from 'zustand/vanilla';
 import type { EventHandler } from '@/shared/api';
-import { fakeOutputEvent, installFakeBridge, type FakeBridge } from '@/shared/testing';
+import { fakeOutputEvent, fakeStageEvent, installFakeBridge, type FakeBridge } from '@/shared/testing';
 import { HIDDEN_FLUSH_DELAY_MS, createEventHub, startEventHub, stopEventHub, type EventHub } from './EventHub';
 
 let bridge: FakeBridge;
@@ -56,7 +56,7 @@ describe('EventHub', () => {
     const unregister = hub.register({ 'agent:output': vi.fn(), toast: vi.fn() });
     unregister();
     hub.register({ 'agent:stage': vi.fn(), 'build:log': vi.fn() });
-    bridge.emit('agent:stage', { ticketId: '71273', at: 1 });
+    bridge.emit('agent:stage', fakeStageEvent('71273', 1));
     vi.advanceTimersToNextFrame();
 
     expect(bridge.on).toHaveBeenCalledTimes(EVENT_CHANNEL_NAMES.length);
@@ -117,13 +117,13 @@ describe('EventHub', () => {
     const onToast = vi.fn<EventHandler<'toast'>>();
     hub.register({ 'agent:stage': onStage, toast: onToast });
 
-    bridge.emit('agent:stage', { ticketId: '71273', at: 1 });
-    bridge.emit('agent:stage', { ticketId: '71273', at: 2 });
+    bridge.emit('agent:stage', fakeStageEvent('71273', 1));
+    bridge.emit('agent:stage', fakeStageEvent('71273', 2));
     bridge.emit('toast', { at: 3, tone: 'error', title: 'Azure DevOps rejected the PAT' });
 
     expect(onStage).toHaveBeenCalledTimes(2);
-    expect(onStage).toHaveBeenNthCalledWith(1, { ticketId: '71273', at: 1 });
-    expect(onStage).toHaveBeenNthCalledWith(2, { ticketId: '71273', at: 2 });
+    expect(onStage).toHaveBeenNthCalledWith(1, fakeStageEvent('71273', 1));
+    expect(onStage).toHaveBeenNthCalledWith(2, fakeStageEvent('71273', 2));
     expect(onToast).toHaveBeenCalledExactlyOnceWith({ at: 3, tone: 'error', title: 'Azure DevOps rejected the PAT' });
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -204,7 +204,7 @@ describe('EventHub', () => {
     expect(vi.getTimerCount()).toBe(0);
 
     // The same function registered twice is two registrations; removing one leaves the other.
-    bridge.emit('agent:stage', { ticketId: '71273', at: 3 });
+    bridge.emit('agent:stage', fakeStageEvent('71273', 3));
     expect(twice).toHaveBeenCalledOnce();
   });
 

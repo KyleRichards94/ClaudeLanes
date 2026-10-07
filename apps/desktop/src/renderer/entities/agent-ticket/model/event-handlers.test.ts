@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeOutputEvent, fakeTicketRecord } from '@/shared/testing';
+import { fakeOutputEvent, fakeStageEvent, fakeTicketRecord } from '@/shared/testing';
 import { agentTicketEventHandlers, createAgentTicketEventHandlers } from './event-handlers';
 import { selectTicket } from './selectors';
 import { createAgentTicketStore } from './store';
@@ -13,8 +13,35 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel and build:queued', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:output', 'build:queued']);
+  it('handles the batched agent:output channel, agent:stage and build:queued', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:output', 'agent:stage', 'build:queued']);
+  });
+
+  it('agent:stage moves the card to its new lane and shows the stage summary as its activity (AL-103)', () => {
+    const { store, handlers } = setup();
+    store.setStage('71273', 'planning', 1_500);
+    store.setActivity('71273', { text: 'Mapping child modals', progress: 0.8 }, 1_600);
+
+    handlers['agent:stage']?.(fakeStageEvent('71273', 3_000, { stage: 'implementing', from: 'planning', activity: 'Plan approved', progress: 0 }));
+
+    const ticket = selectTicket(store.getState(), '71273');
+    expect(ticket).toMatchObject({ stage: 'implementing', stageEnteredAt: 3_000, activity: { text: 'Plan approved', at: 3_000 }, progress: 0 });
+    expect(store.getState().byLane.implementing).toContain('71273');
+    expect(store.getState().byLane.planning).not.toContain('71273');
+  });
+
+  it('agent:stage activity updates change only the activity row and progress', () => {
+    const { store, handlers } = setup();
+    handlers['agent:stage']?.(fakeStageEvent('71273', 3_000, { change: 'activity', stage: 'implementing', from: null, activity: 'Editing JobControl.razor', progress: 0.46 }));
+    handlers['agent:stage']?.(fakeStageEvent('71273', 3_100, { change: 'activity', stage: 'implementing', from: null, activity: 'Running the build', progress: null }));
+    expect(selectTicket(store.getState(), '71273')).toMatchObject({ stage: 'implementing', stageEnteredAt: 2_000, activity: { text: 'Running the build' }, progress: 0.46 });
+  });
+
+  it('a stage change without a summary clears the previous activity', () => {
+    const { store, handlers } = setup();
+    store.setActivity('71273', { text: 'old', progress: 0.5 }, 2_500);
+    handlers['agent:stage']?.(fakeStageEvent('71273', 3_000, { stage: 'code-review', from: 'implementing', activity: null, progress: 0 }));
+    expect(selectTicket(store.getState(), '71273')).toMatchObject({ stage: 'code-review', activity: null, progress: 0 });
   });
 
   it('commits a frame of agent:output as one store update', () => {

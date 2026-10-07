@@ -5,6 +5,8 @@ import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
+import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
@@ -75,6 +77,8 @@ export interface Services {
   readonly sessions: SessionManager;
   /** Each ticket's normalised output (`agent:output`) and the buffer `agent:getTranscript` backfills from (AL-102). */
   readonly transcripts: TranscriptService;
+  /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
+  readonly stages: StageService;
 }
 
 export interface ServiceOptions {
@@ -162,7 +166,15 @@ export function createServices(options: ServiceOptions): Services {
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
-  const sessions = createSessionManager({ claude, connections, tickets, emit: options.emit, log: log.child('agent') });
+  const sessions = createSessionManager({
+    claude,
+    connections,
+    tickets,
+    emit: options.emit,
+    log: log.child('agent'),
+    // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
+    extras: (record) => stageExtras(record),
+  });
   const transcripts = createTranscriptService({
     sessions,
     tickets,
@@ -171,6 +183,8 @@ export function createServices(options: ServiceOptions): Services {
     history: async (sessionId, dir) => (await loadClaudeSdk()).getSessionMessages(sessionId, { dir }),
     log: log.child('agent'),
   });
+  const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
 
   return {
     appDataDir: options.appDataDir,
@@ -191,6 +205,7 @@ export function createServices(options: ServiceOptions): Services {
     worktrees,
     sessions,
     transcripts,
+    stages,
   };
 }
 

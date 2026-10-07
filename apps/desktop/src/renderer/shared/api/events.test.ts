@@ -13,9 +13,10 @@ describe('subscribe', () => {
     const received: EventPayload<'agent:stage'>[] = [];
     subscribe('agent:stage', (payload) => received.push(payload));
 
-    bridge.emit('agent:stage', { ticketId: '71273', at: 1_760_000_000_000 });
+    const stage = { ticketId: '71273', at: 1_760_000_000_000, change: 'stage', stage: 'implementing', from: 'planning', activity: 'Plan approved', progress: 0 } as const;
+    bridge.emit('agent:stage', stage);
 
-    expect(received).toEqual([{ ticketId: '71273', at: 1_760_000_000_000 }]);
+    expect(received).toEqual([stage]);
   });
 
   it('only hears its own channel', () => {

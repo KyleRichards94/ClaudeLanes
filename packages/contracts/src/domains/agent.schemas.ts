@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
-import type { Model } from '../vocabulary';
+import { LaneSchema, type Model } from '../vocabulary';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -166,8 +166,26 @@ export const agentInvokeContracts = {
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
 
-/** `agent:stage`: the agent moved its ticket to another stage through `set_stage` (AL-103). */
-export const AgentStageEventSchema = TicketEventEnvelopeSchema.extend({});
+/** Longest activity line or stage summary the agent can report (the card shows one line). */
+export const STAGE_TEXT_LIMIT = 300;
+
+/**
+ * `agent:stage` (AL-103, design §7 Stage tracking): the ticket moved to another lane, through the
+ * agent's `set_stage` call or the session starting (Queued → Planning); or the agent reported its
+ * activity with `report_activity`, which drives the card's activity row and progress bar.
+ */
+export const AgentStageEventSchema = TicketEventEnvelopeSchema.extend({
+  /** `stage`: the ticket entered `stage` from `from`. `activity`: only the activity row and progress changed. */
+  change: z.enum(['stage', 'activity']),
+  /** The ticket's lane after this event. */
+  stage: LaneSchema,
+  /** The lane it left; null for an activity update. */
+  from: LaneSchema.nullable(),
+  /** The card's activity row ("Plan approved · implementing the grid"). Always set on an activity update; null on a stage change clears the row. */
+  activity: z.string().max(STAGE_TEXT_LIMIT).nullable(),
+  /** The card's progress bar, 0 to 1 (0 on a stage change); null leaves it as it was. */
+  progress: z.number().min(0).max(1).nullable(),
+});
 export type AgentStageEvent = z.infer<typeof AgentStageEventSchema>;
 
 /** `agent:subagent`: a sub-agent started, progressed or finished (AL-107). */
