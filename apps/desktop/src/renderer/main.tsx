@@ -2,6 +2,7 @@
 // runApplication mounts into a DOM element. Components import from 'react-native'.
 import { AppRegistry } from 'react-native-web';
 import '@agent-lanes/tokens/agent-lanes-tokens.css';
+import './app/styles/fonts.css';
 import './app/styles/global.css';
 import { App } from './app';
 

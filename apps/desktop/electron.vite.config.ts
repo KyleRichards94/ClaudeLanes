@@ -13,6 +13,12 @@ const workspacePackages = [
   '@agent-lanes/ui',
 ];
 
+/**
+ * ESM-only dependencies of the main process. The main bundle is CommonJS, and a runtime `require`
+ * of an ES module returns its namespace instead of the default export, so these are bundled too.
+ */
+const esmOnlyMainDeps = ['electron-store'];
+
 /** react-native-web resolves `*.web.*` platform files first (design §13: web-only code lives in *.web.tsx). */
 const webExtensions = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'];
 
@@ -28,7 +34,7 @@ function chunkFileName(chunk: { facadeModuleId: string | null }): string {
 export default defineConfig(({ command }) => ({
   main: {
     build: {
-      externalizeDeps: { exclude: workspacePackages },
+      externalizeDeps: { exclude: [...workspacePackages, ...esmOnlyMainDeps] },
     },
   },
   preload: {
@@ -44,6 +50,8 @@ export default defineConfig(({ command }) => ({
       alias: {
         '@': resolve(__dirname, 'src/renderer'),
         'react-native': 'react-native-web',
+        // react-native-svg's web build asks for RN's asset registry, which RN no longer installs.
+        '@react-native/assets-registry/registry': 'react-native-web/dist/modules/AssetRegistry',
       },
       extensions: webExtensions,
     },
@@ -62,6 +70,8 @@ export default defineConfig(({ command }) => ({
           chunkFileNames: chunkFileName,
         },
       },
+      // Bundled fonts (AL-021) stay files: the CSP allows `font-src 'self'` only, so no data: URIs.
+      assetsInlineLimit: (filePath: string) => (/\.woff2?$/.test(filePath) ? false : undefined),
     },
     plugins: [
       react({

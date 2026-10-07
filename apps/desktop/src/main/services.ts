@@ -1,6 +1,10 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
+import { DEFAULT_BUILD_CONCURRENCY, createJobQueue, type JobQueue } from './build';
+import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
+import { createElectronSettingsFile } from './settings/electron-settings-file';
+import { createSettingsService, type SettingsService } from './settings/service';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -14,12 +18,19 @@ export interface Services {
   readonly appDataDir: string;
   /** Encrypted tokens (AL-040). Main-only: hand it to other services; no IPC channel returns a secret. */
   readonly secrets: SecretStore;
+  /** Pushes typed events to the renderer (AL-012); services hold this, never the window. */
+  readonly emit: Emit;
+  /** App settings and UI prefs in `<userData>/settings.json` (AL-041). */
+  readonly settings: SettingsService;
+  /** Build and run job queue (AL-131): FIFO, one job per worktree, `buildQueueSize` jobs at once. */
+  readonly buildQueue: JobQueue;
 }
 
 export interface ServiceOptions {
   appDataDir: string;
   /** Electron's safeStorage unless a test passes a fake (`./secrets/testing`). */
   safeStorage?: SafeStorageLike;
+  emit: Emit;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -31,10 +42,15 @@ export function createServices(options: ServiceOptions): Services {
   return {
     appDataDir: options.appDataDir,
     secrets,
+    emit: options.emit,
+    settings: createSettingsService({ file: createElectronSettingsFile(options.appDataDir) }),
+    // AL-041 swaps the default for the `buildQueueSize` setting (and calls `buildQueue.refresh()` when it changes).
+    buildQueue: createJobQueue({ concurrency: () => DEFAULT_BUILD_CONCURRENCY }),
   };
 }
 
 /** Stops child processes and flushes state on quit (AL-213 fills this in). */
 export async function disposeServices(services: Services): Promise<void> {
   void services;
+  await services.buildQueue.dispose();
 }

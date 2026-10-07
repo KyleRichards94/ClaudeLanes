@@ -23,7 +23,7 @@ export default defineConfig({
         test: {
           name: 'main',
           environment: 'node',
-          include: ['apps/desktop/src/main/**/*.test.ts'],
+          include: ['apps/desktop/src/main/**/*.test.ts', 'apps/desktop/src/preload/**/*.test.ts', 'apps/desktop/scripts/**/*.test.ts'],
         },
       },
       {
@@ -31,6 +31,11 @@ export default defineConfig({
           alias: {
             '@': rendererRoot,
             'react-native': 'react-native-web',
+            // Tests resolve packages by `main`, which for react-native-svg is the native CommonJS
+            // build; its ESM build picks the `*.web.js` files, as the renderer bundle does.
+            'react-native-svg': 'react-native-svg/lib/module/index.js',
+            // react-native-svg's web build asks for RN's asset registry, which RN no longer installs.
+            '@react-native/assets-registry/registry': 'react-native-web/dist/modules/AssetRegistry',
           },
           extensions: webExtensions,
         },
@@ -43,6 +48,9 @@ export default defineConfig({
         test: {
           name: 'ui',
           environment: 'jsdom',
+          // RN libraries ship `*.web.js` files and import 'react-native'; Vite must resolve them
+          // (alias + web extensions) instead of Node loading their native entry.
+          server: { deps: { inline: [/react-native-svg/, /lucide-react-native/] } },
           include: ['packages/ui/src/**/*.test.tsx', 'apps/desktop/src/renderer/**/*.test.{ts,tsx}'],
           setupFiles: ['./apps/desktop/src/renderer/shared/testing/setup.ts'],
         },

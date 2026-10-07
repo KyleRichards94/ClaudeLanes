@@ -12,7 +12,9 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@agent-lanes/tokens": "workspace:*"
+    "@agent-lanes/tokens": "workspace:*",
+    "lucide-react-native": "^1.52.0",
+    "react-native-svg": "^15.15.5"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",

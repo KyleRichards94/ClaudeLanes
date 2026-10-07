@@ -13,9 +13,11 @@
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint && pnpm lint:fsd",
     "lint:fsd": "steiger ./apps/desktop/src/renderer",
+    "lint:probes": "node scripts/lint-probes.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "pnpm --filter @agent-lanes/desktop e2e",
+    "e2e:packaged": "pnpm --filter @agent-lanes/desktop e2e:packaged",
     "package": "pnpm --filter @agent-lanes/desktop package",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },

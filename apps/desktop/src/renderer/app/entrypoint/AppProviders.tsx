@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
+import { UiPrefsGate } from './UiPrefsGate';
 
 const SIXTY_SECONDS = 60_000;
 
@@ -25,7 +26,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router}>{children}</RouterProvider>
+      <RouterProvider router={router}>
+        <UiPrefsGate>{children}</UiPrefsGate>
+      </RouterProvider>
     </QueryClientProvider>
   );
 }

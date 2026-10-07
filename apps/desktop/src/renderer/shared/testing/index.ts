@@ -1,1 +1,2 @@
-export { installFakeBridge } from './bridge';
+export { installFakeBridge, type FakeBridge } from './bridge';
+export { installFakeSettings, type FakeSettings } from './settings';
