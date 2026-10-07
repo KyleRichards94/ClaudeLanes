@@ -1,40 +1,47 @@
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space } from '@agent-lanes/tokens';
 import { GlassPanel, Text } from '@agent-lanes/ui';
 import { useAppInfo } from '@/shared/api';
+import { useBoardTickets } from '../model/use-board-tickets';
+import { BoardLanes } from './BoardLanes';
 
 /**
- * Walking-skeleton board: proves react-native-web, tokens, glass and typed IPC end to end.
- * The real header, lanes and cards arrive with AL-082 to AL-085 (docs/TICKETS.md).
+ * The agent board (artboard 1). The header is still the walking skeleton's until AL-142; the lanes
+ * (AL-143) show every ticket record loaded into the agent ticket store.
  */
 export function BoardPage() {
   const appInfo = useAppInfo();
+  useBoardTickets();
 
   return (
     <View style={styles.page}>
-      <GlassPanel style={styles.header} testID="board-header">
-        <View style={styles.logo}>
-          <Text variant="title" size="lg" color={color.surface}>
-            ≡
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <GlassPanel style={styles.header} testID="board-header">
+          <View style={styles.logo}>
+            <Text variant="title" size="lg" color={color.surface}>
+              ≡
+            </Text>
+          </View>
+          <Text variant="display" size="lg">
+            Agent Lanes
           </Text>
-        </View>
-        <Text variant="display" size="lg">
-          Agent Lanes
-        </Text>
-        <View style={styles.spacer} />
-        {/* Selectable so the version line can be copied into a bug report. */}
-        <Text variant="mono" color={color.muted} selectable testID="runtime-info">
-          {appInfo.data
-            ? `v${appInfo.data.version} · Electron ${appInfo.data.versions.electron} · ${appInfo.data.platform}`
-            : appInfo.isError
-              ? 'Main process unreachable'
-              : 'Connecting…'}
-        </Text>
-      </GlassPanel>
+          <View style={styles.spacer} />
+          {/* Selectable so the version line can be copied into a bug report. */}
+          <Text variant="mono" color={color.muted} selectable testID="runtime-info">
+            {appInfo.data
+              ? `v${appInfo.data.version} · Electron ${appInfo.data.versions.electron} · ${appInfo.data.platform}`
+              : appInfo.isError
+                ? 'Main process unreachable'
+                : 'Connecting…'}
+          </Text>
+        </GlassPanel>
 
-      <Text variant="display" role="heading" aria-level={1}>
-        Agent board
-      </Text>
+        <Text variant="display" role="heading" aria-level={1}>
+          Agent board
+        </Text>
+
+        <BoardLanes />
+      </ScrollView>
     </View>
   );
 }
@@ -42,6 +49,11 @@ export function BoardPage() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
     padding: space.xl,
     gap: space.xl,
   },

@@ -13,3 +13,4 @@ export {
   type RendererErrorSource,
 } from './diagnostics';
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
+export { ticketsQueryKey, useTicketRecords } from './tickets';
