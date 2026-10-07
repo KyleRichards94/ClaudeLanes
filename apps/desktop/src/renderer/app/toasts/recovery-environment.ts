@@ -15,8 +15,8 @@ export function createRecoveryEnvironment(navigate: (route: Route) => void): Rec
   return {
     openConnections,
     openTicketTab,
-    // No session manager yet (AL-100/AL-110): the drill-in's Output is where the session's state and
-    // its resume will show; AL-110 replaces this with a resume from the saved session id.
+    // No reconnect channel yet (AL-110; `agent:resume` only lifts a pause, AL-105): the drill-in's Output
+    // is where the session's state shows; AL-110 replaces this with a resume from the saved session id.
     reconnectSession: (ticketId) => openTicketTab(ticketId, 'output'),
     copyDiagnostics: () => {
       void copyDiagnostics().then((result) =>
