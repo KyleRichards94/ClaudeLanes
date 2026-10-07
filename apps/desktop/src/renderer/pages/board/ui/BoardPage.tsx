@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel, Text } from '@agent-lanes/ui';
+import { Button, GlassPanel, Text } from '@agent-lanes/ui';
+import { SettingsPanel } from './SettingsPanel';
 import { useAppInfo } from '@/shared/api';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardLanes } from './BoardLanes';
@@ -14,6 +16,7 @@ import { LiveDock } from './LiveDock';
 export function BoardPage() {
   const appInfo = useAppInfo();
   useBoardTickets();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <View style={styles.page}>
@@ -36,6 +39,8 @@ export function BoardPage() {
                 ? 'Main process unreachable'
                 : 'Connecting…'}
           </Text>
+          {/* The header menu's Settings until AL-142 builds the full header (repo dropdown included). */}
+          <Button variant="secondary" size="sm" label="Settings" onPress={() => setSettingsOpen(true)} testID="open-settings" />
         </GlassPanel>
 
         <Text variant="display" role="heading" aria-level={1}>
@@ -47,6 +52,7 @@ export function BoardPage() {
       <View style={styles.dock}>
         <LiveDock />
       </View>
+      <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </View>
   );
 }
