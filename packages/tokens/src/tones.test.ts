@@ -38,6 +38,17 @@ describe('tone tints', () => {
     expect(tone.ado.text).toBe(color.ado);
     expect(tone.ado.fill).toBe(color.skyGlow);
     expect(progressGradient).toEqual({ from: color.claude, to: color.skyGlow });
+    expect(tone.claude.dot).toBe(color.claude);
+    expect(tone.ado.dot).toBe(color.ado);
+    expect(tone.attention.dot).toBe(color.attention);
+    expect(tone.danger.dot).toBe(color.danger);
+    expect(tone.ok.dot).toBe(color.ok);
+  });
+
+  it.each(Object.entries(tone))('%s has a band, text and dot for pills', (_name, values) => {
+    expect(values).toEqual(
+      expect.objectContaining({ band: expect.any(String), text: expect.any(String), dot: expect.any(String) }),
+    );
   });
 
   it.each(Object.entries(tone))('%s text meets 4.5:1 on its band', (_name, values) => {
