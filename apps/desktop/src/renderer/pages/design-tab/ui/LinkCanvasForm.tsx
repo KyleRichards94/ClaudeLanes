@@ -56,7 +56,6 @@ export function LinkCanvasForm({ ticketId, current, onDone }: LinkCanvasFormProp
         }}
         onSubmitEditing={submit}
         error={error}
-        autoFocus
         maxLength={2048}
         style={styles.field}
         testID="link-canvas-url"
