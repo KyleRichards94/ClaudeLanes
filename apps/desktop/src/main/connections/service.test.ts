@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ConnectionSummary, EventChannel } from '@agent-lanes/contracts';
+import { formatAdoConnectionDetails, type AdoScopeCheck, type ConnectionSummary, type EventChannel } from '@agent-lanes/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Emit } from '../ipc/emit';
 import { SECRETS_FILE_NAME, SecretStoreError, createSecretStore, type SecretStore } from '../secrets';
@@ -135,7 +135,15 @@ describe('ConnectionsService', () => {
     it('shows the outcome of a test of the same draft run just before, without testing again', async () => {
       const { service } = start();
       const tested = okData(await service.test({ draft: adoDraft }));
-      expect(tested).toEqual({ status: 'ok', identity: 'Kyle Richards', message: null, missingScopes: [], testedAt: '2026-10-07T03:00:00.000Z' });
+      expect(tested).toEqual({
+        status: 'ok',
+        identity: 'Kyle Richards',
+        message: null,
+        missingScopes: [],
+        scopes: [],
+        projects: null,
+        testedAt: '2026-10-07T03:00:00.000Z',
+      });
 
       clock += 60_000;
       const row = okData(await service.save({ ...adoDraft, defaultProject: 'OnSite Companion', expiresAt: '2027-01-12' }));
@@ -371,6 +379,170 @@ describe('ConnectionsService', () => {
     it('refuses an unknown id', async () => {
       const { service } = start();
       await expect(service.test({ id: 'ado:nowhere' })).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+    });
+  });
+
+  describe('ADO scopes, projects and expiry (AL-043)', () => {
+    const scopesWithoutBuild: AdoScopeCheck[] = [
+      { scope: 'work-items', access: 'read', status: 'granted' },
+      { scope: 'work-items', access: 'write', status: 'unverified' },
+      { scope: 'code', access: 'read', status: 'granted' },
+      { scope: 'code', access: 'write', status: 'unverified' },
+      { scope: 'build', access: 'read', status: 'missing' },
+    ];
+    const withoutBuild: ConnectionTestOutcome = {
+      status: 'ok',
+      identity: 'Kyle Richards',
+      message: null,
+      missingScopes: ['build'],
+      scopes: scopesWithoutBuild,
+      projects: ['Hicora', 'OnSite Companion'],
+    };
+    const COMMENT_URL = `${ORG_URL}/OnSite%20Companion/_apis/wit/workItems/71273/comments?format=html&api-version=7.1-preview.4`;
+
+    function storedScopes(): unknown {
+      const document = file.contents as { connections: Array<{ id: string; scopes?: unknown }> };
+      return document.connections.find((record) => record.id === 'ado:companionsystems')?.scopes;
+    }
+
+    it('a draft test returns the scope checks and the projects for the Default project dropdown', async () => {
+      adoTester.mockResolvedValue(withoutBuild);
+      const { service } = start();
+
+      expect(okData(await service.test({ draft: adoDraft }))).toEqual({
+        status: 'ok',
+        identity: 'Kyle Richards',
+        message: null,
+        missingScopes: ['build'],
+        scopes: scopesWithoutBuild,
+        projects: ['Hicora', 'OnSite Companion'],
+        testedAt: '2026-10-07T03:00:00.000Z',
+      });
+    });
+
+    it('the saved row is signed in, shows the masked token and the expiry, and keeps Build missing', async () => {
+      adoTester.mockResolvedValue(withoutBuild);
+      const { service } = start();
+      okData(await service.test({ draft: adoDraft }));
+
+      const row = okData(await service.save({ ...adoDraft, defaultProject: 'OnSite Companion', expiresAt: '2027-01-12' }));
+      expect(row).toMatchObject({
+        kind: 'ado',
+        status: 'ok',
+        identity: 'Kyle Richards',
+        maskedToken: '••••••••7Fq2',
+        expiresAt: '2027-01-12',
+        missingScopes: ['build'],
+      });
+      expect(row.kind === 'ado' && formatAdoConnectionDetails(row, new Date(2026, 9, 7))).toBe(
+        'dev.azure.com/CompanionSystems · signed in as Kyle Richards · token ••••••••7Fq2 · expires 12 Jan',
+      );
+      // The per-access checks stay in the file; the row shows only the missing areas.
+      expect(row).not.toHaveProperty('scopes');
+      expect(storedScopes()).toEqual(scopesWithoutBuild);
+    });
+
+    it('projects are null when the test fails, and for kinds other than ADO', async () => {
+      adoTester.mockResolvedValue({ status: 'error', identity: null, message: 'nope', projects: ['Hicora'], scopes: [] });
+      const mcp = vi.fn(async (): Promise<ConnectionTestOutcome> => ({ status: 'ok', identity: null, message: null, projects: ['x'], scopes: scopesWithoutBuild }));
+      const { service } = start({ testers: { ado: adoTester, mcp } });
+
+      expect(okData(await service.test({ draft: adoDraft }))).toMatchObject({ status: 'error', projects: null, scopes: [] });
+      expect(okData(await service.test({ draft: mcpDraft }))).toMatchObject({ projects: null, scopes: [], missingScopes: [] });
+    });
+
+    it('a later 403 on a write marks the area missing on the row, once', async () => {
+      adoTester.mockResolvedValue({ ...withoutBuild, missingScopes: [], scopes: scopesWithoutBuild.map((check) => ({ ...check, status: check.access === 'read' ? 'granted' : 'unverified' })) });
+      const { service } = start();
+      okData(await service.test({ draft: adoDraft }));
+      const saved = okData(await service.save(adoDraft));
+      events.length = 0;
+      const writes = file.writes;
+
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+      expect(await service.get('ado:companionsystems')).toMatchObject({ status: 'ok', missingScopes: ['work-items'], updatedAt: saved.updatedAt });
+      expect(events).toEqual([{ channel: 'connections:changed', payload: {} }]);
+
+      // The same answer again changes nothing and writes nothing.
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+      expect(events).toHaveLength(1);
+      expect(file.writes).toBe(writes + 1);
+    });
+
+    it('a write that works verifies write access ("verified on first write") and clears a missing mark', async () => {
+      adoTester.mockResolvedValue(withoutBuild);
+      const { service } = start();
+      okData(await service.test({ draft: adoDraft }));
+      okData(await service.save(adoDraft));
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+      expect(await service.get('ado:companionsystems')).toMatchObject({ missingScopes: ['work-items', 'build'] });
+
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'debug', status: 200 });
+      expect(await service.get('ado:companionsystems')).toMatchObject({ missingScopes: ['build'] });
+      expect(storedScopes()).toContainEqual({ scope: 'work-items', access: 'write', status: 'granted' });
+    });
+
+    it('ignores a 401 (AL-048 handles it), calls outside the required scopes, unknown ids and other kinds', async () => {
+      adoTester.mockResolvedValue(withoutBuild);
+      const { service } = start();
+      okData(await service.test({ draft: adoDraft }));
+      okData(await service.save(adoDraft));
+      okData(await service.save(mcpDraft));
+      events.length = 0;
+      const writes = file.writes;
+
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'error', status: 401 });
+      await service.noteAdoResponse('ado:companionsystems', { method: 'GET', url: `${ORG_URL}/_apis/projects`, level: 'error', status: 403 });
+      await service.noteAdoResponse('ado:nowhere', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+      await service.noteAdoResponse('mcp:github', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+
+      expect(events).toEqual([]);
+      expect(file.writes).toBe(writes);
+      expect(await service.get('ado:companionsystems')).toMatchObject({ missingScopes: ['build'] });
+    });
+
+    it('re-testing settles the scopes again: writes go back to "verified on first write"', async () => {
+      adoTester.mockResolvedValue(withoutBuild);
+      const { service } = start();
+      okData(await service.test({ draft: adoDraft }));
+      okData(await service.save(adoDraft));
+      await service.noteAdoResponse('ado:companionsystems', { method: 'POST', url: COMMENT_URL, level: 'error', status: 403 });
+
+      adoTester.mockResolvedValue({ ...withoutBuild, missingScopes: [], scopes: scopesWithoutBuild.map((check) => ({ ...check, status: check.access === 'read' ? 'granted' : 'unverified' })) });
+      expect(okData(await service.test({ id: 'ado:companionsystems' }))).toMatchObject({ missingScopes: [], projects: ['Hicora', 'OnSite Companion'] });
+      expect(await service.get('ado:companionsystems')).toMatchObject({ missingScopes: [] });
+      expect(storedScopes()).toContainEqual({ scope: 'work-items', access: 'write', status: 'unverified' });
+    });
+
+    it('loads records written before AL-043 (no scope checks) and learns from later calls', async () => {
+      file = createMemoryConnectionsFile({
+        version: 1,
+        connections: [
+          {
+            kind: 'ado',
+            id: 'ado:companionsystems',
+            name: 'CompanionSystems',
+            orgUrl: ORG_URL,
+            defaultProject: null,
+            identity: 'Kyle Richards',
+            maskedToken: '••••••••7Fq2',
+            expiresAt: null,
+            status: 'ok',
+            statusMessage: null,
+            missingScopes: [],
+            lastTestedAt: '2026-10-07T03:00:00.000Z',
+            createdAt: '2026-10-07T03:00:00.000Z',
+            updatedAt: '2026-10-07T03:00:00.000Z',
+            secretId: null,
+          },
+        ],
+      });
+      const { service } = start();
+      expect(await service.list()).toHaveLength(1);
+
+      await service.noteAdoResponse('ado:companionsystems', { method: 'GET', url: `${ORG_URL}/OnSite/_apis/build/builds?$top=1`, level: 'error', status: 403 });
+      expect(await service.get('ado:companionsystems')).toMatchObject({ missingScopes: ['build'] });
+      expect(storedScopes()).toHaveLength(5);
     });
   });
 

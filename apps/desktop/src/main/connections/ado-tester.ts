@@ -1,17 +1,7 @@
-import { z } from 'zod';
-import { createAdoClient, type FetchLike } from '@agent-lanes/ado-client';
+import { createAdoClient, testAdoConnection, type FetchLike } from '@agent-lanes/ado-client';
 import type { ConnectionTester } from './testers';
 
-/** Connection Data is a preview API in REST 7.1 (Location area). */
-export const CONNECTION_DATA_API_VERSION = '7.1-preview.1';
-
-const ConnectionDataSchema = z.object({
-  authenticatedUser: z.object({
-    id: z.string(),
-    providerDisplayName: z.string().optional(),
-    customDisplayName: z.string().optional(),
-  }),
-});
+export { CONNECTION_DATA_API_VERSION } from '@agent-lanes/ado-client';
 
 export interface AdoConnectionTesterOptions {
   /** Defaults to the global `fetch`; tests pass a fake. */
@@ -19,9 +9,11 @@ export interface AdoConnectionTesterOptions {
 }
 
 /**
- * Tests an ADO organisation the way design §8 says: `GET {org}/_apis/connectionData` with the PAT,
- * which answers with the signed-in identity, or 401 for a bad token. The scope probes (Work Items,
- * Code, Build), the project list for "Default project" and the expiry come with AL-043.
+ * Tests an ADO organisation the way design §8 says (AL-043): `GET {org}/_apis/connectionData` with
+ * the PAT for the signed-in identity (a 401 fails the test), then the projects it can see for the
+ * Default project dropdown, then one read per required area (Work Items, Code, Build) in the
+ * default project or the first one listed. A refused probe marks that scope missing without failing
+ * the test; write access stays "verified on first write".
  */
 export function createAdoConnectionTester(options: AdoConnectionTesterOptions = {}): ConnectionTester<'ado'> {
   return async (draft, signal) => {
@@ -34,13 +26,10 @@ export function createAdoConnectionTester(options: AdoConnectionTesterOptions = 
     });
     if (!created.ok) return { status: 'error', identity: null, message: created.message };
 
-    const answer = await created.data.get('/_apis/connectionData', ConnectionDataSchema, {
-      apiVersion: CONNECTION_DATA_API_VERSION,
-      signal,
-    });
-    if (!answer.ok) return { status: 'error', identity: null, message: answer.message };
+    const tested = await testAdoConnection(created.data, { defaultProject: draft.defaultProject ?? null, signal });
+    if (!tested.ok) return { status: 'error', identity: null, message: tested.message };
 
-    const user = answer.data.authenticatedUser;
-    return { status: 'ok', identity: user.customDisplayName || user.providerDisplayName || null, message: null };
+    const { identity, projects, scopes, missingScopes } = tested.data;
+    return { status: 'ok', identity: identity.displayName, message: null, missingScopes, scopes, projects };
   };
 }
