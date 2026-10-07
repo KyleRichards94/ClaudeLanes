@@ -1,5 +1,7 @@
+import { defaultSettings } from '@agent-lanes/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
+import { createBuildCommands } from './commands';
 import { createBuildHandlers } from './handlers';
 import { createJobQueue, type JobQueue } from './job-queue';
 
@@ -7,7 +9,7 @@ let queue: JobQueue;
 
 function handlers(concurrency = 2) {
   queue = createJobQueue({ concurrency: () => concurrency, platform: 'win32' });
-  return createBuildHandlers({ buildQueue: queue });
+  return createBuildHandlers({ buildQueue: queue, buildCommands: createBuildCommands({ settings: { get: defaultSettings } }) });
 }
 
 /** A job that runs until the test disposes the queue. */
@@ -63,6 +65,12 @@ describe('build IPC handlers', () => {
   it('build:cancel refuses a request without a job id', async () => {
     const build = handlers();
     const result = await handleInvoke('build:cancel', { jobId: '' }, build['build:cancel']);
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION' });
+  });
+
+  it('build:commands refuses a repo that is not registered', async () => {
+    const build = handlers();
+    const result = await handleInvoke('build:commands', { repoPath: 'C:\\src\\nowhere' }, build['build:commands']);
     expect(result).toMatchObject({ ok: false, code: 'VALIDATION' });
   });
 });
