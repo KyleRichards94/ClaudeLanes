@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { safeStorage } from 'electron';
 import { createJobQueue, type JobQueue } from './build';
 import type { Emit } from './ipc/emit';
+import { createGitService, type GitService } from './git';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
@@ -24,6 +25,8 @@ export interface Services {
   readonly settings: SettingsService;
   /** Build and run job queue (AL-131): FIFO, one job per worktree, `buildQueueSize` jobs at once. */
   readonly buildQueue: JobQueue;
+  /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
+  readonly git: GitService;
 }
 
 export interface ServiceOptions {
@@ -54,12 +57,15 @@ export function createServices(options: ServiceOptions): Services {
   // Queue transitions reach the renderer as `build:queued` (AL-012).
   buildQueue.subscribe((event) => options.emit('build:queued', event));
 
+  const git = createGitService();
+
   return {
     appDataDir: options.appDataDir,
     secrets,
     emit: options.emit,
     settings,
     buildQueue,
+    git,
   };
 }
 
