@@ -23,3 +23,4 @@ export {
   type ToastInput,
   type ToastState,
 } from './toasts';
+export { closeNewTicket, openNewTicket, useNewTicketOpen } from './new-ticket';
