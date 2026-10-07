@@ -10,8 +10,12 @@ export const DESIGN_INVOKE_CHANNELS = [
   'design:unlinkCanvas', // AL-193
   'design:openCanvas', // AL-193
   'design:listArtboards', // AL-195
+  'design:getThread', // AL-196
+  'design:sendThreadMessage', // AL-196
+  'design:answerThreadApproval', // AL-196
 ] as const;
 export const DESIGN_EVENT_CHANNELS = [
   'design:spec',
   'design:view', // AL-191
+  'design:thread', // AL-196
 ] as const;

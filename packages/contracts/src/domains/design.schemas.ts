@@ -3,6 +3,13 @@ import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
 import { TicketDesignSchema } from './tickets.schemas';
+import {
+  AnswerDesignThreadApprovalRequestSchema,
+  DesignThreadEventSchema,
+  DesignThreadRequestSchema,
+  DesignThreadSchema,
+  SendDesignThreadMessageRequestSchema,
+} from './design.thread';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
 
@@ -146,6 +153,12 @@ export const designInvokeContracts = {
   'design:openCanvas': { request: OpenDesignCanvasRequestSchema, response: DesignViewStateSchema },
   /** Reads the linked canvas's artboards through a short design session (AL-195, D118). */
   'design:listArtboards': { request: DesignViewTicketRequestSchema, response: DesignArtboardListSchema },
+  /** The ticket's design thread (AL-196). */
+  'design:getThread': { request: DesignThreadRequestSchema, response: DesignThreadSchema },
+  /** Sends a message to the ticket's design session; replies arrive as `design:thread` events (AL-196). */
+  'design:sendThreadMessage': { request: SendDesignThreadMessageRequestSchema, response: DesignThreadSchema },
+  /** Approves or declines the canvas change the design session asked for (AL-196, D121). */
+  'design:answerThreadApproval': { request: AnswerDesignThreadApprovalRequestSchema, response: DesignThreadSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**
@@ -170,4 +183,5 @@ export type DesignViewEvent = z.infer<typeof DesignViewEventSchema>;
 export const designEventContracts = {
   'design:spec': DesignSpecEventSchema,
   'design:view': DesignViewEventSchema,
+  'design:thread': DesignThreadEventSchema,
 } as const satisfies Record<(typeof DESIGN_EVENT_CHANNELS)[number], z.ZodType>;

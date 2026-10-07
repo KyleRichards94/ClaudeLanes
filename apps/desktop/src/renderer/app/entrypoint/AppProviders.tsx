@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { connectionsEventHandlers, createBranchStatusEventHandlers } from '@/shared/api';
+import { connectionsEventHandlers, createBranchStatusEventHandlers, designThreadEventHandlers } from '@/shared/api';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
 import { runningEventHub } from './EventHub';
@@ -29,6 +29,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(createBranchStatusEventHandlers(queryClient)), [queryClient]);
   // `connections:changed` refetches the connection list and ADO queries (AL-046, AL-066).
   useEffect(() => runningEventHub()?.register(connectionsEventHandlers(queryClient)), [queryClient]);
+  // `design:thread` → the ticket's cached design thread (AL-196).
+  useEffect(() => runningEventHub()?.register(designThreadEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

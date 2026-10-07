@@ -5,8 +5,8 @@
 //   { "login": { "email", "organization", "subscriptionType" } | null,
 //     "apiKeys": ["keys this fake accepts"],
 //     "log": "path of a JSON-lines file to record each start in",
-//     "design": { "artboards": [{ id, name, width, height }] } (AL-195: Claude Design access and what a
-//       design session answers) }
+//     "design": { "artboards": [{ id, name, width, height }], "reply"?: "text, {prompt} = the message" }
+//       (AL-195: Claude Design access and what a design session answers; AL-196: the design thread's reply) }
 //
 // The log says whether an API key arrived and whether it was accepted, never the key itself.
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -16,7 +16,8 @@ import { createInterface } from 'node:readline';
 const state = JSON.parse(readFileSync(process.env.AGENT_LANES_FAKE_CLAUDE_STATE ?? '', 'utf8'));
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const keyAccepted = apiKey !== undefined && (state.apiKeys ?? []).includes(apiKey);
-const sessionId = randomUUID();
+// The SDK resumes a session with `--resume=<id>`; the resumed session keeps its id, as the real CLI's does.
+const sessionId = process.argv.find((arg) => arg.startsWith('--resume='))?.slice('--resume='.length) ?? randomUUID();
 const record = { argv: process.argv.slice(2), apiKey: apiKey === undefined ? null : keyAccepted ? 'accepted' : 'refused', prompts: [] };
 
 function writeLog() {
@@ -61,7 +62,8 @@ function answer(prompt) {
     uuid: randomUUID(),
     session_id: sessionId,
   });
-  const text = authenticated ? 'OK' : apiKey !== undefined ? 'Invalid API key · Fix external API key' : 'Not logged in · Please run /login';
+  const designReply = state.design?.reply?.replaceAll('{prompt}', prompt);
+  const text = authenticated ? (designReply ?? 'OK') : apiKey !== undefined ? 'Invalid API key · Fix external API key' : 'Not logged in · Please run /login';
   const usage = { input_tokens: authenticated ? 12 : 0, output_tokens: authenticated ? 1 : 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
   send({
     type: 'assistant',
