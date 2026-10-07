@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type Page } from '@playwright/test';
+import { auditTargets, seriousAxeViolations } from './support/accessibility';
 import { appDir, buildGallery, launchGallery, type GalleryApp } from './support/gallery-build';
 
 /** The e2e tsconfig has no DOM types, so the renderer's `location` is reached through `globalThis`. */
@@ -80,6 +81,30 @@ test.describe('component gallery (AL-032)', () => {
       await expect(blocking).toBeVisible();
       await blocking.getByRole('button', { name: 'Finish' }).click();
       await expect(blocking).toHaveCount(0);
+    });
+
+    test('has no serious axe violations (AL-033)', async () => {
+      expect(await seriousAxeViolations(page)).toEqual([]);
+    });
+
+    test('has no serious axe violations with each modal open (AL-033)', async () => {
+      await page.getByTestId('gallery-open-modal').click();
+      await expect(page.getByRole('dialog', { name: 'Connections' })).toBeVisible();
+      expect(await seriousAxeViolations(page)).toEqual([]);
+      await page.keyboard.press('Escape');
+
+      await page.getByTestId('gallery-open-blocking-modal').click();
+      const blocking = page.getByRole('dialog', { name: 'Connect Agent Lanes' });
+      await expect(blocking).toBeVisible();
+      expect(await seriousAxeViolations(page)).toEqual([]);
+      await blocking.getByRole('button', { name: 'Finish' }).click();
+    });
+
+    test('gives every control a target of at least 44 × 44 px (AL-033)', async () => {
+      const audit = await auditTargets(page);
+      // Buttons, tabs, segments, switches and fields across the primitives sheet.
+      expect(audit.checked).toBeGreaterThan(40);
+      expect(audit.small).toEqual([]);
     });
   });
 });
