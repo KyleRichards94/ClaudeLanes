@@ -1,7 +1,7 @@
 import { act, configure, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
-import { fakeAdoRow, fakeClaudeRow, fakeConnections, installFakeSettings, type FakeBridge } from '@/shared/testing';
+import { fakeAdoRow, fakeClaudeRow, fakeConnections, fakeTicketRecord, installFakeSettings, type FakeBridge } from '@/shared/testing';
 import { App } from './index';
 
 // The first test pays the cold load of the lazy board page (lanes, cards); under the full parallel
@@ -35,7 +35,11 @@ describe('App routing', () => {
     const settings = defaultSettings();
     const { bridge } = installFakeSettings(
       { ...settings, repos: [repo], ui: { ...settings.ui, lastRepo: repo.path } },
-      { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' }, 'repos:list': { ok: true, data: [repo] } },
+      {
+        'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' },
+        'repos:list': { ok: true, data: [repo] },
+        'tickets:get': { ok: true, data: { record: fakeTicketRecord() } },
+      },
     );
     fakeConnections(bridge as FakeBridge, [fakeAdoRow(), fakeClaudeRow()]);
   });
@@ -59,7 +63,7 @@ describe('App routing', () => {
     await navigateHash('#/ticket/71273');
     expect(await screen.findByTestId('ticket-page')).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Claude Design ↗'));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Claude Design' }));
     expect(await screen.findByTestId('design-tab-page')).toBeTruthy();
     expect(window.location.hash).toBe('#/ticket/71273/design');
 

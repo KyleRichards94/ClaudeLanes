@@ -9,5 +9,7 @@ export const TICKETS_INVOKE_CHANNELS = [
   'tickets:board',
   'tickets:adoptWorktree',
   'tickets:ignoreWorktree',
+  // One ticket's record for the drill-in and the design tab (AL-170).
+  'tickets:get',
 ] as const;
 export const TICKETS_EVENT_CHANNELS = [] as const;

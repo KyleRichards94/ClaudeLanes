@@ -254,4 +254,24 @@ describe('design view service', () => {
     await service.dispose();
     expect(platform.flush).not.toHaveBeenCalled();
   });
+
+  it('reloads the page the view shows now, or the canvas before any page loaded (AL-192)', () => {
+    const { service, views, emit } = setup();
+    expect(service.reload('71273')).toBe(false);
+
+    open(service, '71273', CANVAS_A);
+    expect(service.reload('71273')).toBe(true);
+    expect(views[0]?.loads).toEqual([CANVAS_A, CANVAS_A]);
+
+    views[0]?.callbacks.onNavigated(`${CANVAS_A}#artboard-2`);
+    expect(service.reload('71273')).toBe(true);
+    expect(views[0]?.loads.at(-1)).toBe(`${CANVAS_A}#artboard-2`);
+    expect(emit).toHaveBeenLastCalledWith('design:view', {
+      ticketId: '71273',
+      status: 'loading',
+      url: `${CANVAS_A}#artboard-2`,
+      visible: true,
+      closed: false,
+    });
+  });
 });

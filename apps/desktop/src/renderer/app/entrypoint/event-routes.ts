@@ -1,7 +1,7 @@
 import { agentTicketEventHandlers } from '@/entities/agent-ticket';
 import { buildLogEventHandlers } from '@/entities/build-log';
 import { windowVisibilityEventHandlers, type EventHandlers } from '@/shared/api';
-import { toastEventHandlers } from '@/shared/model';
+import { designViewEventHandlers, toastEventHandlers } from '@/shared/model';
 
 /**
  * The store handlers the app's event hub feeds (design §6: one subscription in `app/` routes events
@@ -16,4 +16,6 @@ export const appEventHandlers: readonly EventHandlers[] = [
   toastEventHandlers,
   // `app:window` from main → no ADO polling while the window is minimised or hidden (AL-066).
   windowVisibilityEventHandlers,
+  // `design:view` → each ticket's canvas view state for the design tab (AL-192).
+  designViewEventHandlers,
 ];

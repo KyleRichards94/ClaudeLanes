@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 import { View } from 'react-native';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFakeBridge, type FakeBridge } from '@/shared/testing';
-import { useDesignViewSlot } from './design-view';
+import { useDesignCanvasSlot, useDesignViewSlot } from './design-view';
 
 const CANVAS = 'https://claude.ai/design/p/canvas-a';
 const RECT = { left: 240, top: 120, width: 800, height: 600 };
@@ -91,5 +91,26 @@ describe('useDesignViewSlot', () => {
   it('shows nothing while the ticket has no canvas', () => {
     render(<Slot ticketId="71273" url={undefined} />);
     expect(calls(bridge)).toEqual([]);
+  });
+});
+
+function CanvasSlot({ ticketId, canvasUrl }: { ticketId: string; canvasUrl: string | undefined }) {
+  const ref = useDesignCanvasSlot(ticketId, canvasUrl);
+  return <View ref={ref} testID="canvas-slot" />;
+}
+
+describe('useDesignCanvasSlot (AL-193)', () => {
+  it("asks main to open the ticket's linked canvas, which picks the page", () => {
+    const { rerender, unmount } = render(<CanvasSlot ticketId="71273" canvasUrl={CANVAS} />);
+    const bounds = { x: 240, y: 120, width: 800, height: 600 };
+    expect(calls(bridge)).toEqual([['design:openCanvas', { ticketId: '71273', bounds }]]);
+
+    // A relinked canvas opens again; the same canvas does not.
+    rerender(<CanvasSlot ticketId="71273" canvasUrl={CANVAS} />);
+    rerender(<CanvasSlot ticketId="71273" canvasUrl="https://claude.ai/artifact/art-2" />);
+    expect(calls(bridge).filter(([channel]) => channel === 'design:openCanvas')).toHaveLength(2);
+
+    unmount();
+    expect(calls(bridge).at(-1)).toEqual(['design:hide', { ticketId: '71273' }]);
   });
 });
