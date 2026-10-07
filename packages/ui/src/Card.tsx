@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, font, fontSize, fontWeight, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { color, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { Text } from './Text';
 
 /**
  * Card outline, from the "Agent card states" artboard: `selected` violet, `attention` amber
@@ -37,7 +38,9 @@ export function Card({ tone = 'default', footer, style, children, testID }: Card
       {footer ? (
         <View testID={testID ? `${testID}-footer` : undefined} style={[styles.footer, footerStyles[footer.tone]]}>
           {typeof footer.label === 'string' ? (
-            <Text style={[styles.footerText, footerTextStyles[footer.tone]]}>{footer.label}</Text>
+            <Text variant="title" size="sm" color={footerTextColor[footer.tone]}>
+              {footer.label}
+            </Text>
           ) : (
             footer.label
           )}
@@ -85,12 +88,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: inset,
     paddingVertical: 5,
   },
-  footerText: {
-    fontFamily: font.sans,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.heading,
-    lineHeight: 16,
-  },
 });
 
 const toneStyles = StyleSheet.create({
@@ -108,12 +105,13 @@ const footerStyles = StyleSheet.create({
   ok: { backgroundColor: tone.ok.band },
 });
 
-const footerTextStyles = StyleSheet.create({
-  attention: { color: tone.attention.text },
-  ado: { color: tone.ado.text },
-  danger: { color: tone.danger.text },
-  ok: { color: tone.ok.text },
-});
+/** Footer labels are bold 12/16 (`title` at `sm`) in the tone's text colour. */
+const footerTextColor: Record<CardFooterTone, string> = {
+  attention: tone.attention.text,
+  ado: tone.ado.text,
+  danger: tone.danger.text,
+  ok: tone.ok.text,
+};
 
 const sectionStyles = StyleSheet.create({
   claude: { backgroundColor: tone.claude.wash },

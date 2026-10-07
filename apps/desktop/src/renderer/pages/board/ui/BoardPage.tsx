@@ -1,6 +1,6 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { color, font, fontSize, fontWeight, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel } from '@agent-lanes/ui';
+import { StyleSheet, View } from 'react-native';
+import { color, radius, space } from '@agent-lanes/tokens';
+import { GlassPanel, Text } from '@agent-lanes/ui';
 import { useAppInfo } from '@/shared/api';
 
 /**
@@ -14,11 +14,16 @@ export function BoardPage() {
     <View style={styles.page}>
       <GlassPanel style={styles.header} testID="board-header">
         <View style={styles.logo}>
-          <Text style={styles.logoGlyph}>≡</Text>
+          <Text variant="title" size="lg" color={color.surface}>
+            ≡
+          </Text>
         </View>
-        <Text style={styles.brand}>Agent Lanes</Text>
+        <Text variant="display" size="lg">
+          Agent Lanes
+        </Text>
         <View style={styles.spacer} />
-        <Text style={styles.runtime} testID="runtime-info">
+        {/* Selectable so the version line can be copied into a bug report. */}
+        <Text variant="mono" color={color.muted} selectable testID="runtime-info">
           {appInfo.data
             ? `v${appInfo.data.version} · Electron ${appInfo.data.versions.electron} · ${appInfo.data.platform}`
             : appInfo.isError
@@ -27,7 +32,7 @@ export function BoardPage() {
         </Text>
       </GlassPanel>
 
-      <Text style={styles.title} role="heading" aria-level={1}>
+      <Text variant="display" role="heading" aria-level={1}>
         Agent board
       </Text>
     </View>
@@ -55,30 +60,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoGlyph: {
-    color: color.surface,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.heading,
-  },
-  brand: {
-    color: color.ink,
-    fontFamily: font.sans,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.display,
-  },
   spacer: {
     flex: 1,
-  },
-  runtime: {
-    color: color.muted,
-    fontFamily: font.mono,
-    fontSize: fontSize.sm,
-  },
-  title: {
-    color: color.ink,
-    fontFamily: font.sans,
-    fontSize: fontSize.display,
-    fontWeight: fontWeight.display,
-    letterSpacing: -1,
   },
 });

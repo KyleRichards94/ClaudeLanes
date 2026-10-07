@@ -75,6 +75,24 @@ const eslintCases = [
     expect: 'UI code belongs in the renderer',
   },
   {
+    name: "ESLint: React Native's Text in the renderer (Text variants, AL-023)",
+    file: `${renderer}/pages/board/lint-probe.tsx`,
+    code: "import { Text } from 'react-native';\n\nexport const Probe = () => <Text>Agent board</Text>;\n",
+    expect: "Render text with Text from '@agent-lanes/ui'",
+  },
+  {
+    name: 'ESLint: Animated.Text in a UI primitive (Text variants, AL-023)',
+    file: 'packages/ui/src/LintProbe.tsx',
+    code: "import { Animated } from 'react-native';\n\nexport const Probe = () => <Animated.Text>Running</Animated.Text>;\n",
+    expect: "Render text with Text from '@agent-lanes/ui'",
+  },
+  {
+    name: 'ESLint control: a page renders the Text primitive (allowed)',
+    file: `${renderer}/pages/board/lint-probe.tsx`,
+    code: "import { Text } from '@agent-lanes/ui';\n\nexport const Probe = () => <Text variant=\"meta\">Opus · XHigh</Text>;\n",
+    expect: null,
+  },
+  {
     name: 'ESLint control: a page imports shared (allowed)',
     file: `${renderer}/pages/board/lint-probe.ts`,
     code: "export * from '@/shared/api';\n",
