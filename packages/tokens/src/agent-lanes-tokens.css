@@ -97,3 +97,10 @@
   --al-control-pressed-filter: brightness(0.94);
   --al-control-disabled-opacity: 0.5;
 }
+
+/* Modal scrim and shadow from artboards 2 and 5. Mirrors src/overlay.ts. */
+:root {
+  --al-overlay-scrim: rgba(238, 242, 247, 0.55);
+  --al-overlay-scrim-blur: 8px;
+  --al-overlay-shadow: 0 24px 72px rgba(15, 27, 45, 0.18);
+}
