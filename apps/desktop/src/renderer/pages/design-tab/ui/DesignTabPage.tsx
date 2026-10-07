@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { Linking, ScrollView, StyleSheet, View } from 'react-native';
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
-import { Text } from '@agent-lanes/ui';
+import { Button, Text } from '@agent-lanes/ui';
 import { agentTickets, ticketFromRecord, useAgentTicket } from '@/entities/agent-ticket';
 import { invoke, useDesignCanvasSlot, useTicketRecord } from '@/shared/api';
-import { setDesignViewState, useDesignViewState, useEmbedMode } from '@/shared/model';
+import { setDesignViewState, useDesignViewState, useEmbedMode, useUiPrefs } from '@/shared/model';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { BrowserBar } from './BrowserBar';
 import { DesignHeader } from './DesignHeader';
+import { EmbedModeSection } from './EmbedModeSection';
 import { LinkCanvasForm } from './LinkCanvasForm';
 import { AttachedSection } from './SideSection';
 
@@ -29,6 +30,7 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
   const record = recordQuery.data ?? undefined;
   const ticket = live ?? (record ? ticketFromRecord(record) : undefined);
   const mode = useEmbedMode(ticketId);
+  const setEmbedMode = useUiPrefs((state) => state.setEmbedMode);
   const view = useDesignViewState(ticketId);
   const [changing, setChanging] = useState(false);
 
@@ -72,6 +74,7 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
               record={record}
               loading={recordQuery.isPending}
               webview={mode === 'webview'}
+              onOpenInClaude={openUrl ? () => void Linking.openURL(openUrl) : undefined}
               changing={changing}
               onChanged={() => setChanging(false)}
             />
@@ -79,6 +82,7 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
         </View>
 
         <ScrollView style={styles.side} contentContainerStyle={styles.sideContent} testID="design-side-panel">
+          <EmbedModeSection mode={mode} onChange={(next) => setEmbedMode(ticketId, next)} status={view?.status} />
           <AttachedSection specs={record?.design.specs ?? []} />
         </ScrollView>
       </View>
@@ -94,9 +98,11 @@ interface CanvasAreaProps {
   /** The user is replacing or unlinking the linked canvas. */
   changing: boolean;
   onChanged: () => void;
+  /** MCP link mode's "Open in Claude ↗". */
+  onOpenInClaude?: () => void;
 }
 
-function CanvasArea({ ticketId, record, loading, webview, changing, onChanged }: CanvasAreaProps) {
+function CanvasArea({ ticketId, record, loading, webview, changing, onChanged, onOpenInClaude }: CanvasAreaProps) {
   if (loading) {
     return (
       <View style={styles.empty} aria-busy>
@@ -118,7 +124,7 @@ function CanvasArea({ ticketId, record, loading, webview, changing, onChanged }:
   const canvas = record.design.canvas;
   // The placeholder unmounts while the form shows, which hides the live view without closing it.
   if (!canvas || changing) return <LinkCanvasForm ticketId={ticketId} current={canvas?.url} onDone={onChanged} />;
-  if (!webview) return null;
+  if (!webview) return <McpLinkCanvas onOpen={onOpenInClaude} />;
   return <CanvasSlot ticketId={ticketId} canvasUrl={canvas.url} />;
 }
 
@@ -126,6 +132,25 @@ function CanvasArea({ ticketId, record, loading, webview, changing, onChanged }:
 function CanvasSlot({ ticketId, canvasUrl }: { ticketId: string; canvasUrl: string }) {
   const slot = useDesignCanvasSlot(ticketId, canvasUrl);
   return <View ref={slot} style={styles.slot} testID="design-canvas-slot" />;
+}
+
+/**
+ * MCP link mode (AL-194, D115): the canvas lives in Claude in the OS browser; the live view stays
+ * hidden. Artboards are still listed and picked in the side panel (D117: the canvas selection can't
+ * be read back, so the in-app checklist is used in both modes).
+ */
+function McpLinkCanvas({ onOpen }: { onOpen?: () => void }) {
+  return (
+    <View style={styles.empty} testID="design-mcp-link">
+      <Text variant="title" size="lg" role="heading" aria-level={2}>
+        This canvas opens in Claude
+      </Text>
+      <Text variant="meta" size="md" style={styles.centre}>
+        Edit it in your browser. Agent Lanes reads its artboards through your Claude Code login, so the hand-off list stays in step.
+      </Text>
+      <Button label="Open in Claude" variant="primary" trailingIcon="arrow-up-right" disabled={!onOpen} onPress={onOpen} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -162,6 +187,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.sm,
     padding: space.xl,
+  },
+  centre: {
+    textAlign: 'center',
+    maxWidth: 520,
   },
   side: {
     width: 340,

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LANES, type TicketRecord } from '@agent-lanes/contracts';
 import { agentTickets } from '@/entities/agent-ticket';
@@ -214,5 +214,61 @@ describe('DesignTabPage', () => {
     const { router } = renderPage(fakeTicketRecord());
     fireEvent.click(await screen.findByRole('button', { name: '← Board' }));
     expect(selectRoute(router.getState())).toEqual(routes.board());
+  });
+
+  describe('embed mode (AL-194)', () => {
+    it('switches between Webview and MCP link, saved per ticket', async () => {
+      const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+      renderPage(linkedRecord());
+      await screen.findByTestId('design-canvas-slot');
+
+      const webview = screen.getByRole('radio', { name: 'Webview, Electron WebContentsView' });
+      const mcp = screen.getByRole('radio', { name: 'MCP link, Open in Claude, sync via MCP' });
+      expect(webview.getAttribute('aria-checked')).toBe('true');
+      expect(screen.getByText(/A plain iframe is likely blocked by claude.ai frame headers/)).toBeTruthy();
+
+      fireEvent.click(mcp);
+      expect(useUiPrefs.getState().embedModeByTicket['71273']).toBe('mcp-link');
+      expect(screen.queryByTestId('design-canvas-slot')).toBeNull();
+      expect(screen.getByTestId('design-mcp-link')).toBeTruthy();
+      expect(screen.getByTestId('design-view-status').textContent).toBe('MCP link · opens in Claude');
+      expect(screen.getByText(/claude \/design login/)).toBeTruthy();
+
+      fireEvent.click(within(screen.getByTestId('design-mcp-link')).getByRole('button', { name: 'Open in Claude' }));
+      expect(open).toHaveBeenCalledWith(LAST_URL, '_blank', 'noopener');
+      open.mockRestore();
+
+      fireEvent.click(webview);
+      expect(useUiPrefs.getState().embedModeByTicket['71273']).toBe('webview');
+      expect(await screen.findByTestId('design-canvas-slot')).toBeTruthy();
+    });
+
+    it('opens a ticket in the mode saved for it', async () => {
+      useUiPrefs.setState({ embedModeByTicket: { '71273': 'mcp-link' } });
+      const { bridge } = renderPage(linkedRecord());
+      expect(await screen.findByTestId('design-mcp-link')).toBeTruthy();
+      expect(calls(bridge, 'design:openCanvas')).toEqual([]);
+    });
+
+    it('offers MCP link mode when the webview cannot sign in', async () => {
+      renderPage(linkedRecord());
+      await screen.findByTestId('design-canvas-slot');
+      expect(screen.queryByTestId('embed-mode-fallback')).toBeNull();
+
+      viewEvent('signed-out');
+      expect(screen.getByTestId('embed-mode-fallback').textContent).toMatch(/Google sign-in is refused inside apps/);
+      fireEvent.click(screen.getByRole('button', { name: 'Use MCP link' }));
+
+      expect(useUiPrefs.getState().embedModeByTicket['71273']).toBe('mcp-link');
+      expect(screen.getByTestId('design-mcp-link')).toBeTruthy();
+      expect(screen.queryByTestId('embed-mode-fallback')).toBeNull();
+    });
+
+    it('offers it too when the canvas fails to load', async () => {
+      renderPage(linkedRecord());
+      await screen.findByTestId('design-canvas-slot');
+      viewEvent('load-failed');
+      expect(screen.getByText("The canvas couldn't load here.")).toBeTruthy();
+    });
   });
 });
