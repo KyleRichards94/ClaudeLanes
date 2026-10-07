@@ -18,6 +18,7 @@ import {
 } from '@agent-lanes/contracts';
 import { tokens } from '@agent-lanes/tokens';
 import type { ClaudeLauncher, ClaudeQuery } from '../agent/claude-sdk';
+import { createInputQueue, type InputQueue } from '../agent/input-queue';
 import type { Emit } from '../ipc/emit';
 import { errnoCode, nodeRecordFs, writeFileAtomic, type RecordFs } from '../tickets/atomic-file';
 import type { TicketRecordStore } from '../tickets';
@@ -89,40 +90,8 @@ const SavedThreadSchema = z.object({
 });
 type SavedThread = z.infer<typeof SavedThreadSchema>;
 
-/** Messages written to a running session, one at a time, as the user sends them. */
-class InputQueue implements AsyncIterable<SDKUserMessage> {
-  private readonly items: SDKUserMessage[] = [];
-  private wake: (() => void) | undefined;
-  private ended = false;
-
-  push(message: SDKUserMessage): void {
-    this.items.push(message);
-    this.wake?.();
-  }
-
-  end(): void {
-    this.ended = true;
-    this.wake?.();
-  }
-
-  async *[Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
-    for (;;) {
-      const next = this.items.shift();
-      if (next) {
-        yield next;
-        continue;
-      }
-      if (this.ended) return;
-      await new Promise<void>((resolve) => {
-        this.wake = resolve;
-      });
-      this.wake = undefined;
-    }
-  }
-}
-
 interface Session {
-  input: InputQueue;
+  input: InputQueue<SDKUserMessage>;
   abort: AbortController;
   canvasUrl: string;
   query: ClaudeQuery | undefined;
@@ -280,7 +249,7 @@ export function createDesignThreadService(options: DesignThreadServiceOptions): 
     if (!session) return;
     entry.session = null;
     settleApproval(entry, false);
-    session.input.end();
+    session.input.close();
     session.abort.abort();
     session.query?.close();
   }
@@ -317,7 +286,7 @@ export function createDesignThreadService(options: DesignThreadServiceOptions): 
     const tool = TOOL_BY_KIND[canvas.kind];
     // A relinked canvas starts a new session; the history stays.
     const resume = entry.saved.canvasUrl === canvas.url ? entry.saved.sessionId : null;
-    const session: Session = { input: new InputQueue(), abort: new AbortController(), canvasUrl: canvas.url, query: undefined, started: false, resumed: resume !== null };
+    const session: Session = { input: createInputQueue<SDKUserMessage>(), abort: new AbortController(), canvasUrl: canvas.url, query: undefined, started: false, resumed: resume !== null };
     entry.session = session;
     void (async () => {
       try {

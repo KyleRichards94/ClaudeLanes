@@ -3,7 +3,9 @@ import type { Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-a
 import { ok, type DesignThread, type DesignThreadEvent, type TicketRecord } from '@agent-lanes/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createClaudeLauncher, type ClaudeQuery, type ClaudeQueryFunction } from '../agent/claude-sdk';
-import { createFakeClaude, fakeAssistant, fakeErrorResult, fakeResult } from '../agent/testing/fake-claude';
+import { createSessionManager } from '../agent/session-manager';
+import { createFakeClaude, fakeAssistant, fakeErrorResult, fakeInit, fakeResult } from '../agent/testing/fake-claude';
+import { eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from '../agent/testing/sessions';
 import { createMemoryRecordFs, type MemoryRecordFs } from '../tickets/testing';
 import { UNAVAILABLE_REASON } from './artboards';
 import { DESIGN_THREAD_MODEL, createDesignThreadService, designThreadsDir, threadPrompt, type DesignThreadService } from './thread';
@@ -51,6 +53,9 @@ function interactiveClaude(respond: Responder, tools: string[] = ['ClaudeDesign'
       close: () => {
         call.closed = true;
       },
+      interrupt: async () => undefined,
+      setModel: async () => undefined,
+      applyFlagSettings: async () => undefined,
     }) as ClaudeQuery;
   };
   return { query, calls };
@@ -155,6 +160,41 @@ describe('design thread', () => {
     // Nothing reached the lead agent's session, and it is still running.
     expect(lead.calls[0]).toMatchObject({ prompt: 'Implement the plan', sent: [], closed: false });
     leadQuery.close();
+  });
+
+  it('answers while the session manager’s lead agent is mid-turn, and the agent’s output keeps streaming', async () => {
+    // The lead agent (AL-100): a live session that has started its turn and not finished it.
+    const lead = createFakeClaude({ live: true, messages: [fakeInit('lead-session'), fakeAssistant('Editing JobGrid.razor…')] });
+    const leadClaude = createClaudeLauncher({ executable: () => 'claude', query: () => lead.query, baseEnv: () => ({}) });
+    const sessions = createSessionManager({
+      claude: leadClaude,
+      connections: fakeClaudeConnections('login'),
+      tickets: await memoryTickets({ id: '71273' }),
+      emit: recordingEmit().emit,
+    });
+    // What the session streams; the transcript service turns these into `agent:output` (AL-102).
+    const streamed: SDKMessage[] = [];
+    sessions.subscribe((event) => {
+      if (event.ticketId === '71273') streamed.push(event.message);
+    });
+    const design = interactiveClaude(echo);
+    const { service, events } = setup(design.query);
+
+    expect(await sessions.start({ ticketId: '71273', jobDescription: 'Implement the plan' })).toMatchObject({ ok: true });
+    await eventually(() => streamed.some((message) => message.type === 'assistant'));
+
+    await service.send('71273', 'Is the header sticky?');
+    const thread = await until(events, (t) => t.status === 'idle' && t.messages.length === 2);
+    expect(thread.messages[1]).toMatchObject({ role: 'design', text: 'Looked at the canvas: Is the header sticky?' });
+
+    // The agent's turn carries on streaming, and only its own first turn ever reached it.
+    const before = streamed.length;
+    lead.calls[0]!.push(fakeAssistant('Still editing JobGrid.razor…'));
+    await eventually(() => streamed.length > before);
+    expect(lead.calls[0]!.sent).toHaveLength(1);
+    expect(String(lead.calls[0]!.sent[0]!.message.content)).not.toContain('Is the header sticky?');
+    expect(design.calls[0]!.sent).toEqual(['Is the header sticky?']);
+    await sessions.dispose();
   });
 
   it('saves the history and resumes the same design session after a restart', async () => {
