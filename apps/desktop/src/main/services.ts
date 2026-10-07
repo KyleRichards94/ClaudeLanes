@@ -3,6 +3,7 @@ import { safeStorage, type BrowserWindow } from 'electron';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
+import { adoMcpServerFor, createMcpConnectionTester } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
 import { createElectronDesignPlatform } from './design/electron-platform';
@@ -98,7 +99,9 @@ export function createServices(options: ServiceOptions): Services {
     file: createElectronConnectionsFile(options.appDataDir),
     secrets,
     emit: options.emit,
-    testers: { ado: createAdoConnectionTester() },
+    testers: { ado: createAdoConnectionTester(), mcp: createMcpConnectionTester() },
+    // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
+    adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
   });
 
