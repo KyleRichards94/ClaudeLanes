@@ -111,9 +111,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-115 | ADO write-back on stage change | E6 | S | AL-103, AL-063 | todo |
 | AL-130 | Build/run command detection and overrides | E7 | S | AL-081 | done |
 | AL-131 | Job queue | E7 | S | AL-011 | done |
-| AL-132 | Build job and log parsing | E7 | M | AL-130, AL-131, AL-012 | todo |
-| AL-133 | Run job, port and URL | E7 | M | AL-132 | todo |
-| AL-134 | Stop and process-tree kill | E7 | S | AL-133 | todo |
+| AL-132 | Build job and log parsing | E7 | M | AL-130, AL-131, AL-012 | partial |
+| AL-133 | Run job, port and URL | E7 | M | AL-132 | done |
+| AL-134 | Stop and process-tree kill | E7 | S | AL-133 | done |
 | AL-135 | Build log tab | E7 | M | AL-132, AL-029 | todo |
 | AL-140 | App router and lazy pages | E8 | S | AL-003 | done |
 | AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | done |
@@ -725,19 +725,19 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §10, artboard 6 "Build failed" · **Depends on:** AL-130, AL-131, AL-012
 - **Scope:** Spawn in the worktree, stream `build:log` lines (batched), parse MSBuild (`file(line,col): error CS0246: …`) and tsc/eslint formats into diagnostics; result `ok` or `BUILD_FAILED` with counts; store "Last build 14:02 · succeeded" on the ticket.
 - **Acceptance criteria:**
-  - [ ] Card shows "Build failed · 3 errors" and the first error as activity.
+  - [ ] Card shows "Build failed · 3 errors" and the first error as activity. (open: data path done and tested in unit and e2e `build-job.spec.ts`; `buildCardState()` returns this footer and activity, but no agent card draws it until AL-160s)
 
 #### AL-133 · Run job, port and URL
 - **Design:** §10 Run · **Depends on:** AL-132
 - **Scope:** Build if the last build is stale, then start as a child process; web projects get a free port (`ASPNETCORE_URLS` / `PORT`), detect the listening URL from output, card shows "Running · localhost:5080" (click opens the browser); desktop exe launches its own window. `run:status` events.
 - **Acceptance criteria:**
-  - [ ] Two tickets run the same web app side by side on different ports.
+  - [x] Two tickets run the same web app side by side on different ports.
 
 #### AL-134 · Stop and process-tree kill
 - **Design:** §10 Stop · **Depends on:** AL-133
 - **Scope:** Kill the whole tree (`taskkill /PID <pid> /T /F` on Windows, process group elsewhere); app quit stops every run it started.
 - **Acceptance criteria:**
-  - [ ] No orphan `dotnet` or `node` processes after Stop or quit.
+  - [x] No orphan `dotnet` or `node` processes after Stop or quit.
 
 #### AL-135 · Build log tab
 - **Design:** artboard 3 tabs, §10 · **Depends on:** AL-132, AL-029
@@ -1489,6 +1489,27 @@ implementation agent, mid-run if needed.
 | D391 | AL-030: The info auto-dismiss timer pauses while the pointer is over the toast or focus is inside it | Users can read it and use its buttons (accessibility) | 2026-10-07 |
 | D392 | AL-030: Only error toasts use `role=alert` / `aria-live=assertive`; other tones use `role=status` / polite; a plain info toast with no actions has no Dismiss button | Errors interrupt, notices don't; an info toast closes itself | 2026-10-07 |
 | D393 | AL-030: The e2e helper resends a toast by id until it appears | One cold-start run lost the first toast under load; id-based replace means a resend never adds a copy | 2026-10-07 |
+| D394 | AL-132: `build:start({ ticketId })` settles when the build ends (ok or BUILD_FAILED) instead of returning a job id at once | The ticket asks for an ok-or-BUILD_FAILED result; the job id still reaches the renderer early through `build:queued` | 2026-10-07 |
+| D395 | AL-132: New `build:finished` event carries the build result plus the envelope | The card and Live dock can show builds started from anywhere, including the agent (AL-112), without awaiting the invoke | 2026-10-07 |
+| D396 | AL-132: `build:log` payload is `{ ticketId, at, jobId, kind, lines: [{ text, stream, level }] }`, batched about every 100 ms, at most 500 lines per batch and 4,000 characters per line (longer lines end in …), ANSI codes stripped | Bounded IPC traffic; the log tab filters by `kind` and colours by `level` | 2026-10-07 |
+| D397 | AL-132: `TicketLastBuildSchema` gains an optional, nullable `firstError` diagnostic (optional, not defaulted) | Existing records and tests still parse unchanged | 2026-10-07 |
+| D398 | AL-132: Builds run through the platform shell (`shell: true`) with NO_COLOR, FORCE_COLOR=0, DOTNET_NOLOGO, DOTNET_CLI_UI_LANGUAGE=en and MSBUILDTERMINALLOGGER=off | Detected commands and overrides are command lines; the env keeps the log parseable | 2026-10-07 |
+| D399 | AL-132: The build outcome comes from the exit code (0 = succeeded); diagnostic counts are only reported. A missing worktree, unknown ticket or repo without a build command returns VALIDATION before anything is queued | Parsers can miss formats; the exit code is authoritative | 2026-10-07 |
+| D400 | AL-132: Card text helpers live in `packages/contracts/src/domains/build.display.ts` (pure, like `connections.display.ts`) and shorten C# and TS "name not found" messages to "X not found" | Matches artboard 6; reusable by card, worktree panel and Live dock | 2026-10-07 |
+| D401 | AL-132: `events.test` envelope loop no longer lists `build:log` and `run:status`; `EventHub.test`/`emit.test` send full or other payloads | Test-only edits forced by the new required payload fields | 2026-10-07 |
+| D402 | AL-133: `run:status` payload is the full RunStatus (runId, state building/starting/running/stopping/stopped/failed, runKind, port, url, startedAt, stoppedAt, exitCode, message) plus the envelope; `ACTIVE_RUN_STATES` is exported | Every change is a full snapshot, so the renderer never merges partial updates | 2026-10-07 |
+| D403 | AL-133: Build staleness is a git fingerprint (HEAD plus size and mtime of changed or untracked files) taken when the last successful build started, kept in memory per ticket; the first Run after an app restart always builds; ignored build output never counts | Cheap and correct enough; no stale binaries run | 2026-10-07 |
+| D404 | AL-133: A detected `dotnet run` for a web project gets `-- --urls=http://localhost:<port>` appended; override command lines are never changed and get the port only through the environment | launchSettings `applicationUrl` beats ASPNETCORE_URLS; overrides are the user's own | 2026-10-07 |
+| D405 | AL-133: Both ASPNETCORE_URLS and PORT are set for any run that gets a port (web projects, scripts, unclassified overrides) | Overrides don't say which toolchain they use | 2026-10-07 |
+| D406 | AL-133: Only local hosts count as the run URL (localhost, 127.0.0.1, ::1; wildcards become localhost). Without a printed URL the port is probed every 500 ms; after 120 s with neither, the run counts as running without a URL | Reads ASP.NET, Vite, Next and generic output; never reports a remote URL | 2026-10-07 |
+| D407 | AL-133: `run:openUrl({ ticketId })` opens only the URL main found for that ticket's running app (via `shell.openExternal`); the renderer never passes a URL | The renderer can't make main open arbitrary URLs | 2026-10-07 |
+| D408 | AL-133: Run output goes to `build:log` with kind `run` and jobId = runId; a Run's build step goes through the queue as kind `run` | One log stream and one queue for builds and runs | 2026-10-07 |
+| D409 | AL-133: A port allocator remembers ports handed to live runs and releases them when the run ends | Two Runs started at the same moment never get the same port | 2026-10-07 |
+| D410 | AL-133: `run:start` on an already running ticket returns its current status; a failed build step returns BUILD_FAILED and starts nothing | Idempotent Run button; never run a broken build | 2026-10-07 |
+| D411 | AL-134: A run ended by Stop or quit is `stopped` with exitCode null; an unexpected non-zero exit is `failed` with "The app exited with code N" | The card tells a user Stop from a crash | 2026-10-07 |
+| D412 | AL-134: `BuildService.build` takes an optional AbortSignal that cancels its queue job; Stop on a building run uses it | No process starts after Stop | 2026-10-07 |
+| D413 | AL-134: Quit waits at most 5 s for runs to die (as D100 for build jobs); `disposeServices` calls `runs.dispose()` before `buildQueue.dispose()`, then tickets | A stuck tree can't block quit | 2026-10-07 |
+| D414 | AL-134: `killTree` uses `taskkill /PID <pid> /T /F` on Windows; elsewhere SIGTERM to the process group (commands spawn detached), then SIGKILL after 3 s. The POSIX path is covered only by unit tests with a fake `process.kill` | Only Windows was exercised for real on this machine | 2026-10-07 |
 
 ---
 
@@ -1533,6 +1554,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 13: merged AL-029 (done). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D353–D359. `pnpm verify` green (1837 unit tests), e2e 53/53. Follow-ups: AL-032 gallery shows Modal (normal and blocking) and Tabs (status dots and the ↗ tab); AL-046, AL-135, AL-146 and AL-160 can now build on Modal/Tabs. |
 | 2026-10-07 | Integrator batch 14: merged AL-130 (done) and AL-045 (partial: the MCP error output is the row's `statusMessage`, proven over IPC; the row that draws it is AL-046). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D360–D369. `pnpm verify` green (1948 unit tests), e2e 57/57 (the first run had one failure in `text.spec.ts` mouse selection, unrelated to these tickets; it passed 3/3 alone and the full rerun was green). Follow-ups: AL-146 adds the settings UI for `buildCommand`/`runCommand` overrides and shows the detected commands from `build:commands`; AL-131/AL-132 jobs get their command line from `buildCommands.forRepo(repoPath, { dir: worktree })`; AL-046 draws each MCP row's `statusMessage`, `tools` and `builtInFor` (no Remove on built-in servers); AL-108 reuses `adoMcpServerFor` (`connections/ado-mcp.ts`) and `sessionMcpServers({ adoConnectionId })`; leftover `agent-lanes-*` / `playwright-artifacts-*` folders in %TEMP% from parallel agents were not cleaned. Drive C: had about 8.8 GB free. |
 | 2026-10-07 | Integrator batch 15: merged AL-065, AL-141, AL-083 and AL-030 (done). AL-030 conflicted with AL-141 in renderer `app/entrypoint/event-routes.ts` (`agentTicketEventHandlers` + `toastEventHandlers`) and with AL-029 in `packages/ui/src/index.ts` (Modal/Tabs + Toast); kept both sides. Lockfile unchanged after `pnpm install`. Integration fix: AdoService hands every ADO client log entry to `connections.noteAdoResponse(orgId, entry)` (the batch 12 follow-up for AL-065), with a unit test. Decisions D370–D393. `pnpm verify` green (2155 unit tests), e2e 62/62. The AL-065, AL-141 and AL-083 agents could not push their branches (Git Credential Manager prompt / remote rejected); they were merged from the local branches. Follow-ups: AL-066 builds the renderer queries on the `ado:*` channels; AL-165 calls `services.worktrees.create` and shows `details.reason` and `rollback.leftovers`; AL-088/AL-090 reuse `undoWorktreeAdd`, `findRegisteredWorktree` and `inspectPath` (`main/worktrees/worktree-git.ts`); AL-103/104/106/107/109/131–133/181 each add one line in `entities/agent-ticket/model/event-handlers.ts`; AL-090 calls `agentTickets.load(records)` and AL-165 `agentTickets.upsert(record)`; AL-048/AL-211 add toast intents to `ToastIntentSchema` and `app/toasts/toast-intents.ts`; `e2e/settings.spec.ts` AL-063 state-transitions test may be flaky under load (failed once in AL-030's run). |
+| 2026-10-07 | Integrator batch 16: merged AL-133 and AL-134 (done) and AL-132 (partial: build data path done and proven in unit and e2e `build-job.spec.ts`; `buildCardState()` gives "Build failed · 3 errors" and the first error, but no agent card draws it until AL-160s). One registration conflict in `services.ts` (AL-065 `createAdoService` import + AL-133 `shell` import, kept both sides). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D394–D414. `pnpm verify` green (2229 unit tests), e2e 65/65. The first full test run had a Vitest fork crash on start-up (exit 0xC0000409) and the second timed out two `App.test.tsx` routing tests on `findBy`'s 1 s default under load from parallel agents (about 58 node processes); the file passed alone and the third full run was green. Follow-ups: AL-160s card renders `buildCardState(record.lastBuild)` and `runLabel(status)` and updates on `build:finished`/`run:status`; AL-173 Build/Run/Stop buttons call `build:start`/`run:start`/`run:stop`, show `lastBuildLabel()`, click opens `run:openUrl`, backfill with `run:list` after reload; AL-135 consumes `build:log` lines with `level`, filtered by `kind`; AL-112 uses the `build:finished` payload as next-turn context; AL-213 keeps the dispose order (runs, build queue, tickets); AL-146 could show which commands are overrides (no `--urls`); run the POSIX process-group kill on macOS/Linux CI; `App.test.tsx` may want the 15 s `asyncUtilTimeout` that `AppRouter.test.tsx` got in batch 11. |
 
 ---
 
