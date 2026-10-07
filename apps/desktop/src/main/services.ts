@@ -23,6 +23,7 @@ import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type Secret
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
+import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -58,6 +59,8 @@ export interface Services {
   readonly repos: RepoRegistry;
   /** Starts Claude Code through the Agent SDK with the Claude connection's credential (AL-044; sessions, AL-100). */
   readonly claude: ClaudeLauncher;
+  /** Creates a ticket's worktree and branch and records them on the ticket, or rolls everything back (AL-083). */
+  readonly worktrees: TicketWorktreeService;
 }
 
 export interface ServiceOptions {
@@ -108,6 +111,7 @@ export function createServices(options: ServiceOptions): Services {
 
   const git = createGitService();
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
+  const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -153,6 +157,7 @@ export function createServices(options: ServiceOptions): Services {
     tickets,
     repos,
     claude,
+    worktrees,
   };
 }
 
