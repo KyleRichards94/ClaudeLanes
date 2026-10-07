@@ -36,11 +36,18 @@ export function installFakeSettings(
     updates.push(payload);
     const patch = SettingsPatchSchema.safeParse(payload);
     if (!patch.success) return { ok: false, code: 'VALIDATION', message: 'Invalid settings update' };
-    const { repos = settings.repos, buildQueueSize = settings.buildQueueSize, defaults, ui } = patch.data;
+    const {
+      repos = settings.repos,
+      buildQueueSize = settings.buildQueueSize,
+      adoStateTransitions = settings.adoStateTransitions,
+      defaults,
+      ui,
+    } = patch.data;
     settings = {
       ...settings,
       repos,
       buildQueueSize,
+      adoStateTransitions,
       defaults: { ...settings.defaults, ...defaults },
       ui: { ...settings.ui, ...ui },
     };

@@ -51,6 +51,33 @@ describe('SettingsService', () => {
     expect(service.get().ui).toMatchObject({ collapsedLanes: ['qa'], embedModeByTicket: { '71330': 'webview' } });
   });
 
+  it('keeps ADO state transitions off until turned on, and remembers the choice (AL-063)', () => {
+    const { service, file } = start();
+    expect(service.get().adoStateTransitions).toBe(false);
+
+    const result = service.update({ adoStateTransitions: true });
+    expect(result.ok && result.data.adoStateTransitions).toBe(true);
+    expect(createSettingsService({ file, warn: vi.fn() }).get().adoStateTransitions).toBe(true);
+
+    service.update({ buildQueueSize: 3 });
+    expect(service.get().adoStateTransitions).toBe(true);
+  });
+
+  it('reads a file saved before ADO state transitions existed with the setting off', () => {
+    const { adoStateTransitions: _missing, ...older } = { ...defaultSettings(), buildQueueSize: 4 };
+    const { service, warn } = start(older);
+
+    expect(service.get()).toEqual({ ...defaultSettings(), buildQueueSize: 4, adoStateTransitions: false });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('turns a stored non-boolean ADO state transitions value back off', () => {
+    const { service, warn } = start({ ...defaultSettings(), adoStateTransitions: 'yes' });
+
+    expect(service.get().adoStateTransitions).toBe(false);
+    expect(warn.mock.calls[0]?.[0]).toContain('adoStateTransitions');
+  });
+
   it('stores repos with their overrides', () => {
     const { service } = start();
     const repo = createRepoSettings(repoPath, { buildCommand: 'dotnet build OnSite.sln -c Debug', maxConcurrentAgents: 2 });

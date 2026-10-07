@@ -51,3 +51,13 @@ export {
   PULL_REQUEST_STATUSES_API_VERSION,
   type PullRequestCallOptions,
 } from './pull-requests';
+export {
+  addWorkItemComment,
+  COMMENTS_API_VERSION,
+  COMMENTS_PAGE_SIZE,
+  listWorkItemComments,
+  setWorkItemState,
+  type SetWorkItemStateOptions,
+  type WorkItemRef,
+  type WriteBackCallOptions,
+} from './write-back';

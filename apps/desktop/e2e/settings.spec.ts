@@ -123,6 +123,17 @@ test('a corrupt settings file falls back to the defaults and is replaced on the 
   expect(readSettingsFile()).toMatchObject({ version: 2, buildQueueSize: 3 });
 });
 
+test('ADO state transitions start off and are saved when turned on (AL-063)', async () => {
+  const page = await launch();
+  expect((await getSettings(page)).adoStateTransitions).toBe(false);
+
+  const updated = await invoke(page, 'settings:update', { adoStateTransitions: true });
+  expect(updated.ok && updated.data.adoStateTransitions).toBe(true);
+  await close();
+
+  expect(readSettingsFile()).toMatchObject({ version: 2, adoStateTransitions: true });
+});
+
 test('an invalid update is refused and nothing is written', async () => {
   const page = await launch();
   const refused = await invoke(page, 'settings:update', { ui: { collapsedLanes: ['backlog'] } });
