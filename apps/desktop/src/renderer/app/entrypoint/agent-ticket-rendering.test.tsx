@@ -11,7 +11,7 @@ import {
   useLaneNeedsYouCount,
   useLaneTicketIds,
 } from '@/entities/agent-ticket';
-import { fakeTicketRecord, installFakeBridge, type FakeBridge } from '@/shared/testing';
+import { fakeOutputEvent, fakeTicketRecord, installFakeBridge, type FakeBridge } from '@/shared/testing';
 import { startEventHub, stopEventHub } from './EventHub';
 
 /**
@@ -92,7 +92,7 @@ function streamOutput(ticketId: string, count: number, frames: number) {
   let at = 1_000;
   for (let frame = 0; frame < frames; frame += 1) {
     for (let i = 0; i < perFrame && at < 1_000 + count; i += 1) {
-      bridge.emit('agent:output', { ticketId, at });
+      bridge.emit('agent:output', fakeOutputEvent(ticketId, at));
       at += 1;
     }
     act(() => {
@@ -141,8 +141,8 @@ describe('agent ticket rendering (React Profiler)', () => {
 
     for (let frame = 0; frame < 5; frame += 1) {
       for (let i = 0; i < 100; i += 1) {
-        bridge.emit('agent:output', { ticketId: STREAMING, at: 2_000 + frame * 100 + i });
-        bridge.emit('agent:output', { ticketId: '71301', at: 2_000 + frame * 100 + i });
+        bridge.emit('agent:output', fakeOutputEvent(STREAMING, 2_000 + frame * 100 + i));
+        bridge.emit('agent:output', fakeOutputEvent('71301', 2_000 + frame * 100 + i));
       }
       act(() => {
         vi.advanceTimersToNextFrame();

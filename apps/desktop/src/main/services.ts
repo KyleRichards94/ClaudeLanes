@@ -2,7 +2,11 @@ import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
 import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
-import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
+import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
+import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
+import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
+import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
 import { createBuildService, createGitFingerprint, createJobQueue, createRunService, type BuildService, type JobQueue, type RunService } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
@@ -89,6 +93,12 @@ export interface Services {
   readonly claude: ClaudeLauncher;
   /** Creates a ticket's worktree and branch and records them on the ticket, or rolls everything back (AL-083). */
   readonly worktrees: TicketWorktreeService;
+  /** One Claude Agent SDK session per ticket, in its worktree (AL-100). Main-only: holds the session processes. */
+  readonly sessions: SessionManager;
+  /** Each ticket's normalised output (`agent:output`) and the buffer `agent:getTranscript` backfills from (AL-102). */
+  readonly transcripts: TranscriptService;
+  /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
+  readonly stages: StageService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -228,6 +238,28 @@ export function createServices(options: ServiceOptions): Services {
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
+  const sessions = createSessionManager({
+    claude,
+    connections,
+    tickets,
+    emit: options.emit,
+    log: log.child('agent'),
+    // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
+    extras: (record) => stageExtras(record),
+    // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
+    onEnded: (ticketId) => stages.cancelGate(ticketId),
+  });
+  const transcripts = createTranscriptService({
+    sessions,
+    tickets,
+    emit: options.emit,
+    // Output from before a restart is read back from the saved session (AL-102).
+    history: async (sessionId, dir) => (await loadClaudeSdk()).getSessionMessages(sessionId, { dir }),
+    log: log.child('agent'),
+  });
+  const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -250,6 +282,9 @@ export function createServices(options: ServiceOptions): Services {
     repos,
     claude,
     worktrees,
+    sessions,
+    transcripts,
+    stages,
     branches,
     mergeToMain,
     ticketArchive,
@@ -262,6 +297,9 @@ export function createServices(options: ServiceOptions): Services {
 /** Stops child processes and flushes state on quit (AL-213 fills this in). */
 export async function disposeServices(services: Services): Promise<void> {
   void services;
+  // First, so each claude process is closed and its session id is already saved (AL-100).
+  await services.sessions.dispose();
+  services.transcripts.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

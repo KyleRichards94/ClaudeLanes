@@ -1,3 +1,4 @@
+import type * as ClaudeSdk from '@anthropic-ai/claude-agent-sdk';
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 /**
@@ -8,8 +9,11 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
  * app happened to inherit: see `claudeProcessEnv`.
  */
 
-/** The part of the SDK's `Query` the app uses: the message stream, the account, and stopping. */
-export type ClaudeQuery = AsyncIterable<SDKMessage> & Pick<Query, 'accountInfo' | 'close'>;
+/**
+ * The part of the SDK's `Query` the app uses: the message stream, the account, stopping, and the
+ * streaming-input controls agent sessions use (AL-100: interrupt, model and effort changes).
+ */
+export type ClaudeQuery = AsyncIterable<SDKMessage> & Pick<Query, 'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings'>;
 
 export type ClaudeQueryFunction = (params: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => ClaudeQuery;
 
@@ -97,6 +101,19 @@ export function loadClaudeQuery(): Promise<ClaudeQueryFunction> {
     },
   );
   return sdkQuery;
+}
+
+/** The whole SDK module, imported on first use: `createSdkMcpServer` (AL-103) and `getSessionMessages` (AL-102). */
+export type ClaudeSdkModule = typeof ClaudeSdk;
+
+let sdkModule: Promise<ClaudeSdkModule> | undefined;
+
+export function loadClaudeSdk(): Promise<ClaudeSdkModule> {
+  sdkModule ??= import('@anthropic-ai/claude-agent-sdk').catch((cause: unknown) => {
+    sdkModule = undefined;
+    throw cause;
+  });
+  return sdkModule;
 }
 
 export function createClaudeLauncher(options: ClaudeLauncherOptions): ClaudeLauncher {

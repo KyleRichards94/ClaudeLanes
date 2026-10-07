@@ -97,11 +97,12 @@ describe('MCP connection test (stdio)', () => {
   });
 
   it("says so when the command isn't an MCP server", async () => {
-    const quick = createMcpConnectionTester({ timeoutMs: 1_500 });
+    // Long enough for node to start and print under a loaded full run; 1.5 s was not.
+    const quick = createMcpConnectionTester({ timeoutMs: 3_000 });
     const outcome = await quick(stdio(['-e', "console.log('hello there'); setTimeout(() => {}, 60000)"]), signal());
     expect(outcome.status).toBe('error');
-    expect(outcome.message).toMatch(/did not answer within 2 seconds\.\nIts output isn't MCP: /);
-  });
+    expect(outcome.message).toMatch(/did not answer within 3 seconds\.\nIts output isn't MCP: /);
+  }, 15_000);
 
   it('stops when the service gives up', async () => {
     const controller = new AbortController();

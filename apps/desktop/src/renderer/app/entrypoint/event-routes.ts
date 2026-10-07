@@ -1,3 +1,4 @@
+import { agentOutputEventHandlers } from '@/entities/agent-output';
 import { agentTicketEventHandlers } from '@/entities/agent-ticket';
 import { buildLogEventHandlers } from '@/entities/build-log';
 import { windowVisibilityEventHandlers, type EventHandlers } from '@/shared/api';
@@ -10,6 +11,8 @@ import { designViewEventHandlers, toastEventHandlers } from '@/shared/model';
  */
 export const appEventHandlers: readonly EventHandlers[] = [
   agentTicketEventHandlers,
+  // `agent:output` → the output stream of each ticket a view watches (AL-102).
+  agentOutputEventHandlers,
   // `build:log` → each ticket's Build log tab (AL-135).
   buildLogEventHandlers,
   // `toast` from main → the toast stack the app's ToastHost shows (AL-030).
