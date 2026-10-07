@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, shell } from 'electron';
 import { color } from '@agent-lanes/tokens';
+import { createEmitter, type EventFrame } from './ipc/emit';
 import { createInvokeHandlers } from './ipc/handlers';
 import { registerInvokeHandlers, type RendererLocation } from './ipc/router';
 import { createServices, disposeServices, type Services } from './services';
@@ -19,6 +20,12 @@ if (userDataOverride) app.setPath('userData', userDataOverride);
 
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
+
+/** Events go to the main window's top frame only (AL-012); nothing while there is no live window. */
+function mainWindowFrame(): EventFrame | undefined {
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return undefined;
+  return mainWindow.webContents.mainFrame;
+}
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -68,7 +75,9 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(() => {
     app.setAppUserModelId(APP_ID);
-    services = createServices({ appDataDir: app.getPath('userData') });
+    // Invalid event payloads throw while developing and are logged and dropped in the installed app.
+    const emit = createEmitter({ frame: mainWindowFrame, renderer, strict: !app.isPackaged });
+    services = createServices({ appDataDir: app.getPath('userData'), emit });
     registerInvokeHandlers(createInvokeHandlers(services), renderer);
     mainWindow = createMainWindow();
 

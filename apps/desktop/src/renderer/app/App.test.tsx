@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { installFakeBridge } from '@/shared/testing';
+import { defaultSettings } from '@agent-lanes/contracts';
+import { installFakeSettings } from '@/shared/testing';
 import { App } from './index';
 
 function setHash(hash: string) {
@@ -18,7 +19,8 @@ async function navigateHash(hash: string) {
 describe('App routing', () => {
   beforeEach(() => {
     setHash('');
-    installFakeBridge({ 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
+    // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here.
+    installFakeSettings(defaultSettings(), { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
   });
 
   it('opens at the board and shows it in the location hash', async () => {

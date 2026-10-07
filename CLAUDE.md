@@ -28,6 +28,7 @@ against Azure DevOps work items at once, one git worktree per ticket.
 | `pnpm start` | Run the built app (`electron-vite preview`) |
 | `pnpm test` | Vitest: `packages`, `main` (node) and `ui` (jsdom + react-native-web) projects |
 | `pnpm typecheck` / `pnpm lint` | tsc in every package / ESLint + Steiger FSD check |
+| `pnpm lint:probes` | Checks that layer, process and Steiger rules still fail lint on a violation. CI (`.github/workflows/ci.yml`, Windows) runs typecheck, lint, probes, tests, build and e2e on PRs and on pushes to `main` and `feature/**` |
 | `pnpm e2e` | Build, then Playwright drives the real Electron app (`apps/desktop/e2e`) |
 | `pnpm verify` | Everything except e2e |
 | `pnpm package` | Windows NSIS installer via electron-builder |
