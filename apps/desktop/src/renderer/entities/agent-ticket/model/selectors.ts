@@ -32,6 +32,22 @@ export function selectLaneNeedsYouCount(state: AgentTicketsState, lane: Lane): n
   return count;
 }
 
+/**
+ * The lane's ticket ids that need the user, in lane order, for the board's "need you" filter
+ * (AL-142). A new array on every call: read it through `useLaneNeedsYouTicketIds` (shallow-equal).
+ */
+export function selectLaneNeedsYouTicketIds(state: AgentTicketsState, lane: Lane): string[] {
+  return state.byLane[lane].filter((id) => {
+    const ticket = state.byId.get(id);
+    return ticket ? ticketNeedsYou(ticket) : false;
+  });
+}
+
+/** How many tickets the board holds, for the sub-header's "8 agent tickets" (AL-142). */
+export function selectTicketTotal(state: AgentTicketsState): number {
+  return state.byId.size;
+}
+
 /** Board-wide counts for the header pills (AL-142) and the live dock (AL-145). */
 export const AGENT_TICKET_COUNTS = ['running', 'needs-you', 'queued', 'sub-agents-running', 'builds-running'] as const;
 export type AgentTicketCount = (typeof AGENT_TICKET_COUNTS)[number];

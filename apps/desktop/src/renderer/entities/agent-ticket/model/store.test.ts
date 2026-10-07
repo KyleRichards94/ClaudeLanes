@@ -1,7 +1,14 @@
 import { LANES, type TicketRecord } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { fakeTicketRecord } from '@/shared/testing';
-import { selectLaneNeedsYouCount, selectLaneTicketIds, selectTicket, selectTicketCount } from './selectors';
+import {
+  selectLaneNeedsYouCount,
+  selectLaneNeedsYouTicketIds,
+  selectLaneTicketIds,
+  selectTicket,
+  selectTicketCount,
+  selectTicketTotal,
+} from './selectors';
 import { createAgentTicketStore, type AgentTicketStore } from './store';
 
 /** The artboard 1 board: one card in Queued, Planning, Code review, QA and Create PR; two in Implementing. */
@@ -155,6 +162,10 @@ describe('agent ticket store', () => {
     expect(selectLaneNeedsYouCount(state, 'code-review')).toBe(1);
     expect(selectLaneNeedsYouCount(state, 'qa')).toBe(1);
     expect(selectLaneNeedsYouCount(state, 'implementing')).toBe(0);
+    // The header's "need you" filter and the sub-header's total (AL-142).
+    expect(selectLaneNeedsYouTicketIds(state, 'code-review')).toEqual(['71301']);
+    expect(selectLaneNeedsYouTicketIds(state, 'implementing')).toEqual([]);
+    expect(selectTicketTotal(state)).toBe(7);
   });
 
   it('routes every action to its ticket', () => {
