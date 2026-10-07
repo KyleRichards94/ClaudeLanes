@@ -67,6 +67,15 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('heading', { name: '#80001' })).toBeTruthy();
   });
 
+  it('shows the component gallery on its dev-only route (AL-032)', async () => {
+    const { router, routes } = await renderFreshRouter();
+    await screen.findByText('Agent board');
+
+    act(() => router.navigate(routes.gallery()));
+    expect(await screen.findByTestId('gallery-page')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Component gallery' })).toBeTruthy();
+  });
+
   it('keeps the current page on screen while the next page loads', async () => {
     const { router, routes } = await renderFreshRouter();
     await screen.findByText('Agent board');

@@ -1,7 +1,7 @@
 import { Suspense, useDeferredValue, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRoute, type Route } from '@/shared/routing';
-import { BoardPage, DesignTabPage, TicketPage } from './pages';
+import { BoardPage, DesignTabPage, GalleryPage, TicketPage } from './pages';
 
 /**
  * Shows the page for the current route, each loaded lazily behind Suspense (design §12).
@@ -28,6 +28,9 @@ function RoutePage({ route }: { route: Route }): ReactElement {
       return <TicketPage ticketId={route.ticketId} />;
     case 'ticketDesign':
       return <DesignTabPage ticketId={route.ticketId} />;
+    case 'gallery':
+      // Development only (AL-032); a production build has no gallery and shows the board.
+      return GalleryPage ? <GalleryPage /> : <BoardPage />;
   }
 }
 
