@@ -7,7 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { createStore } from 'zustand/vanilla';
 import type { EventHandler } from '@/shared/api';
-import { installFakeBridge, type FakeBridge } from '@/shared/testing';
+import { fakeOutputEvent, installFakeBridge, type FakeBridge } from '@/shared/testing';
 import { HIDDEN_FLUSH_DELAY_MS, createEventHub, startEventHub, stopEventHub, type EventHub } from './EventHub';
 
 let bridge: FakeBridge;
@@ -72,7 +72,7 @@ describe('EventHub', () => {
     hub.register({ 'agent:output': onAgentOutput });
 
     for (let at = 0; at < 1000; at += 1) {
-      bridge.emit('agent:output', { ticketId: at % 2 === 0 ? '71273' : '71274', at });
+      bridge.emit('agent:output', fakeOutputEvent(at % 2 === 0 ? '71273' : '71274', at));
     }
     expect(commits).not.toHaveBeenCalled();
 
@@ -93,7 +93,7 @@ describe('EventHub', () => {
     hub.register({ 'agent:output': output.onAgentOutput, 'build:log': onBuildLog });
 
     bridge.emit('build:log', { ticketId: '71273', at: 1 });
-    bridge.emit('agent:output', { ticketId: '71273', at: 2 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 2));
     bridge.emit('build:log', { ticketId: '71274', at: 3 });
     vi.advanceTimersToNextFrame();
 
@@ -135,10 +135,10 @@ describe('EventHub', () => {
     const onGate = vi.fn<EventHandler<'agent:gate'>>();
     hub.register({ 'agent:output': onAgentOutput, 'agent:gate': onGate });
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 1 });
-    bridge.emit('agent:output', { ticketId: '', at: 2 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 1));
+    bridge.emit('agent:output', fakeOutputEvent('', 2));
     bridge.emit('agent:output', 'not an event');
-    bridge.emit('agent:output', { ticketId: '71273', at: 4 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 4));
     bridge.emit('agent:gate', { at: 5 });
     bridge.emit('agent:gate', { ticketId: '71273', at: 6 });
     vi.advanceTimersToNextFrame();
@@ -151,11 +151,11 @@ describe('EventHub', () => {
     expect(warn).toHaveBeenCalledWith('Dropped an invalid agent:gate event', expect.any(Array));
 
     // A frame with only invalid events commits nothing; the next valid one still arrives.
-    bridge.emit('agent:output', { ticketId: '71273', at: -1 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', -1));
     vi.advanceTimersToNextFrame();
     expect(commits).toHaveBeenCalledOnce();
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 7 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 7));
     vi.advanceTimersToNextFrame();
     expect(times()).toEqual([1, 4, 7]);
     expect(commits).toHaveBeenCalledTimes(2);
@@ -173,11 +173,11 @@ describe('EventHub', () => {
     hub.register({ 'agent:output': failing, 'agent:status': failing });
     hub.register({ 'agent:output': onAgentOutput, 'agent:status': onStatus });
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 1 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 1));
     const status = { ticketId: '71273', state: 'idle', sessionId: 'session-a', message: null } as const;
     bridge.emit('agent:status', { ...status, at: 2 });
     vi.advanceTimersToNextFrame();
-    bridge.emit('agent:output', { ticketId: '71273', at: 3 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 3));
     vi.advanceTimersToNextFrame();
 
     expect(times()).toEqual([1, 3]);
@@ -216,8 +216,8 @@ describe('EventHub', () => {
     const { commits, onAgentOutput, times } = createOutputStore();
     hub.register({ 'agent:output': onAgentOutput });
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 1 });
-    bridge.emit('agent:output', { ticketId: '71273', at: 2 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 1));
+    bridge.emit('agent:output', fakeOutputEvent('71273', 2));
     vi.advanceTimersByTime(HIDDEN_FLUSH_DELAY_MS - 1);
     expect(commits).not.toHaveBeenCalled();
 
@@ -231,16 +231,16 @@ describe('EventHub', () => {
     const { commits, onAgentOutput, times } = createOutputStore();
     hub.register({ 'agent:output': onAgentOutput });
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 1 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 1));
     hub.flush();
     expect(times()).toEqual([1]);
     expect(vi.getTimerCount()).toBe(0);
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 2 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 2));
     hub.stop();
     vi.advanceTimersToNextFrame();
     vi.advanceTimersByTime(HIDDEN_FLUSH_DELAY_MS);
-    bridge.emit('agent:output', { ticketId: '71273', at: 3 });
+    bridge.emit('agent:output', fakeOutputEvent('71273', 3));
     vi.advanceTimersToNextFrame();
 
     expect(commits).toHaveBeenCalledOnce();

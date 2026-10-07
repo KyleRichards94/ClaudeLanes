@@ -1,3 +1,4 @@
+import type * as ClaudeSdk from '@anthropic-ai/claude-agent-sdk';
 import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 /**
@@ -100,6 +101,19 @@ export function loadClaudeQuery(): Promise<ClaudeQueryFunction> {
     },
   );
   return sdkQuery;
+}
+
+/** The whole SDK module, imported on first use: `createSdkMcpServer` (AL-103) and `getSessionMessages` (AL-102). */
+export type ClaudeSdkModule = typeof ClaudeSdk;
+
+let sdkModule: Promise<ClaudeSdkModule> | undefined;
+
+export function loadClaudeSdk(): Promise<ClaudeSdkModule> {
+  sdkModule ??= import('@anthropic-ai/claude-agent-sdk').catch((cause: unknown) => {
+    sdkModule = undefined;
+    throw cause;
+  });
+  return sdkModule;
 }
 
 export function createClaudeLauncher(options: ClaudeLauncherOptions): ClaudeLauncher {

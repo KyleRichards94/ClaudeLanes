@@ -47,9 +47,10 @@ describe('subscribe', () => {
     const listener = vi.fn();
     subscribe('agent:output', listener);
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 3, extra: 'not in the contract' });
+    const event = { ticketId: '71273', at: 3, seq: 1, item: { kind: 'system', text: 'Plan approved', parentToolUseId: null } } as const;
+    bridge.emit('agent:output', { ...event, extra: 'not in the contract', item: { ...event.item, secret: 'not in the contract' } });
 
-    expect(listener).toHaveBeenCalledExactlyOnceWith({ ticketId: '71273', at: 3 });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(event);
   });
 
   it('returns an unsubscribe function that stops delivery', () => {

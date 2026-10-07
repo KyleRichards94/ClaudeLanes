@@ -1,3 +1,4 @@
+import { agentOutputEventHandlers } from '@/entities/agent-output';
 import { agentTicketEventHandlers } from '@/entities/agent-ticket';
 import type { EventHandlers } from '@/shared/api';
 import { toastEventHandlers } from '@/shared/model';
@@ -9,6 +10,8 @@ import { toastEventHandlers } from '@/shared/model';
  */
 export const appEventHandlers: readonly EventHandlers[] = [
   agentTicketEventHandlers,
+  // `agent:output` → the output stream of each ticket a view watches (AL-102).
+  agentOutputEventHandlers,
   // `toast` from main → the toast stack the app's ToastHost shows (AL-030).
   toastEventHandlers,
 ];

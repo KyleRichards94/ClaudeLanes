@@ -71,7 +71,8 @@ export interface SessionMessageInput {
   shouldQuery?: boolean;
 }
 
-export type SessionMessageListener = (event: { ticketId: string; message: SDKMessage }) => void;
+/** A session message, with the worktree the session runs in and whether it resumed a saved session. */
+export type SessionMessageListener = (event: { ticketId: string; cwd: string; resumed: boolean; message: SDKMessage }) => void;
 
 /** What a session gets from the rest of E6: AL-103's `agent_lanes` server, AL-108's MCP servers, … */
 export interface SessionExtras {
@@ -96,6 +97,10 @@ export interface SessionManagerOptions {
 
 interface Session {
   readonly ticketId: string;
+  /** The ticket worktree. */
+  readonly cwd: string;
+  /** Started with `resume`: the conversation has output from before this session. */
+  readonly resumed: boolean;
   readonly input: InputQueue<SDKUserMessage>;
   readonly abort: AbortController;
   query: ClaudeQuery | undefined;
@@ -195,7 +200,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     }
     for (const listener of listeners) {
       try {
-        listener({ ticketId: session.ticketId, message });
+        listener({ ticketId: session.ticketId, cwd: session.cwd, resumed: session.resumed, message });
       } catch (error) {
         log?.warn(`A session message listener failed for ticket ${session.ticketId}: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -243,6 +248,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
 
     const session: Session = {
       ticketId,
+      cwd: record.worktreePath,
+      resumed: resuming,
       input: createInputQueue<SDKUserMessage>(),
       abort: new AbortController(),
       query: undefined,
