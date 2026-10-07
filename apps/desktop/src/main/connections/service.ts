@@ -9,6 +9,7 @@ import {
   ReplaceConnectionRequestSchema,
   TestConnectionRequestSchema,
   err,
+  missingScopesOf,
   ok,
   type ClaudeLoginDetection,
   type ConnectionDraft,
@@ -21,6 +22,7 @@ import {
 } from '@agent-lanes/contracts';
 import type { Emit } from '../ipc/emit';
 import { SecretStoreError, type SecretStore } from '../secrets';
+import { applyScopeEvidence, sameScopeChecks, scopeEvidence, type AdoResponseNote } from './ado-scopes';
 import type { ConnectionsFile } from './connections-file';
 import {
   CONNECTIONS_FILE_VERSION,
@@ -79,6 +81,13 @@ export interface ConnectionsService {
    * Claude Code without a prompt and reads its account; changes nothing.
    */
   detectClaudeLogin(): Promise<Result<ClaudeLoginDetection>>;
+  /**
+   * Main process only (AL-043): what a later Azure DevOps call says about an organisation's token
+   * scopes. The ADO service (AL-065) passes each client log entry for connection `id`: a write that
+   * worked verifies write access ("verified on first write"); a 403 marks the area missing on the
+   * row and emits `connections:changed`. Other answers, a 401 included (AL-048), change nothing.
+   */
+  noteAdoResponse(id: string, response: AdoResponseNote): Promise<void>;
 }
 
 export interface ConnectionsServiceOptions {
@@ -311,6 +320,7 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
           // Left out of a replace: keep the project already chosen.
           defaultProject: draft.defaultProject !== undefined ? draft.defaultProject : previous?.kind === 'ado' ? previous.defaultProject : null,
           missingScopes: test?.missingScopes ?? [],
+          scopes: test?.scopes ?? [],
         };
       case 'claude':
         return { ...common, kind: 'claude', name: 'Claude', mode: draft.mode };
@@ -409,11 +419,15 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     }
     const token = [tokenOf(draft)];
     const passed = outcome.status === 'ok';
+    const ado = draft.kind === 'ado';
+    const scopes = ado ? [...(outcome.scopes ?? [])] : [];
     return ok({
       status: passed ? 'ok' : 'error',
       identity: outcome.identity ? scrubSecrets(outcome.identity, token) : null,
       message: passed ? null : scrubSecrets(outcome.message || 'The test failed.', token),
-      missingScopes: draft.kind === 'ado' ? [...(outcome.missingScopes ?? [])] : [],
+      missingScopes: ado ? [...(outcome.missingScopes ?? missingScopesOf(scopes))] : [],
+      scopes,
+      projects: ado && passed && outcome.projects ? outcome.projects.map((name) => scrubSecrets(name, token)) : null,
       testedAt: now().toISOString(),
     });
   }
@@ -442,7 +456,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       statusMessage: result.message,
       lastTestedAt: result.testedAt,
     };
-    return record.kind === 'ado' ? { ...record, ...tested, missingScopes: result.missingScopes } : { ...record, ...tested };
+    // A new test settles the scopes again: write access goes back to "verified on first write".
+    return record.kind === 'ado' ? { ...record, ...tested, missingScopes: result.missingScopes, scopes: result.scopes } : { ...record, ...tested };
   }
 
   async function testSaved(id: string): Promise<Result<ConnectionTestResult>> {
@@ -450,7 +465,7 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     if (!record) return notFound(id);
     const draft = await draftFromRecord(record);
     if (!draft) {
-      return ok({ status: 'error', identity: null, message: RECONNECT_MESSAGE, missingScopes: [], testedAt: now().toISOString() });
+      return ok({ status: 'error', identity: null, message: RECONNECT_MESSAGE, missingScopes: [], scopes: [], projects: null, testedAt: now().toISOString() });
     }
 
     const result = await runTest(draft);
@@ -620,6 +635,23 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return err('INTERNAL', `Could not look for a Claude Code login: ${describe(cause)}`);
       }
     },
+    noteAdoResponse: (id, response) =>
+      exclusive(async () => {
+        const evidence = scopeEvidence(response);
+        const record = findRecord(id);
+        // Every ADO call lands here: write only when what is known changes, and stay quiet while the file is locked.
+        if (!evidence || record?.kind !== 'ado' || !writable) return;
+        const scopes = applyScopeEvidence(record.scopes, evidence);
+        if (sameScopeChecks(scopes, record.scopes)) return;
+        // updatedAt stays: it dates the token and settings, and a test running now must still land.
+        const updated: StoredConnection = { ...record, scopes, missingScopes: missingScopesOf(scopes) };
+        const written = writeRecords(records.map((item) => (item.id === id ? updated : item)));
+        if (!written.ok) {
+          warn(`Could not record what Azure DevOps said about the scopes of ${id}: ${written.message}`);
+          return;
+        }
+        changed();
+      }),
   };
 }
 

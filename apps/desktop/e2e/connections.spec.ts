@@ -222,7 +222,8 @@ test('no IPC reply or event carries a token (IPC spy)', async () => {
   await expect.poll(connectionEventCount).toBe(6);
 
   // The tokens did reach the fake Azure DevOps (only it), so the spy below is checking real traffic.
-  expect(adoRequests.filter((request) => request.authorized)).toHaveLength(3);
+  // Three sign-ins; a passing test then also lists projects and probes scopes (AL-043), which this fake answers 404.
+  expect(adoRequests.filter((request) => request.authorized && request.path.includes('/_apis/connectionData'))).toHaveLength(3);
   expect(adoRequests.filter((request) => !request.authorized)).toHaveLength(1);
 
   const sent = await eventsSentToRenderer();

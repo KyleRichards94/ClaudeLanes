@@ -7,6 +7,7 @@ export {
   type ConnectionsFileRead,
   type MemoryConnectionsFile,
 } from './connections-file';
+export type { AdoResponseNote } from './ado-scopes';
 export { createConnectionsHandlers } from './handlers';
 export {
   ANTHROPIC_API_KEY_ENV,
