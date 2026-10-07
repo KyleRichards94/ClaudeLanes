@@ -56,9 +56,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-021 | Bundled fonts | E2 | S | AL-020 | partial |
 | AL-022 | GlassPanel | E2 | S | AL-020 | done |
 | AL-023 | Text primitives | E2 | S | AL-021 | done |
-| AL-024 | Button | E2 | S | AL-023 | todo |
+| AL-024 | Button | E2 | S | AL-023 | done |
 | AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | done |
-| AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | todo |
+| AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | done |
 | AL-027 | TextField | E2 | S | AL-023 | todo |
 | AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
 | AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | todo |
@@ -83,7 +83,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | todo |
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
 | AL-080 | Git runner | E5 | S | AL-001 | done |
-| AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | todo |
+| AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | done |
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | todo |
 | AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
@@ -327,9 +327,9 @@ colour alone.
 - **Design:** §11 Primitives, artboard 7 · **Depends on:** AL-023
 - **Scope:** Variants `primary` (Claude violet), `strong` (ink), `secondary` (white + line), `soft` (Claude tint pill); sizes; optional leading icon; `loading` and `disabled`; hover lifts 3 px with the deeper shadow over 150–220 ms ease-out; pressed state; focus ring; min 44 px target.
 - **Acceptance criteria:**
-  - [ ] All four variants match artboard 7.
-  - [ ] Keyboard: Tab focuses with the violet ring; Enter/Space activates.
-  - [ ] `disabled` blocks presses and is announced (`aria-disabled`).
+  - [x] All four variants match artboard 7.
+  - [x] Keyboard: Tab focuses with the violet ring; Enter/Space activates.
+  - [x] `disabled` blocks presses and is announced (`aria-disabled`).
 
 #### AL-025 · Pill, Badge, StatusBadge, IdChip
 - **Design:** artboards 1, 6 · **Depends on:** AL-023
@@ -342,8 +342,8 @@ colour alone.
 - **Design:** artboards 2, 3 · **Depends on:** AL-023
 - **Scope:** `SegmentedControl` (Sprint/Search/No ticket; Low/Med/High/XHigh/Max; Output/Diff/…) with arrow-key navigation and `radiogroup` semantics; `Switch` with label and "Auto / Needs approval" side text.
 - **Acceptance criteria:**
-  - [ ] Arrow keys move selection; selected segment is white with the violet text where the artboard shows it.
-  - [ ] Switch toggles with Space and exposes `role="switch"` + `aria-checked`.
+  - [x] Arrow keys move selection; selected segment is white with the violet text where the artboard shows it.
+  - [x] Switch toggles with Space and exposes `role="switch"` + `aria-checked`.
 
 #### AL-027 · TextField
 - **Design:** artboards 2, 5 · **Depends on:** AL-023
@@ -530,7 +530,7 @@ colour alone.
 - **Design:** §8 ("Repo paths are picked with a native folder dialog"), artboard 1 Repo dropdown · **Depends on:** AL-080, AL-041
 - **Scope:** `repos:add` opens `dialog.showOpenDialog` in main, validates a git work tree, detects default branch (`origin/HEAD`, fallback `main`), stores the repo; `repos:list`, `repos:remove`; worktree root defaults to `<repo>/../.agent-lanes/` (§9).
 - **Acceptance criteria:**
-  - [ ] Picking a non-git folder shows an error and stores nothing.
+  - [x] Picking a non-git folder shows an error and stores nothing.
 
 #### AL-082 · Branch and worktree naming
 - **Design:** §9, artboard 2 Workspace ("Worktree 71273-cutover-frmjobcontrol-to") · **Depends on:** —
@@ -1375,6 +1375,44 @@ implementation agent, mid-run if needed.
 | D277 | AL-101: `tickets/atomic-file.ts` has its own small rename-with-retry helper rather than exporting AL-040's private one | No refactoring other tickets' code | 2026-10-07 |
 | D278 | AL-101: The kill test runs the real store in a plain Node child via Node's type stripping and a resolve hook (`testing/strip-types-hooks.mjs`); needs Node ≥ 22.15 for `registerHooks` | No tsx/esbuild dependency; fits `>=22.18` | 2026-10-07 |
 | D279 | AL-101: e2e `tickets.spec.ts` checks start-up loading, corrupt records set aside, temp files removed, and no rewrite of unchanged records on quit. Test helpers for AL-090/AL-110 in `src/main/tickets/testing`: `newTicketInput`, `createTempDir`, `listTree`, `createMemoryRecordFs`, `createCrashingFs` | Proves the store is wired into the real app | 2026-10-07 |
+| D280 | AL-026: New token group `selection` in `packages/tokens/src/selection.ts` (track #EEF2F7, label #475569, switchOff #CBD5E1, thumbShadow, pillShadow, disabledOpacity 0.5) with a matching `--al-selection-*` CSS block; `selection.test.ts` checks the CSS sync and 4.5:1 label contrast | Values sampled from artboards 2 and 3; a separate file avoids colliding with other E2 tickets editing `color` | 2026-10-07 |
+| D281 | AL-026: One label colour (#475569) for unselected track segments, unselected effort pills and switch side text | Artboard 3's pills use a slightly darker slate (#334155), but one token keeps the set small | 2026-10-07 |
+| D282 | AL-026: `SegmentedControl` has `variant: 'track' \| 'pills'`; `pills` is artboard 3's effort pills | Beyond the ticket text, but AL-171 needs it | 2026-10-07 |
+| D283 | AL-026: `SegmentedControl` has `tone: 'claude' \| 'ink'` (default claude): violet text for Effort and model, ink for Sprint / Search / No ticket | Meets "violet text where the artboard shows it" | 2026-10-07 |
+| D284 | AL-026: `fill` prop stretches equal-width segments across the row (Effort, model); without it the track hugs its labels (work item control) | Both layouts appear on the artboards | 2026-10-07 |
+| D285 | AL-026: Track labels are bold (700) in every state; pills go from 500 to 700 when selected | Artboard labels look semibold and 600 isn't bundled; constant weight stops neighbours reflowing on selection | 2026-10-07 |
+| D286 | AL-026: Track is 44 px (artboards draw 42 and 46) with a 4 px thumb inset; each whole slot is the radio, so every segment is a 44 px target; effort pills stay 34 px tall inside a 44 px slot | Min target size | 2026-10-07 |
+| D287 | AL-026: The focus ring is the app's global `:focus-visible` outline with an inline `outlineOffset: -2`, ringing the visible thumb or pill rather than the 44 px slot | react-native-web inserts its stylesheet first in `<head>`, so a class would lose to global.css | 2026-10-07 |
+| D288 | AL-026: `Switch` is the whole artboard row (label, side text, 38×22 toggle with 16 px knob, 48 px tall, 14 px side padding) with `stateText: {on, off}`; its accessible name comes from `aria-labelledby` on label plus state text (e.g. "Planning Needs approval") | React Native's types have no `aria-describedby` | 2026-10-07 |
+| D289 | AL-026: Space toggles the switch on keydown and ignores key repeat; Enter works through react-native-web's PressResponder; `SegmentedControl` handles Space itself | PressResponder only handles Space for buttons | 2026-10-07 |
+| D290 | AL-026: Knob slide, track colour and thumb fill use the design's 150 ms ease-out through `selectionMotion.web.ts`; native `selectionMotion.ts` has no transitions; the web file needs one cast | React Native's style types don't list CSS transition properties | 2026-10-07 |
+| D291 | AL-026: Switch off track #CBD5E1 is under 3:1 on white, as on the artboard; state is never shown by colour alone (knob position and side-text word) | Matches the artboard; AL-033 should review against WCAG 1.4.11 | 2026-10-07 |
+| D292 | AL-024: Fifth Button variant `danger` (white fill, `tone.danger.border` outline, `color.danger` label) for artboard 5's Remove button | AL-046 doesn't need its own button | 2026-10-07 |
+| D293 | AL-024: Sizes `md` (44 px tall, 18 px sides, 14 px bold label, 16 px icon) and `sm` (38 px visible surface, 14 px sides, 12 px label, 14 px icon, as Replace/Remove on artboard 5); both keep a pressable target of at least 44×44 by putting the surface inside the target | The artboard's sm label measures about 13 px, which is not on the fontSize scale | 2026-10-07 |
+| D294 | AL-024: `trailingIcon`, `iconOnly` (label becomes the aria-label; a union type makes `icon` required) and `justify: 'center' \| 'between'` | Covers "Launch agent →", the Connections icon button and the drill-in's full-width merge buttons | 2026-10-07 |
+| D295 | AL-024: New `control` token group in `packages/tokens/src/controls.ts` with a mirrored `:root` block: `ink` #334155, primary violet shadows at rest and on hover, `pressedFilter` brightness(0.94), `disabledOpacity` 0.5; `controls.test.ts` checks the CSS mirror and text contrast | Values sampled from artboards 3, 5 and 7 | 2026-10-07 |
+| D296 | AL-024: Only the primary button has a shadow at rest (violet); on hover primary takes a deeper violet shadow and the others take `shadow.lifted` | Sampled from artboard 7 | 2026-10-07 |
+| D297 | AL-024: Only the inner surface lifts 3 px on hover, not the pressable target; one 220 ms (`motion.slowMs`) transition with `motion.easing` covers transform, box-shadow and filter; pressing drops the lift and applies `pressedFilter` | The pointer never slips off the edge, so hover doesn't flicker; react-native-web's added `-webkit-filter` breaks a per-property duration list | 2026-10-07 |
+| D298 | AL-024: `variant` defaults to `secondary`, `size` to `md` | Neutral default; primary is chosen explicitly | 2026-10-07 |
+| D299 | AL-024: react-native-web renders `role="button"` as a native `<button type="button">` (Enter/Space activate natively); disabled sets the `disabled` attribute plus `aria-disabled="true"`, so Tab skips it | Announced as unavailable; if disabled buttons should stay focusable Button would need a non-`<button>` element | 2026-10-07 |
+| D300 | AL-024: `loading` doesn't disable the button: it removes onPress, sets `aria-busy`, shows an ActivityIndicator in the leading-icon slot, keeps the label and doesn't fade | A natively disabled button loses keyboard focus | 2026-10-07 |
+| D301 | AL-024: The focus ring (focusRing tokens: 2 px violet, 2 px offset) is drawn on the surface and shows only for keyboard focus, tracked with capture-phase keydown/pointerdown listeners in `interaction.web.ts` | jsdom gets `:focus-visible` wrong on a second Tab; in Electron the result matched Chromium's `:focus-visible` | 2026-10-07 |
+| D302 | AL-024: The target's own global `:focus-visible` outline is turned off with an inline `outlineWidth: 0` so only one ring shows | react-native-web inserts its class rules ahead of the app CSS, so a class would lose to the global rule | 2026-10-07 |
+| D303 | AL-024: Web-only code (keyboard tracking, CSS transitions) is in `packages/ui/src/interaction.web.ts`; native `interaction.ts` always shows the ring and has no transitions; `isFocusVisible` and `liftTransition` are reusable by AL-026/AL-029 | Keeps DOM code out of the native build | 2026-10-07 |
+| D304 | AL-024: `@testing-library/user-event` is a devDependency of `packages/ui` | Tests press Tab, Shift+Tab, Enter and Space and hover like a real user | 2026-10-07 |
+| D305 | AL-081: A refused folder is not an error Result: main shows a native error box parented to the window ("\"Downloads\" is not a git repository.", "Choose another folder…" / "Cancel"), and on Cancel `repos:add` returns ok `{ status: 'rejected', reason, folder, repos }` | The picker is native and owned by main, the error is visible without AL-030's ToastHost, and callers never show it twice | 2026-10-07 |
+| D306 | AL-081: The `repos:add` outcome is a union `added \| existing \| cancelled \| rejected`, each carrying the full `repos` list; error Results are kept for git missing or too old (checked with `ensureSupported` before the dialog opens, INTERNAL with gitCode) and a failed settings save | Callers report only real failures | 2026-10-07 |
+| D307 | AL-081: "Choose another folder…" reopens the picker in the refused folder; the first picker opens in the parent of the last registered repo | Repos usually sit side by side | 2026-10-07 |
+| D308 | AL-081: The registered path is always the repo's main checkout: a sub-folder resolves to its work tree root (`rev-parse --show-toplevel`), a linked worktree to the main worktree (first `worktree list` entry when `--git-dir` ≠ `--git-common-dir`) | D63: a repo is identified by its main checkout, so it is registered only once | 2026-10-07 |
+| D309 | AL-081: Folder problems are typed `RepoFolderProblem`: not-a-repo, bare-repo, git-dir (inside .git), bare-main (linked worktree of a bare repo) and unreadable (git COMMAND_FAILED, CWD_NOT_FOUND, TIMEOUT; shows git's stderr, e.g. "dubious ownership") | Precise messages per cause | 2026-10-07 |
+| D310 | AL-081: Default-branch detection: `origin/HEAD` (symbolic-ref, never contacts the remote), then `main` if it exists locally or on origin, then `master`, then `main`; if detection fails `main` is used and the repo is still registered | A local-only or older repo with only `master` would otherwise get a base branch that doesn't exist | 2026-10-07 |
+| D311 | AL-081: Repo paths compare case-insensitively and ignore a trailing separator on Windows and macOS (`repoPathKey`/`isSameRepoPath`), for the "existing" check and `repos:remove` | Case-insensitive file systems | 2026-10-07 |
+| D312 | AL-081: Only one folder picker opens at a time; a second `repos:add` meanwhile gets the same promise and outcome | No stacked native dialogs | 2026-10-07 |
+| D313 | AL-081: Dialogs are an injectable `RepoDialogs` interface; the Electron version (`repos/electron-dialogs.ts`) finds its parent at call time (focused window, else first visible) and reads `dialog.*` at call time | Services hold no window (D42), `main/index.ts` unchanged, e2e can stub showOpenDialog/showMessageBox in main | 2026-10-07 |
+| D314 | AL-081: `repos:remove` only removes the settings entry, touches nothing on disk, returns `{ removed: false }` for an unknown path without writing, and doesn't clear `ui.lastRepo` | The renderer's persisted Zustand store owns `ui` and would write a stale value back | 2026-10-07 |
+| D315 | AL-081: The `repos` domain imports `RepoSettingsSchema`/`ReposSchema` from settings.schemas (repos stay in the settings document); `repos/*.ts` import `../git/git-error` and `../git/git-service`, not the git index | No second store; main-project tests don't load `electron` (the git index re-exports git-dialog) | 2026-10-07 |
+| D316 | AL-081: Renderer hooks `useRepos`/`useAddRepo`/`useRemoveRepo` (query key `['repos']`, staleTime Infinity) in `shared/api/repos.ts`; the mutations update both the repos cache and the cached settings' `repos`. No UI: the Repo dropdown is AL-142, the first-run picker step AL-047 | Ready for AL-142 and AL-047 | 2026-10-07 |
+| D317 | AL-081: e2e `repos.spec.ts` builds its git fixture with execFileSync and an isolated config instead of importing `src/main/git/testing` | No existing spec imports runtime code from src/ through Playwright's transform | 2026-10-07 |
 
 ---
 
@@ -1413,6 +1451,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 7: merged AL-214 (done). Registration conflicts kept both sides: `services.ts` (`settings`, `buildQueue`, `git` + `log`, `diagnostics`), `ipc/handlers.ts` (settings, build + diagnostics), renderer `shared/api/index.ts` (settings/event-handler + diagnostics exports) and `main.tsx` (`startEventHub()` + `installErrorReporting()` and the `AppErrorRoot` wrapper). At merge, AL-214's follow-ups for AL-041 were applied: diagnostics read `settings.get()` and the settings service warns to the log. Integration fix: `ErrorFallback` renders text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. Decisions D193–D206. `pnpm verify` green (1031 unit tests), e2e 34/34. Follow-ups: AL-210 reuses `ErrorBoundary`/`ErrorFallback`; swap `ActionButton` for AL-024's Button; later services take `services.log.child('<scope>')`. |
 | 2026-10-07 | Integrator batch 8: merged AL-042 and AL-191 (done), AL-063 (partial: "visible in ADO" needs one manual check against a real org) and AL-064 (partial: card text and move to Done wait for AL-065/AL-144/AL-181; data side done). Registration conflicts kept both sides: `ado-client/src/index.ts` (AL-061/062 sprint and work-item exports + AL-064 PRs + AL-063 write-back), `contracts/src/index.ts` (`ado.pull-requests` + `ado.write-back`), `services.ts` (`git`, `log`, `diagnostics` + `connections` + `designView`), `ipc/handlers.ts` (build, diagnostics + connections + design) and `main/index.ts` (AL-214 logger wiring + AL-191 `mainWindow`/`designTestOrigin` options). At merge the connections service's warnings go to `log.child('connections')`. Integration fix: AL-063/AL-064 DTOs use AL-062's `WorkItemIdSchema` (D219). Lockfile unchanged after `pnpm install`. Decisions D207–D252. `pnpm verify` green (1337 unit tests), e2e 44/44. Follow-ups: AL-065 registers `createWorkItemWriteBack` and the PR channels; AL-047 raises Reconnect for `needsReconnect` rows (closes AL-040). |
 | 2026-10-07 | Integrator batch 9: merged AL-025 and AL-101 (done). AL-101 conflicted in `services.ts` (kept both sides: `git`, `log`, `diagnostics`, `connections`, `designView` + `tickets`; `disposeServices` flushes tickets after the build queue, then closes the design views). At merge the ticket store's warnings go to `log.child('tickets')` (AL-101 follow-up for AL-214). Integration fix: real-git `record-store.worktree.test.ts` gets the 60 s timeouts `src/main/git` uses, and `AppRouter.test.tsx` 30 s (its cold first import passed 5 s under the full suite). Lockfile unchanged after `pnpm install`. Decisions D253–D279. `pnpm verify` green (1506 unit tests), e2e 45/45. Follow-ups: live-dock "Live" pill needs a filled Pill variant; drill-in may want an `xs` Pill and larger IdChip; AL-021's fonts e2e can point at IdChip once AL-144 lands; AL-032's gallery can use `pillTones`/`badgeStatuses`; `tickets:*` IPC channels for AL-090/AL-141/AL-165; same work item in two repos gives a duplicate ticket id (AL-083/AL-161); AL-197 stores specs outside `<repoKey>/<ticketId>.json`; AL-088's archive list not built (`delete` exists for AL-083 rollback); AL-100/AL-110 call `services.tickets.flush(id)` for must-save values; `nameSubAgent` and `BuildJobSchema.ticketId` can reuse `TICKET_ID_PATTERN`/`TicketIdSchema`. |
+| 2026-10-07 | Integrator batch 10: merged AL-026, AL-024 and AL-081 (done). Registration conflicts kept both sides: `packages/ui/src/index.ts` (AL-025 Pill/Badge/StatusBadge/IdChip + AL-026 SegmentedControl/Switch + AL-024 Button), `packages/tokens/src/index.ts` and `agent-lanes-tokens.css` (AL-026 `selection` + AL-024 `control` token groups, each its own `:root` block), `services.ts` (`git`, `log`, `diagnostics`, `connections`, `designView`, `tickets` + `repos`), `ipc/handlers.ts` (diagnostics, connections, design + repos) and renderer `shared/api/index.ts` (design-view and diagnostics exports + repos hooks). `pnpm-lock.yaml` took main's side and was regenerated (adds `@testing-library/user-event` to `packages/ui`). No integration fixes needed. Decisions D280–D317. `pnpm verify` green (1634 unit tests), e2e 47/47. Follow-ups: AL-032 gallery renders Button, SegmentedControl and Switch (plus real-Chromium keyboard e2e); AL-033 checks the Switch off-track contrast; AL-029 reuses `selection` tokens and `interaction(.web).ts`; AL-214's `ActionButton` (D206) and AL-140's plain Pressables (D165) can switch to Button; AL-142/AL-047 fall back when `ui.lastRepo` is gone and treat `rejected` like `cancelled`; AL-146 invalidates `['repos']` after editing `settings.repos`; `repos:remove` should guard repos with live tickets once AL-141 lands. |
 
 ---
 
