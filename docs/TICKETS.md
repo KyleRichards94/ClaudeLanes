@@ -68,7 +68,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-033 | Accessibility checks | E2 | S | AL-032 | todo |
 | AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | partial |
 | AL-041 | Settings store and UI prefs | E3 | M | AL-011 | done |
-| AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | todo |
+| AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | done |
 | AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | todo |
 | AL-044 | Claude connection | E3 | M | AL-042 | todo |
 | AL-045 | MCP server entries | E3 | M | AL-042 | todo |
@@ -78,8 +78,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-060 | ado-client core | E4 | M | AL-001 | done |
 | AL-061 | Sprints (iterations) | E4 | S | AL-060 | done |
 | AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | done |
-| AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | todo |
-| AL-064 | Pull requests: create, link, checks | E4 | M | AL-060 | todo |
+| AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | partial |
+| AL-064 | Pull requests: create, link, checks | E4 | M | AL-060 | partial |
 | AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | todo |
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
 | AL-080 | Git runner | E5 | S | AL-001 | done |
@@ -141,7 +141,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-180 | ADO tab | E10 | M | AL-066, AL-170 | todo |
 | AL-181 | Create PR stage | E10 | M | AL-064, AL-104, AL-170 | todo |
 | AL-190 | Spike: Claude Design integration surface | E11 | S | — | partial |
-| AL-191 | Design view service (WebContentsView) | E11 | L | AL-190, AL-011 | todo |
+| AL-191 | Design view service (WebContentsView) | E11 | L | AL-190, AL-011 | done |
 | AL-192 | Design tab page | E11 | M | AL-191, AL-140, AL-170 | todo |
 | AL-193 | Link a canvas to a ticket | E11 | S | AL-101, AL-192 | todo |
 | AL-194 | Embed mode switch and MCP-link fallback | E11 | M | AL-190, AL-192 | todo |
@@ -417,8 +417,8 @@ colour alone.
 - **Design:** §8 · **Depends on:** AL-040, AL-041
 - **Scope:** Main `ConnectionsService` holding ADO orgs (url, default project, identity, PAT ref), Claude (mode: existing login | API key), MCP servers. Channels: `connections:list` (name, kind, identity, expiry, status ok/error/untested, missing scopes), `connections:test` (draft or saved), `connections:save`, `connections:replace`, `connections:remove`. Event `connections:changed`. PATs go straight from the save request into SecretStore; the response carries a masked tail only (`••••••••7Fq2`).
 - **Acceptance criteria:**
-  - [ ] No response or event contains a full token (contract test + e2e IPC spy).
-  - [ ] Remove deletes the secret and any session env that used it on next launch.
+  - [x] No response or event contains a full token (contract test + e2e IPC spy).
+  - [x] Remove deletes the secret and any session env that used it on next launch.
 
 #### AL-043 · ADO connection test
 - **Design:** §8 ("tested with GET /_apis/connectionData … which required scopes are missing") · **Depends on:** AL-042, AL-060
@@ -494,14 +494,14 @@ colour alone.
 - **Design:** §7 ADO write-back · **Depends on:** AL-060
 - **Scope:** Add comment (Comments API); optional state transition (only when enabled in settings; default off).
 - **Acceptance criteria:**
-  - [ ] A comment posted by the app is visible in ADO with a recognisable prefix ("Agent Lanes ·").
+  - [ ] A comment posted by the app is visible in ADO with a recognisable prefix ("Agent Lanes ·"). (open: proven against an MSW fake of the Comments API (post, read back with the prefix, `fromAgentLanes: true`); needs one manual check by Kyle with a real PAT, which also confirms `format=html` on 7.1-preview.4, that the middle dot survives, and the status of a failed `/rev` test op (handled as 409 or 412). Comments API and the settings-gated state transition (`adoStateTransitions`, default off) are done)
 
 #### AL-064 · Pull requests: create, link, checks
 - **Design:** §7, §9 step 5 alternative, artboard 6 "PR open" · **Depends on:** AL-060
 - **Scope:** Create PR (source = ticket branch, target = base branch, title/description, `workItemRefs`); get PR (status, merge status); checks = policy evaluations + build statuses → `{ passed, total, failing[] }`; complete/abandon detection for Done.
 - **Acceptance criteria:**
-  - [ ] Card shows "PR !10612 · 3 / 4 checks".
-  - [ ] A completed PR moves the ticket to Done (via AL-181).
+  - [ ] Card shows "PR !10612 · 3 / 4 checks". (open: data side done, `getPullRequestSnapshot` + `formatPullRequestActivity` yield exactly this string from the artboard 6 MSW fixture; rendering waits for AL-065 (IPC), AL-144 and AL-181)
+  - [ ] A completed PR moves the ticket to Done (via AL-181). (open: detection done, `isPullRequestClosed`/`pullRequestOutcome` give closed/merged or closed/abandoned plus `closedAt`; moving the ticket is AL-181. Also needs a check against a real ADO org: `includeWorkItemRefs` on the single-PR GET, the preview api-versions, and PAT scopes for policy evaluations and the artifact link)
 
 #### AL-065 · Main ADO service, IPC and MSW fixtures
 - **Depends on:** AL-061–AL-064, AL-042
@@ -929,8 +929,9 @@ implementation agent, mid-run if needed.
 - **Scope:** Main `DesignViewService`: one `WebContentsView` per open ticket canvas, partition `persist:claude-design`, attached to the main window and positioned over the renderer's canvas placeholder (bounds from a `ResizeObserver` → `design:setBounds`). Switching tabs or pages **hides** the view and never destroys it, so the canvas and its chat keep their state across stage changes (R11). Navigation allow-list (claude.ai and its auth domains); popups go to the OS browser; no preload, no Node, no access to app IPC (AL-011 trusted-sender check). LRU limit on live views (e.g. 3).
 - **Scope update (AL-190 spike):** Partition `persist:claude-design`, no preload, sandboxed, no custom user agent (D111–D113). Popups to claude.ai and its auth hosts open as child windows in the same partition; all other popups go to `shell.openExternal` (D114). Navigation allow-list: claude.ai plus known auth hosts (enterprise SSO hosts may need adding). Call `cookies.flushStore()` on quit. Detect signed-out by redirects to claude.ai login pages. Reuse the fake-site pattern from `e2e/design-embed.spec.ts` for its e2e.
 - **Acceptance criteria:**
-  - [ ] Moving between Output and Claude Design keeps the canvas exactly where it was (scroll, selection, chat draft).
-  - [ ] The design view cannot call any app channel (e2e).
+  - [x] Moving between Output and Claude Design keeps the canvas exactly where it was (scroll, selection, chat draft). (service-level e2e `design-view.spec.ts`: same webContents, no reload, scroll, draft, selection and focus kept; the tab UI is AL-192)
+  - [x] The design view cannot call any app channel (e2e).
+  - Manual check by Kyle: real claude.ai email and SSO sign-in inside the view, and whether the team's SSO host must be added to `AUTH_HOSTS` (`apps/desktop/src/main/design/navigation.ts`).
 
 #### AL-192 · Design tab page
 - **Design:** artboard 4 · **Depends on:** AL-191, AL-140, AL-170
@@ -1301,6 +1302,52 @@ implementation agent, mid-run if needed.
 | D204 | AL-214: The clipboard is written in main (`app:copyDiagnostics`), not via `navigator.clipboard`; e2e checks `app:getDiagnostics` instead | Copying doesn't depend on focus or permissions; test runs don't overwrite the developer's clipboard | 2026-10-07 |
 | D205 | AL-214: The renderer reports errors through `app:logError` (error boundaries, window.onerror, unhandled rejections), capped at 30 reports a minute for window/promise sources, fields truncated to `RENDERER_ERROR_LIMITS` | An error thrown in a loop cannot flood the log | 2026-10-07 |
 | D206 | AL-214: A reusable `ErrorBoundary`/`ErrorFallback` lives in renderer `shared/ui` (artboard 6 error-toast layout: alert tile, Retry, Copy diagnostics, status line) and `AppErrorRoot` wraps the app root in `main.tsx`; buttons are a local Pressable `ActionButton` until AL-024's Button lands | AL-210 wraps pages, lanes and panels with it instead of building new boundaries | 2026-10-07 |
+| D207 | AL-064: PR DTOs and pure helpers (`summarizeChecks`, `isPullRequestClosed`/`pullRequestOutcome`, `formatPullRequestActivity`) live in `packages/contracts/src/domains/ado.pull-requests.ts`, exported with one line in `contracts/src/index.ts`; ado-client functions in `packages/ado-client/src/pull-requests.ts` | Avoids collisions with AL-061–AL-063 in `ado.schemas.ts`; AL-065 imports them for `ado:createPullRequest` / `ado:getPullRequest` | 2026-10-07 |
+| D208 | AL-064: No IPC channels, main service or renderer code | Those belong to AL-065, AL-066, AL-144 and AL-181 | 2026-10-07 |
+| D209 | AL-064: Checks = enabled, not-deleted, applicable branch policy evaluations (`_apis/policy/evaluations?artifactId=vstfs:///CodeReview/CodeReviewId/{projectId}/{prId}`) plus the latest PR status per genre/name (`.../pullRequests/{id}/statuses`), both on api-version 7.1-preview.1 | Those APIs are still preview in 7.1 | 2026-10-07 |
+| D210 | AL-064: Check states: approved/succeeded/partiallySucceeded pass; rejected/broken/failed/error fail; queued/running/pending/notSet/unknown pending; notApplicable not counted | A partially succeeded build satisfies ADO's build policy | 2026-10-07 |
+| D211 | AL-064: Every check, required or optional, counts towards total; each carries `required` (policy `isBlocking`; plain statuses optional); required policies listed first. A status enforced by an applicable Status policy is counted once, as the policy (genre/name, case-insensitive) | Matches what ADO shows on the PR; no double counting | 2026-10-07 |
+| D212 | AL-064: Build policy checks link to `{org}/{project}/_build/results?buildId=N` and, when failing, carry the first `buildOutputPreview` error as `detail`; status checks use their description and an http(s)-only `targetUrl` | The card can show why a check failed and link to it safely | 2026-10-07 |
+| D213 | AL-064: `createPullRequest` is idempotent: a 409 TF401179 reuses the active PR for the same branches (`created: false`); after create or reuse it reads back with `includeWorkItemRefs=true` and adds a missing work item link as an ArtifactLink (`vstfs:///Git/PullRequestId/{projectId}%2F{repoId}%2F{prId}`) via PATCH on the org-level work item URL. A failure after creation keeps its code and starts "Pull request !N was created, but …" | Retries are safe; work items in other projects link too | 2026-10-07 |
+| D214 | AL-064: Validation before any request: git check-ref-format branch names (`refs/heads/` accepted and stripped), source ≠ target, title 1–400, description ≤ 4000 (`PULL_REQUEST_DESCRIPTION_MAX`, for AL-181 to trim the draft), ≤ 50 work item ids | Bounded input; ADO's own limits | 2026-10-07 |
+| D215 | AL-064: Merge statuses are kebab-cased (`not-set`, `rejected-by-policy`, …), unknown → `not-set`; an unknown PR status fails with VALIDATION | Never guess whether a ticket is Done | 2026-10-07 |
+| D216 | AL-064: `PullRequestRef` / `pullRequestRef(pr)` identify a PR by project and repository GUIDs; `webUrl` is `{org}/{project}/_git/{repo}/pullrequest/{id}`, http(s) only | The ticket record survives renames | 2026-10-07 |
+| D217 | AL-064: `parseAdoGitRemote` (`ado-client/src/git-remote.ts`) reads org URL, project and repo from dev.azure.com, visualstudio.com, SSH v3 and Azure DevOps Server remotes; errors never echo the remote; Server remotes must include the project | The Create PR stage needs project and repo for a local repo and no ticket covered it | 2026-10-07 |
+| D218 | AL-064: `formatPullRequestActivity` → "PR !N · x / y checks" ("1 / 1 check", "no checks"), "PR !N" while checks are unknown, "PR !N · merged" / "· abandoned" once closed | Exactly the artboard 6 card text | 2026-10-07 |
+| D219 | AL-064, AL-063: At integration both DTO files use AL-062's shared `WorkItemIdSchema` instead of private copies (same bounds) | One definition of a work item id | 2026-10-07 |
+| D220 | AL-042: Connection records live in an app-written `<userData>/connections.json` (electron-store, version 1), not in `settings.json` | `settings:get`/`settings:update` are open to the renderer; AL-041's schema stays untouched | 2026-10-07 |
+| D221 | AL-042: `MaskedTokenSchema` only accepts eight bullets plus at most the last 4 printable characters; tokens shorter than 16 chars show bullets only. The masked tail is stored at save time, so listing never decrypts | A full token cannot fit in any response field | 2026-10-07 |
+| D222 | AL-042: Ids: `ado:<org slug>` (-2, -3 … on a clash), `mcp:<name slug>`, `claude` (one Claude connection); secret ids follow D23 (`ado:<slug>`, `claude:api-key`, `mcp:<slug>`) | Stable, readable ids | 2026-10-07 |
+| D223 | AL-042: Save refuses a duplicate (same org URL case-insensitive, same MCP name, second Claude) with VALIDATION and `{id}`, pointing at Replace. `connections:replace` takes `{id, draft}` of the same kind, keeps id, createdAt and the default project when omitted, clears expiresAt, resets status, and restores the old token if the record write fails | No silent overwrite; replace is all-or-nothing | 2026-10-07 |
+| D224 | AL-042: `connections:remove` deletes the secret, then the record; unknown id → ok `{removed:false}`. Start-up deletes orphan connection-owned secrets (`ado:`/`claude:`/`mcp:` ids) only when `connections.json` was read cleanly | A corrupt or partly malformed file never costs the user tokens | 2026-10-07 |
+| D225 | AL-042: A corrupt `connections.json` is renamed `connections.corrupt-<time>.json`; an unreadable (I/O) or newer-version file is left alone and changes are refused until it can be read | Same recovery rules as settings and secrets | 2026-10-07 |
+| D226 | AL-042: Rows carry `needsReconnect` (status `error`, reconnect message) when the saved token is missing or no longer decrypts; start-up decrypts each referenced token once and discards it | Data side of AL-040's open reconnect criterion | 2026-10-07 |
+| D227 | AL-042: A draft test outcome is remembered in memory for 15 minutes, keyed by sha256 of kind + URL + token; testing a saved id updates its row and emits `connections:changed` | Save right after Test shows ok and the identity without a second call | 2026-10-07 |
+| D228 | AL-042: Testers are pluggable per kind (`ConnectionTesters`); only a minimal ADO tester ships (GET `_apis/connectionData`, 7.1-preview.1, one retry, returns the identity). A kind without one returns INTERNAL "not available yet" | AL-043–AL-045 add the rest | 2026-10-07 |
+| D229 | AL-042: Tester messages and identities are scrubbed of the token (raw, base64, Basic `:token` base64, URL-encoded) before being returned, stored or logged | No leak through error text | 2026-10-07 |
+| D230 | AL-042: `connections:changed` stays envelope-only (`{at}`); the renderer refetches the list | Required id/change fields would have broken existing event tests | 2026-10-07 |
+| D231 | AL-042: MCP draft shape: transport stdio `{command, args, envVar}` or http/sse `{url, header}`; a token needs envVar or header; URLs with embedded credentials are refused. Expiry is an optional user-entered ISO date (proposed default for Q10). No renderer hooks yet (AL-046) | AL-045 refines MCP; AL-046 owns the UI | 2026-10-07 |
+| D232 | AL-042: Main-only `secret(id)` and `sessionEnv()` (`ANTHROPIC_API_KEY`) accessors on the service; at integration its start-up warnings go to `log.child('connections')` | For AL-063/AL-100/AL-108; problems reach the app log (AL-214) | 2026-10-07 |
+| D233 | AL-063: `adoStateTransitions: boolean` (default false) is a top-level setting next to `buildQueueSize`, no version bump: the loader fills the default | AL-146 lists it as a global setting; AL-041 rules allow additive defaults | 2026-10-07 |
+| D234 | AL-063: The settings gate lives in main (`createWorkItemWriteBack`, `apps/desktop/src/main/ado/write-back.ts`), reading `settings.get()` on every call; while off it returns ok `{ outcome: 'disabled' }` without asking for a client. It takes an injected `clientFor(org)` and is not registered in `services.ts` yet | Turning the setting off stops the next change; the per-org client comes with AL-065 | 2026-10-07 |
+| D235 | AL-063: `listWorkItemComments` added (not named in the ticket) | Lets the "visible in ADO" check read back; AL-065 `ado:getComments` and AL-115's no-duplicate check need it | 2026-10-07 |
+| D236 | AL-063: Comments go to the Comments API (7.1-preview.4) with `format=html`: plain text HTML-escaped, line breaks as `<br>`, prefixed "Agent Lanes · " | Text like `<frmJobControl>` can't vanish; HTML is supported by Services and Server | 2026-10-07 |
+| D237 | AL-063: `setWorkItemState` reads `System.State` first; same state (case-insensitive) → `unchanged`, nothing written; otherwise the PATCH has a `test /rev` op, and 409/412 becomes INTERNAL "nothing was written". An optional `reason` goes into `System.History` (prefixed) in the same revision | Never overwrites someone else's change | 2026-10-07 |
+| D238 | AL-063: Comment text ≤ 10,000 chars (`WORK_ITEM_COMMENT_MAX_LENGTH`); state names ≤ 128 chars, no control characters | Bounded input | 2026-10-07 |
+| D239 | AL-063: Write-back DTOs live in `packages/contracts/src/domains/ado.write-back.ts`, exported with one line in `contracts/src/index.ts` | Avoids collisions in `ado.schemas.ts` | 2026-10-07 |
+| D240 | AL-063: `isAgentLanesComment` also recognises the prefix inside leading markup and with the dot/space stored as an entity (`&middot;`, `&#183;`, `&nbsp;`), looking at the first 2,000 chars only | ADO may rewrite stored HTML; fast on hostile input | 2026-10-07 |
+| D241 | AL-063: Comment dates become plain ISO instants; `updatedAt` is null when modifiedDate equals createdDate | ADO sends 7-digit fractions and sets both on an unedited comment | 2026-10-07 |
+| D242 | AL-191: Channels `design:open {ticketId, url, bounds?}` → DesignViewState; `design:setBounds`, `design:hide`, `design:close` → `{found}`; `design:getView` → `{view\|null}`. Event `design:view {ticketId, at, status, url, visible, closed}` | Feeds AL-192's sign-in pill and AL-193's relink | 2026-10-07 |
+| D243 | AL-191: View status `loading \| signed-in \| signed-out \| load-failed`; signed-out = claude.ai `/login`, `/logout`, `/signup`, `/sso`, `/magic-link`, `/auth` or an identity-provider page, where the reported URL drops query and fragment; canvas URLs are kept whole | Sign-in URLs can carry one-time tokens; AL-193 needs the full canvas URL | 2026-10-07 |
+| D244 | AL-191: `design:open` with the URL the view was opened with only shows it again; a different URL navigates. One view visible at a time | Keeps canvas state; a relinked canvas still loads | 2026-10-07 |
+| D245 | AL-191: Navigation allow-list: https claude.ai plus accounts.google.com, appleid.apple.com, login.microsoftonline.com, login.live.com, *.okta.com, *.workos.com (default port, no userinfo). Blocked top-level links open in the OS browser (https only); blocked redirects are stopped; sub-frames left alone; `<webview>` refused; allowed popups are child windows in the same partition with the same guards | D114; enterprise SSO hosts may need adding to `AUTH_HOSTS` | 2026-10-07 |
+| D246 | AL-191: Design-partition permissions are denied except clipboard-sanitized-write and fullscreen on allow-listed origins | Electron grants every permission by default | 2026-10-07 |
+| D247 | AL-191: `AGENT_LANES_DESIGN_TEST_ORIGIN` adds one exact origin treated as claude.ai, read in `main/index.ts` only when `app.isPackaged` is false | e2e uses a local fake site and never contacts claude.ai | 2026-10-07 |
+| D248 | AL-191: Placeholder bounds arrive in CSS pixels; main rounds them and multiplies by the renderer's zoom factor | The view lines up at any zoom | 2026-10-07 |
+| D249 | AL-191: LRU limit `DEFAULT_MAX_LIVE_DESIGN_VIEWS` = 3; an evicted view emits `design:view` with `closed: true` | Bounded memory | 2026-10-07 |
+| D250 | AL-191: Electron code sits in `design/electron-platform.ts` behind `DesignViewPlatform`; `view-service.ts` and `guards.ts` are plain logic tested with fakes | Testable in the Vitest main project | 2026-10-07 |
+| D251 | AL-191: Renderer piece is `useDesignViewSlot(ticketId, url)` in `shared/api/design-view.ts`, not a new FSD slice | A slice nothing imports fails Steiger's insignificant-slice rule; AL-192 uses it | 2026-10-07 |
+| D252 | AL-191: `services.ts` gains `designView` plus options `mainWindow` and `designTestOrigin`; `disposeServices` closes the views and calls `cookies.flushStore()`; `main/index.ts` passes these options | The service needs the window; sign-in survives restarts | 2026-10-07 |
 
 ---
 
@@ -1337,6 +1384,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 5: merged AL-023, AL-061 and AL-015 (done). One registration conflict in the renderer's `shared/api/index.ts` (AL-041 settings exports + AL-015 event-handler exports, kept both sides). Lockfile unchanged after `pnpm install`. M0 now met except AL-007. Decisions D126–D158. `pnpm verify` green (728 unit tests), lint probes 12/12, e2e 25/25. |
 | 2026-10-07 | Integrator batch 6: merged AL-140, AL-080 and AL-062 (done). AL-080 conflicted with AL-012/AL-041/AL-131 in `main/index.ts` and `services.ts` (kept both sides: `emit`, `settings`, `buildQueue` + `git`); AL-062 conflicted with AL-061 in `ado.schemas.ts` and `ado-client/src/index.ts` (kept both: sprint block, then work-item block above the channel contracts). Integration fix: AL-140's placeholder pages render text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. D13 implemented (now dated). Decisions D159–D192. `pnpm verify` green (908 unit tests), e2e 31/31. AL-080's agent could not push its branch (Git Credential Manager account prompt); it was merged from the local branch. Drive C: had about 1.6 GB free. |
 | 2026-10-07 | Integrator batch 7: merged AL-214 (done). Registration conflicts kept both sides: `services.ts` (`settings`, `buildQueue`, `git` + `log`, `diagnostics`), `ipc/handlers.ts` (settings, build + diagnostics), renderer `shared/api/index.ts` (settings/event-handler + diagnostics exports) and `main.tsx` (`startEventHub()` + `installErrorReporting()` and the `AppErrorRoot` wrapper). At merge, AL-214's follow-ups for AL-041 were applied: diagnostics read `settings.get()` and the settings service warns to the log. Integration fix: `ErrorFallback` renders text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. Decisions D193–D206. `pnpm verify` green (1031 unit tests), e2e 34/34. Follow-ups: AL-210 reuses `ErrorBoundary`/`ErrorFallback`; swap `ActionButton` for AL-024's Button; later services take `services.log.child('<scope>')`. |
+| 2026-10-07 | Integrator batch 8: merged AL-042 and AL-191 (done), AL-063 (partial: "visible in ADO" needs one manual check against a real org) and AL-064 (partial: card text and move to Done wait for AL-065/AL-144/AL-181; data side done). Registration conflicts kept both sides: `ado-client/src/index.ts` (AL-061/062 sprint and work-item exports + AL-064 PRs + AL-063 write-back), `contracts/src/index.ts` (`ado.pull-requests` + `ado.write-back`), `services.ts` (`git`, `log`, `diagnostics` + `connections` + `designView`), `ipc/handlers.ts` (build, diagnostics + connections + design) and `main/index.ts` (AL-214 logger wiring + AL-191 `mainWindow`/`designTestOrigin` options). At merge the connections service's warnings go to `log.child('connections')`. Integration fix: AL-063/AL-064 DTOs use AL-062's `WorkItemIdSchema` (D219). Lockfile unchanged after `pnpm install`. Decisions D207–D252. `pnpm verify` green (1337 unit tests), e2e 44/44. Follow-ups: AL-065 registers `createWorkItemWriteBack` and the PR channels; AL-047 raises Reconnect for `needsReconnect` rows (closes AL-040). |
 
 ---
 
