@@ -29,8 +29,9 @@ function invalid(payload: unknown): never {
 describe('emit', () => {
   it('sends a valid payload to the trusted renderer frame', () => {
     const { emit, send } = setup();
-    emit('agent:status', { ticketId: '71273', at: 1_760_000_000_000 });
-    expect(send).toHaveBeenCalledExactlyOnceWith('agent:status', { ticketId: '71273', at: 1_760_000_000_000 });
+    const status = { ticketId: '71273', state: 'running', sessionId: 'session-a', message: null } as const;
+    emit('agent:status', { ...status, at: 1_760_000_000_000 });
+    expect(send).toHaveBeenCalledExactlyOnceWith('agent:status', { ...status, at: 1_760_000_000_000 });
   });
 
   it('trusts the dev server origin in development', () => {
@@ -51,8 +52,9 @@ describe('emit', () => {
 
   it('sends only the fields the contract declares, so secrets passed by mistake never cross IPC', () => {
     const { emit, send } = setup();
-    emit('agent:stage', invalid({ ticketId: '71273', at: 5, pat: 'not-a-real-token' }));
-    expect(send).toHaveBeenCalledExactlyOnceWith('agent:stage', { ticketId: '71273', at: 5 });
+    const stage = { ticketId: '71273', at: 5, change: 'stage', stage: 'implementing', from: 'planning', activity: null, progress: 0 } as const;
+    emit('agent:stage', invalid({ ...stage, pat: 'not-a-real-token' }));
+    expect(send).toHaveBeenCalledExactlyOnceWith('agent:stage', stage);
   });
 
   describe('with an invalid payload', () => {
@@ -101,7 +103,7 @@ describe('emit', () => {
     it('refuses a different local file when packaged', () => {
       const { frame, send } = fakeFrame(pathToFileURL(rendererFile.replace('index.html', 'evil.html')).href);
       const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log: vi.fn() });
-      emit('agent:status', { ticketId: '71273', at: 5 });
+      emit('design:spec', { ticketId: '71273', at: 5 });
       expect(send).not.toHaveBeenCalled();
     });
 
@@ -112,7 +114,7 @@ describe('emit', () => {
 
       for (const frame of [undefined, gone.frame, loading.frame]) {
         const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log });
-        emit('agent:gate', { ticketId: '71273', at: 5 });
+        emit('agent:subagent', { ticketId: '71273', at: 5 });
       }
 
       expect(gone.send).not.toHaveBeenCalled();
