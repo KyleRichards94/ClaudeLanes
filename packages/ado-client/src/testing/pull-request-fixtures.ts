@@ -3,7 +3,7 @@
  * artboard 6 "PR open": PR !10612 from the ticket branch of #71273 into main, with 3 of 4 checks
  * passed. AL-065 can lift these into the shared MSW fixture set.
  */
-import { ORG_URL } from './msw-server';
+import { ORG_URL } from './constants';
 
 export const PROJECT_ID = '6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c';
 export const PROJECT_NAME = 'Onsite Companion';

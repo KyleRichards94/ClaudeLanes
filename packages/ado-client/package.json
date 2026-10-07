@@ -5,7 +5,8 @@
   "description": "Typed Azure DevOps REST 7.x client used by the Electron main process.",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkItemIdSchema } from './ado.schemas';
+import { WorkItemIdSchema } from './ado.ids';
 
 /**
  * Azure DevOps pull requests for the Create PR stage (AL-064; design §7 "Create PR opens the PR,
