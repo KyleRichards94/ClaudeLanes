@@ -10,3 +10,4 @@ export {
   type TicketErrorBoundaryProps,
   type TicketPanel,
 } from './error-boundary';
+export { TicketTabBar, type TicketTabBarProps } from './ticket-tabs';

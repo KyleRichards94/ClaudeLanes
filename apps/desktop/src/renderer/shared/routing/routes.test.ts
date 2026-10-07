@@ -6,6 +6,7 @@ describe('routes', () => {
     [routes.board(), 'board'],
     [routes.ticket('71273'), 'ticket/71273'],
     [routes.ticketDesign('71273'), 'ticket/71273/design'],
+    [routes.gallery(), 'gallery'],
   ])('writes %o as %s and reads it back', (route, path) => {
     expect(routeToPath(route)).toBe(path);
     expect(parseRoutePath(path)).toEqual(route);

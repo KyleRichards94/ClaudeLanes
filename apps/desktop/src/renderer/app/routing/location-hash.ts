@@ -5,9 +5,13 @@ export function routeHash(route: Route): string {
   return `#/${routeToPath(route)}`;
 }
 
-/** The route in the window's location hash, if it names one. */
-export function routeFromHash(hash: string): Route | undefined {
-  return parseRoutePath(hash);
+/**
+ * The route in the window's location hash, if it names one. `#/gallery` names one only in builds
+ * that have the component gallery (`pnpm dev`, AL-032); elsewhere it is ignored like any unknown hash.
+ */
+export function routeFromHash(hash: string, galleryEnabled: boolean = __GALLERY__): Route | undefined {
+  const route = parseRoutePath(hash);
+  return route?.name === 'gallery' && !galleryEnabled ? undefined : route;
 }
 
 /**

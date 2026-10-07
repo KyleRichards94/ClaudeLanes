@@ -156,3 +156,8 @@ export function stopEventHub(): void {
   appEventHub?.stop();
   appEventHub = undefined;
 }
+
+/** The app's hub once `startEventHub` ran, else undefined (tests that render without starting it). */
+export function runningEventHub(): EventHub | undefined {
+  return appEventHub;
+}

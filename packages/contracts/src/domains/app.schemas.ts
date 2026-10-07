@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { APP_EVENT_CHANNELS, APP_INVOKE_CHANNELS } from './app.names';
+import { ConnectionIdSchema } from './connections.schemas';
 
 export const AppInfoSchema = z.object({
   name: z.string(),
@@ -115,6 +116,8 @@ export type ToastRoute = z.infer<typeof ToastRouteSchema>;
  */
 export const ToastIntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('navigate'), route: ToastRouteSchema }),
+  // AL-046: Reconnect opens the Connections modal on that row, with its token field focused (design §8).
+  z.object({ type: z.literal('openConnections'), connectionId: ConnectionIdSchema.optional() }),
 ]);
 export type ToastIntent = z.infer<typeof ToastIntentSchema>;
 
@@ -144,6 +147,17 @@ export const ToastEventSchema = EventEnvelopeSchema.extend({
 });
 export type ToastEvent = z.infer<typeof ToastEventSchema>;
 
+/**
+ * `app:window` (AL-066): the main window was minimised or hidden (`visible: false`), or restored or
+ * shown again (`visible: true`). The renderer stops polling Azure DevOps while it is not visible and
+ * refetches when it comes back (design §6); the page's own visibility can't be trusted for this.
+ */
+export const WindowVisibilityEventSchema = EventEnvelopeSchema.extend({
+  visible: z.boolean(),
+});
+export type WindowVisibilityEvent = z.infer<typeof WindowVisibilityEventSchema>;
+
 export const appEventContracts = {
   toast: ToastEventSchema,
+  'app:window': WindowVisibilityEventSchema,
 } as const satisfies Record<(typeof APP_EVENT_CHANNELS)[number], z.ZodType>;
