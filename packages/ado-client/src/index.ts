@@ -21,3 +21,21 @@ export { normalizeOrgUrl } from './org-url';
 export { adoPath } from './path';
 export { DEFAULT_RETRY_POLICY, parseRetryAfter, type RetryPolicy } from './retry';
 export { listSprints, listTeams, TEAMS_PAGE_SIZE, type ListSprintsOptions, type SprintCallOptions, type TeamScope } from './sprints';
+export { runWiql, WIQL_MAX_TOP, wiqlString, type RunWiqlOptions } from './wiql';
+export {
+  DEFAULT_SEARCH_TOP,
+  DEFAULT_SPRINT_MAX_ITEMS,
+  DEFAULT_WORK_ITEM_CATEGORIES,
+  getWorkItem,
+  getWorkItems,
+  listSprintWorkItems,
+  SEARCH_QUERY_MAX_LENGTH,
+  SEARCH_TOP_MAX,
+  searchWorkItems,
+  WORK_ITEM_FIELDS,
+  WORK_ITEMS_BATCH_SIZE,
+  type GetWorkItemOptions,
+  type GetWorkItemsOptions,
+  type ListSprintWorkItemsOptions,
+  type SearchWorkItemsOptions,
+} from './work-items';
