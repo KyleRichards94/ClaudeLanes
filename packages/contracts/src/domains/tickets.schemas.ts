@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketIdSchema } from '../events';
 import { EffortSchema, LaneSchema, ModelSchema } from '../vocabulary';
+import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
 import { StageGatesSchema } from './settings.schemas';
 import type { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './tickets.names';
@@ -78,6 +79,8 @@ export const TicketLastBuildSchema = z.object({
   finishedAt: EpochMsSchema,
   errors: z.int().nonnegative(),
   warnings: z.int().nonnegative(),
+  /** The first error, the card's activity after a failed build (AL-132); null or absent without one (older records lack it). */
+  firstError: BuildDiagnosticSchema.nullable().optional(),
 });
 export type TicketLastBuild = z.infer<typeof TicketLastBuildSchema>;
 

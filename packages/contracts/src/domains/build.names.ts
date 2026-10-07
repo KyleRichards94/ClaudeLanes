@@ -3,9 +3,11 @@ export const BUILD_INVOKE_CHANNELS = [
   'build:listJobs',
   'build:cancel',
   'build:commands',
+  'build:start',
 ] as const;
 export const BUILD_EVENT_CHANNELS = [
   'build:log',
   'run:status',
   'build:queued',
+  'build:finished',
 ] as const;

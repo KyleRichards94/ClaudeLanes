@@ -1,3 +1,4 @@
+export { createBuildService, type BuildService, type BuildServiceOptions } from './build-service';
 export {
   DEFAULT_BUILD_CONCURRENCY,
   createJobQueue,
