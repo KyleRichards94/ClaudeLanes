@@ -8,6 +8,7 @@ import {
   selectTicket,
   selectTicketCount,
   selectTicketTotal,
+  selectWorkItemLanes,
   type AgentTicketCount,
 } from './selectors';
 import { agentTickets, type AgentTicketStore } from './store';
@@ -45,6 +46,11 @@ export function useLaneNeedsYouCount(lane: Lane, store: AgentTicketStore = agent
 /** A board-wide count: header pills (AL-142) and dock totals (AL-145). */
 export function useAgentTicketCount(count: AgentTicketCount, store: AgentTicketStore = agentTickets): number {
   return useStore(store, (state) => selectTicketCount(state, count));
+}
+
+/** The lane of each work item an agent ticket is working on, keyed by work item id (AL-161). */
+export function useWorkItemLanes(store: AgentTicketStore = agentTickets): Readonly<Record<string, Lane>> {
+  return useStore(store, useShallow(selectWorkItemLanes));
 }
 
 /** How many tickets are on the board ("8 agent tickets", AL-142). */

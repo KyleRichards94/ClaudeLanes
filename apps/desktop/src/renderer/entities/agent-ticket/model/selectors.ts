@@ -43,6 +43,19 @@ export function selectLaneNeedsYouTicketIds(state: AgentTicketsState, lane: Lane
   });
 }
 
+/**
+ * The lane of every work item an agent ticket is working on, keyed by work item id, for the New
+ * agent ticket picker (AL-161): those rows show their lane instead of a radio. Done tickets are left
+ * out, so a merged work item can be picked again. A new object on every call: read it shallowly.
+ */
+export function selectWorkItemLanes(state: AgentTicketsState): Readonly<Record<string, Lane>> {
+  const lanes: Record<string, Lane> = {};
+  for (const ticket of state.byId.values()) {
+    if (ticket.ado && ticket.stage !== 'done') lanes[String(ticket.ado.workItemId)] = ticket.stage;
+  }
+  return lanes;
+}
+
 /** How many tickets the board holds, for the sub-header's "8 agent tickets" (AL-142). */
 export function selectTicketTotal(state: AgentTicketsState): number {
   return state.byId.size;
