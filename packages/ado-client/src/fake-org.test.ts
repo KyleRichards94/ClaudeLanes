@@ -12,6 +12,7 @@ import {
 import { setupServer } from 'msw/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAdoClient, type AdoClient } from './client';
+import { testAdoConnection } from './connection-test';
 import { createPullRequest, getPullRequestSnapshot } from './pull-requests';
 import { listSprints, listTeams } from './sprints';
 import { ADO_FIXTURE_PAT, createFakeAdoOrg, type FakeAdoOrg } from './testing';
@@ -76,6 +77,13 @@ describe('createFakeAdoOrg: reads give back the fixture', () => {
     // By GUIDs, as `pullRequestRef` keeps it.
     expect(await getPullRequestSnapshot(client, { project: ADO_FIXTURE_PROJECT_ID, repository: ADO_FIXTURE_REPOSITORY.id, pullRequestId: 10612 })).toEqual(snapshot);
     expect(snapshot.ok && formatPullRequestActivity(snapshot.data.pullRequest, snapshot.data.checks)).toBe('PR !10612 · 3 / 4 checks');
+  });
+
+  it('passes the connection test: identity, projects and every read probe granted', async () => {
+    const { org, client } = setup();
+    const tested = await testAdoConnection(client, { defaultProject: ADO_FIXTURE_PROJECT });
+    expect(tested).toMatchObject({ ok: true, data: { identity: { displayName: ADO_FIXTURE_IDENTITY }, projects: [ADO_FIXTURE_PROJECT], missingScopes: [] } });
+    expect(org.state.unhandled).toEqual([]);
   });
 
   it('works the same at a loopback organisation URL (the e2e server)', async () => {
