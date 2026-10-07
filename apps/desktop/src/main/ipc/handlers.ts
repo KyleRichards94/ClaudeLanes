@@ -1,4 +1,5 @@
 import { createAppHandlers } from '../app/handlers';
+import { createConnectionsHandlers } from '../connections/handlers';
 import type { Services } from '../services';
 import { createSettingsHandlers } from '../settings/handlers';
 import type { InvokeHandlers } from './handle-invoke';
@@ -13,5 +14,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
   return {
     ...createAppHandlers(),
     ...createSettingsHandlers(services.settings),
+    ...createConnectionsHandlers(services.connections),
   };
 }
