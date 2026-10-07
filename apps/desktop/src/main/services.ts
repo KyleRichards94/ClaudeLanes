@@ -1,8 +1,16 @@
 import { join } from 'node:path';
-import { safeStorage, type BrowserWindow } from 'electron';
+import { app, safeStorage, type BrowserWindow } from 'electron';
+import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
+import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
-import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
+import {
+  createAdoConnectionTester,
+  createClaudeConnectionTester,
+  createClaudeLoginDetector,
+  createConnectionsService,
+  type ConnectionsService,
+} from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
 import { createElectronDesignPlatform } from './design/electron-platform';
@@ -42,6 +50,8 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Starts Claude Code through the Agent SDK with the Claude connection's credential (AL-044; sessions, AL-100). */
+  readonly claude: ClaudeLauncher;
 }
 
 export interface ServiceOptions {
@@ -55,6 +65,8 @@ export interface ServiceOptions {
   mainWindow?: () => BrowserWindow | null | undefined;
   /** Extra origin the design view treats as claude.ai: the e2e fake site, unpackaged builds only (AL-191). */
   designTestOrigin?: string;
+  /** A `claude` executable to start instead of the Agent SDK's: the e2e fake, unpackaged builds only (AL-044). */
+  claudeExecutable?: string;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -94,11 +106,18 @@ export function createServices(options: ServiceOptions): Services {
     settings: () => settings.get(),
   });
 
+  // Claude Code through the Agent SDK (AL-044): the login check and the one-token test start it.
+  const claude = createClaudeLauncher({
+    executable: () => options.claudeExecutable ?? resolveClaudeExecutable(claudeExecutableLookup(app)),
+    clientApp: `agent-lanes/${app.getVersion()}`,
+  });
+
   const connections = createConnectionsService({
     file: createElectronConnectionsFile(options.appDataDir),
     secrets,
     emit: options.emit,
-    testers: { ado: createAdoConnectionTester() },
+    testers: { ado: createAdoConnectionTester(), claude: createClaudeConnectionTester(claude) },
+    detectClaudeLogin: createClaudeLoginDetector(claude),
     warn: (message) => log.child('connections').warn(message),
   });
 
@@ -120,6 +139,7 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    claude,
   };
 }
 
