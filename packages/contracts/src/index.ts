@@ -2,6 +2,7 @@ export * from './contract';
 export * from './names';
 export * from './result';
 export * from './schemas';
+export * from './vocabulary';
 
 // Domain schemas and types (WorkItem, AgentOutputEvent, …) are exported per domain.
 export * from './domains/ado.schemas';
