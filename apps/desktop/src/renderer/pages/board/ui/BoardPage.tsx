@@ -4,6 +4,7 @@ import { color, radius, space } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Text } from '@agent-lanes/ui';
 import { SettingsPanel } from './SettingsPanel';
 import { useAppInfo } from '@/shared/api';
+import { openNewTicket } from '@/shared/model';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardLanes } from './BoardLanes';
 import { LiveDock } from './LiveDock';
@@ -41,6 +42,7 @@ export function BoardPage() {
           </Text>
           {/* The header menu's Settings until AL-142 builds the full header (repo dropdown included). */}
           <Button variant="secondary" size="sm" label="Settings" onPress={() => setSettingsOpen(true)} testID="open-settings" />
+          <Button variant="primary" size="sm" icon="plus" label="New agent ticket" onPress={openNewTicket} testID="open-new-ticket" />
         </GlassPanel>
 
         <Text variant="display" role="heading" aria-level={1}>
