@@ -13,13 +13,19 @@ const workspacePackages = [
   '@agent-lanes/ui',
 ];
 
+/**
+ * ESM-only dependencies of the main process. The main bundle is CommonJS, and a runtime `require`
+ * of an ES module returns its namespace instead of the default export, so these are bundled too.
+ */
+const esmOnlyMainDeps = ['electron-store'];
+
 /** react-native-web resolves `*.web.*` platform files first (design §13: web-only code lives in *.web.tsx). */
 const webExtensions = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'];
 
 export default defineConfig(({ command }) => ({
   main: {
     build: {
-      externalizeDeps: { exclude: workspacePackages },
+      externalizeDeps: { exclude: [...workspacePackages, ...esmOnlyMainDeps] },
     },
   },
   preload: {
