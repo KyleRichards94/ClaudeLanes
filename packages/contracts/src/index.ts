@@ -13,6 +13,7 @@ export * from './domains/agent.schemas';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';
 export * from './domains/connections.schemas';
+export * from './domains/connections.display';
 export * from './domains/design.schemas';
 export * from './domains/design.canvas';
 export * from './domains/git.schemas';

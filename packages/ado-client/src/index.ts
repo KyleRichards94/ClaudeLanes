@@ -61,3 +61,18 @@ export {
   type WorkItemRef,
   type WriteBackCallOptions,
 } from './write-back';
+export {
+  adoScopeOfRequest,
+  CONNECTION_DATA_API_VERSION,
+  getConnectionIdentity,
+  listProjectNames,
+  probeAdoScopes,
+  PROJECTS_PAGE_SIZE,
+  testAdoConnection,
+  WORK_ITEMS_PROBE_QUERY,
+  type AdoConnectionTest,
+  type AdoConnectionTestOptions,
+  type AdoIdentity,
+  type ConnectionCallOptions,
+  type ProbeAdoScopesOptions,
+} from './connection-test';
