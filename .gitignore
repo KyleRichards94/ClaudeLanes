@@ -17,3 +17,6 @@ playwright-report/
 .vscode/*
 !.vscode/extensions.json
 .claude/settings.local.json
+
+# Component gallery build for e2e (AL-032, electron-vite build --mode gallery)
+out-gallery/
