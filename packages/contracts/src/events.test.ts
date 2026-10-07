@@ -19,6 +19,7 @@ describe('event contracts', () => {
         'design:view', // AL-191
         'run:status',
         'toast',
+        'app:window', // AL-066
       ].sort(),
     );
   });

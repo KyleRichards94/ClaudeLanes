@@ -25,3 +25,15 @@ export {
   useTestConnection,
   type ConnectionDraftInput,
 } from './connections';
+export {
+  ADO_REFETCH_INTERVAL_MS,
+  adoKeys,
+  usePullRequest,
+  useSprints,
+  useWorkItem,
+  useWorkItemSearch,
+  useWorkItems,
+  windowVisibilityEventHandlers,
+  type AdoQueryOptions,
+  type AdoScope,
+} from './ado';

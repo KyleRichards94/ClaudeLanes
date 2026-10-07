@@ -6,6 +6,7 @@ import type {
   ConnectionTestResult,
   RemoveConnectionResult,
 } from '@agent-lanes/contracts';
+import { adoKeys } from './ado';
 import type { EventHandlers } from './event-handlers';
 import { invoke, unwrap } from './ipc';
 
@@ -97,11 +98,15 @@ export function useClaudeLoginDetection(enabled: boolean) {
   });
 }
 
-/** `connections:changed` → refetch the list. The app registers this with its event hub. */
+/**
+ * `connections:changed` → refetch the list, and the Azure DevOps data (AL-066): an organisation
+ * added, replaced or removed changes what those queries return. The app registers this with its event hub.
+ */
 export function connectionsEventHandlers(queryClient: QueryClient): EventHandlers {
   return {
     'connections:changed': () => {
       void queryClient.invalidateQueries({ queryKey: connectionsQueryKey, exact: true });
+      void queryClient.invalidateQueries({ queryKey: adoKeys.all });
     },
   };
 }
