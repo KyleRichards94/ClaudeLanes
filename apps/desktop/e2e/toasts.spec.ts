@@ -65,6 +65,8 @@ test('shows an error toast raised by main until it is acted on', async () => {
 });
 
 test('closes an info toast raised by main after 5 s', async () => {
+  // The previous test's Dismiss click left the pointer over the toast stack, and hovering pauses the timer.
+  await page.mouse.move(1, 1);
   await toastFromMain({ at: 2, id: 'diagnostics-copied', tone: 'info', title: 'Diagnostics copied' });
 
   const status = page.getByRole('region', { name: 'Notifications' }).getByRole('status');
