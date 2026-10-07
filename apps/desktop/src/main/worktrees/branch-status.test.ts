@@ -8,8 +8,9 @@ import { createTicketRecordStore, type TicketRecordStore } from '../tickets/reco
 import { newTicketInput } from '../tickets/testing';
 import { createBranchStatusService, type SubagentActivity } from './branch-status';
 
-// Every git call is a process spawn (slow on Windows with antivirus), as in src/main/git.
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+// Every git call is a process spawn (slow on Windows with antivirus), as in src/main/git. The first test
+// makes about 35 git calls, which took over 90 s in a full `pnpm test` run on a loaded machine.
+vi.setConfig({ testTimeout: 180_000, hookTimeout: 60_000 });
 
 let repo: TempRepo;
 let tickets: TicketRecordStore;
