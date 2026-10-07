@@ -6,7 +6,8 @@ import type { Services } from '../services';
 export function createDesignHandlers({
   designView,
   designCanvases,
-}: Pick<Services, 'designView' | 'designCanvases'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
+  designArtboards,
+}: Pick<Services, 'designView' | 'designCanvases' | 'designArtboards'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
   return {
     'design:open': ({ ticketId, url, bounds }) => designView.open(ticketId, url, bounds),
     'design:setBounds': ({ ticketId, bounds }) => ok({ found: designView.setBounds(ticketId, bounds) }),
@@ -17,5 +18,6 @@ export function createDesignHandlers({
     'design:linkCanvas': ({ ticketId, url }) => designCanvases.link(ticketId, url),
     'design:unlinkCanvas': ({ ticketId }) => designCanvases.unlink(ticketId),
     'design:openCanvas': ({ ticketId, bounds }) => designCanvases.open(ticketId, bounds),
+    'design:listArtboards': ({ ticketId }) => designArtboards.list(ticketId),
   };
 }

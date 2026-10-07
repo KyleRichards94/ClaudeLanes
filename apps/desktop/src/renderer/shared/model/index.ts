@@ -32,3 +32,10 @@ export {
   type TicketTab,
 } from './ticket-tabs';
 export { designViewEventHandlers, resetDesignViews, setDesignViewState, useDesignViewState } from './design-views';
+export {
+  getSelectedArtboards,
+  keepSelectedArtboards,
+  resetArtboardSelection,
+  toggleArtboard,
+  useSelectedArtboards,
+} from './artboard-selection';

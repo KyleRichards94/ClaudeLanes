@@ -17,3 +17,4 @@ export { ticketRecordQueryKey, useTicketRecord } from './tickets';
 export { useWorkItem, workItemQueryKey } from './work-item';
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
+export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
