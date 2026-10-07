@@ -23,3 +23,13 @@ export {
   type WorktreeGit,
   type WorktreeStart,
 } from './worktree-git';
+export {
+  NO_SUBAGENTS_RUNNING,
+  createBranchStatusService,
+  readWorktreeState,
+  refExists,
+  resolveBaseRef,
+  type BranchStatusService,
+  type BranchStatusServiceOptions,
+  type SubagentActivity,
+} from './branch-status';
