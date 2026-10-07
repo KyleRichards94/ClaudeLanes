@@ -70,3 +70,12 @@
   --al-progress-gradient: linear-gradient(90deg, #5b4bc4, #38bdf8);
   --al-muted-opacity: 0.75;
 }
+
+/* Buttons and controls from the "Design tokens" artboard. Mirrors src/controls.ts. */
+:root {
+  --al-control-ink: #334155;
+  --al-control-primary-shadow: 0 6px 16px rgba(91, 75, 196, 0.28);
+  --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 75, 196, 0.34);
+  --al-control-pressed-filter: brightness(0.94);
+  --al-control-disabled-opacity: 0.5;
+}
