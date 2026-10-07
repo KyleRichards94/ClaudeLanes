@@ -228,7 +228,11 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   // The log virtualises its rows, so it needs a bounded height inside the page's scroll view (AL-135).
+  // Its own style is `flex: 1`, whose 0% basis would let it grow to every row here; a fixed basis wins.
   buildLog: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 560,
     height: 560,
   },
   side: {
