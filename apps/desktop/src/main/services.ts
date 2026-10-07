@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { safeStorage } from 'electron';
 import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
+import { createElectronSettingsFile } from './settings/electron-settings-file';
+import { createSettingsService, type SettingsService } from './settings/service';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -17,6 +19,8 @@ export interface Services {
   readonly secrets: SecretStore;
   /** Pushes typed events to the renderer (AL-012); services hold this, never the window. */
   readonly emit: Emit;
+  /** App settings and UI prefs in `<userData>/settings.json` (AL-041). */
+  readonly settings: SettingsService;
 }
 
 export interface ServiceOptions {
@@ -36,6 +40,7 @@ export function createServices(options: ServiceOptions): Services {
     appDataDir: options.appDataDir,
     secrets,
     emit: options.emit,
+    settings: createSettingsService({ file: createElectronSettingsFile(options.appDataDir) }),
   };
 }
 
