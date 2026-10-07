@@ -24,7 +24,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 
 | Milestone | Outcome a user can see | Tickets | Exit check |
 |---|---|---|---|
-| **M0 Foundation** | The app opens, renders RN-web with tokens and glass, and talks to the main process over typed IPC | E0, AL-010–AL-015, AL-020, AL-022 | `pnpm verify` + `pnpm e2e` green (met 2026-10-07, except AL-007/AL-015) |
+| **M0 Foundation** | The app opens, renders RN-web with tokens and glass, and talks to the main process over typed IPC | E0, AL-010–AL-015, AL-020, AL-022 | `pnpm verify` + `pnpm e2e` green (met 2026-10-07, except AL-007) |
 | **M1 Walking skeleton** | Connect ADO and Claude, pick a repo, launch one agent on a real work item, and watch its card move through the lanes with live output | AL-012, AL-015, AL-021, AL-023–AL-031, AL-040–AL-047, AL-060–AL-066, AL-080–AL-083, AL-100–AL-103, AL-105, AL-140–AL-145, AL-160–AL-165, AL-170, AL-175 | Manual run against a real ADO sprint + repo: ticket reaches Implementing with streamed output |
 | **M2 Control** | Gates, model/effort switching, messaging, sub-agents, crash recovery, queueing | AL-104, AL-106–AL-111, AL-113–AL-115, AL-171, AL-172, AL-176, AL-177 | Approve a plan; switch Opus→Sonnet mid-run; kill the session process and see it resume |
 | **M3 Ship** | Build/run per worktree, both merges, diff, ADO tab, PR stage, archive | E7, AL-084–AL-090, AL-112, AL-173, AL-174, AL-178–AL-181 | Two tickets build and run side by side; sub-branches merge; a PR is created with checks on the card |
@@ -51,11 +51,11 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-012 | Event channels: main → renderer push | E1 | S | AL-011 | done |
 | AL-013 | Preload bridge | E1 | S | AL-011 | done |
 | AL-014 | Renderer IPC client | E1 | S | AL-013 | done |
-| AL-015 | Event hub in the app layer | E1 | S | AL-012 | todo |
+| AL-015 | Event hub in the app layer | E1 | S | AL-012 | done |
 | AL-020 | Tokens package (TS + CSS) | E2 | S | AL-001 | done |
 | AL-021 | Bundled fonts | E2 | S | AL-020 | partial |
 | AL-022 | GlassPanel | E2 | S | AL-020 | done |
-| AL-023 | Text primitives | E2 | S | AL-021 | todo |
+| AL-023 | Text primitives | E2 | S | AL-021 | done |
 | AL-024 | Button | E2 | S | AL-023 | todo |
 | AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | todo |
 | AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | todo |
@@ -76,7 +76,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-047 | First-run flow and repo picker | E3 | M | AL-046, AL-081 | todo |
 | AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | todo |
 | AL-060 | ado-client core | E4 | M | AL-001 | done |
-| AL-061 | Sprints (iterations) | E4 | S | AL-060 | todo |
+| AL-061 | Sprints (iterations) | E4 | S | AL-060 | done |
 | AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | todo |
 | AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | todo |
 | AL-064 | Pull requests: create, link, checks | E4 | M | AL-060 | todo |
@@ -284,10 +284,10 @@ All main ↔ renderer traffic goes through channels declared in `packages/contra
 - **Design:** §6 ("One subscription in app/ routes them into the Zustand stores") · **Depends on:** AL-012
 - **Scope:** `app/entrypoint/EventHub` subscribes once per channel at start-up, validates payloads, and dispatches to registered store handlers (entities register `onAgentOutput`, `onStage`, …). Batches high-rate channels (`agent:output`, `build:log`) to at most one store update per animation frame (§12 Performance).
 - **Acceptance criteria:**
-  - [ ] Exactly one bridge subscription per channel for the app's lifetime.
-  - [ ] 1,000 `agent:output` events within one frame cause one store commit.
-  - [ ] An invalid payload is dropped and logged, and doesn't break the stream.
-- **Tests:** unit test with fake bridge + fake rAF.
+  - [x] Exactly one bridge subscription per channel for the app's lifetime.
+  - [x] 1,000 `agent:output` events within one frame cause one store commit.
+  - [x] An invalid payload is dropped and logged, and doesn't break the stream.
+- **Tests:** unit test with fake bridge + fake rAF. (done: 10 tests in `app/entrypoint/EventHub.test.ts`)
 
 ---
 
@@ -320,8 +320,8 @@ colour alone.
 - **Design:** §11 Type · **Depends on:** AL-021
 - **Scope:** `Text` variants `display` (800), `title` (700, card titles, panel headings), `body` (500), `meta` (muted), `mono` (ids, branches, logs, diffs); `selectable` prop (logs need text selection — web file if RN-web's default is not enough, §13 risk).
 - **Acceptance criteria:**
-  - [ ] All text in the app goes through these variants (lint rule or review).
-  - [ ] Body text on `bg` and `surface` meets 4.5:1.
+  - [x] All text in the app goes through these variants (lint rule or review). (ESLint `no-restricted-syntax` rule, 3 lint probes)
+  - [x] Body text on `bg` and `surface` meets 4.5:1. (contrast test covers all five variants on bg, surface and the card-section washes)
 
 #### AL-024 · Button
 - **Design:** §11 Primitives, artboard 7 · **Depends on:** AL-023
@@ -481,7 +481,7 @@ colour alone.
 - **Design:** artboard 1 header ("Sprint 42 · 7 – 20 Oct") · **Depends on:** AL-060
 - **Scope:** Teams for a project; iterations for a team (`_apis/work/teamsettings/iterations`), current one via `$timeframe=current`; DTO `{ id, name, path, start, finish }`.
 - **Acceptance criteria:**
-  - [ ] Current sprint is pre-selected; past and future sprints are selectable.
+  - [x] Current sprint is pre-selected; past and future sprints are selectable. (data and selection level: `listSprints` + `pickSprint`; the dropdown is AL-142. MSW only, not checked against a real org)
 
 #### AL-062 · Work items: sprint list, search, get
 - **Design:** artboard 2, R6 · **Depends on:** AL-060
@@ -1220,6 +1220,39 @@ implementation agent, mid-run if needed.
 | D123 | AL-190: Both canvas kinds are supported; Design artifacts are read with the SDK's built-in `Artifact` tool (read, files listing, read path) | The CLI makes most new designs from Design Artifact types rather than standalone Design projects | 2026-10-07 |
 | D124 | AL-190: The canvas schema lives in `packages/contracts/src/domains/design.canvas.ts`, exported with one line in `packages/contracts/src/index.ts`, not in `design.schemas.ts` | Keeps the shared design registration file free for AL-191–AL-199 | 2026-10-07 |
 | D125 | AL-190: `apps/desktop/e2e/design-embed.spec.ts` (3 tests) stays as a standing guard of the Electron behaviour the design view relies on, against a local fake site; no spike write-up file: the findings are D111–D125 and the AL-191–AL-197 scope updates | Never contacts claude.ai (§7 rule 6) | 2026-10-07 |
+| D126 | AL-023: `selectable` defaults to false, as in React Native; logs, diffs and error details opt in, and nested Text follows its parent unless it sets its own | Dragging across the board must not highlight labels | 2026-10-07 |
+| D127 | AL-023: No `Text.web.tsx`: react-native-web's `selectable` (user-select text/none) is enough | Works in Electron 44's Chromium; e2e shows it with a real mouse drag and a triple-click | 2026-10-07 |
+| D128 | AL-023: Default sizes and line heights: display 40/44 with -0.025em tracking, title 14/18, body 14/20, meta 12/16, mono 12/18, kept as line-height multiples in Text.tsx; no new tokens | Taken from artboards 1, 3, 6 and 7 | 2026-10-07 |
+| D129 | AL-023: `size` prop (a step of the fontSize scale) and `color` override added beyond the ticket scope | Panel headings, footer bands and buttons need them | 2026-10-07 |
+| D130 | AL-023: A nested Text inherits the outer variant and size unless it sets its own; a nested variant changes only face and colour | Inline emphasis (bold file names, a mono path in body text) without size mismatches | 2026-10-07 |
+| D131 | AL-023: `textStyle(variant, size)` and `textVariants` are exported | TextInput values and placeholders (AL-027) match a variant without RN Text; the gallery (AL-032) lists variants | 2026-10-07 |
+| D132 | AL-023: The lint rule is `no-restricted-syntax` (raw Text import from react-native or react-native-web, and any `<X.Text>` JSX element), not more `no-restricted-imports` entries | Flat-config rule options replace rather than merge, so layer rules would be overwritten; typescript-eslint's version is deprecated since 8.64 | 2026-10-07 |
+| D133 | AL-023: The lint rule exempts `packages/ui/src/Text.tsx` and `*.test.tsx` | Tests (Card, GlassPanel, Icon) render React Native's Text as a fixture | 2026-10-07 |
+| D134 | AL-023: Card's footer label uses `<Text variant="title" size="sm" color={tone text}>`, replacing D35's interim RN Text | Looks the same (bold 12/16) | 2026-10-07 |
+| D135 | AL-023: BoardPage text uses the primitive: brand and title `display`, runtime line `mono` muted and `selectable`, logo glyph `title` lg white | The version can be copied into a bug report | 2026-10-07 |
+| D136 | AL-023: The contrast test reads each variant's computed colour from the rendered component and checks 4.5:1 on bg, surface and the claude, ado, danger and ok washes | A mutation check confirmed a lighter meta colour (#94A3B8) fails it | 2026-10-07 |
+| D137 | AL-061: The Sprint DTO adds `timeFrame` ('past', 'current' or 'future') to `{ id, name, path, start, finish }` | The dropdown can label past and future sprints without date maths | 2026-10-07 |
+| D138 | AL-061: `start` and `finish` are calendar days (YYYY-MM-DD), not ISO instants | ADO keeps sprint dates as midnight UTC; formatting an instant in AU or US time zones moves the range by a day | 2026-10-07 |
+| D139 | AL-061: `listSprints` returns `{ sprints, currentId }`, oldest first with undated iterations last; `SprintListSchema` refines that only the `currentId` sprint has timeFrame 'current' | One consistent current sprint | 2026-10-07 |
+| D140 | AL-061: `$timeframe=current` wins over the full list's `attributes.timeFrame`; a missing or conflicting time frame is worked out from dates against the current sprint's start (or today) | ADO's per-iteration time frame can be missing or disagree | 2026-10-07 |
+| D141 | AL-061: `pickSprint(list, selectedId?)` lives in contracts next to the DTO; order: selected id if it still exists, then current, next future, latest past, then null | The renderer can use it without importing ado-client | 2026-10-07 |
+| D142 | AL-061: Team is optional in `TeamScope`; leaving it out calls `/{project}/_apis/work/teamsettings/iterations` (the project's default team); `listTeams` does not mark the default team | ADO answers that route for the default team | 2026-10-07 |
+| D143 | AL-061: `listTeams` pages with `$top=100`/`$skip`, removes teams repeated across pages, and stops after `DEFAULT_MAX_PAGES` with a 'paging' error | The Teams API has no continuation tokens | 2026-10-07 |
+| D144 | AL-061: The iterations response is read from `value` or `values`; a `$timeframe=current` answer without `path` is accepted | ADO sends `value`, the 7.1 docs sample shows `values`; only the current id is used | 2026-10-07 |
+| D145 | AL-061: No IPC channel yet; `ado:listSprints` belongs to AL-065 | It needs AL-042's ConnectionsService to pick the client per org; the DTO schemas are ready as its response contract | 2026-10-07 |
+| D146 | AL-061: `ado.schemas.ts` imports `z` as a value (not `import type`) and has a sprint block above the channel contracts | Runtime schemas; AL-062–AL-064 will edit the same lines, so integrators keep both sides | 2026-10-07 |
+| D147 | AL-061: The contracts test is `ado.sprints.test.ts`, not `ado.schemas.test.ts` | Avoids colliding with a file another E4 ticket adds | 2026-10-07 |
+| D148 | AL-015: Handler types and the batched-channel list (`BATCHED_EVENT_CHANNELS`, `EventHandler<C>`, `EventHandlers`) live in `@/shared/api/event-handlers.ts` | Entity slices type their handler maps and cannot import from app/ (FSD) | 2026-10-07 |
+| D149 | AL-015: A batched channel's handler gets `readonly EventPayload<C>[]` (every valid event since the last frame, in order); other channels get one payload at a time | Each store commits a frame's batch in one `setState` | 2026-10-07 |
+| D150 | AL-015: Entity handlers are registered in `app/entrypoint/event-routes.ts` (`appEventHandlers`, empty for now); each entity exports its handler map from index.ts and adds one line; `hub.register()` returns an unregister function and never touches the bridge | One registration point, one subscription per channel | 2026-10-07 |
+| D151 | AL-015: `startEventHub()` is idempotent and is called from `main.tsx` before `runApplication`, not in a React effect | Subscriptions exist before first render; StrictMode or remounts cannot add a second | 2026-10-07 |
+| D152 | AL-015: `main.tsx` imports `startEventHub` from `./app/entrypoint/EventHub` directly, not through `app/index.tsx` | Keeps `app/index.tsx` a Fast Refresh boundary and avoids conflicts with AL-140 | 2026-10-07 |
+| D153 | AL-015: Each batch flushes on the next animation frame, or after `HIDDEN_FLUSH_DELAY_MS` = 250 ms if no frame comes first | Chromium pauses rAF while the window is hidden; without it the buffer grows and stores go stale | 2026-10-07 |
+| D154 | AL-015: Order is kept within a channel but not between a batched and an unbatched channel; consumers order by the event's `at` | Flushing before each unbatched event would add commits per frame | 2026-10-07 |
+| D155 | AL-015: Events on a channel with no registered handler are dropped without buffering or logging | Nothing piles up before entities register; renderers opening mid-run backfill over invoke (AL-102) | 2026-10-07 |
+| D156 | AL-015: A throwing handler is caught and logged (`An <channel> event handler failed`); other handlers and later events still run; validation logging stays in AL-012's `subscribe` | One bad store cannot break the stream | 2026-10-07 |
+| D157 | AL-015: `hub.stop()` unsubscribes and drops buffered events but keeps handlers; `stopEventHub()` forgets the singleton | For tests and teardown only | 2026-10-07 |
+| D158 | AL-015: No new e2e test | Production has no registered handlers yet; the existing e2e suite confirms the app starts with the hub subscribed | 2026-10-07 |
 
 ---
 
@@ -1253,6 +1286,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 2: merged AL-028, AL-012, AL-008, AL-031 (done) and AL-021 (partial: OFL licences in the packaged app not yet confirmed, waits for AL-007). Two registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit`; `packages/ui/src/index.ts`). Lockfile unchanged after `pnpm install`. Decisions D29–D55. `pnpm verify` green (251 unit tests), lint probes 9/9, e2e 13/13. |
 | 2026-10-07 | Integrator batch 3: merged AL-041 and AL-060 (done). Registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit` + `settings`; renderer `shared/api/index.ts` and `shared/testing/index.ts`); lockfile regenerated (adds electron-store). Decisions D56–D81. `pnpm verify` green (437 unit tests), e2e 17/17. |
 | 2026-10-07 | Integrator batch 4: merged AL-082 and AL-131 (done), AL-007 (partial: `pnpm package`, install and uninstall not run because drive C: was full; icon, pinned Electron, SDK binary resolver, NSIS include and packaged e2e specs are in) and AL-190 (partial: real claude.ai sign-in in the view and the live ClaudeDesign operation list need a manual check by Kyle). AL-131 conflicted with AL-012/AL-041 in `build.names.ts`, `build.schemas.ts`, `services.ts` and `ipc/handlers.ts` (kept both sides); AL-007's Vitest include merged with main's preload include. Integration fix: queue concurrency now reads `settings.buildQueueSize`, settings updates refresh the queue, `build:queued` is emitted, event contract test lists the channel. Lockfile unchanged after `pnpm install`. Decisions D82–D125; AL-190's scope updates written into AL-191–AL-197; Q11/Q12 answered. `pnpm verify` green (631 unit tests), e2e 22/22. Disk C: dropped below 50 MB during the run (typecheck hit an out-of-memory once). |
+| 2026-10-07 | Integrator batch 5: merged AL-023, AL-061 and AL-015 (done). One registration conflict in the renderer's `shared/api/index.ts` (AL-041 settings exports + AL-015 event-handler exports, kept both sides). Lockfile unchanged after `pnpm install`. M0 now met except AL-007. Decisions D126–D158. `pnpm verify` green (728 unit tests), lint probes 12/12, e2e 25/25. |
 
 ---
 
