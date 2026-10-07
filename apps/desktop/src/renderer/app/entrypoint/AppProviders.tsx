@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { RouterProvider } from '@/shared/routing';
+import { connectRouterToWindow, createAppRouter } from '../routing';
 import { UiPrefsGate } from './UiPrefsGate';
 
 const SIXTY_SECONDS = 60_000;
@@ -19,9 +21,14 @@ function createQueryClient() {
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [queryClient] = useState(createQueryClient);
+  const [router] = useState(() => createAppRouter());
+  useEffect(() => connectRouterToWindow(router), [router]);
+
   return (
     <QueryClientProvider client={queryClient}>
-      <UiPrefsGate>{children}</UiPrefsGate>
+      <RouterProvider router={router}>
+        <UiPrefsGate>{children}</UiPrefsGate>
+      </RouterProvider>
     </QueryClientProvider>
   );
 }
