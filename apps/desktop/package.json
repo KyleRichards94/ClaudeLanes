@@ -11,9 +11,11 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
-    "lint": "eslint src e2e",
+    "lint": "eslint src e2e scripts",
     "e2e": "electron-vite build && playwright test",
-    "package": "electron-vite build && electron-builder --win"
+    "package": "electron-vite build && electron-builder --win",
+    "e2e:packaged": "pnpm run package && playwright test -c playwright.packaged.config.ts",
+    "icon": "node scripts/app-icon.mts"
   },
   "dependencies": {
     "@agent-lanes/ado-client": "workspace:*",
@@ -36,7 +38,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "~5.2.0",
     "babel-plugin-react-compiler": "^1.0.0",
-    "electron": "^44.6.0",
+    "electron": "44.6.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "jsdom": "^30.1.2",
