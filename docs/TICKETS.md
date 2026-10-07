@@ -77,12 +77,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | todo |
 | AL-060 | ado-client core | E4 | M | AL-001 | done |
 | AL-061 | Sprints (iterations) | E4 | S | AL-060 | done |
-| AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | todo |
+| AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | done |
 | AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | todo |
 | AL-064 | Pull requests: create, link, checks | E4 | M | AL-060 | todo |
 | AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | todo |
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
-| AL-080 | Git runner | E5 | S | AL-001 | todo |
+| AL-080 | Git runner | E5 | S | AL-001 | done |
 | AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | todo |
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | todo |
@@ -115,7 +115,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-133 | Run job, port and URL | E7 | M | AL-132 | todo |
 | AL-134 | Stop and process-tree kill | E7 | S | AL-133 | todo |
 | AL-135 | Build log tab | E7 | M | AL-132, AL-029 | todo |
-| AL-140 | App router and lazy pages | E8 | S | AL-003 | todo |
+| AL-140 | App router and lazy pages | E8 | S | AL-003 | done |
 | AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | todo |
 | AL-142 | Board header | E8 | M | AL-141, AL-066, AL-024, AL-025, AL-081 | todo |
 | AL-143 | Lanes | E8 | M | AL-141 | todo |
@@ -487,8 +487,8 @@ colour alone.
 - **Design:** artboard 2, R6 · **Depends on:** AL-060
 - **Scope:** WIQL for items in an iteration path (stories, bugs, tasks; configurable types) → batch `workitems?ids=` with fields `System.Id, Title, WorkItemType, State, AssignedTo, IterationPath, Description, AcceptanceCriteria`; search by numeric id or title `CONTAINS`; DTO includes state category for colouring and the web URL ("Open in Azure DevOps ↗").
 - **Acceptance criteria:**
-  - [ ] Sprint list returns ≥ 200 items with paging.
-  - [ ] Searching "71273" or "frmJobControl" finds #71273.
+  - [x] Sprint list returns ≥ 200 items with paging.
+  - [x] Searching "71273" or "frmJobControl" finds #71273.
 
 #### AL-063 · Work item write-back (comments, state)
 - **Design:** §7 ADO write-back · **Depends on:** AL-060
@@ -523,7 +523,7 @@ colour alone.
 - **Depends on:** AL-001
 - **Scope:** `git(args, { cwd })` via `execFile` (no shell, so no injection), timeout, typed errors, porcelain parsers (`status --porcelain=v2`, `worktree list --porcelain`, `rev-list --left-right --count`); minimum git version check (≥ 2.38) on start-up with a clear message.
 - **Acceptance criteria:**
-  - [ ] Branch names with spaces or quotes cannot break a command (test).
+  - [x] Branch names with spaces or quotes cannot break a command (test).
 - **Tests:** against temp repos (AL-221 kit).
 
 #### AL-081 · Repo registry and folder picker
@@ -753,7 +753,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §5 App layer, §12 Performance · **Depends on:** AL-003
 - **Scope:** Typed in-app router (Decision D13): `board`, `ticket/:id`, `ticket/:id/design`; history back/forward (mouse buttons, Alt+←); pages lazy-loaded behind Suspense.
 - **Acceptance criteria:**
-  - [ ] Each page is its own chunk.
+  - [x] Each page is its own chunk.
 
 #### AL-141 · Agent ticket entity and store
 - **Design:** §6 Live client state · **Depends on:** AL-015, AL-101
@@ -1107,7 +1107,7 @@ implementation agent, mid-run if needed.
 | D10 | Live model change via `Query.setModel()`, effort via `Query.applyFlagSettings({ effortLevel })`. Model map: Opus → `claude-opus-5-5`, Sonnet → `claude-sonnet-5-5`, Haiku → `claude-haiku-4-5` (one constant in contracts). Effort Low/Med/High/XHigh/Max → `low`/`medium`/`high`/`xhigh`/`max` | SDK 0.3.292 types; current model IDs as of 2026-10-07 | 2026-10-07 |
 | D11 | Mid-run delivery uses `SDKUserMessage.priority`: `'now'` (design ship, "steer now") interjects at the next tool boundary; `'next'` (normal messages) waits for the turn. Build results use `shouldQuery: false` so they ride along with the next turn | Meets R11 and §10 without restarting sessions | 2026-10-07 |
 | D12 | Sessions in a worktree pass `projectConfigRoot` = the repo's main checkout | Project skills, settings and `.mcp.json` come from the trusted checkout, not whatever the branch carries | 2026-10-07 |
-| D13 | Small typed in-app router (three routes) instead of React Navigation | Three routes, desktop only; avoids a navigation stack built for mobile. Revisit with Q3 | proposed |
+| D13 | Small typed in-app router (three routes) instead of React Navigation | Three routes, desktop only; avoids a navigation stack built for mobile. Revisit with Q3. Implemented by AL-140 (D159–D167) | 2026-10-07 |
 | D14 | The web entry imports `AppRegistry` from react-native-web, typed by a local `.d.ts` | RN's types model native `RootTag`; `@types/react-native-web` exports interfaces only | 2026-10-07 |
 | D15 | App ID `au.com.companionsystems.agentlanes`; NSIS per-user installer; Windows x64 first | Team platform | 2026-10-07 |
 | D16 | Design hand-off sends a short user turn and the agent pulls the full spec with `agent_lanes.get_design_spec`, then calls `ack_design_spec` | Keeps large artboard payloads out of the prompt and gives the UI an acknowledgement for "Used · 14:01" | 2026-10-07 |
@@ -1253,6 +1253,40 @@ implementation agent, mid-run if needed.
 | D156 | AL-015: A throwing handler is caught and logged (`An <channel> event handler failed`); other handlers and later events still run; validation logging stays in AL-012's `subscribe` | One bad store cannot break the stream | 2026-10-07 |
 | D157 | AL-015: `hub.stop()` unsubscribes and drops buffered events but keeps handlers; `stopEventHub()` forgets the singleton | For tests and teardown only | 2026-10-07 |
 | D158 | AL-015: No new e2e test | Production has no registered handlers yet; the existing e2e suite confirms the app starts with the hub subscribed | 2026-10-07 |
+| D159 | AL-140: D13 is an in-memory history of typed routes (`{name:'board'} \| {name:'ticket',ticketId} \| {name:'ticketDesign',ticketId}`) in a Zustand store, with `routes.*` builders and `routeToPath`/`parseRoutePath` | React context carries only the store instance, never route state (§6: context is not a store) | 2026-10-07 |
+| D160 | AL-140: Router core (route types, store, `RouterProvider`, `useRoute`, `useNavigation`) lives in `shared/routing`; the lazy page map, `AppRouter` outlet and window wiring live in `app/routing` | Pages must navigate and FSD forbids pages importing `app` | 2026-10-07 |
+| D161 | AL-140: The current route is mirrored into the location hash with `history.replaceState` (no browser history entries); outside hash changes (`href="#/ticket/1"`, devtools, tests) are followed as navigations | Keeps the page across reloads and dev HMR and lets e2e deep-link | 2026-10-07 |
+| D162 | AL-140: Back/Forward also work from Alt+←/→ and the keyboard's Browser Back/Forward keys; Alt+arrows are ignored inside text fields and contenteditable, key repeats are ignored, a component that calls `preventDefault()` first keeps the input; the side-button handler calls `preventDefault()` | Protects word jumps and drafts; Chromium's own history never moves | 2026-10-07 |
+| D163 | AL-140: `AppRouter` defers the route with `useDeferredValue`; the fallback (blank view with `aria-busy`) only shows at start-up | Navigating to a page whose chunk hasn't loaded keeps the current page on screen instead of blanking | 2026-10-07 |
+| D164 | AL-140: `electron.vite.config.ts` names lazy page chunks `assets/page-<slice>-[hash].js` via `rollupOptions.output.chunkFileNames`; other chunk names unchanged | Rollup otherwise names them all `index`; makes one-chunk-per-page visible and testable | 2026-10-07 |
+| D165 | AL-140: Minimal `pages/ticket` (`TicketPage`) and `pages/design-tab` (`DesignTabPage`) with the artboard 3/4 top bar ('← Board' + ticket id) and one cross-link, using plain Pressables and the `Text` primitive | AL-024's Button isn't merged; AL-170 and AL-192 replace the bodies and keep the `ticketId` prop | 2026-10-07 |
+| D166 | AL-140: History is capped at 100 entries, navigating to the route already shown does nothing, `navigate(route, { replace: true })` is supported | Bounded memory and no duplicate entries | 2026-10-07 |
+| D167 | AL-140: `AppProviders` order is QueryClientProvider > RouterProvider > AL-041's UiPrefsGate; the router connects to the window in a `useEffect` with cleanup | Anything rendered app-wide can navigate | 2026-10-07 |
+| D168 | AL-080: No IPC channel; the runner is on Services as `git: GitService` (run, version, checkVersion, ensureSupported, status, worktrees, aheadBehind); `git.names.ts`/`git.schemas.ts` untouched | The ticket asks for a main-process runner for AL-081–AL-090 to use | 2026-10-07 |
+| D169 | AL-080: Start-up check shows a non-blocking native warning over the main window once visible ('Get Git' opens https://git-scm.com/downloads) naming the version needed, the version found and what to do; the app keeps running; `main/index.ts` gets one import and one call | Work items can still be browsed without git; the check has to start at launch | 2026-10-07 |
+| D170 | AL-080: The runner sets `GIT_TERMINAL_PROMPT=0` and `LC_ALL=C` | No credential prompts; English stderr can be sorted into typed errors such as NOT_A_REPO | 2026-10-07 |
+| D171 | AL-080: The runner strips inherited repo-locating variables (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest of git's local_repo_env list) | A parent git hook cannot point git at another repository | 2026-10-07 |
+| D172 | AL-080: stdin is closed and `windowsHide` is set | git never hangs waiting for input; no console window flashes on Windows | 2026-10-07 |
+| D173 | AL-080: GitError messages, args and stderr hide URL user-info and Authorization/extraHeader values; Node's exec error is never attached as `cause` | Tokens cannot cross IPC through handleInvoke's error message | 2026-10-07 |
+| D174 | AL-080: GitError codes are runner-level (GIT_NOT_FOUND, GIT_TOO_OLD, SPAWN_FAILED, CWD_NOT_FOUND, NOT_A_REPO, TIMEOUT, ABORTED, OUTPUT_TOO_LARGE, INVALID_ARGUMENT, COMMAND_FAILED, PARSE_FAILED); `gitErrorToErr` maps all to INTERNAL for now | AL-083/AL-086/AL-087 map them onto GIT_DIRTY and MERGE_CONFLICT later | 2026-10-07 |
+| D175 | AL-080: `status()` runs with `-z` and `GIT_OPTIONAL_LOCKS=0`; `aheadBehind()` puts revisions after `--end-of-options` | A background status never takes index.lock from an agent in the same worktree; a revision can't be read as an option | 2026-10-07 |
+| D176 | AL-080: Parsers also accept line-based (C-quoted) output; `worktrees()` returns paths with platform separators | Robust to either output form | 2026-10-07 |
+| D177 | AL-080: Smallest piece of the AL-221 kit built: `src/main/git/testing/temp-repo.ts` (temp repo with a bare origin, git cut off from system/global config, hooks and signing, optional reftable) | AL-221 extends it rather than building a second factory | 2026-10-07 |
+| D178 | AL-080: The double-quote branch test uses a reftable repo and skips on git < 2.45 | Windows loose refs are files and Windows file names cannot contain `"`, `\|`, `<`, `>` | 2026-10-07 |
+| D179 | AL-080: On Windows the e2e test detects the modal warning via `BrowserWindow.isEnabled()`, with a git-present control test | Playwright cannot read native dialogs | 2026-10-07 |
+| D180 | AL-080: git test files raise Vitest test/hook timeouts to 60 s | Every git call starts a process, slow on Windows | 2026-10-07 |
+| D181 | AL-062: Work items are read with POST `_apis/wit/workitemsbatch` (200-id limit), not GET `workitems?ids=` | A 200-id GET with %2C-encoded commas is ~2.3 KB and could hit URL length limits | 2026-10-07 |
+| D182 | AL-062: The sprint list filters by type categories (`IN GROUP 'Microsoft.RequirementCategory' / 'Microsoft.BugCategory' / 'Microsoft.TaskCategory'`) by default; a `types` option (type names) replaces it | Picks up stories, bugs and tasks in any process; `types` is how types are configurable | 2026-10-07 |
+| D183 | AL-062: Free functions taking an `AdoClient`; `client.ts` unchanged | Low conflict with AL-061, AL-063, AL-064 | 2026-10-07 |
+| D184 | AL-062: `WorkItemSchema` lives in contracts `ado.schemas.ts` (below the sprint block); stateCategory is kebab-case `proposed \| in-progress \| resolved \| completed \| removed \| unknown`; webUrl limited to http(s); description/acceptanceCriteria are ADO HTML or null; `project` (`System.TeamProject`) added | AL-065 sends it over IPC; the URL is opened externally; comments (AL-063) and PRs (AL-064) are project-scoped | 2026-10-07 |
+| D185 | AL-062: Web URL is built as `{orgUrl}/{project}/_workitems/edit/{id}` | ADO does not allow `$expand=links` together with `fields` | 2026-10-07 |
+| D186 | AL-062: State categories come from `GET {project}/_apis/wit/workitemtypes/{type}/states`, cached in memory per client/project/type with a shared in-flight read; a missing state triggers one re-read; failed reads are not cached | Process edits are picked up without repeated calls | 2026-10-07 |
+| D187 | AL-062: If the states read fails, affected items get `unknown` instead of failing the list; 401/403 still return ADO_UNAUTHORIZED/ADO_SCOPE_MISSING | Category only affects colour; credential failures must stay visible | 2026-10-07 |
+| D188 | AL-062: Search is per project; a numeric query ('71273' or '#71273') runs an exact-id WIQL alongside the title `CONTAINS` query, listed first and matching any type; a blank query returns [] without calling ADO; top 50 by default, at most 200; query at most 256 chars | The exact id can't be pushed out by the result limit | 2026-10-07 |
+| D189 | AL-062: The sprint list sorts by `[System.Id] ASC`, filters `[System.IterationPath] = '<path>'` (AL-061's sprint `path`) and stops at `maxItems` (default 2,000, max 20,000) | Matches artboard 2; 20,000 is WIQL's limit | 2026-10-07 |
+| D190 | AL-062: Unreadable ids are dropped via `errorPolicy: 'omit'`; any failed batch fails the call (D77); an unknown id in `getWorkItem` returns ADO's 404 as INTERNAL with `details.status` 404 (D72) | Items deleted between query and read don't fail the list | 2026-10-07 |
+| D191 | AL-062: All WIQL text goes through `wiqlString` (doubles single quotes); options are checked with zod before any request (no control characters, length/count limits); bad input returns VALIDATION with `details.kind: 'config'` | No WIQL injection | 2026-10-07 |
+| D192 | AL-062: New package exports include `getWorkItems` (bulk read by id, beyond the ticket), `runWiql`, `wiqlString`, `WIQL_MAX_TOP`, `WORK_ITEM_FIELDS`, `DEFAULT_WORK_ITEM_CATEGORIES`, `WORK_ITEMS_BATCH_SIZE` and the defaults/limits | The board needs bulk reads to refresh every card's ADO state (R6) | 2026-10-07 |
 
 ---
 
@@ -1287,6 +1321,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 3: merged AL-041 and AL-060 (done). Registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit` + `settings`; renderer `shared/api/index.ts` and `shared/testing/index.ts`); lockfile regenerated (adds electron-store). Decisions D56–D81. `pnpm verify` green (437 unit tests), e2e 17/17. |
 | 2026-10-07 | Integrator batch 4: merged AL-082 and AL-131 (done), AL-007 (partial: `pnpm package`, install and uninstall not run because drive C: was full; icon, pinned Electron, SDK binary resolver, NSIS include and packaged e2e specs are in) and AL-190 (partial: real claude.ai sign-in in the view and the live ClaudeDesign operation list need a manual check by Kyle). AL-131 conflicted with AL-012/AL-041 in `build.names.ts`, `build.schemas.ts`, `services.ts` and `ipc/handlers.ts` (kept both sides); AL-007's Vitest include merged with main's preload include. Integration fix: queue concurrency now reads `settings.buildQueueSize`, settings updates refresh the queue, `build:queued` is emitted, event contract test lists the channel. Lockfile unchanged after `pnpm install`. Decisions D82–D125; AL-190's scope updates written into AL-191–AL-197; Q11/Q12 answered. `pnpm verify` green (631 unit tests), e2e 22/22. Disk C: dropped below 50 MB during the run (typecheck hit an out-of-memory once). |
 | 2026-10-07 | Integrator batch 5: merged AL-023, AL-061 and AL-015 (done). One registration conflict in the renderer's `shared/api/index.ts` (AL-041 settings exports + AL-015 event-handler exports, kept both sides). Lockfile unchanged after `pnpm install`. M0 now met except AL-007. Decisions D126–D158. `pnpm verify` green (728 unit tests), lint probes 12/12, e2e 25/25. |
+| 2026-10-07 | Integrator batch 6: merged AL-140, AL-080 and AL-062 (done). AL-080 conflicted with AL-012/AL-041/AL-131 in `main/index.ts` and `services.ts` (kept both sides: `emit`, `settings`, `buildQueue` + `git`); AL-062 conflicted with AL-061 in `ado.schemas.ts` and `ado-client/src/index.ts` (kept both: sprint block, then work-item block above the channel contracts). Integration fix: AL-140's placeholder pages render text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. D13 implemented (now dated). Decisions D159–D192. `pnpm verify` green (908 unit tests), e2e 31/31. AL-080's agent could not push its branch (Git Credential Manager account prompt); it was merged from the local branch. Drive C: had about 1.6 GB free. |
 
 ---
 
