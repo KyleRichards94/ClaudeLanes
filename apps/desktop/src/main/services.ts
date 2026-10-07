@@ -5,6 +5,7 @@ import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
+import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -24,6 +25,8 @@ export interface Services {
   readonly settings: SettingsService;
   /** Build and run job queue (AL-131): FIFO, one job per worktree, `buildQueueSize` jobs at once. */
   readonly buildQueue: JobQueue;
+  /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
+  readonly tickets: TicketRecordStore;
 }
 
 export interface ServiceOptions {
@@ -53,6 +56,7 @@ export function createServices(options: ServiceOptions): Services {
   };
   // Queue transitions reach the renderer as `build:queued` (AL-012).
   buildQueue.subscribe((event) => options.emit('build:queued', event));
+  const tickets = createTicketRecordStore({ rootDir: ticketsRootDir(options.appDataDir) });
 
   return {
     appDataDir: options.appDataDir,
@@ -60,6 +64,7 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     settings,
     buildQueue,
+    tickets,
   };
 }
 
@@ -67,4 +72,6 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   void services;
   await services.buildQueue.dispose();
+  // After the queue, so a build that finished while stopping is still saved to its ticket.
+  await services.tickets.dispose();
 }
