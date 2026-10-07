@@ -13,6 +13,8 @@ import { closeConnections, showConnectionsTab, useConnectionsModal } from '@/sha
 export const CONNECTIONS_SUBTITLE = 'Tokens are encrypted on this computer and never shown again after you save them.';
 export const CONNECTIONS_LOCK_NOTE = "Stored with your operating system's keychain. Agents receive tokens at launch; the interface never does.";
 
+export const FIRST_RUN_HINT = 'Connect one Azure DevOps organisation and Claude to open the board. MCP servers can wait.';
+
 const tabLabels: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP servers' };
 
 /**
@@ -103,6 +105,12 @@ export function ConnectionsModal() {
 
   const content = (
     <View style={styles.body}>
+      {blocking ? (
+        // First run (AL-047): say what unlocks the board.
+        <Text variant="body" testID="connections-first-run">
+          {FIRST_RUN_HINT}
+        </Text>
+      ) : null}
       <Tabs label="Connection type" tabs={tabs} value={tab} onChange={showConnectionsTab} idPrefix={idPrefix} testID="connections-tabs" style={styles.tabs} />
       {connections.isError ? (
         <Text variant="meta" color={tone.danger.text} role="alert">

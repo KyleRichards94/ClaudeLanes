@@ -57,10 +57,16 @@ function createMainWindow(): BrowserWindow {
   });
   window.webContents.on('will-navigate', (event) => event.preventDefault());
 
+  // e2e opens most specs straight on the board instead of first run (AL-047); never honoured in the installed app.
+  const query: Record<string, string> =
+    !app.isPackaged && process.env['AGENT_LANES_SKIP_FIRST_RUN'] === '1' ? { firstRun: 'skip' } : {};
+
   if (renderer.url) {
-    void window.loadURL(renderer.url);
+    const url = new URL(renderer.url);
+    for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
+    void window.loadURL(url.toString());
   } else {
-    void window.loadFile(renderer.file);
+    void window.loadFile(renderer.file, { query });
   }
 
   return window;

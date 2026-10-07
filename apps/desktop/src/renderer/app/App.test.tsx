@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
-import { installFakeSettings } from '@/shared/testing';
+import { fakeAdoRow, fakeClaudeRow, fakeConnections, installFakeSettings, type FakeBridge } from '@/shared/testing';
 import { App } from './index';
 
 function setHash(hash: string) {
@@ -19,8 +19,15 @@ async function navigateHash(hash: string) {
 describe('App routing', () => {
   beforeEach(() => {
     setHash('');
-    // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here.
-    installFakeSettings(defaultSettings(), { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
+    // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here. A
+    // returning user (connections saved, last repo set), so first run (AL-047) goes straight to the board.
+    const repo = { path: 'C:\\src\\OnSiteCompanion', name: 'OnSiteCompanion', baseBranch: 'main', worktreeRoot: 'C:\\src\\.agent-lanes', buildCommand: null, runCommand: null, maxConcurrentAgents: 3 };
+    const settings = defaultSettings();
+    const { bridge } = installFakeSettings(
+      { ...settings, repos: [repo], ui: { ...settings.ui, lastRepo: repo.path } },
+      { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' }, 'repos:list': { ok: true, data: [repo] } },
+    );
+    fakeConnections(bridge as FakeBridge, [fakeAdoRow(), fakeClaudeRow()]);
   });
 
   it('opens at the board and shows it in the location hash', async () => {
