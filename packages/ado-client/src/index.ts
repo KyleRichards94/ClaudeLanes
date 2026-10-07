@@ -20,3 +20,15 @@ export { isAdoErrorDetails, type AdoErrorDetails, type AdoErrorKind } from './er
 export { normalizeOrgUrl } from './org-url';
 export { adoPath } from './path';
 export { DEFAULT_RETRY_POLICY, parseRetryAfter, type RetryPolicy } from './retry';
+export { parseAdoGitRemote, type AdoGitRemote } from './git-remote';
+export {
+  createPullRequest,
+  findActivePullRequest,
+  getPullRequest,
+  getPullRequestChecks,
+  getPullRequestSnapshot,
+  linkWorkItemsToPullRequest,
+  POLICY_EVALUATIONS_API_VERSION,
+  PULL_REQUEST_STATUSES_API_VERSION,
+  type PullRequestCallOptions,
+} from './pull-requests';
