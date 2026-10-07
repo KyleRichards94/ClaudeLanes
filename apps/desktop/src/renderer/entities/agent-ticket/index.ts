@@ -34,3 +34,4 @@ export {
   useMergeToMain,
   useMergeToMainPreview,
 } from './api/merge-to-main';
+export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from './api/archive';

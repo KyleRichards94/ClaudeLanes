@@ -170,6 +170,70 @@ export const TicketRecordSchema = z
   });
 export type TicketRecord = z.infer<typeof TicketRecordSchema>;
 
-export const ticketsInvokeContracts = {} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
+// ── Archive (AL-088, design §9 step 6) ───────────────────────────────────────────────────────────
+//
+// Only ever started by the user (never automatically). Removes the ticket worktree and its
+// sub-worktrees, optionally deletes the branches already merged into the base, and moves the record
+// to the archive list. The record leaves the board only once every worktree is gone.
+
+export const ArchiveTicketRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  /** The user chose Archive. */
+  confirmed: z.literal(true),
+  /**
+   * The user confirmed a second time after being told about unmerged commits or uncommitted changes
+   * (the first call returns VALIDATION `unmerged-work` with what would be lost).
+   */
+  discardUnmerged: z.boolean().optional(),
+  /** Also delete the ticket branch and sub-branches already merged into the base. Unmerged ones are always kept. */
+  deleteMergedBranches: z.boolean().optional(),
+});
+export type ArchiveTicketRequest = z.infer<typeof ArchiveTicketRequestSchema>;
+
+/** Something Archive could not remove (a locked file, a long path), for the partial-removal report. */
+export const ArchiveLeftoverSchema = z.object({
+  kind: z.enum(['worktree', 'branch']),
+  /** The worktree folder or the branch name. */
+  target: z.string().min(1),
+  /** Git's or the file system's reason. */
+  reason: z.string(),
+});
+export type ArchiveLeftover = z.infer<typeof ArchiveLeftoverSchema>;
+
+/** One archived ticket in the archive list. */
+export const ArchivedTicketSchema = z.object({
+  archivedAt: EpochMsSchema,
+  /** The record as it was when archived; its worktrees are gone. */
+  record: TicketRecordSchema,
+  /** Branches deleted because they were merged into the base. */
+  deletedBranches: z.array(BranchNameSchema),
+  /** Branches kept: unmerged, or deletion not asked for. */
+  keptBranches: z.array(BranchNameSchema),
+});
+export type ArchivedTicket = z.infer<typeof ArchivedTicketSchema>;
+
+/** Unmerged work the second confirmation names (VALIDATION `unmerged-work` details). */
+export const UnmergedWorkSchema = z.object({
+  /** Branches with commits that are in neither the base nor (for a sub-branch) the ticket branch. */
+  branches: z.array(z.object({ branch: BranchNameSchema, commits: z.int().nonnegative() })),
+  /** Worktrees with uncommitted changes. */
+  dirtyWorktrees: z.array(LocalPathSchema),
+});
+export type UnmergedWork = z.infer<typeof UnmergedWorkSchema>;
+
+export const ArchiveTicketResultSchema = z.discriminatedUnion('status', [
+  /** Every worktree is gone and the record is in the archive list. */
+  z.object({ status: z.literal('archived'), archived: ArchivedTicketSchema }),
+  /** Some worktrees could not be removed (listed); the ticket stays on the board and Archive can run again. */
+  z.object({ status: z.literal('partial'), removedWorktrees: z.array(LocalPathSchema), leftovers: z.array(ArchiveLeftoverSchema) }),
+]);
+export type ArchiveTicketResult = z.infer<typeof ArchiveTicketResultSchema>;
+
+export const ticketsInvokeContracts = {
+  /** VALIDATION `ticket-not-found`, or `unmerged-work` (details: UnmergedWork) until `discardUnmerged`. */
+  'tickets:archive': { request: ArchiveTicketRequestSchema, response: ArchiveTicketResultSchema },
+  /** The archive list, newest first. */
+  'tickets:archived': { request: z.undefined(), response: z.array(ArchivedTicketSchema) },
+} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const ticketsEventContracts = {} as const satisfies Record<(typeof TICKETS_EVENT_CHANNELS)[number], z.ZodType>;
