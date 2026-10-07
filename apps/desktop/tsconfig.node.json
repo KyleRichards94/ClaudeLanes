@@ -10,9 +10,11 @@
   "include": [
     "electron.vite.config.ts",
     "playwright.config.ts",
+    "playwright.packaged.config.ts",
     "vitest.config.ts",
     "src/main/**/*",
     "src/preload/**/*",
-    "e2e/**/*"
+    "e2e/**/*",
+    "scripts/**/*"
   ]
 }
