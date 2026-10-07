@@ -31,6 +31,7 @@ import { createTicketWorktreeService, type TicketWorktreeService } from './workt
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
 import { createArchiveService, type ArchiveService } from './worktrees/archive';
+import { createDiffService, type DiffService } from './worktrees/diff';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 
@@ -82,6 +83,8 @@ export interface Services {
   readonly ticketArchive: TicketArchive;
   /** User-chosen Archive: removes the ticket's worktrees and moves its record to the archive list (AL-088). */
   readonly archive: ArchiveService;
+  /** The Diff tab's files and per-file unified diffs against the base or a sub-branch (AL-089). */
+  readonly diffs: DiffService;
 }
 
 export interface ServiceOptions {
@@ -140,6 +143,7 @@ export function createServices(options: ServiceOptions): Services {
   const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
+  const diffs = createDiffService({ git, tickets });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -196,6 +200,7 @@ export function createServices(options: ServiceOptions): Services {
     mergeToMain,
     ticketArchive,
     archive,
+    diffs,
   };
 }
 

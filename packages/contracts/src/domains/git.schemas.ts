@@ -124,11 +124,90 @@ export const MergeToMainResultSchema = z.object({
 });
 export type MergeToMainResult = z.infer<typeof MergeToMainResultSchema>;
 
+// ── Diff provider (AL-089, artboard 3 Diff tab) ─────────────────────────────────────────────────
+
+/** Most files one `git:diff` lists; `truncated` says when there were more. */
+export const DIFF_MAX_FILES = 2_000;
+/** Largest unified diff `git:diffFile` returns; a bigger one is a `too-large` placeholder. */
+export const DIFF_FILE_MAX_BYTES = 256 * 1024;
+
+/**
+ * What a ticket's diff is taken against: its base branch (everything the ticket changed), or one
+ * sub-branch against the ticket branch (what that sub-agent changed).
+ */
+export const DiffAgainstSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('base') }),
+  z.strictObject({ kind: z.literal('sub-branch'), branch: z.string().min(1).max(255) }),
+]);
+export type DiffAgainst = z.infer<typeof DiffAgainstSchema>;
+
+export const DIFF_FILE_STATUSES = ['added', 'modified', 'deleted', 'renamed', 'copied', 'type-changed', 'unmerged', 'untracked'] as const;
+export const DiffFileStatusSchema = z.enum(DIFF_FILE_STATUSES);
+export type DiffFileStatus = z.infer<typeof DiffFileStatusSchema>;
+
+export const DiffFileSchema = z.object({
+  /** Path relative to the worktree, with `/` separators. */
+  path: z.string().min(1),
+  /** The path before a rename or copy; null otherwise. */
+  oldPath: z.string().min(1).nullable(),
+  status: DiffFileStatusSchema,
+  /** Lines added and removed; null for a binary file. */
+  additions: CountSchema.nullable(),
+  deletions: CountSchema.nullable(),
+  binary: z.boolean(),
+});
+export type DiffFile = z.infer<typeof DiffFileSchema>;
+
+export const GitDiffRequestSchema = z.strictObject({ ticketId: TicketIdSchema, against: DiffAgainstSchema });
+export type GitDiffRequest = z.infer<typeof GitDiffRequestSchema>;
+
+export const GitDiffSchema = z.object({
+  ticketId: TicketIdSchema,
+  against: DiffAgainstSchema,
+  /** The branch compared with (`main`, `origin/main` or the ticket branch) and the merge base the diff starts at. */
+  fromRef: z.string().min(1),
+  fromCommit: z.string().min(1),
+  /** The branch whose changes are shown. */
+  toRef: z.string().min(1),
+  /** True when the branch's worktree exists, so uncommitted and untracked files are included. */
+  includesUncommitted: z.boolean(),
+  files: z.array(DiffFileSchema).max(DIFF_MAX_FILES),
+  /** More files changed than `files` lists. */
+  truncated: z.boolean(),
+  totals: z.object({ files: CountSchema, additions: CountSchema, deletions: CountSchema }),
+});
+export type GitDiff = z.infer<typeof GitDiffSchema>;
+
+export const GitDiffFileRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  against: DiffAgainstSchema,
+  /** A path from `git:diff` (relative, `/` separators). */
+  path: z.string().min(1).max(4096),
+  /** The old path of a rename or copy. */
+  oldPath: z.string().min(1).max(4096).optional(),
+});
+export type GitDiffFileRequest = z.infer<typeof GitDiffFileRequestSchema>;
+
+/** One file's diff, or the placeholder shown instead of raw content. */
+export const GitDiffFileSchema = z.discriminatedUnion('kind', [
+  /** Git's unified diff, at most DIFF_FILE_MAX_BYTES. */
+  z.object({ kind: z.literal('text'), path: z.string().min(1), patch: z.string() }),
+  /** "Binary file not shown". */
+  z.object({ kind: z.literal('binary'), path: z.string().min(1) }),
+  /** "Diff too large to show"; `bytes` is the file or diff size when known. */
+  z.object({ kind: z.literal('too-large'), path: z.string().min(1), bytes: CountSchema.nullable(), limit: CountSchema }),
+]);
+export type GitDiffFile = z.infer<typeof GitDiffFileSchema>;
+
 export const gitInvokeContracts = {
   /** `VALIDATION` with `details.reason: 'ticket-not-found'` for an unknown ticket. */
   'branches:status': { request: TicketRefRequestSchema, response: BranchStatusSchema },
   'git:mergeToMainPreview': { request: TicketRefRequestSchema, response: MergeToMainPreviewSchema },
   'git:mergeToMain': { request: MergeToMainRequestSchema, response: MergeToMainResultSchema },
+  /** VALIDATION `ticket-not-found`, `sub-branch-not-found`, `base-not-found` or `branch-missing`. */
+  'git:diff': { request: GitDiffRequestSchema, response: GitDiffSchema },
+  /** VALIDATION `invalid-path` for an absolute path or one that leaves the worktree. */
+  'git:diffFile': { request: GitDiffFileRequestSchema, response: GitDiffFileSchema },
 } as const satisfies Record<(typeof GIT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const gitEventContracts = {} as const satisfies Record<(typeof GIT_EVENT_CHANNELS)[number], z.ZodType>;

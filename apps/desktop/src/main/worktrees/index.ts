@@ -35,3 +35,4 @@ export {
 } from './branch-status';
 export { createMergeToMainService, qaPassed, type MergeToMainService, type MergeToMainServiceOptions } from './merge-to-main';
 export { createArchiveService, type ArchiveService, type ArchiveServiceOptions } from './archive';
+export { createDiffService, parseNameStatus, parseNumstat, safeRelativePath, type DiffService, type DiffServiceOptions } from './diff';
