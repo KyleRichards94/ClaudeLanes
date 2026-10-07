@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
+import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 
 /**
@@ -14,12 +15,15 @@ export interface Services {
   readonly appDataDir: string;
   /** Encrypted tokens (AL-040). Main-only: hand it to other services; no IPC channel returns a secret. */
   readonly secrets: SecretStore;
+  /** Pushes typed events to the renderer (AL-012); services hold this, never the window. */
+  readonly emit: Emit;
 }
 
 export interface ServiceOptions {
   appDataDir: string;
   /** Electron's safeStorage unless a test passes a fake (`./secrets/testing`). */
   safeStorage?: SafeStorageLike;
+  emit: Emit;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -31,6 +35,7 @@ export function createServices(options: ServiceOptions): Services {
   return {
     appDataDir: options.appDataDir,
     secrets,
+    emit: options.emit,
   };
 }
 
