@@ -14,3 +14,4 @@ export {
 } from './diagnostics';
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
 export { branchesQueryKey, createBranchStatusEventHandlers, useBranchStatus } from './branches';
+export { diffFileQueryKey, diffQueryKey, useDiffFile, useTicketDiff } from './diff';

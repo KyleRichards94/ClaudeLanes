@@ -5,5 +5,8 @@ export const GIT_INVOKE_CHANNELS = [
   // Merge worktree → main: what the confirm modal shows, then the merge and push (AL-087).
   'git:mergeToMainPreview',
   'git:mergeToMain',
+  // Files changed against the base or a sub-branch, and one file's unified diff on demand (AL-089).
+  'git:diff',
+  'git:diffFile',
 ] as const;
 export const GIT_EVENT_CHANNELS = [] as const;
