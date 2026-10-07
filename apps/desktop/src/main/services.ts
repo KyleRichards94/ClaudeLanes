@@ -3,6 +3,7 @@ import { app, safeStorage, type BrowserWindow } from 'electron';
 import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
+import { createSessionManager, type SessionManager } from './agent/session-manager';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
@@ -69,6 +70,8 @@ export interface Services {
   readonly claude: ClaudeLauncher;
   /** Creates a ticket's worktree and branch and records them on the ticket, or rolls everything back (AL-083). */
   readonly worktrees: TicketWorktreeService;
+  /** One Claude Agent SDK session per ticket, in its worktree (AL-100). Main-only: holds the session processes. */
+  readonly sessions: SessionManager;
 }
 
 export interface ServiceOptions {
@@ -156,6 +159,8 @@ export function createServices(options: ServiceOptions): Services {
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
+  const sessions = createSessionManager({ claude, connections, tickets, emit: options.emit, log: log.child('agent') });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -173,12 +178,15 @@ export function createServices(options: ServiceOptions): Services {
     repos,
     claude,
     worktrees,
+    sessions,
   };
 }
 
 /** Stops child processes and flushes state on quit (AL-213 fills this in). */
 export async function disposeServices(services: Services): Promise<void> {
   void services;
+  // First, so each claude process is closed and its session id is already saved (AL-100).
+  await services.sessions.dispose();
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();

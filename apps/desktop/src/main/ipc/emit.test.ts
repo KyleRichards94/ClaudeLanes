@@ -29,8 +29,9 @@ function invalid(payload: unknown): never {
 describe('emit', () => {
   it('sends a valid payload to the trusted renderer frame', () => {
     const { emit, send } = setup();
-    emit('agent:status', { ticketId: '71273', at: 1_760_000_000_000 });
-    expect(send).toHaveBeenCalledExactlyOnceWith('agent:status', { ticketId: '71273', at: 1_760_000_000_000 });
+    const status = { ticketId: '71273', state: 'running', sessionId: 'session-a', message: null } as const;
+    emit('agent:status', { ...status, at: 1_760_000_000_000 });
+    expect(send).toHaveBeenCalledExactlyOnceWith('agent:status', { ...status, at: 1_760_000_000_000 });
   });
 
   it('trusts the dev server origin in development', () => {

@@ -174,13 +174,14 @@ describe('EventHub', () => {
     hub.register({ 'agent:output': onAgentOutput, 'agent:status': onStatus });
 
     bridge.emit('agent:output', { ticketId: '71273', at: 1 });
-    bridge.emit('agent:status', { ticketId: '71273', at: 2 });
+    const status = { ticketId: '71273', state: 'idle', sessionId: 'session-a', message: null } as const;
+    bridge.emit('agent:status', { ...status, at: 2 });
     vi.advanceTimersToNextFrame();
     bridge.emit('agent:output', { ticketId: '71273', at: 3 });
     vi.advanceTimersToNextFrame();
 
     expect(times()).toEqual([1, 3]);
-    expect(onStatus).toHaveBeenCalledExactlyOnceWith({ ticketId: '71273', at: 2 });
+    expect(onStatus).toHaveBeenCalledExactlyOnceWith({ ...status, at: 2 });
     expect(failing).toHaveBeenCalledTimes(3);
     expect(error).toHaveBeenCalledWith('An agent:output event handler failed', failure);
     expect(error).toHaveBeenCalledWith('An agent:status event handler failed', failure);
