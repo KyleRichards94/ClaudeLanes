@@ -10,5 +10,6 @@ export function createDesignHandlers({ designView }: Pick<Services, 'designView'
     'design:hide': ({ ticketId }) => ok({ found: designView.hide(ticketId) }),
     'design:close': ({ ticketId }) => ok({ found: designView.close(ticketId) }),
     'design:getView': ({ ticketId }) => ok({ view: designView.get(ticketId) ?? null }),
+    'design:reload': ({ ticketId }) => ok({ found: designView.reload(ticketId) }),
   };
 }

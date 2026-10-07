@@ -1,8 +1,12 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, configure, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
 import { fakeTicketRecord, installFakeSettings } from '@/shared/testing';
 import { App } from './index';
+
+// Lazy pages load cold under the full parallel suite; give them as long as AppRouter.test does.
+vi.setConfig({ testTimeout: 30_000 });
+configure({ asyncUtilTimeout: 15_000 });
 
 function setHash(hash: string) {
   window.history.replaceState(null, '', hash || window.location.pathname);

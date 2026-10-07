@@ -79,6 +79,8 @@ export const designInvokeContracts = {
   'design:hide': { request: DesignViewTicketRequestSchema, response: DesignViewFoundResponseSchema },
   'design:close': { request: DesignViewTicketRequestSchema, response: DesignViewFoundResponseSchema },
   'design:getView': { request: DesignViewTicketRequestSchema, response: GetDesignViewResponseSchema },
+  /** Reloads the page the ticket's view shows (the design tab's reload button, AL-192). */
+  'design:reload': { request: DesignViewTicketRequestSchema, response: DesignViewFoundResponseSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**

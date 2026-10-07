@@ -71,6 +71,8 @@ export interface DesignViewService {
   setBounds(ticketId: string, bounds: DesignViewBounds): boolean;
   /** Parks the ticket's view behind the renderer, keeping it alive. False when it has no live view. */
   hide(ticketId: string): boolean;
+  /** Loads the view's current page again (the design tab's reload button). False when it has no live view. */
+  reload(ticketId: string): boolean;
   /** Destroys the ticket's view (ticket removed, canvas unlinked). False when it has no live view. */
   close(ticketId: string): boolean;
   get(ticketId: string): DesignViewState | undefined;
@@ -230,6 +232,16 @@ export function createDesignViewService(options: DesignViewServiceOptions): Desi
       const entry = entries.get(ticketId);
       if (!entry) return false;
       setVisible(entry, false);
+      return true;
+    },
+
+    reload(ticketId) {
+      const entry = entries.get(ticketId);
+      if (!entry) return false;
+      entry.status = 'loading';
+      // The page it shows now (a sign-in page's URL without its one-time query), else the canvas.
+      entry.handle.load(entry.url !== null && policy.isAllowed(entry.url) ? entry.url : entry.canvasUrl);
+      publish(entry);
       return true;
     },
 
