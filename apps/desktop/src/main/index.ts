@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { BrowserWindow, app, shell } from 'electron';
 import { color } from '@agent-lanes/tokens';
 import { createEmitter, type EventFrame } from './ipc/emit';
+import { checkGitOnStartup, showGitStartupNotice } from './git';
 import { createInvokeHandlers } from './ipc/handlers';
 import { registerInvokeHandlers, type RendererLocation } from './ipc/router';
 import { createServices, disposeServices, type Services } from './services';
@@ -80,6 +81,8 @@ if (!app.requestSingleInstanceLock()) {
     services = createServices({ appDataDir: app.getPath('userData'), emit });
     registerInvokeHandlers(createInvokeHandlers(services), renderer);
     mainWindow = createMainWindow();
+    // AL-080: warn once, without blocking start-up, when git is missing or older than 2.38.
+    void checkGitOnStartup(services.git, (notice) => showGitStartupNotice(mainWindow, notice));
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow();
