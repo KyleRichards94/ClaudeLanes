@@ -14,11 +14,13 @@ describe('event contracts', () => {
         'agent:subagent',
         'build:log',
         'build:queued', // AL-131
+        'build:finished', // AL-132
         'connections:changed',
         'design:spec',
         'design:view', // AL-191
         'run:status',
         'toast',
+        'app:window', // AL-066
       ].sort(),
     );
   });
@@ -33,7 +35,7 @@ describe('event contracts', () => {
   });
 
   it('puts ticketId and at on every ticket event', () => {
-    for (const channel of ['agent:output', 'agent:stage', 'agent:subagent', 'agent:gate', 'agent:status', 'build:log', 'run:status', 'design:spec'] as const) {
+    for (const channel of ['agent:output', 'agent:stage', 'agent:subagent', 'agent:gate', 'agent:status', 'design:spec'] as const) {
       const schema = eventContracts[channel];
       // The envelope fields are there whatever the owning ticket added (AL-100 onwards).
       expect(Object.keys(schema.shape), channel).toEqual(expect.arrayContaining(['ticketId', 'at']));

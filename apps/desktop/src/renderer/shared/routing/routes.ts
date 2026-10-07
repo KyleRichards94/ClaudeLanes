@@ -1,11 +1,13 @@
 /**
- * The app's three routes (Decision D13): `board`, `ticket/:id` and `ticket/:id/design`.
- * A route is a typed value; the path form exists for the location hash and for tests.
+ * The app's three routes (Decision D13): `board`, `ticket/:id` and `ticket/:id/design`, plus the
+ * development-only component gallery (`gallery`, AL-032), which the app layer opens only in
+ * `pnpm dev`. A route is a typed value; the path form exists for the location hash and for tests.
  */
 export type Route =
   | { readonly name: 'board' }
   | { readonly name: 'ticket'; readonly ticketId: string }
-  | { readonly name: 'ticketDesign'; readonly ticketId: string };
+  | { readonly name: 'ticketDesign'; readonly ticketId: string }
+  | { readonly name: 'gallery' };
 
 export type RouteName = Route['name'];
 
@@ -14,9 +16,10 @@ export const routes = {
   board: (): Route => ({ name: 'board' }),
   ticket: (ticketId: string): Route => ({ name: 'ticket', ticketId }),
   ticketDesign: (ticketId: string): Route => ({ name: 'ticketDesign', ticketId }),
+  gallery: (): Route => ({ name: 'gallery' }),
 } as const;
 
-/** `board` · `ticket/71273` · `ticket/71273/design` (the id is URI-encoded). */
+/** `board` · `ticket/71273` · `ticket/71273/design` · `gallery` (the id is URI-encoded). */
 export function routeToPath(route: Route): string {
   switch (route.name) {
     case 'board':
@@ -25,6 +28,8 @@ export function routeToPath(route: Route): string {
       return `ticket/${encodeURIComponent(route.ticketId)}`;
     case 'ticketDesign':
       return `ticket/${encodeURIComponent(route.ticketId)}/design`;
+    case 'gallery':
+      return 'gallery';
   }
 }
 
@@ -36,6 +41,7 @@ export function parseRoutePath(path: string): Route | undefined {
   const segments = path.replace(/^#/, '').replace(/^\/+|\/+$/g, '').split('/');
 
   if (segments.length === 1 && segments[0] === 'board') return routes.board();
+  if (segments.length === 1 && segments[0] === 'gallery') return routes.gallery();
   if (segments[0] !== 'ticket' || segments.length < 2 || segments.length > 3) return undefined;
 
   const ticketId = decodeSegment(segments[1] ?? '');

@@ -1,11 +1,11 @@
 import { act, configure, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
-import { installFakeSettings } from '@/shared/testing';
+import { fakeAdoRow, fakeClaudeRow, fakeConnections, fakeTicketRecord, installFakeSettings, type FakeBridge } from '@/shared/testing';
 import { App } from './index';
 
-// As in AppRouter.test.tsx: under the full parallel suite the lazy page chunk can outlast findBy's
-// 1 s default and the cold first import Vitest's 5 s test timeout.
+// The first test pays the cold load of the lazy board page (lanes, cards); under the full parallel
+// suite that can outlast findBy's 1 s default, as in AppRouter.test.tsx.
 vi.setConfig({ testTimeout: 30_000 });
 configure({ asyncUtilTimeout: 15_000 });
 
@@ -22,10 +22,26 @@ async function navigateHash(hash: string) {
 }
 
 describe('App routing', () => {
+  // The pages are lazy chunks; transforming them cold can outlast findBy's 1 s on a busy machine.
+  beforeAll(async () => {
+    await Promise.all([import('@/pages/board'), import('@/pages/ticket'), import('@/pages/design-tab')]);
+  }, 60_000);
+
   beforeEach(() => {
     setHash('');
-    // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here.
-    installFakeSettings(defaultSettings(), { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
+    // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here. A
+    // returning user (connections saved, last repo set), so first run (AL-047) goes straight to the board.
+    const repo = { path: 'C:\\src\\OnSiteCompanion', name: 'OnSiteCompanion', baseBranch: 'main', worktreeRoot: 'C:\\src\\.agent-lanes', buildCommand: null, runCommand: null, maxConcurrentAgents: 3 };
+    const settings = defaultSettings();
+    const { bridge } = installFakeSettings(
+      { ...settings, repos: [repo], ui: { ...settings.ui, lastRepo: repo.path } },
+      {
+        'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' },
+        'repos:list': { ok: true, data: [repo] },
+        'tickets:get': { ok: true, data: { record: fakeTicketRecord() } },
+      },
+    );
+    fakeConnections(bridge as FakeBridge, [fakeAdoRow(), fakeClaudeRow()]);
   });
 
   it('opens at the board and shows it in the location hash', async () => {
@@ -47,7 +63,7 @@ describe('App routing', () => {
     await navigateHash('#/ticket/71273');
     expect(await screen.findByTestId('ticket-page')).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Claude Design ↗'));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Claude Design' }));
     expect(await screen.findByTestId('design-tab-page')).toBeTruthy();
     expect(window.location.hash).toBe('#/ticket/71273/design');
 

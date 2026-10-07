@@ -8,3 +8,12 @@ export const TicketPage = lazy(() => import('@/pages/ticket').then((page) => ({ 
 export const DesignTabPage = lazy(() =>
   import('@/pages/design-tab').then((page) => ({ default: page.DesignTabPage })),
 );
+
+/**
+ * The component gallery (AL-032), or null in a production build. `__GALLERY__` is a build-time
+ * constant (electron.vite.config.ts): with it false the import below is dead code, so the gallery
+ * page never reaches the production bundle.
+ */
+export const GalleryPage = __GALLERY__
+  ? lazy(() => import('@/pages/gallery').then((page) => ({ default: page.GalleryPage })))
+  : null;

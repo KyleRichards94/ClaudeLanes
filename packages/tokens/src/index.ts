@@ -111,3 +111,4 @@ export * from './tones';
 export * from './selection';
 export * from './controls';
 export * from './overlay';
+export * from './contrast';
