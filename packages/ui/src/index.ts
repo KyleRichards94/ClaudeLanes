@@ -3,3 +3,7 @@ export { Card, CardSection, type CardFooter, type CardFooterTone, type CardProps
 export { ProgressBar, type ProgressBarProps, type ProgressTone } from './ProgressBar';
 export { Icon, IconProvider, iconNames, type IconName, type IconProps, type IconProviderProps } from './Icon';
 export { Text, textStyle, textVariants, type TextProps, type TextSize, type TextVariant } from './Text';
+export { Pill, pillTones, type PillProps, type PillSize, type PillTone } from './Pill';
+export { Badge, type BadgeProps, type BadgeTone } from './Badge';
+export { StatusBadge, badgeStatuses, statusLabel, type BadgeStatus, type StatusBadgeProps } from './StatusBadge';
+export { IdChip, type IdChipProps } from './IdChip';
