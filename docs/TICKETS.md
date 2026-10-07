@@ -24,7 +24,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 
 | Milestone | Outcome a user can see | Tickets | Exit check |
 |---|---|---|---|
-| **M0 Foundation** | The app opens, renders RN-web with tokens and glass, and talks to the main process over typed IPC | E0, AL-010–AL-015, AL-020, AL-022 | `pnpm verify` + `pnpm e2e` green (met 2026-10-07, except AL-007/AL-008/AL-012/AL-015) |
+| **M0 Foundation** | The app opens, renders RN-web with tokens and glass, and talks to the main process over typed IPC | E0, AL-010–AL-015, AL-020, AL-022 | `pnpm verify` + `pnpm e2e` green (met 2026-10-07, except AL-007/AL-015) |
 | **M1 Walking skeleton** | Connect ADO and Claude, pick a repo, launch one agent on a real work item, and watch its card move through the lanes with live output | AL-012, AL-015, AL-021, AL-023–AL-031, AL-040–AL-047, AL-060–AL-066, AL-080–AL-083, AL-100–AL-103, AL-105, AL-140–AL-145, AL-160–AL-165, AL-170, AL-175 | Manual run against a real ADO sprint + repo: ticket reaches Implementing with streamed output |
 | **M2 Control** | Gates, model/effort switching, messaging, sub-agents, crash recovery, queueing | AL-104, AL-106–AL-111, AL-113–AL-115, AL-171, AL-172, AL-176, AL-177 | Approve a plan; switch Opus→Sonnet mid-run; kill the session process and see it resume |
 | **M3 Ship** | Build/run per worktree, both merges, diff, ADO tab, PR stage, archive | E7, AL-084–AL-090, AL-112, AL-173, AL-174, AL-178–AL-181 | Two tickets build and run side by side; sub-branches merge; a PR is created with checks on the card |
@@ -44,26 +44,26 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-005 | Unit test harness | E0 | S | AL-003 | done |
 | AL-006 | E2E harness (Playwright for Electron) | E0 | S | AL-002 | done |
 | AL-007 | Packaging (electron-builder, NSIS) | E0 | M | AL-002 | in-progress |
-| AL-008 | CI pipeline | E0 | S | AL-004, AL-005, AL-006 | todo |
+| AL-008 | CI pipeline | E0 | S | AL-004, AL-005, AL-006 | done |
 | AL-009 | Agent docs: CLAUDE.md, design copy, this plan | E0 | S | — | done |
 | AL-010 | Result type and error codes | E1 | S | AL-001 | done |
 | AL-011 | Invoke channels: contracts, router, validation, trusted sender | E1 | S | AL-010 | done |
-| AL-012 | Event channels: main → renderer push | E1 | S | AL-011 | todo |
+| AL-012 | Event channels: main → renderer push | E1 | S | AL-011 | done |
 | AL-013 | Preload bridge | E1 | S | AL-011 | done |
 | AL-014 | Renderer IPC client | E1 | S | AL-013 | done |
 | AL-015 | Event hub in the app layer | E1 | S | AL-012 | todo |
 | AL-020 | Tokens package (TS + CSS) | E2 | S | AL-001 | done |
-| AL-021 | Bundled fonts | E2 | S | AL-020 | todo |
+| AL-021 | Bundled fonts | E2 | S | AL-020 | partial |
 | AL-022 | GlassPanel | E2 | S | AL-020 | done |
 | AL-023 | Text primitives | E2 | S | AL-021 | todo |
 | AL-024 | Button | E2 | S | AL-023 | todo |
 | AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | todo |
 | AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | todo |
 | AL-027 | TextField | E2 | S | AL-023 | todo |
-| AL-028 | Card and ProgressBar | E2 | S | AL-022 | todo |
+| AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
 | AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | todo |
 | AL-030 | Toast and ToastHost | E2 | S | AL-024 | todo |
-| AL-031 | Icons | E2 | S | AL-020 | todo |
+| AL-031 | Icons | E2 | S | AL-020 | done |
 | AL-032 | Component gallery (dev route) | E2 | S | AL-023–AL-031 | todo |
 | AL-033 | Accessibility checks | E2 | S | AL-032 | todo |
 | AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | partial |
@@ -229,8 +229,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 - **Design:** §5 · **Depends on:** AL-004, AL-005, AL-006 · **Host:** GitHub Actions (Decision D17)
 - **Scope:** `.github/workflows/ci.yml` running `pnpm install --frozen-lockfile`, `pnpm verify`, and `pnpm e2e` on a Windows agent (Electron needs a desktop session; use `xvfb-run` if a Linux agent is used). Cache the pnpm store and the Electron download.
 - **Acceptance criteria:**
-  - [ ] Every PR runs typecheck, lint, Steiger, unit tests, build and e2e.
-  - [ ] Failing Steiger or a layer-rule violation fails the build.
+  - [x] Every PR runs typecheck, lint, Steiger, unit tests, build and e2e.
+  - [x] Failing Steiger or a layer-rule violation fails the build.
 
 #### AL-009 · Agent docs: CLAUDE.md, design copy, this plan
 - **Scope:** `CLAUDE.md` (how to work a ticket, commands, architecture rules, stack gotchas), `docs/design/DESIGN.md` + `screens/`, this file.
@@ -262,9 +262,9 @@ All main ↔ renderer traffic goes through channels declared in `packages/contra
 - **Design:** §6 Live events · **Depends on:** AL-011
 - **Scope:** Event names and zod payload schemas for `agent:output`, `agent:stage`, `agent:subagent`, `agent:gate`, `agent:status`, `build:log`, `run:status`, `connections:changed`, `design:spec`, `toast` (payloads defined by the owning tickets; start with the envelope `{ ticketId, at, … }`). Main-side `emit(channel, payload)` that validates in development and sends to the main window's `webContents` only. Events carry no secrets.
 - **Acceptance criteria:**
-  - [ ] `emit` with an invalid payload throws in dev and logs + drops in production.
-  - [ ] Events are delivered only to the trusted renderer frame.
-  - [ ] Preload `on()` returns an unsubscribe function; unsubscribing stops delivery.
+  - [x] `emit` with an invalid payload throws in dev and logs + drops in production.
+  - [x] Events are delivered only to the trusted renderer frame.
+  - [x] Preload `on()` returns an unsubscribe function; unsubscribing stops delivery.
 - **Tests:** main unit test for `emit` validation; renderer test that a fake bridge event reaches a subscriber.
 
 #### AL-013 · Preload bridge
@@ -307,8 +307,8 @@ colour alone.
 - **Design:** §11 Type · **Depends on:** AL-020
 - **Scope:** Ship Plus Jakarta Sans (500, 700, 800) and JetBrains Mono (400) inside the app (e.g. `@fontsource/*` woff2 imported in `main.tsx`); no network font loading (offline desktop app, CSP `font-src 'self'`).
 - **Acceptance criteria:**
-  - [ ] Board title renders in Plus Jakarta Sans 800 and ids/branches in JetBrains Mono with the network disabled.
-  - [ ] Font licences (OFL) included in the packaged app's licence notices.
+  - [x] Board title renders in Plus Jakarta Sans 800 and ids/branches in JetBrains Mono with the network disabled.
+  - [ ] Font licences (OFL) included in the packaged app's licence notices. (open: licence files committed in `apps/desktop/licenses/fonts/` and shipped via electron-builder `extraFiles`, e2e checks the files and config; not yet confirmed in a real package. Check `<install dir>/licenses/fonts/*.txt` once AL-007 packages)
 
 #### AL-022 · GlassPanel
 - **Design:** §11 Glass, artboard 7 · **Depends on:** AL-020
@@ -356,7 +356,7 @@ colour alone.
 - **Design:** artboards 1, 6 · **Depends on:** AL-022
 - **Scope:** `Card` (surface, radius 16, card shadow, optional border tone: selected violet, attention amber, danger red, muted for merged; optional footer band in attention/ado/danger/ok tint); `ProgressBar` (violet→sky gradient, green for merged).
 - **Acceptance criteria:**
-  - [ ] Card supports every border + footer combination on artboard 6.
+  - [x] Card supports every border + footer combination on artboard 6.
 
 #### AL-029 · Modal and Tabs
 - **Design:** artboards 2, 3, 5 · **Depends on:** AL-022, AL-024
@@ -376,7 +376,7 @@ colour alone.
 - **Depends on:** AL-020
 - **Scope:** One `Icon` primitive (lucide set via `react-native-svg`, which renders on web) for: plus, link, chevron, arrow-left, arrow-right, play, stop, hammer/build, branch/merge, external-link, refresh, search, check, close, lock, alert, pause.
 - **Acceptance criteria:**
-  - [ ] Icons inherit text colour and size; decorative icons are hidden from screen readers.
+  - [x] Icons inherit text colour and size; decorative icons are hidden from screen readers.
 
 #### AL-032 · Component gallery (dev route)
 - **Design:** artboards 6, 7 · **Depends on:** AL-023–AL-031
@@ -1115,6 +1115,33 @@ implementation agent, mid-run if needed.
 | D26 | AL-040: Secrets are decrypted on every `get()`, no plaintext is cached, `list()` never decrypts; the store reads the file when created, so corruption is moved aside and reported at start-up | Shortest plaintext lifetime; start-up gets the issue list | 2026-10-07 |
 | D27 | AL-040: `services.ts` uses Electron's `safeStorage` by default with an optional `ServiceOptions.safeStorage`; a reusable AES-GCM fake (`createFakeSafeStorage`) lives in `src/main/secrets/testing` | Other tickets' tests can encrypt for real without Electron | 2026-10-07 |
 | D28 | AL-040: The no-secret contract test checks output-side JSON Schema (`z.toJSONSchema`) of every invoke response and event payload; fields showing part of a token must start with `masked` (e.g. `maskedToken`), other false positives go in `SAFE_FIELD_NAMES` with a reason, plural `tokens` (LLM counts) is allowed, request schemas are not checked | Save requests legitimately carry the token | 2026-10-07 |
+| D29 | AL-028: New `tone` token group (border, wash, band, text, fill for claude, ado, attention, danger, ok) plus `progressGradient` and `mutedOpacity` = 0.75 in `packages/tokens/src/tones.ts`, with a matching `:root` block in `agent-lanes-tokens.css`; values sampled from artboard 6 (e.g. attention border #FCD34D / band #FEF3C7 / text #92400E; danger #FECACA / #FEE2E2 / #991B1B, fill #F87171; ok band #D1FAE5, text #047857, fill #10B981; selected border #8B80E0) | §11 has no tints; CLAUDE.md puts values in packages/tokens | 2026-10-07 |
+| D30 | AL-028: `tones.ts` repeats the hex values it shares with `color` instead of importing them; `tones.test.ts` checks they still equal `color` and the CSS variables, and that each band text meets 4.5:1 on its band | `index.ts` re-exports `tones.ts`, so importing back would be circular | 2026-10-07 |
+| D31 | AL-028: Added `CardSection` (tone claude/ado/danger/ok, 14 px side inset) beyond the ticket scope | Every card on artboards 1 and 6 has a tinted activity area under a white header; AL-144 needs it | 2026-10-07 |
+| D32 | AL-028: The muted (merged) card is opacity 0.75 over the whole card, text included, with the default line border | Matches artboard 6 (about 0.76 measured); AL-033 decides whether this inactive content is exempt from contrast | 2026-10-07 |
+| D33 | AL-028: `ProgressBar` tones are gradient (violet to sky), `ado` (#38BDF8), `danger` (#F87171) and green; `progress` is 0 to 1, clamped (NaN/Infinity count as 0); `label` is required for the accessible name | Artboard 6 shows PR-open and build-failed fills; axe flags `aria-progressbar-name` without a name | 2026-10-07 |
+| D34 | AL-028: The gradient uses RN 0.87's typed `backgroundImage` string over a solid violet `backgroundColor`, no `*.web.tsx` | react-native-web passes it through to CSS | 2026-10-07 |
+| D35 | AL-028: Card's footer band renders a string label with React Native `Text` (bold 12 px, tone text colour) until AL-023's Text primitives land | AL-023 not merged yet | 2026-10-07 |
+| D36 | AL-012: Event `at` is epoch milliseconds (`Date.now()`), defaulted by `emit` when the caller omits it | Cheap to stamp and validate on high-rate channels such as `agent:output`; the UI formats it | 2026-10-07 |
+| D37 | AL-012: Shared envelopes in `packages/contracts/src/events.ts`: `EventEnvelopeSchema` `{ at }` and `TicketEventEnvelopeSchema` `{ ticketId, at }` (`TicketIdSchema` is a non-empty string for now); `toast` and `connections:changed` use `{ at }`, the other eight channels `{ ticketId, at }` | One definition for all domains; AL-082/AL-101 tighten `TicketIdSchema` | 2026-10-07 |
+| D38 | AL-012: Payloads are envelope-only except `toast` (tone info/success/warning/error, title, optional body); placement: `agent:*` in agent, `build:log` and `run:status` in build, `connections:changed` in connections, `design:spec` in design, `toast` in app | Owning tickets extend the envelopes; main can raise a usable toast now (AL-030 adds actions) | 2026-10-07 |
+| D39 | AL-012: `emit` sends the zod-parsed copy, so undeclared fields are stripped; logs carry zod issue paths and messages, never rejected values | Enforces "events carry no secrets" in dev and production | 2026-10-07 |
+| D40 | AL-012: Strict mode (throw on invalid payload) is `!app.isPackaged`, so dev, start and e2e throw; only the installed app logs and drops | Contract bugs surface everywhere except for end users | 2026-10-07 |
+| D41 | AL-012: Events go to `mainWindow.webContents.mainFrame` only while its URL passes `isTrustedSenderUrl`; no window or a loading page drops quietly, any other URL is refused and logged | Same trust rule as invoke; renderers backfill over invoke (AL-102) | 2026-10-07 |
+| D42 | AL-012: Services get `emit` through `ServiceOptions`/`Services` (`services.emit`), never a window reference; `EventInput<C>` (z.input) added next to `EventPayload<C>` for emit's argument | Keeps services free of window state | 2026-10-07 |
+| D43 | AL-012: Renderer `subscribe(channel, listener)` in `@/shared/api` validates each payload and logs and drops invalid ones; `installFakeBridge` returns a `FakeBridge` with `emit` and `listenerCount` (its `on` throws for unknown channels; replies optional) | AL-015's EventHub builds on `subscribe`; tests push events through the fake | 2026-10-07 |
+| D44 | AL-012: Vitest's `main` project also includes `apps/desktop/src/preload/**/*.test.ts`; the e2e sends via `webContents.mainFrame.send` from Playwright rather than through `emit` | Unit-tests the preload bridge with a mocked electron; no test-only hook in production code | 2026-10-07 |
+| D45 | AL-008: CI runs typecheck, lint, lint probes, test, build and e2e as separate named steps (not one `pnpm verify`) on `windows-latest`, Node 24, no xvfb | A red run names the failing check; the app ships for Windows and hosted Windows runners have a desktop session | 2026-10-07 |
+| D46 | AL-008: Triggers are `pull_request`, push to `main` and `feature/**`, and `workflow_dispatch`; concurrency cancels superseded runs except on `main` | §7 merges without PRs, so a branch push is the only pre-merge check; every integration merge gets its own result | 2026-10-07 |
+| D47 | AL-008: `scripts/lint-probes.mjs` (`pnpm lint:probes`) checks that each layer/process rule and Steiger's forbidden-imports still fail lint, with a passing control per rule; probes lint from stdin or a temp FSD tree and never write to `src/` | Tests acceptance criterion 2 on every run; mutation-tested | 2026-10-07 |
+| D48 | AL-008: Electron binary fetched with `node node_modules/electron/install.js` and cached from @electron/get's default folder keyed on the Electron version; pnpm store cached via `pnpm/action-setup` `cache: true`; third-party `pnpm/action-setup` pinned to a SHA (v6.1.0), first-party actions on major tags; `test-results/` uploaded as `e2e-results` for 14 days; `contents: read`, 30-minute timeout | Electron 44 has no postinstall; supply-chain hygiene; failure evidence | 2026-10-07 |
+| D49 | AL-031: Icons are named for meaning (build = hammer, stop = square, close = X, alert = circle-alert, refresh = rotate-cw, branch, merge), plus arrow-up-right and chevron-up/left/right beyond the ticket list; play/stop/pause are filled, the rest lucide 2 px stroke | A glyph can change without touching callers; artboards 3 and 4 use the up-right arrow and solid Run/Stop | 2026-10-07 |
+| D50 | AL-031: Icon colour and size resolve explicit prop, then nearest `IconProvider`, then surrounding text (`currentColor`/`1em` on web, 16 px native fallback); decorative unless given a `label` (then role img) | Icons inside Button/Pill/Tabs/Toast labels match their text | 2026-10-07 |
+| D51 | AL-031: Glyphs come from `lucide-react-native` (per-icon imports) on `react-native-svg` 15.15.5; `@react-native/assets-registry/registry` is aliased to react-native-web's AssetRegistry in electron-vite and Vitest; Vitest's ui project aliases `react-native-svg` to its ESM build and inlines both packages | RN 0.87 no longer installs the asset registry; Vitest otherwise loads the native CommonJS build | 2026-10-07 |
+| D52 | AL-021: CSP is `font-src 'self'` (no `data:`); `assetsInlineLimit` keeps .woff/.woff2 as emitted files | Small subset files would otherwise be inlined as data: URIs the CSP blocks | 2026-10-07 |
+| D53 | AL-021: Fonts load through `app/styles/fonts.css` (one import in `main.tsx`) using the full per-weight @fontsource CSS with every subset (unicode-range loads only what is used); Plus Jakarta Sans 400 is not bundled (CSS falls back to 500) | Accented names render in brand fonts; one shared-file line | 2026-10-07 |
+| D54 | AL-021: OFL texts are committed copies in `apps/desktop/licenses/fonts/`, shipped by electron-builder `extraFiles` to `<install dir>/licenses/`; an e2e test fails if they drift from the installed package or a new @fontsource dependency has no licence file | Licence notices without a package-time copy step | 2026-10-07 |
+| D55 | AL-021: "Network disabled" in e2e means session offline emulation plus a webRequest hook that cancels and records any http(s)/ws(s) request; the drawn face is checked with CDP `CSS.getPlatformFontsForNode`; the mono check uses the runtime-info line plus an injected id/branch sample until AL-025/AL-144 land | Proves the face Chromium drew, not just the CSS declaration | 2026-10-07 |
 
 ---
 
@@ -1145,6 +1172,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Environment prepared: pnpm/Turborepo monorepo, electron-vite 5 + Electron 44, React 19 + react-native-web 0.21 + React Compiler, typed IPC with zod, tokens package, GlassPanel, ESLint + Steiger, Vitest (45 tests), Playwright smoke e2e (3 tests, isolated profile). Done: AL-001–AL-006, AL-009–AL-011, AL-013, AL-014, AL-020, AL-022. AL-007 in progress (config only). |
 | 2026-10-07 | Repo pushed to github.com/KyleRichards94/ClaudeLanes. Prepared for the parallel build: IPC contracts and main handlers split per domain (D19), composition root `src/main/services.ts`, quit waits for `disposeServices`. Q6 answered (GitHub Actions, D17); Q9 built with the default (D18); AL-008 and AL-109 unblocked. Rules in §7. |
 | 2026-10-07 | Integrator batch 1: merged AL-040 (partial: the reconnect prompt waits for AL-042/AL-047). Decisions D20–D28. `pnpm verify` green (107 unit tests), e2e 4/4. |
+| 2026-10-07 | Integrator batch 2: merged AL-028, AL-012, AL-008, AL-031 (done) and AL-021 (partial: OFL licences in the packaged app not yet confirmed, waits for AL-007). Two registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit`; `packages/ui/src/index.ts`). Lockfile unchanged after `pnpm install`. Decisions D29–D55. `pnpm verify` green (251 unit tests), lint probes 9/9, e2e 13/13. |
 
 ---
 
