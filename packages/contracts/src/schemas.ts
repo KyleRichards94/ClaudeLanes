@@ -44,6 +44,8 @@ export const eventContracts = {
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeContracts)[C]['request']>;
 export type InvokeResponse<C extends InvokeChannel> = z.output<(typeof invokeContracts)[C]['response']>;
 export type EventPayload<C extends EventChannel> = z.output<(typeof eventContracts)[C]>;
+/** What main passes to `emit`: the payload before defaults (such as the envelope's `at`) are filled in. */
+export type EventInput<C extends EventChannel> = z.input<(typeof eventContracts)[C]>;
 
 /** Validates the Result envelope that comes back over IPC before the payload is parsed. */
 export const ResultEnvelopeSchema = z.discriminatedUnion('ok', [
