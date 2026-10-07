@@ -14,7 +14,28 @@ import {
   type CardTone,
   type ProgressTone,
 } from '@agent-lanes/ui';
+import { BuildRunControlsView, type BuildRunControlsViewProps } from '@/features/build-run';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
+
+/** The drill-in's Worktree panel in its build and run states (AL-173), with no actions behind it. */
+const worktreeStates: readonly { state: string; ticket: BuildRunControlsViewProps['ticket'] }[] = [
+  {
+    state: 'Idle · last build succeeded',
+    ticket: {
+      build: { job: null, last: { outcome: 'succeeded', startedAt: 0, finishedAt: new Date(2026, 9, 7, 14, 2).getTime(), errors: 0, warnings: 0 } },
+      run: { state: 'stopped', url: null, startedAt: null },
+    },
+  },
+  {
+    state: 'Build queued',
+    ticket: { build: { job: { jobId: 'job-2', kind: 'build', state: 'queued', position: 2 }, last: null }, run: { state: 'stopped', url: null, startedAt: null } },
+  },
+  {
+    state: 'Running',
+    ticket: { build: { job: null, last: null }, run: { state: 'running', url: 'http://localhost:5080/', startedAt: 0 } },
+  },
+];
+const ignore = () => undefined;
 
 /** One card on artboard 6. Built from the primitives; the board's own card is AL-144's AgentTicketCard. */
 interface CardState {
@@ -161,6 +182,13 @@ export function CardStatesSheet() {
             testID="gallery-toast-error"
           />
         </GalleryBlock>
+        {worktreeStates.map((sample) => (
+          <GalleryBlock key={sample.state} title={`Worktree · ${sample.state}`} style={styles.wideBlock}>
+            <View style={styles.badgePanel}>
+              <BuildRunControlsView ticket={sample.ticket} onBuild={ignore} onRun={ignore} onStop={ignore} onOpen={ignore} />
+            </View>
+          </GalleryBlock>
+        ))}
         <GalleryBlock title="Status badges" style={styles.wideBlock}>
           <View style={styles.badgePanel}>
             <GalleryRow>

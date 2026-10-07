@@ -13,8 +13,8 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate and build:queued', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued']);
+  it('handles the batched agent:output channel, agent:stage, agent:gate, build:queued, build:finished and run:status', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:finished', 'build:queued', 'run:status']);
   });
 
   it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {
@@ -63,6 +63,40 @@ describe('agent ticket event handlers', () => {
     store.setActivity('71273', { text: 'old', progress: 0.5 }, 2_500);
     handlers['agent:stage']?.(fakeStageEvent('71273', 3_000, { stage: 'code-review', from: 'implementing', activity: null, progress: 0 }));
     expect(selectTicket(store.getState(), '71273')).toMatchObject({ stage: 'code-review', activity: null, progress: 0 });
+  });
+
+  it('follows a run through run:status and keeps the last build from build:finished (AL-173)', () => {
+    const { store, handlers } = setup();
+    const run = { ticketId: '71273', runId: 'run-1', runKind: 'web', port: 5080, startedAt: 10, stoppedAt: null, exitCode: null, message: null, at: 10 } as const;
+
+    handlers['run:status']?.({ ...run, state: 'starting', url: null });
+    expect(selectTicket(store.getState(), '71273')?.run).toEqual({ state: 'starting', url: null, startedAt: 10 });
+    handlers['run:status']?.({ ...run, state: 'running', url: 'http://localhost:5080/', at: 11 });
+    expect(selectTicket(store.getState(), '71273')?.run).toEqual({ state: 'running', url: 'http://localhost:5080/', startedAt: 10 });
+
+    const error = { severity: 'error', code: 'CS0246', message: 'JobFilterState not found', file: 'a.cs', line: 1, column: 1 } as const;
+    handlers['build:finished']?.({
+      jobId: 'job-1',
+      ticketId: '71273',
+      kind: 'build',
+      outcome: 'failed',
+      command: 'dotnet build',
+      exitCode: 1,
+      errors: 3,
+      warnings: 0,
+      diagnostics: [{ ...error, severity: 'warning', code: 'CS0168' }, error],
+      startedAt: 20,
+      finishedAt: 30,
+      at: 30,
+    });
+    expect(selectTicket(store.getState(), '71273')?.build.last).toEqual({
+      outcome: 'failed',
+      startedAt: 20,
+      finishedAt: 30,
+      errors: 3,
+      warnings: 0,
+      firstError: error,
+    });
   });
 
   it('commits a frame of agent:output as one store update', () => {
