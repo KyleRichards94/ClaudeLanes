@@ -70,3 +70,13 @@
   --al-progress-gradient: linear-gradient(90deg, #5b4bc4, #38bdf8);
   --al-muted-opacity: 0.75;
 }
+
+/* Selection controls (SegmentedControl, Switch) from artboards 2 and 3. Mirrors src/selection.ts. */
+:root {
+  --al-selection-track: #eef2f7;
+  --al-selection-label: #475569;
+  --al-selection-switch-off: #cbd5e1;
+  --al-selection-thumb-shadow: 0 1px 2px rgba(15, 27, 45, 0.1), 0 1px 3px rgba(15, 27, 45, 0.08);
+  --al-selection-pill-shadow: 0 2px 8px rgba(91, 75, 196, 0.28);
+  --al-selection-disabled-opacity: 0.5;
+}
