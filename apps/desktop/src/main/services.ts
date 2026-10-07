@@ -6,10 +6,12 @@ import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
 import {
+  adoMcpServerFor,
   createAdoConnectionTester,
   createClaudeConnectionTester,
   createClaudeLoginDetector,
   createConnectionsService,
+  createMcpConnectionTester,
   type ConnectionsService,
 } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
@@ -131,8 +133,10 @@ export function createServices(options: ServiceOptions): Services {
     file: createElectronConnectionsFile(options.appDataDir),
     secrets,
     emit: options.emit,
-    testers: { ado: createAdoConnectionTester(), claude: createClaudeConnectionTester(claude) },
+    testers: { ado: createAdoConnectionTester(), claude: createClaudeConnectionTester(claude), mcp: createMcpConnectionTester() },
     detectClaudeLogin: createClaudeLoginDetector(claude),
+    // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
+    adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
   });
 
