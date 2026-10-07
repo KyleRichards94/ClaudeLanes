@@ -13,7 +13,7 @@ export {
   type RendererErrorSource,
 } from './diagnostics';
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
-export { ticketsQueryKey, useTicketRecords } from './tickets';
+export { ticketRecordQueryKey, ticketsQueryKey, useTicketRecord, useTicketRecords } from './tickets';
 export { repoCommandsQueryKey, useRepoCommands } from './build-commands';
 export { branchesQueryKey, createBranchStatusEventHandlers, useBranchStatus } from './branches';
 export { diffFileQueryKey, diffQueryKey, useDiffFile, useTicketDiff } from './diff';
@@ -41,3 +41,6 @@ export {
   type AdoQueryOptions,
   type AdoScope,
 } from './ado';
+export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
+export { useDesignCanvasSlot } from './design-view';
+export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';

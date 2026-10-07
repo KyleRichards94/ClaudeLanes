@@ -17,6 +17,8 @@ import {
 } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
+import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas-links';
+import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
 import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
@@ -70,6 +72,10 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Each ticket's linked canvas and the page it was left on, in its record (AL-193). */
+  readonly designCanvases: DesignCanvasLinks;
+  /** Reads a linked canvas's artboards through a short read-only design session (AL-195, D118). */
+  readonly designArtboards: DesignArtboardReader;
   /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
   readonly ado: AdoService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
@@ -199,7 +205,16 @@ export function createServices(options: ServiceOptions): Services {
     platform: createElectronDesignPlatform({ window: options.mainWindow ?? (() => undefined), policy: designPolicy }),
     policy: designPolicy,
     emit: options.emit,
+    // Each signed-in canvas page is remembered on the ticket record (AL-193).
+    onChange: (view, closed) => designCanvases.noteView(view, closed),
   });
+  const designCanvases = createDesignCanvasLinks({
+    tickets,
+    designView,
+    testOrigin: options.designTestOrigin,
+    warn: (message) => log.child('design').warn(message),
+  });
+  const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
@@ -217,6 +232,8 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    designCanvases,
+    designArtboards,
     ado,
     tickets,
     repos,

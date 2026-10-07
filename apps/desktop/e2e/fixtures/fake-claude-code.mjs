@@ -4,7 +4,9 @@
 //
 //   { "login": { "email", "organization", "subscriptionType" } | null,
 //     "apiKeys": ["keys this fake accepts"],
-//     "log": "path of a JSON-lines file to record each start in" }
+//     "log": "path of a JSON-lines file to record each start in",
+//     "design": { "artboards": [{ id, name, width, height }] } (AL-195: Claude Design access and what a
+//       design session answers) }
 //
 // The log says whether an API key arrived and whether it was accepted, never the key itself.
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -47,7 +49,8 @@ function answer(prompt) {
     apiKeySource: apiKey !== undefined ? 'ANTHROPIC_API_KEY' : 'none',
     claude_code_version: '0.0.0-fake',
     cwd: process.cwd(),
-    tools: [],
+    // AL-195: a login with Claude Design access offers its tools; the design session gets the artboard list.
+    tools: state.design ? ['ClaudeDesign', 'Artifact'] : [],
     mcp_servers: [],
     model,
     permissionMode: 'default',
@@ -90,6 +93,7 @@ function answer(prompt) {
     total_cost_usd: 0,
     usage,
     modelUsage: {},
+    ...(state.design && authenticated ? { structured_output: { artboards: state.design.artboards } } : {}),
     permission_denials: [],
     uuid: randomUUID(),
     session_id: sessionId,

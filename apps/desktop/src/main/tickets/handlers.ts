@@ -2,7 +2,7 @@ import { ok, type TICKETS_INVOKE_CHANNELS } from '@agent-lanes/contracts';
 import type { HandlersFor } from '../ipc/handle-invoke';
 import type { Services } from '../services';
 
-/** The tickets domain's channels: records for the board (AL-143), archive (AL-088) and start-up reconciliation (AL-090). Launch (AL-165) adds its channels here. */
+/** The tickets domain's channels: records for the board (AL-143) and drill-in (AL-170), archive (AL-088) and start-up reconciliation (AL-090). Launch (AL-165) adds its channels here. */
 export function createTicketsHandlers({
   tickets,
   archive,
@@ -16,5 +16,6 @@ export function createTicketsHandlers({
     'tickets:board': () => reconcile.board(),
     'tickets:adoptWorktree': ({ worktreePath }) => reconcile.adopt(worktreePath),
     'tickets:ignoreWorktree': ({ worktreePath }) => reconcile.ignore(worktreePath),
+    'tickets:get': async ({ ticketId }) => ok({ record: (await tickets.get(ticketId)) ?? null }),
   };
 }
