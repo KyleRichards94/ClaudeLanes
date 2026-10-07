@@ -15,3 +15,5 @@ export {
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
 export { ticketsQueryKey, useTicketRecords } from './tickets';
 export { repoCommandsQueryKey, useRepoCommands } from './build-commands';
+export { branchesQueryKey, createBranchStatusEventHandlers, useBranchStatus } from './branches';
+export { diffFileQueryKey, diffQueryKey, useDiffFile, useTicketDiff } from './diff';

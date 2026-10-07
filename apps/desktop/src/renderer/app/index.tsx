@@ -1,4 +1,5 @@
 import { AppProviders } from './entrypoint/AppProviders';
+import { BoardSync } from './entrypoint/BoardSync';
 import { AppRouter } from './routing';
 import { NewTicketHost } from './new-ticket';
 import { ToastHost } from './toasts';
@@ -9,6 +10,7 @@ export function App() {
       <AppRouter />
       <NewTicketHost />
       <ToastHost />
+      <BoardSync />
     </AppProviders>
   );
 }
