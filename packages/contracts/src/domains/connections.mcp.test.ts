@@ -38,7 +38,7 @@ describe('MCP server entries (AL-045)', () => {
   });
 
   it('a test result carries the tools for an MCP server', () => {
-    const result = { status: 'ok', identity: 'fake-mcp 1.2.3', message: null, missingScopes: [], testedAt: '2026-10-07T03:00:00.000Z', tools: ['echo'] };
+    const result = { status: 'ok', identity: 'fake-mcp 1.2.3', message: null, missingScopes: [], scopes: [], projects: null, testedAt: '2026-10-07T03:00:00.000Z', tools: ['echo'] };
     expect(invokeContracts['connections:test'].response.parse(result)).toEqual(result);
   });
 });
