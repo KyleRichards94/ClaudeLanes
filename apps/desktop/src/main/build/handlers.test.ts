@@ -1,4 +1,4 @@
-import { defaultSettings } from '@agent-lanes/contracts';
+import { defaultSettings, err, ok } from '@agent-lanes/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createBuildCommands } from './commands';
@@ -9,7 +9,15 @@ let queue: JobQueue;
 
 function handlers(concurrency = 2) {
   queue = createJobQueue({ concurrency: () => concurrency, platform: 'win32' });
-  return createBuildHandlers({ buildQueue: queue, buildCommands: createBuildCommands({ settings: { get: defaultSettings } }) });
+  return createBuildHandlers({
+    buildQueue: queue,
+    buildCommands: createBuildCommands({ settings: { get: defaultSettings } }),
+    builds: { build: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), isStale: () => Promise.resolve(true) },
+    runs: { start: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), list: () => [], openUrl: () => Promise.resolve(ok({ opened: false })),
+      stop: () => Promise.resolve(ok({ stopped: false })),
+      dispose: () => Promise.resolve(),
+    },
+  });
 }
 
 /** A job that runs until the test disposes the queue. */

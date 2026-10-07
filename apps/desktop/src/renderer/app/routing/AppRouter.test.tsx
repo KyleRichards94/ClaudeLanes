@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, configure, render, screen } from '@testing-library/react';
+import { act, configure, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFakeBridge } from '@/shared/testing';
 
@@ -65,6 +65,50 @@ describe('AppRouter', () => {
 
     act(() => router.navigate(routes.ticket('80001')));
     expect(await screen.findByRole('heading', { name: '#80001' })).toBeTruthy();
+  });
+
+  it('contains a page that fails to render to that page', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const bridge = installFakeBridge({ 'app:getInfo': appInfo, 'app:logError': { ok: true, data: null } });
+    vi.doMock('@/pages/ticket', () => ({
+      TicketPage: ({ ticketId }: { ticketId: string }) => {
+        if (ticketId === '666') throw new Error('ticket page failed');
+        return <span data-testid="ticket-page">#{ticketId}</span>;
+      },
+    }));
+    try {
+      const { router, routes } = await renderFreshRouter();
+      await screen.findByText('Agent board');
+
+      act(() => router.navigate(routes.ticket('666')));
+      expect(await screen.findByRole('heading', { name: 'Something went wrong in ticket #666' })).toBeTruthy();
+      await waitFor(() =>
+        expect(bridge.invoke).toHaveBeenCalledWith(
+          'app:logError',
+          expect.objectContaining({ boundary: 'page:ticket', message: 'ticket page failed' }),
+        ),
+      );
+
+      // Another ticket gets a fresh boundary, not the last page's fallback.
+      act(() => router.navigate(routes.ticket('1')));
+      expect(await screen.findByTestId('ticket-page')).toBeTruthy();
+      expect(screen.queryByRole('alert')).toBeNull();
+
+      act(() => router.navigate(routes.board()));
+      expect(await screen.findByText('Agent board')).toBeTruthy();
+    } finally {
+      vi.doUnmock('@/pages/ticket');
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('shows the component gallery on its dev-only route (AL-032)', async () => {
+    const { router, routes } = await renderFreshRouter();
+    await screen.findByText('Agent board');
+
+    act(() => router.navigate(routes.gallery()));
+    expect(await screen.findByTestId('gallery-page')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Component gallery' })).toBeTruthy();
   });
 
   it('keeps the current page on screen while the next page loads', async () => {

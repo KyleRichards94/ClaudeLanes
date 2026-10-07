@@ -7,4 +7,5 @@ export const APP_INVOKE_CHANNELS = [
 ] as const;
 export const APP_EVENT_CHANNELS = [
   'toast',
+  'app:window', // AL-066: the main window was minimised, hidden or shown again
 ] as const;

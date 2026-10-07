@@ -47,6 +47,11 @@ function createOutputStore() {
   return { store, commits, onAgentOutput, times };
 }
 
+/** A build:log batch as AL-132 sends it. */
+function buildLog(ticketId: string, at: number) {
+  return { ticketId, at, jobId: 'job-1', kind: 'build' as const, lines: [{ text: 'Build started', stream: 'stdout' as const, level: 'info' as const }] };
+}
+
 describe('EventHub', () => {
   it('subscribes exactly once per channel at start-up and keeps those subscriptions for the app lifetime', () => {
     const hub = startEventHub();
@@ -92,22 +97,22 @@ describe('EventHub', () => {
     const onBuildLog = vi.fn<EventHandler<'build:log'>>();
     hub.register({ 'agent:output': output.onAgentOutput, 'build:log': onBuildLog });
 
-    bridge.emit('build:log', { ticketId: '71273', at: 1 });
+    bridge.emit('build:log', buildLog('71273', 1));
     bridge.emit('agent:output', fakeOutputEvent('71273', 2));
-    bridge.emit('build:log', { ticketId: '71274', at: 3 });
+    bridge.emit('build:log', buildLog('71274', 3));
     vi.advanceTimersToNextFrame();
 
     expect(onBuildLog).toHaveBeenCalledExactlyOnceWith([
-      { ticketId: '71273', at: 1 },
-      { ticketId: '71274', at: 3 },
+      buildLog('71273', 1),
+      buildLog('71274', 3),
     ]);
     expect(output.commits).toHaveBeenCalledOnce();
 
-    bridge.emit('build:log', { ticketId: '71273', at: 4 });
+    bridge.emit('build:log', buildLog('71273', 4));
     vi.advanceTimersToNextFrame();
 
     expect(onBuildLog).toHaveBeenCalledTimes(2);
-    expect(onBuildLog).toHaveBeenLastCalledWith([{ ticketId: '71273', at: 4 }]);
+    expect(onBuildLog).toHaveBeenLastCalledWith([buildLog('71273', 4)]);
     expect(output.commits).toHaveBeenCalledOnce();
   });
 
@@ -194,13 +199,13 @@ describe('EventHub', () => {
     const unregister = hub.register({ 'build:log': onBuildLog, 'agent:stage': twice });
     hub.register({ 'agent:stage': twice });
 
-    bridge.emit('build:log', { ticketId: '71273', at: 1 });
+    bridge.emit('build:log', buildLog('71273', 1));
     unregister();
     vi.advanceTimersToNextFrame();
     expect(onBuildLog).not.toHaveBeenCalled();
 
     // Nothing listens to build:log now, so no frame is even scheduled.
-    bridge.emit('build:log', { ticketId: '71273', at: 2 });
+    bridge.emit('build:log', buildLog('71273', 2));
     expect(vi.getTimerCount()).toBe(0);
 
     // The same function registered twice is two registrations; removing one leaves the other.

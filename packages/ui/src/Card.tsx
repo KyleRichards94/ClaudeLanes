@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 
 /**
@@ -95,7 +95,8 @@ const toneStyles = StyleSheet.create({
   selected: { borderColor: tone.claude.border },
   attention: { borderColor: tone.attention.border },
   danger: { borderColor: tone.danger.border },
-  muted: { opacity: mutedOpacity },
+  // AL-033: mostly a loss of colour, which keeps text contrast; the light opacity on top fades it back.
+  muted: { opacity: mutedOpacity, filter: mutedFilter },
 });
 
 const footerStyles = StyleSheet.create({

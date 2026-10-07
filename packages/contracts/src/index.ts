@@ -12,6 +12,7 @@ export * from './domains/ado.write-back';
 export * from './domains/agent.schemas';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';
+export * from './domains/build.display';
 export * from './domains/connections.schemas';
 export * from './domains/connections.claude';
 export * from './domains/connections.display';

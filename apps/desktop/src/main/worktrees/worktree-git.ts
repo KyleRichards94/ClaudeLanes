@@ -174,7 +174,7 @@ const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
  * A folder that only git could have made: its `.git` file points into this repo's worktrees folder.
  * Anything else at the path is left alone, so a rollback never deletes someone else's files.
  */
-async function isWorktreeFolderOf(git: WorktreeGit, repo: string, path: string): Promise<boolean> {
+export async function isWorktreeFolderOf(git: WorktreeGit, repo: string, path: string): Promise<boolean> {
   let pointer: string;
   try {
     pointer = await readFile(join(path, '.git'), 'utf8');

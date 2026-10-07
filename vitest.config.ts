@@ -41,6 +41,8 @@ export default defineConfig({
         },
         define: {
           __DEV__: 'true',
+          // Renderer tests can open the development-only component gallery (AL-032).
+          __GALLERY__: 'true',
         },
         esbuild: {
           jsx: 'automatic',
