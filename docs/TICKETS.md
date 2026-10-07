@@ -67,7 +67,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-032 | Component gallery (dev route) | E2 | S | AL-023–AL-031 | todo |
 | AL-033 | Accessibility checks | E2 | S | AL-032 | todo |
 | AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | partial |
-| AL-041 | Settings store and UI prefs | E3 | M | AL-011 | todo |
+| AL-041 | Settings store and UI prefs | E3 | M | AL-011 | done |
 | AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | todo |
 | AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | todo |
 | AL-044 | Claude connection | E3 | M | AL-042 | todo |
@@ -75,7 +75,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-046 | Connections modal UI | E3 | L | AL-043, AL-044, AL-045, AL-027, AL-029 | todo |
 | AL-047 | First-run flow and repo picker | E3 | M | AL-046, AL-081 | todo |
 | AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | todo |
-| AL-060 | ado-client core | E4 | M | AL-001 | todo |
+| AL-060 | ado-client core | E4 | M | AL-001 | done |
 | AL-061 | Sprints (iterations) | E4 | S | AL-060 | todo |
 | AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | todo |
 | AL-063 | Work item write-back (comments, state) | E4 | S | AL-060 | todo |
@@ -409,9 +409,9 @@ colour alone.
 - **Design:** §6 Persisted UI prefs, §8, R5 · **Depends on:** AL-011
 - **Scope:** electron-store (app data, written only by the app) with a versioned zod schema + migrations: repos (path, name, base branch, worktree root, build/run overrides, max concurrent agents), defaults (model, effort, stage gates, skills), build queue size, UI prefs (last repo, last sprint, collapsed lanes, embed mode per ticket). IPC `settings:get`, `settings:update` (partial, validated). Renderer Zustand `persist` adapter backed by these channels for UI prefs.
 - **Acceptance criteria:**
-  - [ ] Nothing in the app reads a user-edited file; settings change only through the UI.
-  - [ ] Schema migration from v1 to v2 is covered by a test.
-  - [ ] Collapsed lanes survive a restart.
+  - [x] Nothing in the app reads a user-edited file; settings change only through the UI.
+  - [x] Schema migration from v1 to v2 is covered by a test.
+  - [x] Collapsed lanes survive a restart. (store-level and e2e relaunch test; the click-to-collapse UI test comes with AL-143)
 
 #### AL-042 · Connections service and IPC
 - **Design:** §8 · **Depends on:** AL-040, AL-041
@@ -473,9 +473,9 @@ colour alone.
 - **Design:** §7 · **Depends on:** AL-001
 - **Scope:** `createAdoClient({ orgUrl, pat, fetch })`: Basic auth header from the PAT, `api-version=7.1`, JSON + zod-validated responses, continuation-token paging, 429/503 retry honouring `Retry-After` (max 3), error mapping (401 → `ADO_UNAUTHORIZED`; 403 or the 203-login-page case → `ADO_SCOPE_MISSING`), request timeout, and redaction of the auth header in any error.
 - **Acceptance criteria:**
-  - [ ] Every exported call returns `Result<T>`.
-  - [ ] No error message or log line contains the PAT (test).
-- **Tests:** MSW for paging, retry, each error class.
+  - [x] Every exported call returns `Result<T>`.
+  - [x] No error message or log line contains the PAT (test).
+- **Tests:** MSW for paging, retry, each error class. (done: 124 MSW-backed Vitest tests)
 
 #### AL-061 · Sprints (iterations)
 - **Design:** artboard 1 header ("Sprint 42 · 7 – 20 Oct") · **Depends on:** AL-060
@@ -1142,6 +1142,32 @@ implementation agent, mid-run if needed.
 | D53 | AL-021: Fonts load through `app/styles/fonts.css` (one import in `main.tsx`) using the full per-weight @fontsource CSS with every subset (unicode-range loads only what is used); Plus Jakarta Sans 400 is not bundled (CSS falls back to 500) | Accented names render in brand fonts; one shared-file line | 2026-10-07 |
 | D54 | AL-021: OFL texts are committed copies in `apps/desktop/licenses/fonts/`, shipped by electron-builder `extraFiles` to `<install dir>/licenses/`; an e2e test fails if they drift from the installed package or a new @fontsource dependency has no licence file | Licence notices without a package-time copy step | 2026-10-07 |
 | D55 | AL-021: "Network disabled" in e2e means session offline emulation plus a webRequest hook that cancels and records any http(s)/ws(s) request; the drawn face is checked with CDP `CSS.getPlatformFontsForNode`; the mono check uses the runtime-info line plus an injected id/branch sample until AL-025/AL-144 land | Proves the face Chromium drew, not just the CSS declaration | 2026-10-07 |
+| D56 | AL-041: electron-store only stores the whole document as one file with atomic writes; versioning, zod validation and migrations live in the main-process `SettingsService` (`apps/desktop/src/main/settings/`) | electron-store's migrations are keyed on the app's semver and its validation is JSON Schema, not zod | 2026-10-07 |
+| D57 | AL-041: electron-store is bundled into the CommonJS main build (`esmOnlyMainDeps` in `apps/desktop/electron.vite.config.ts`) | It is ESM-only; an externalised `require()` returned the module namespace rather than the class | 2026-10-07 |
+| D58 | AL-041: Settings v1 is the flat, prefs-only shape from design §6 (gates as a `gatedStages` list); the v1→v2 migration also registers v1's `lastRepo` as a repo | No release wrote v1; it exists so the migration is real and tested | 2026-10-07 |
+| D59 | AL-041: The loader recovers field by field: an invalid value reverts to its default with a warning, corrupt JSON falls back to defaults, a newer version is read as current without being written back, a new field takes its default without a version bump | A bad field never loses the rest of the user's settings | 2026-10-07 |
+| D60 | AL-041: Settings zod schemas have no `.default()`; defaults are functions in contracts (`defaultSettings`, `defaultUiPrefs`, …) | zod 4 applies defaults inside `.partial()`, which would make every patch overwrite stored values | 2026-10-07 |
+| D61 | AL-041: Added `packages/contracts/src/vocabulary.ts` with `STAGES`, `LANES`, `MODELS`, `EFFORTS`, `GATES`, `EMBED_MODES` in kebab-case (`code-review`, `create-pr`, `mcp-link`) | Settings needs them now; ticket, agent and board domains reuse them | 2026-10-07 |
+| D62 | AL-041: Defaults: Opus with XHigh effort, Planning and Create PR gated, build queue 2, 3 agents per repo, Done lane collapsed, embed mode webview, worktree root `<repo>/../.agent-lanes`, base branch `main` | Artboards 1–2, design §9/§10, Q5 | 2026-10-07 |
+| D63 | AL-041: Repos are identified by absolute path (no separate id); `ui.lastRepo` holds that path, `ui.lastSprint` one ADO iteration id; build/run overrides are `buildCommand`/`runCommand`, `null` meaning use the detected command | Simplest stable key; one sprint selection app-wide | 2026-10-07 |
+| D64 | AL-041: `settings:update` semantics: a top-level section replaces the stored one; inside `defaults` and `ui` each named field replaces that field; arrays and records are replaced whole; undefined fields are ignored; unknown keys are refused | Predictable partial updates with a strict zod patch | 2026-10-07 |
+| D65 | AL-041: `settings:update` from the renderer can edit, reorder or remove repos but cannot add a new repo path (returns `VALIDATION`); main services add repos through `SettingsService.update` | Keeps design §8's "repo paths are picked with a native folder dialog" | 2026-10-07 |
+| D66 | AL-041: The UI prefs Zustand store (`useUiPrefs`) lives in a new `shared/model` segment, not an entity slice | App-wide UI state used by pages and features; Steiger flags a slice nothing references yet | 2026-10-07 |
+| D67 | AL-041: The persist store uses `skipHydration`; an app-level `UiPrefsGate` (in `AppProviders`) holds the first render until prefs load, rendering on defaults if loading fails; the storage adapter never rejects | Lanes don't flash their default state | 2026-10-07 |
+| D68 | AL-041: electron-store's own `electron-store-get-data` ipcMain listener (userData path, app version) is left registered | The renderer cannot reach it: the preload exposes only allow-listed `invoke`/`on` | 2026-10-07 |
+| D69 | AL-041: Test helpers `installFakeSettings` (renderer `shared/testing`, a stateful fake main process for settings) and `createMemorySettingsFile` (`main/settings/settings-file.ts`) | Shared fakes for later settings consumers | 2026-10-07 |
+| D70 | AL-041: No `settings:changed` event yet; `useUpdateSettings` updates its query cache from the `settings:update` reply | AL-012 was not merged when the ticket was built; a follow-up can add the event | 2026-10-07 |
+| D71 | AL-060: `createAdoClient` returns `Result<AdoClient>` (`VALIDATION` for a bad org URL, PAT or options) instead of throwing; messages never echo the URL or PAT | The factory also meets "every exported call returns `Result<T>`" | 2026-10-07 |
+| D72 | AL-060: No new error codes: non-auth HTTP failure, timeout, network error, cancel, exhausted 429/503 retries and paging loops → `INTERNAL`; 400, non-JSON 2xx and schema mismatch → `VALIDATION`; `Err.details` is a typed `AdoErrorDetails` (`source: 'ado'`, kind, status, method, url, attempts, activityId, adoMessage, adoTypeKey, retryAfterMs, issues) read with `isAdoErrorDetails()` | Callers branch on `details.kind` without widening the contracts error enum | 2026-10-07 |
+| D73 | AL-060: Every request sends `X-TFS-FedAuthRedirect: Suppress`; a 203 or a 2xx HTML body still maps to `ADO_SCOPE_MISSING` | ADO answers a bad token with 401 rather than a sign-in redirect | 2026-10-07 |
+| D74 | AL-060: Retry: 3 retries, 1/2/4 s backoff without `Retry-After`; a `Retry-After` above `maxDelayMs` (30 s) ends the call at once with a `throttled` error; POSTs are retried too | A 429/503 means ADO did not process the request; never block a call for minutes | 2026-10-07 |
+| D75 | AL-060: Timeout is 30 s per attempt including the body read; a caller `AbortSignal` cancels the request and any retry wait | Bounded calls, cancellable from the UI | 2026-10-07 |
+| D76 | AL-060: Org URLs must be https (http only for loopback) with no credentials; relative paths may not climb out of the org (even with encoded `..`); absolute URLs only to the org's origin or, for cloud orgs, `*.dev.azure.com` / `*.visualstudio.com`; anything else is refused before fetch | Keeps the PAT on the right hosts | 2026-10-07 |
+| D77 | AL-060: `list()` follows the `x-ms-continuationtoken` header or a `continuationToken` body field; options `itemsKey` (e.g. `comments`), `tokenParam`, `maxPages` (default 100); a failing page fails the whole call | Never returns a partial list | 2026-10-07 |
+| D78 | AL-060: Redaction removes the raw PAT, its base64 forms and any `Basic …`/`Bearer …` credential from error messages, details and log entries; the optional `log` callback gets one redacted entry per attempt | PAT-leak test over 19 error scenarios (fails 15 with redaction off) | 2026-10-07 |
+| D79 | AL-060: The default `fetch` is looked up on `globalThis` at call time, not at client creation | A later-installed fetch (MSW in tests, Electron `net.fetch`) is used | 2026-10-07 |
+| D80 | AL-060: Also exported: `normalizeOrgUrl` (for the Connections form) and an `adoPath` tagged template that URL-encodes project/team names; `ADO_API_VERSION` and `REQUIRED_PAT_SCOPES` moved to `src/constants.ts`, re-exported unchanged | Shared helpers for AL-043 and the E4 endpoint tickets | 2026-10-07 |
+| D81 | AL-060: `msw` ^3.0.2 is a devDependency of `@agent-lanes/ado-client` (msw 3's listen option is `onUnhandledFrame`); `@agent-lanes/contracts` is a dependency for `Result`; `src/testing/msw-server.ts` is test-only, not exported | AL-065 decides whether to export a `./testing` entry | 2026-10-07 |
 
 ---
 
@@ -1173,6 +1199,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Repo pushed to github.com/KyleRichards94/ClaudeLanes. Prepared for the parallel build: IPC contracts and main handlers split per domain (D19), composition root `src/main/services.ts`, quit waits for `disposeServices`. Q6 answered (GitHub Actions, D17); Q9 built with the default (D18); AL-008 and AL-109 unblocked. Rules in §7. |
 | 2026-10-07 | Integrator batch 1: merged AL-040 (partial: the reconnect prompt waits for AL-042/AL-047). Decisions D20–D28. `pnpm verify` green (107 unit tests), e2e 4/4. |
 | 2026-10-07 | Integrator batch 2: merged AL-028, AL-012, AL-008, AL-031 (done) and AL-021 (partial: OFL licences in the packaged app not yet confirmed, waits for AL-007). Two registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit`; `packages/ui/src/index.ts`). Lockfile unchanged after `pnpm install`. Decisions D29–D55. `pnpm verify` green (251 unit tests), lint probes 9/9, e2e 13/13. |
+| 2026-10-07 | Integrator batch 3: merged AL-041 and AL-060 (done). Registration conflicts resolved by keeping both sides (`services.ts`: `secrets` + `emit` + `settings`; renderer `shared/api/index.ts` and `shared/testing/index.ts`); lockfile regenerated (adds electron-store). Decisions D56–D81. `pnpm verify` green (437 unit tests), e2e 17/17. |
 
 ---
 
