@@ -52,8 +52,9 @@ describe('emit', () => {
 
   it('sends only the fields the contract declares, so secrets passed by mistake never cross IPC', () => {
     const { emit, send } = setup();
-    emit('agent:stage', invalid({ ticketId: '71273', at: 5, pat: 'not-a-real-token' }));
-    expect(send).toHaveBeenCalledExactlyOnceWith('agent:stage', { ticketId: '71273', at: 5 });
+    const stage = { ticketId: '71273', at: 5, change: 'stage', stage: 'implementing', from: 'planning', activity: null, progress: 0 } as const;
+    emit('agent:stage', invalid({ ...stage, pat: 'not-a-real-token' }));
+    expect(send).toHaveBeenCalledExactlyOnceWith('agent:stage', stage);
   });
 
   describe('with an invalid payload', () => {
