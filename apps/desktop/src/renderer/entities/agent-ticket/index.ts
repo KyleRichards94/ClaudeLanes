@@ -1,0 +1,30 @@
+export type {
+  AgentTicket,
+  AgentTicketActivity,
+  AgentTicketBuild,
+  AgentTicketBuildJob,
+  AgentTicketGate,
+  AgentTicketModelSwitch,
+  AgentTicketPullRequest,
+  AgentTicketRun,
+  NeedsYouKind,
+  NeedsYouReason,
+  OtherNeedsYouKind,
+  OtherNeedsYouReason,
+  SubAgentCounts,
+  SubAgentState,
+} from './model/types';
+export { SUB_AGENT_STATES } from './model/types';
+export { NO_SUB_AGENTS, clampProgress, subAgentTotal, ticketFromRecord } from './model/ticket';
+export { agentTickets, createAgentTicketStore, type AgentTicketStore, type AgentTicketsState } from './model/store';
+export {
+  AGENT_TICKET_COUNTS,
+  ticketNeedsYou,
+  selectLaneNeedsYouCount,
+  selectLaneTicketIds,
+  selectTicket,
+  selectTicketCount,
+  type AgentTicketCount,
+} from './model/selectors';
+export { useAgentTicket, useAgentTicketCount, useLaneNeedsYouCount, useLaneTicketIds } from './model/hooks';
+export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
