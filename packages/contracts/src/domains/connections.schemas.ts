@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema } from '../events';
+import { ClaudeLoginDetectionSchema } from './connections.claude';
 import type { CONNECTIONS_EVENT_CHANNELS, CONNECTIONS_INVOKE_CHANNELS } from './connections.names';
 
 /**
@@ -236,6 +237,8 @@ export const connectionsInvokeContracts = {
   'connections:save': { request: ConnectionDraftSchema, response: ConnectionSummarySchema },
   'connections:replace': { request: ReplaceConnectionRequestSchema, response: ConnectionSummarySchema },
   'connections:remove': { request: RemoveConnectionRequestSchema, response: RemoveConnectionResultSchema },
+  /** Looks for a Claude Code login on this computer, for "Use my Claude Code login" (AL-044). Sends no prompt. */
+  'connections:detectClaude': { request: z.undefined(), response: ClaudeLoginDetectionSchema },
 } as const satisfies Record<(typeof CONNECTIONS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**
