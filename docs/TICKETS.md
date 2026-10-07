@@ -71,7 +71,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | done |
 | AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | partial |
 | AL-044 | Claude connection | E3 | M | AL-042 | partial |
-| AL-045 | MCP server entries | E3 | M | AL-042 | todo |
+| AL-045 | MCP server entries | E3 | M | AL-042 | partial |
 | AL-046 | Connections modal UI | E3 | L | AL-043, AL-044, AL-045, AL-027, AL-029 | todo |
 | AL-047 | First-run flow and repo picker | E3 | M | AL-046, AL-081 | todo |
 | AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | todo |
@@ -109,7 +109,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-113 | Usage, tokens and session pill | E6 | S | AL-102 | todo |
 | AL-114 | Skill discovery | E6 | S | AL-100 | todo |
 | AL-115 | ADO write-back on stage change | E6 | S | AL-103, AL-063 | todo |
-| AL-130 | Build/run command detection and overrides | E7 | S | AL-081 | todo |
+| AL-130 | Build/run command detection and overrides | E7 | S | AL-081 | done |
 | AL-131 | Job queue | E7 | S | AL-011 | done |
 | AL-132 | Build job and log parsing | E7 | M | AL-130, AL-131, AL-012 | todo |
 | AL-133 | Run job, port and URL | E7 | M | AL-132 | todo |
@@ -440,8 +440,8 @@ colour alone.
 - **Design:** §7 MCP servers, §8 · **Depends on:** AL-042
 - **Scope:** Add/edit/remove MCP servers: name, transport (stdio command + args | HTTP/SSE URL), optional token (secret, injected as env or header at launch). Built-in entry for the ADO MCP server per connected org (AL-108). Test = start the server and list its tools.
 - **Acceptance criteria:**
-  - [ ] A server whose command fails to start shows the error output in the row.
-  - [ ] Tokens for MCP servers are stored in SecretStore, never in settings.
+  - [ ] A server whose command fails to start shows the error output in the row. (open: data path done, the error output is the row's `statusMessage` on `connections:list` / `connections:save` and is proven over IPC in e2e; the MCP row that draws it is AL-046)
+  - [x] Tokens for MCP servers are stored in SecretStore, never in settings.
 
 #### AL-046 · Connections modal UI
 - **Design:** §8, artboard 5, R4 · **Depends on:** AL-043, AL-044, AL-045, AL-027, AL-029
@@ -713,7 +713,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §10 · **Depends on:** AL-081
 - **Scope:** Detect per repo: `.sln`/`.csproj` → `dotnet build <sln> -c Debug` / `dotnet run --project <proj>`; `package.json` → its `build` / `start` (or `dev`) scripts with the repo's package manager. Overrides stored per repo in settings (edited in AL-146), never in a file.
 - **Acceptance criteria:**
-  - [ ] OnSite Companion resolves to `dotnet build OnSite.sln -c Debug`.
+  - [x] OnSite Companion resolves to `dotnet build OnSite.sln -c Debug`.
 
 #### AL-131 · Job queue
 - **Design:** §10 ("at most 2 at once by default") · **Depends on:** AL-011
@@ -1455,6 +1455,16 @@ implementation agent, mid-run if needed.
 | D357 | AL-029: `Tabs` follows the WAI-ARIA tabs pattern with one Tab stop; selection follows arrow-key focus except on tabs marked `opensElsewhere` (the drill-in's Claude Design tab, shown with ↗) | Standard keyboard behaviour; a tab that opens elsewhere must not fire on arrow focus | 2026-10-07 |
 | D358 | AL-029: A tab's status dot is decorative; its word is part of the tab's accessible name | Status never depends on colour alone | 2026-10-07 |
 | D359 | AL-029: `TabPanel` helper and `tabId`/`tabPanelId` functions are exported to link tabs to their panels | Callers get correct aria-controls/aria-labelledby wiring | 2026-10-07 |
+| D360 | AL-130: Build/run commands are detected again on every call, not cached; overrides live only in repo settings (`buildCommand`/`runCommand`) and nothing is written to disk | A new solution or script is picked up at once | 2026-10-07 |
+| D361 | AL-130: `buildCommands.forRepo(repoPath, { dir })` takes an optional worktree dir | A ticket branch that changes the build files gets its own detected commands | 2026-10-07 |
+| D362 | AL-130: Detection order is root `.sln`/`.slnx`, then root project files, then `package.json` scripts with the repo's package manager, then a solution one folder down. With several solutions the one with most projects wins, `.sln` before `.slnx`, then the shallower path; the run project is the best-ranked runnable project (WinExe/Exe/Web ahead of tests and libraries) | Picks the main app solution and a project that actually runs | 2026-10-07 |
+| D363 | AL-130: Projects a solution lists outside the repo (`../` paths) are left out of run-target detection | A ticket worktree holds only the repo's own files | 2026-10-07 |
+| D364 | AL-130: New `build:commands` invoke channel returns the resolved commands and where each came from (detected or override) | The renderer and AL-146 can show and edit them | 2026-10-07 |
+| D365 | AL-045: An MCP server's error output reaches the row as `statusMessage` on the `connections:list` / `connections:save` summary | The Connections modal row is AL-046; the data path is tested over IPC | 2026-10-07 |
+| D366 | AL-045: Built-in ADO MCP servers are never written to `connections.json`; they are rebuilt from the ADO connections on each list, marked `builtInFor`, use the org's PAT, cannot be replaced or removed on their own, and go when the org is removed | One source of truth per org; no stale copies | 2026-10-07 |
+| D367 | AL-045: `McpConnectionSummary` and `ConnectionTestResult` carry `tools` (capped at `MCP_TOOLS_LIMIT` = 256, names 1–128 chars); a passing test keeps the list across restarts, a failing test drops it | The row can show tools without re-testing | 2026-10-07 |
+| D368 | AL-045: On Windows `npx` is started through `cmd /c`, and the PAT and tokens are scrubbed from all test output | `npx` is a .cmd shim; secrets never reach the row | 2026-10-07 |
+| D369 | AL-045: Tests use a local fake MCP server (`fake-mcp-server.mjs`) and a fake HTTP MCP endpoint; no real services are called | §7 rule 6 | 2026-10-07 |
 
 ---
 
@@ -1497,6 +1507,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 11: merged AL-027 (done). One registration conflict in `packages/ui/src/index.ts` (AL-025/AL-026/AL-024 exports + AL-027 TextField, kept both sides). Lockfile unchanged after `pnpm install`. Integration fix: `AppRouter.test.tsx` sets Testing Library's `asyncUtilTimeout` to 15 s, because under the full suite the lazy page chunk outlasted `findBy`'s 1 s default (the batch 9 fix raised only the Vitest test timeout). Decisions D318–D329. `pnpm verify` green (1662 unit tests), e2e 47/47. Follow-ups: AL-046 holds a `useRef<SecureTextFieldHandle>` for the PAT (`read()` for Test connection, `take()` for Save, `onSecretChange` to reset tested state, Test connection in `accessory`, ref `focus()` or `autoFocus` for a Reconnect toast); AL-032 gallery shows TextField's four variants plus error, help and disabled states (no in-app page renders TextField yet, so no e2e); AL-033 checks the `line` border (#E2E8F0 on white, about 1.2:1, below WCAG 1.4.11's 3:1). |
 | 2026-10-07 | Integrator batch 12: merged AL-044 and AL-043 (both partial: data paths done and proven through IPC in unit and e2e tests; the Claude tab, saved ADO row, scope chips and expiry input are AL-046, and each needs a manual check by Kyle against a real Claude Code login / ADO org). Registration conflicts kept both sides: `services.ts` (`tickets`, `repos` + `claude`), `contracts/src/index.ts` (`connections.claude` + `connections.display`) and `connections/service.ts` (`detectClaudeLogin` + `noteAdoResponse` in the interface and the service object). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D330–D352. `pnpm verify` green (1787 unit tests), e2e 53/53. Follow-ups: AL-046 builds the Claude tab on `connections:detectClaude` ("Use my Claude Code login", render `claudeConnectionStatusLine`, red while status is error) and the ADO row/chips/expiry with `formatAdoConnectionDetails`, `tokenExpiryState`, `adoScopeChips(result.scopes)`, the Default project dropdown from `result.projects` (free text when null) and an optional expiry date input; AL-065 passes `log: (entry) => void services.connections.noteAdoResponse(orgId, entry)` to the per-org ADO client; AL-100 starts sessions with `services.claude.launch({ credential, ... })` or `claudeProcessEnv`, not `process.env` + `sessionEnv()` (an inherited ANTHROPIC_API_KEY would override the login), and may unify the test model with D10; AL-048 tells a refused write (ADO may answer 401 TF400813) from a revoked token; AL-047/AL-048 own any near-expiry toast; re-run `e2e/claude-connection.spec.ts` on an Agent SDK upgrade (fake follows 0.3.292). |
 | 2026-10-07 | Integrator batch 13: merged AL-029 (done). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D353–D359. `pnpm verify` green (1837 unit tests), e2e 53/53. Follow-ups: AL-032 gallery shows Modal (normal and blocking) and Tabs (status dots and the ↗ tab); AL-046, AL-135, AL-146 and AL-160 can now build on Modal/Tabs. |
+| 2026-10-07 | Integrator batch 14: merged AL-130 (done) and AL-045 (partial: the MCP error output is the row's `statusMessage`, proven over IPC; the row that draws it is AL-046). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D360–D369. `pnpm verify` green (1948 unit tests), e2e 57/57 (the first run had one failure in `text.spec.ts` mouse selection, unrelated to these tickets; it passed 3/3 alone and the full rerun was green). Follow-ups: AL-146 adds the settings UI for `buildCommand`/`runCommand` overrides and shows the detected commands from `build:commands`; AL-131/AL-132 jobs get their command line from `buildCommands.forRepo(repoPath, { dir: worktree })`; AL-046 draws each MCP row's `statusMessage`, `tools` and `builtInFor` (no Remove on built-in servers); AL-108 reuses `adoMcpServerFor` (`connections/ado-mcp.ts`) and `sessionMcpServers({ adoConnectionId })`; leftover `agent-lanes-*` / `playwright-artifacts-*` folders in %TEMP% from parallel agents were not cleaned. Drive C: had about 8.8 GB free. |
 
 ---
 
