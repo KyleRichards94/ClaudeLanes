@@ -193,6 +193,16 @@ describe('AdoService picks the client per organisation', () => {
     await connectContoso(connections, 'fakepatAL065wrong00000only1111never2222real3333zzW1');
     expect(await ado.listSprints({})).toMatchObject({ ok: false, code: 'ADO_UNAUTHORIZED' });
   });
+
+  it('hands every answer to the connection, so its scope checks learn from real calls (AL-043)', async () => {
+    const { connections } = await setup();
+    await connectContoso(connections);
+    const noteAdoResponse = vi.spyOn(connections, 'noteAdoResponse');
+    const ado = createAdoService({ connections, settings: createSettingsService({ file: createMemorySettingsFile(), warn: () => undefined }), fetch: route(createFakeAdoOrg()) });
+
+    expect(await ado.getWorkItem({ id: 71273 })).toMatchObject({ ok: true });
+    expect(noteAdoResponse).toHaveBeenCalledWith(ADO_FIXTURE_ORG_ID, expect.objectContaining({ method: 'GET', status: 200 }));
+  });
 });
 
 describe('AdoService write-back (AL-063) through the same clients', () => {

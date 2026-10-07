@@ -64,7 +64,8 @@ export interface AdoService {
 }
 
 export interface AdoServiceOptions {
-  connections: Pick<ConnectionsService, 'list' | 'get' | 'secret'>;
+  /** `noteAdoResponse`, when given, records what each answer says about the token's scopes (AL-043). */
+  connections: Pick<ConnectionsService, 'list' | 'get' | 'secret'> & Partial<Pick<ConnectionsService, 'noteAdoResponse'>>;
   settings: Pick<SettingsService, 'get'>;
   /** Defaults to the global `fetch`, looked up at call time (D79); tests pass the fake organisation's. */
   fetch?: FetchLike;
@@ -87,6 +88,14 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
 
   function logEntry(entry: AdoLogEntry): void {
     options.log?.log(entry.level, entry.message, { status: entry.status, attempt: entry.attempt, durationMs: entry.durationMs });
+  }
+
+  /** Each request's log line, plus its scope evidence on the organisation's connection (AL-043 follow-up). */
+  function logFor(connectionId: string): (entry: AdoLogEntry) => void {
+    return (entry) => {
+      logEntry(entry);
+      connections.noteAdoResponse?.(connectionId, entry).catch(() => undefined);
+    };
   }
 
   async function connectionFor(org: string | undefined): Promise<Result<AdoConnectionSummary>> {
@@ -123,7 +132,7 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
     const cached = clients.get(connection.id);
     if (cached?.key === key) return ok(cached.client);
 
-    const created = createAdoClient({ orgUrl: connection.orgUrl, pat, log: logEntry, ...(options.fetch ? { fetch: options.fetch } : {}) });
+    const created = createAdoClient({ orgUrl: connection.orgUrl, pat, log: logFor(connection.id), ...(options.fetch ? { fetch: options.fetch } : {}) });
     if (!created.ok) return created;
     clients.set(connection.id, { key, client: created.data });
     return created;
