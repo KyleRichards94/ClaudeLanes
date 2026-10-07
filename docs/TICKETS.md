@@ -93,12 +93,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-088 | Archive | E5 | M | AL-083 | done |
 | AL-089 | Diff provider | E5 | S | AL-083 | done |
 | AL-090 | Start-up reconciliation | E5 | M | AL-083, AL-101 | partial |
-| AL-100 | Session manager core | E6 | L | AL-083, AL-044 | todo |
+| AL-100 | Session manager core | E6 | L | AL-083, AL-044 | partial |
 | AL-101 | Ticket records | E6 | M | AL-041 | done |
-| AL-102 | Output normalisation and transcript buffer | E6 | L | AL-100, AL-012 | todo |
-| AL-103 | Stage protocol: `agent_lanes` MCP server | E6 | M | AL-100 | todo |
-| AL-104 | Stage gates | E6 | M | AL-103 | todo |
-| AL-105 | Messages, skills and pause | E6 | S | AL-100 | todo |
+| AL-102 | Output normalisation and transcript buffer | E6 | L | AL-100, AL-012 | partial |
+| AL-103 | Stage protocol: `agent_lanes` MCP server | E6 | M | AL-100 | partial |
+| AL-104 | Stage gates | E6 | M | AL-103 | partial |
+| AL-105 | Messages, skills and pause | E6 | S | AL-100 | partial |
 | AL-106 | Live model and effort change | E6 | M | AL-100 | todo |
 | AL-107 | Sub-agent tracking | E6 | M | AL-102 | todo |
 | AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | todo |
@@ -602,9 +602,9 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §4 Session manager, §7 · **Depends on:** AL-083, AL-044
 - **Scope:** One `query({ prompt: AsyncIterable<SDKUserMessage>, options })` per ticket in streaming-input mode, with an input queue the app pushes into. Options: `cwd` = ticket worktree; `projectConfigRoot` = repo main checkout (Decision D12); `model`; `effort`; `thinking: { type: 'adaptive' }`; `settingSources: ['user', 'project', 'local']`; `includePartialMessages: true`; `env` with the connection's credentials; `abortController`; `mcpServers` (AL-103, AL-108); `hooks` (AL-084); `canUseTool`/`permissionMode` (AL-109); `resume` when a session id exists (AL-110). First user turn = job description + work item summary + selected skills + stage protocol (AL-103). API surface for the rest of E6: `send(ticketId, message)`, `interrupt`, `setModel`, `setEffort`, `stop`, `status`.
 - **Acceptance criteria:**
-  - [ ] Two tickets run concurrently in different worktrees without cross-talk.
-  - [ ] Closing a ticket's session releases its process (no orphan `claude` processes; check Task Manager in AL-213).
-  - [ ] The SDK's native binary is found in dev and in the packaged app (AL-007).
+  - [x] Two tickets run concurrently in different worktrees without cross-talk.
+  - [x] Closing a ticket's session releases its process (no orphan `claude` processes; check Task Manager in AL-213).
+  - [ ] The SDK's native binary is found in dev and in the packaged app (AL-007). (open: dev uses AL-044's `resolveClaudeExecutable`; the packaged build was not run against a real Claude install)
 - **Tests:** with the fake SDK from AL-221.
 
 #### AL-101 · Ticket records
@@ -618,29 +618,29 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §6 Live events, artboard 3 Output · **Depends on:** AL-100, AL-012
 - **Scope:** Map `SDKMessage`s to an `AgentOutputEvent` union: `text-delta` (partial assistant text), `text`, `tool` (Read/Edit/Write/Bash/Grep/Glob/Agent→"Spawn"/MCP, with a one-line mono detail and stats like `+214 −0`, `1,842 lines`, `0 errors · 2 warnings`), `tool-result` (summary only), `system` ("Plan approved by Kyle · moved to Implementing"), `result` (usage, cost, duration). Keep a per-ticket ring buffer (e.g. last 5,000 events) in main; `agent:getTranscript(ticketId)` returns it so a reloaded renderer or newly opened drill-in can backfill; older history from `getSessionMessages()`.
 - **Acceptance criteria:**
-  - [ ] Every tool row on artboard 3 can be produced from real SDK messages.
-  - [ ] Opening a drill-in mid-run shows prior output, then continues live with no gap or duplicate.
+  - [ ] Every tool row on artboard 3 can be produced from real SDK messages. (open: covered against recorded-shape fake SDK messages only, never a real session)
+  - [x] Opening a drill-in mid-run shows prior output, then continues live with no gap or duplicate.
 
 #### AL-103 · Stage protocol: `agent_lanes` MCP server
 - **Design:** §7 Stage tracking · **Depends on:** AL-100
 - **Scope:** In-process server via `createSdkMcpServer({ name: 'agent_lanes', tools: [...] })` with `tool()` definitions: `set_stage({ stage, summary })`, `report_activity({ text, progress })` (drives the card's activity line and progress bar). Allowed without permission prompts. Stage protocol text appended to the system prompt: report each stage change; Code review and QA may send work back to Implementing (§9 diagram loop). Emits `agent:stage`.
 - **Acceptance criteria:**
-  - [ ] A `set_stage` call moves the card within one frame of the event.
-  - [ ] Invalid stage transitions are rejected with a tool error the agent can read.
+  - [ ] A `set_stage` call moves the card within one frame of the event. (open: the store updates on the event batch and is tested; not measured with a live agent driving the card)
+  - [x] Invalid stage transitions are rejected with a tool error the agent can read.
 
 #### AL-104 · Stage gates
 - **Design:** §9 step 2, artboard 2 Stage gates, artboard 6 "Needs approval" · **Depends on:** AL-103
 - **Scope:** When `set_stage` targets a stage whose *entry* is gated (defaults: Planning approval before Implementing; Create PR approval), the tool call does not return until the user decides: Approve → tool result "approved"; Request changes → tool result with the user's note. Card shows "Needs you · approve plan"; `agent:gate` event; `agent:resolveGate` channel. Gates are per ticket and editable from the drill-in.
 - **Acceptance criteria:**
-  - [ ] While waiting, the session uses no tokens and the card is amber.
-  - [ ] Turning a gate off while waiting releases it as approved.
+  - [ ] While waiting, the session uses no tokens and the card is amber. (open: the amber card is tested; "no tokens" rests on the tool call staying open and was not measured against a real account)
+  - [x] Turning a gate off while waiting releases it as approved.
 
 #### AL-105 · Messages, skills and pause
 - **Design:** §7 Skills, artboard 3 composer · **Depends on:** AL-100
 - **Scope:** `agent:send({ ticketId, text, priority })` pushes an `SDKUserMessage` (`priority: 'next'` default; `'now'` for "steer now"). Skill chips send `/skill-name` as the next user turn so they behave as in the terminal. Pause = `interrupt()`; the input queue holds further messages until Resume.
 - **Acceptance criteria:**
-  - [ ] A message sent mid-turn is delivered without killing the turn.
-  - [ ] `/code-review` from a chip runs the skill exactly as typed in the terminal.
+  - [x] A message sent mid-turn is delivered without killing the turn.
+  - [ ] `/code-review` from a chip runs the skill exactly as typed in the terminal. (open: the exact `/code-review` text reaching the input stream is tested; running the skill needs a real Claude Code session)
 
 #### AL-106 · Live model and effort change
 - **Design:** R7, §7, artboard 6 "Model switching" · **Depends on:** AL-100
@@ -1634,6 +1634,17 @@ implementation agent, mid-run if needed.
 | D535 | Integration (AL-066, AL-170): AL-170's own `shared/api/work-item.ts` was dropped; the drill-in uses AL-066's `useWorkItem` (refetch on focus, no 60 s poll) without `org`, so main uses the first organisation | One `['ado','workItem',id]` query, and only the board polls (D496) | 2026-10-07 |
 | D536 | Integration (AL-135, AL-170): The Build log renders in the drill-in's Build log tab with a fixed 560 px height, and AL-066's WorkItemChip shows in the ADO tab until AL-180 builds it | The virtual list needs a bounded height inside the page's ScrollView; WorkItemChip keeps its second reference | 2026-10-07 |
 | D537 | Integration (AL-046): `connections:changed` handlers register with `runningEventHub()?.register(...)`, like AL-085's branch-status handlers, not `startEventHub()` | Tests that render AppProviders without a hub stay unsubscribed | 2026-10-07 |
+| D538 | AL-100: The SDK options set `permissionMode: 'acceptEdits'` as a placeholder until AL-109 brings the full permission policy | Sessions can edit files in their worktree now; AL-109 owns the real policy | 2026-10-08 |
+| D539 | AL-100: Hooks (AL-084) and the extra MCP servers (AL-108) come in through a per-session `extras` callback instead of being built in the session manager | Keeps the session manager free of those tickets' code | 2026-10-08 |
+| D540 | AL-100: SDK model ids live in contracts as `SDK_MODEL_IDS` | Each model id is spelled in one place (D10) | 2026-10-08 |
+| D541 | AL-100: Two `emit.test.ts` cases from main that used empty `agent:status` and `agent:gate` payloads now use `design:spec` and `agent:subagent`, which still have the plain envelope | `agent:status` and `agent:gate` now have real payload schemas | 2026-10-08 |
+| D542 | AL-102: Each `agent:output` event carries a per-ticket `seq`; history read back from the saved session gets seq 0 or below | The backfill and the live stream merge by seq with no gap or duplicate | 2026-10-08 |
+| D543 | AL-102: A finished `text` event replaces its streamed `text-delta` events in the transcript buffer | Keeps the 5,000-event buffer within capacity | 2026-10-08 |
+| D544 | AL-103: A session starting moves a Queued ticket to Planning through the same stage service | Design §9 step 1; every stage move takes one path | 2026-10-08 |
+| D545 | AL-103: Stage moves for one ticket run one at a time on a keyed queue | Two `set_stage` calls at once cannot both pass the transition check | 2026-10-08 |
+| D546 | AL-104: Added `agent:setGate` and `agent:getGate` channels | Gates are editable per ticket from the drill-in, and a reloaded renderer can recover a gate that is still waiting | 2026-10-08 |
+| D547 | AL-104: System lines such as "Plan approved by Kyle · moved to Implementing" use the OS user's first name | There is no user profile to take a name from | 2026-10-08 |
+| D548 | AL-105: `agent:send` returns `held: true` when the session is paused | The composer can show that the message is queued until Resume | 2026-10-08 |
 
 ---
 
@@ -1683,7 +1694,9 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 18: merged AL-145 and AL-160 (done), AL-143 (partial: lanes, badges, Done strip, cards and dock match artboard 1 at 1440 × 960, but the cards' ADO state text waits for AL-066, live activity for AL-103, and the header and legend for AL-142), AL-144 (partial: every artboard 6 state built and tested through store actions; the gallery is AL-032 and most agent event payloads are not wired until AL-103/AL-104/AL-106/AL-107/AL-109/AL-132) and AL-146 (partial: every setting is editable; opening from the Repo dropdown waits for AL-142). One branch, no conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D420–D444. `pnpm verify` green (2296 unit tests), e2e 70/70. Follow-ups: AL-066/AL-142 pass each card's `adoState`; AL-142 filters lanes by repo and sprint, replaces the skeleton header and the interim Settings / New agent ticket buttons, and opens Settings from the Repo dropdown; AL-090 reconciles records at start-up and AL-165 invalidates `['tickets']` after a launch, then highlights the new card; AL-210 wraps each lane in `LaneErrorBoundary` and each card in `TicketErrorBoundary`; AL-032 shows `AgentTicketCardView` per state; AL-115 respects `repoAdoWriteBack(repo)`; AL-111 reads per-repo `maxConcurrentAgents`; AL-114/AL-162 replace the default-skills text field with chips; AL-161–AL-164 fill the new-ticket modal's slots; AL-200 adds design presence to the card. |
 | 2026-10-07 | Integrator batch 7 (b10): merged AL-085, AL-088 and AL-089 (done), AL-087 (partial: refuses a dirty worktree, merges --no-ff and pushes, record and store go to Done with "Merged into main · HH:MM"; showing it on the card waits for AL-144, the confirm modal for AL-174, the block-until-PR-approved setting for Q1) and AL-090 (partial: `tickets:board` reconciles records with `git worktree list`, Adopt/Ignore orphans, BoardSync loads the board at launch, e2e proves identical boards across restarts; cards drawing "Worktree missing" wait for AL-143/AL-144 and resuming sessions for AL-110). One branch; conflicts with AL-143 in `tickets.names.ts`/`tickets.schemas.ts`/`main/tickets/handlers.ts` (`tickets:list` kept beside the five new channels), `ipc/handlers.ts`, `shared/api/index.ts`, `entities/agent-ticket/index.ts` (kept both sides) and `App.test.tsx` (kept main's 15 s async timeout). Lockfile unchanged after `pnpm install`. Integration fix: `tickets/handlers.test.ts` passes stub archive/reconcile services to the merged `createTicketsHandlers`. Decisions D445–D467. `pnpm verify` green (2374 unit tests), e2e 71/71 on rerun (first run: `toasts.spec.ts` info toast auto-close timed out under load; passed 3/3 alone and in the full rerun). Follow-ups: the board now loads records twice (AL-143 `useBoardTickets` via `tickets:list` and AL-090 `BoardSync` via `tickets:board`, both `agentTickets.load`), so AL-142/AL-143 should switch the board to `useTicketBoard()` and drop one; AL-107 passes sub-agent tracking to `createBranchStatusService({ subagents })` and narrows the `agent:subagent` invalidation to completions; AL-174 needs IpcError to carry `details` for GIT_DIRTY/MERGE_CONFLICT file lists; AL-100/AL-213 stop the session before Archive; the Archive UI and archive list view have no owning ticket; AL-110 resumes sessions from records' sessionId; report `recordIssues` in the UI (AL-101); AL-178 and AL-179 build on `useBranchStatus` and `useTicketDiff`/`useDiffFile`. |
 | 2026-10-07 | Integrator batch 8 (b9, b15, b13): merged AL-032, AL-033, AL-046, AL-047, AL-066, AL-135, AL-170 and AL-193 (done), AL-192 (partial: the design thread panel, shipping and the "Agent is watching" note wait for AL-196–AL-198), AL-194 (partial: shipping and the design thread wait for AL-196/AL-197, Design access status on the Connections Claude tab not built, MCP-link mode needs a real-account check by Kyle) and AL-195 (partial: the artboard listing needs a check against a real claude.ai Design canvas). Three branches. b9 conflicted in renderer wiring (`AppProviders.tsx`: branch-status + connections handlers both on `runningEventHub()`; `app/index.tsx`: FirstRunGate around AppRouter plus ConnectionsModal, NewTicketHost and BoardSync; `AppRouter.tsx`: PageErrorBoundary plus the gallery route and label; `shared/api`/`shared/model` index exports; `BoardPage.tsx` header: repo pill and Connections button beside Settings and New agent ticket; their tests kept both). b15 conflicted in `event-routes.ts`, `shared/lib/index.ts`, `App.test.tsx` and `TicketPage.tsx` (kept both). b13 conflicted with AL-088/AL-090/AL-143 in `tickets.names.ts`/`tickets.schemas.ts`/`main/tickets/handlers(.test).ts` (`tickets:get` added beside the six tickets channels), `ipc/handlers.ts`, `shared/api/tickets.ts` (`useTicketRecords` and `useTicketRecord`), the renderer index files and `event-routes.ts` (kept both); AL-170's `shared/api/work-item.ts` was dropped for AL-066's `useWorkItem`, and `TicketPage.tsx` took AL-170's frame with AL-135's BuildLog in the Build log tab and AL-066's WorkItemChip in the ADO tab. Lockfile from the branches (adds `@axe-core/playwright`); unchanged after `pnpm install`. Integration fix: the Build log gets a fixed 560 px height in the tab (its `flex: 1` let the virtual list draw all 50,001 rows inside the page ScrollView), and `build-log.spec.ts` opens the tab, scrolls the log into view and finishes the wheel trip if Chromium coalesced events. Decisions D468–D537. `pnpm verify` green (2562 unit tests; the first run hit a Vitest out-of-memory crash at start-up under load from parallel agents, the rerun was green), e2e 101/101. Drive C: had about 5.9 GB free. Follow-ups: AL-043/AL-044/AL-045 criteria that waited on AL-046's rows can be re-checked now (real ADO org and Claude account checks still need Kyle); AL-048 raises Reconnect with `{ type: 'openConnections', connectionId }` and the main-side toast for `needsReconnect` rows (closes AL-040); `e2e/packaged/packaged-app.spec.ts` will meet the first-run Connections modal on a fresh packaged profile (`pnpm e2e:packaged` not run); AL-142 replaces the `board-repo` pill and Connections/Settings buttons with the real header, keeps `ui.lastRepo` as the selection, and calls `useSprints`/`useWorkItems` with `{ live: true }`; the drill-in's `useWorkItem` should pass the ticket's ADO organisation once records carry an org id; AL-144/AL-032 swap the gallery's composed card samples for `AgentTicketCardView` and keep Card tone `muted` for merged cards; re-run the axe and target-size checks on the real board after AL-142–AL-145; AL-161 uses `useWorkItemSearch` with its own debounce, AL-180 `useWorkItem` (and replaces the ADO tab's WorkItemChip), AL-144/AL-181 `usePullRequest`; AL-171–AL-181 replace the drill-in's read-only stepper, panels and tab placeholders; AL-113 adds tokens to the session pill; AL-144/AL-200 open the design tab from the board card; AL-196 adds the design thread and refreshes artboards after each reply; AL-197 ships `getSelectedArtboards(ticketId)`; offer a canvas picker via ClaudeDesign `list_projects` once AL-196's session exists; Kyle runs the artboard listing against a real Design project and an artifact canvas; agent-lanes-tickets-* temp folders still pile up in %TEMP%. |
+| 2026-10-08 | Integrator batch 1 (b11): merged AL-100 (partial: the packaged app was not run against a real Claude install), AL-102 (partial: tool rows covered by recorded-shape fake SDK messages only), AL-103 (partial: card move within one frame not measured with a live agent), AL-104 (partial: "no tokens while waiting" not measured against a real account) and AL-105 (partial: `/code-review` running the skill needs a real session). The branch also carried an AL-030 e2e fix (pointer moved off the toast stack). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D538–D548. `pnpm verify`: typecheck, lint and build green; 2686/2687 unit tests passed in the full run, AL-085's `branch-status.test.ts` timed out under machine load (every git call slow while other agents' suites ran) and passed 10/10 when rerun alone. E2E: E2E_RESULT. |
 
+| 2026-10-08 | Merged AL-100, AL-102, AL-103, AL-104, AL-105 (batch b11: session manager, output normalisation, stage protocol, gates, messages) as partial; open criteria need a real Claude session. Integration was interrupted by a pause for a Git upgrade (2.56.0) and finished by hand: `pnpm verify` green (2,687 tests), e2e 105/105 on rerun; 3 e2e tests failed once under load and passed on rerun, to be hardened under AL-220. |
 ---
 
 ## 7. Parallel build rules
