@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTicketRecordStore } from './record-store';
 import { createTempDir, listTree, newTicketInput } from './testing';
+
+// Real git processes are slow on Windows while the whole suite runs in parallel (as in src/main/git).
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 /**
  * Acceptance criterion: nothing is written inside a worktree, so the store can never make one dirty

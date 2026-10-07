@@ -3,6 +3,10 @@ import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { installFakeBridge } from '@/shared/testing';
 
+// The first test pays the cold transform of every page and the UI package; under the full parallel
+// suite that can take longer than Vitest's 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
+
 const appInfo = {
   ok: true,
   data: {
