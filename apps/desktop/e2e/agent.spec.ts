@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
@@ -53,14 +53,22 @@ function invoke<T>(page: Page, channel: string, payload?: unknown): Promise<Resu
   ) as Promise<Result<T>>;
 }
 
+/** Every `71273.json` under the tickets folder, parsed. */
+function savedRecords(ticketsDir: string): TicketRecord[] {
+  return readdirSync(ticketsDir, { recursive: true, encoding: 'utf8' })
+    .filter((path) => path.endsWith('71273.json'))
+    .map((path) => JSON.parse(readFileSync(join(ticketsDir, path), 'utf8')) as TicketRecord);
+}
+
 let app: ElectronApplication | undefined;
+let ticketsDir: string;
 let root: string;
 let page: Page;
 
 test.beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-agent-'));
   const userDataDir = join(root, 'user-data');
-  const ticketsDir = join(userDataDir, 'tickets');
+  ticketsDir = join(userDataDir, 'tickets');
   const folder = join(ticketsDir, 'onsite-companion-0123456789ab');
   mkdirSync(folder, { recursive: true });
   writeFileSync(join(folder, '71273.json'), `${JSON.stringify(ticket(root), null, 2)}\n`);
@@ -90,4 +98,23 @@ test('agent:getStatus reports a ticket without a session and refuses a bad ticke
 
 test('agent:getTranscript backfills an empty transcript for a ticket with no output yet (AL-102)', async () => {
   expect(await invoke(page, 'agent:getTranscript', { ticketId: '71273' })).toEqual({ ok: true, data: { ticketId: '71273', events: [], lastSeq: 0 } });
+});
+
+test('stage gates answer over IPC and a gate change is saved on the ticket (AL-104)', async () => {
+  expect(await invoke(page, 'agent:getGate', { ticketId: '71273' })).toEqual({ ok: true, data: { gate: null } });
+  expect(await invoke(page, 'agent:resolveGate', { ticketId: '71273', decision: 'approve' })).toEqual({ ok: true, data: { resolved: false } });
+  expect(await invoke(page, 'agent:resolveGate', { ticketId: '71273', decision: 'request-changes' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+
+  // Gates are per ticket and editable (the drill-in's stepper, AL-171).
+  expect(await invoke(page, 'agent:setGate', { ticketId: '71273', stage: 'qa', gate: 'approval' })).toEqual({
+    ok: true,
+    data: { gates: { planning: 'approval', implementing: 'auto', 'code-review': 'auto', qa: 'approval', 'create-pr': 'approval' }, released: false },
+  });
+
+  // Quitting writes the change to the ticket record.
+  await app?.close();
+  app = undefined;
+  const records = savedRecords(ticketsDir);
+  expect(records.length).toBeGreaterThan(0);
+  expect(records.some((record) => record.gates.qa === 'approval')).toBe(true);
 });
