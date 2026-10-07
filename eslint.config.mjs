@@ -23,6 +23,22 @@ function forbidUpperLayers(layer) {
 /** Packages that hold tokens or spawn processes stay in the main process (design §4, §8). */
 const mainOnlyModules = ['electron', '@agent-lanes/ado-client', '@anthropic-ai/claude-agent-sdk', 'electron-store'];
 
+/**
+ * AL-023: every piece of text renders through the Text primitive's variants (design §11 Type), so
+ * React Native's own Text stays inside packages/ui/src/Text.tsx. Tests may still render it as a fixture.
+ */
+const rawTextMessage =
+  "Render text with Text from '@agent-lanes/ui' and a variant (display, title, body, meta, mono), design §11 Type.";
+const rawTextRules = [
+  {
+    selector:
+      "ImportDeclaration[source.value=/^react-native(-web)?$/][importKind!='type'] > ImportSpecifier[imported.name='Text'][importKind!='type']",
+    message: rawTextMessage,
+  },
+  // Animated.Text, RN.Text and the like bypass the variants too.
+  { selector: "JSXOpeningElement > JSXMemberExpression[property.name='Text']", message: rawTextMessage },
+];
+
 const deepSliceImport = {
   // The matcher has no brace expansion, so one glob per sliced layer.
   group: ['processes', 'pages', 'features', 'entities'].map((name) => `@/${name}/*/**`),
@@ -81,6 +97,15 @@ export default tseslint.config(
       ],
     },
   })),
+  // All text goes through the Text variants (AL-023). A separate rule from no-restricted-imports,
+  // so it adds to the layer rules above instead of replacing them.
+  {
+    files: ['apps/desktop/src/renderer/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
+    ignores: ['packages/ui/src/Text.tsx', '**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', ...rawTextRules],
+    },
+  },
   // Main and preload never import UI code.
   {
     files: ['apps/desktop/src/main/**/*.ts', 'apps/desktop/src/preload/**/*.ts'],
