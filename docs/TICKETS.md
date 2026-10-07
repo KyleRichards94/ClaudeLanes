@@ -118,11 +118,11 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-140 | App router and lazy pages | E8 | S | AL-003 | done |
 | AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | done |
 | AL-142 | Board header | E8 | M | AL-141, AL-066, AL-024, AL-025, AL-081 | todo |
-| AL-143 | Lanes | E8 | M | AL-141 | todo |
-| AL-144 | AgentTicketCard and its states | E8 | M | AL-141, AL-025, AL-028 | todo |
-| AL-145 | Live dock | E8 | S | AL-141 | todo |
-| AL-146 | Settings panel (repo and defaults) | E8 | M | AL-041, AL-130, AL-029 | todo |
-| AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | todo |
+| AL-143 | Lanes | E8 | M | AL-141 | partial |
+| AL-144 | AgentTicketCard and its states | E8 | M | AL-141, AL-025, AL-028 | partial |
+| AL-145 | Live dock | E8 | S | AL-141 | done |
+| AL-146 | Settings panel (repo and defaults) | E8 | M | AL-041, AL-130, AL-029 | partial |
+| AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | done |
 | AL-161 | Work item picker | E9 | M | AL-160, AL-066 | todo |
 | AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | todo |
 | AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | todo |
@@ -771,25 +771,26 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 1, artboard 6 "Empty lane" · **Depends on:** AL-141
 - **Scope:** Lanes Queued, Planning, Implementing, Code review, QA, Create PR, then a collapsed vertical Done lane ("7 · Done · merged this sprint", expandable). Count badge per lane (amber when any card needs the user). Empty-lane copy per lane ("Nothing in QA · Tickets land here once code review passes."). Collapsible lanes persisted (AL-041). Horizontal scroll below the min width.
 - **Acceptance criteria:**
-  - [ ] Matches artboard 1 at 1440 × 960.
+  - [ ] Matches artboard 1 at 1440 × 960. (open: lanes, count badges, Done strip, cards and dock match in the 1440 × 960 e2e screenshot; still missing are the cards' ADO state text (AL-066 queries), live activity and progress (AL-103 events), and the header and legend (AL-142))
 
 #### AL-144 · AgentTicketCard and its states
 - **Design:** artboard 6, R6 · **Depends on:** AL-141, AL-025, AL-028
 - **Scope:** `entities/agent-ticket/ui/AgentTicketCard`: IdChip + ADO state, title, activity row (violet dot), progress bar, footer "Model · Effort" + "N sub-agents", optional status band. States: Running, Selected, Needs approval, Model switching, Build failed, QA gap, PR open, Merged; plus Queued ("Waiting for a free slot") and Needs permission (AL-109). Click opens the drill-in; keyboard focusable.
 - **Acceptance criteria:**
-  - [ ] Each state on artboard 6 reproduced in the gallery (AL-032) and from real events.
+  - [ ] Each state on artboard 6 reproduced in the gallery (AL-032) and from real events. (open: every state is built and tested through the store actions that main-process events drive (`AgentTicketCard.test`); the gallery is AL-032, and `agent:stage`/`agent:gate`/`agent:status` payloads are still bare, so only `build:queued` and `agent:output` reach the card in the running app until AL-103, AL-104, AL-106, AL-107, AL-109 and AL-132 wire the rest)
 
 #### AL-145 · Live dock
 - **Design:** artboard 1 bottom bar · **Depends on:** AL-141
 - **Scope:** Glass dock with `Live` pill, the latest three timestamped events across tickets (amber for needs-you events), "Sub-agents N", "Builds N"; clicking an event opens its ticket.
 - **Acceptance criteria:**
-  - [ ] Dock updates no more than once per frame under load.
+  - [x] Dock updates no more than once per frame under load. (`LiveDock.test`: 800 store commits per frame give one render per frame; e2e shows a `build:queued` event from main reaching "Builds 1")
 
 #### AL-146 · Settings panel (repo and defaults)
 - **Design:** §10 ("override them in the repo's settings panel"), R5 — no artboard; build with E2 primitives · **Depends on:** AL-041, AL-130, AL-029
 - **Scope:** Per repo: base branch, worktree root, build/run commands, max concurrent agents, ADO write-back on/off. Global: default model/effort, default gates, default skills, build queue size, ADO state transitions on/off. Opened from the Repo dropdown and from a header menu.
 - **Acceptance criteria:**
-  - [ ] Every setting the app uses is editable here or in Connections; no other place.
+  - [x] Every setting the app uses is editable here or in Connections; no other place. (`SettingsPanel.test` checks every key of `SettingsSchema`, `AgentDefaultsSchema` and `RepoSettingsSchema` has a control; exceptions are `version`, ui prefs and the repo path, picked through Add repo…)
+  - [ ] Opened from the Repo dropdown and from a header menu. (open: the panel takes `repoPath`/`section` props, but the Repo dropdown and header menu are AL-142; today it opens from the interim header's Settings button)
 
 ---
 
@@ -799,7 +800,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 2, §1 goal ("under a minute") · **Depends on:** AL-029
 - **Scope:** `processes/new-ticket` with `features/create-ticket`: two-column modal, `useReducer` form state, validation, Cancel, "Launch agent →", footer summary ("Launch starts a headless Claude Code session in its own worktree via the MCP bridge. Linked to #71273. Opus · XHigh.").
 - **Acceptance criteria:**
-  - [ ] Keyboard-only path from open to launch works.
+  - [x] Keyboard-only path from open to launch works. (e2e `new-ticket.spec` drives the real app with Tab, arrows, typing and Enter from the board to Launch; `NewTicketModal.test` does the same with user-event)
 
 #### AL-161 · Work item picker
 - **Design:** artboard 2 left column · **Depends on:** AL-160, AL-066
@@ -1515,6 +1516,31 @@ implementation agent, mid-run if needed.
 | D417 | AL-210: The page boundary sits inside Suspense and is keyed by `routeToPath(route)` | Moving to another page or ticket gets a fresh boundary instead of the last page's fallback | 2026-10-07 |
 | D418 | AL-210: Page fallback labels are "the board", "ticket #<id>" and "the Claude Design tab of #<id>" | Says what failed | 2026-10-07 |
 | D419 | AL-210: No new e2e spec; no real card or panel UI can be made to throw in the built app without a test-only hook | Unit tests on stand-ins cover it until real cards/panels exist | 2026-10-07 |
+| D420 | AL-143: New invoke channel `tickets:list` (request undefined, response `TicketRecord[]` via `TicketRecordListSchema`) with `createTicketsHandlers` in `main/tickets/handlers.ts` | The board shows records after a start; the smallest piece of AL-090/AL-165 the lanes needed | 2026-10-07 |
+| D421 | AL-143: The lanes render the real `AgentTicketCard`, so AL-144 was committed before AL-143 | No throwaway stand-in card; reverting AL-144 alone breaks AL-143 | 2026-10-07 |
+| D422 | AL-143: Any lane collapses by pressing its header (a button with `aria-expanded`); a collapsed lane becomes the same vertical strip as Done | Needs no chrome beyond the artboard | 2026-10-07 |
+| D423 | AL-143: Empty-lane copy for lanes other than QA follows artboard 6's pattern (e.g. "Nothing in Code review · Tickets land here once implementing finishes.") | Artboard 6 only shows the QA copy | 2026-10-07 |
+| D424 | AL-143: Lanes have a 196 px minimum width and the Done strip is 70 px; the row's minimum is `LANES_MIN_WIDTH` and it scrolls horizontally below that | Horizontal scroll below the min width | 2026-10-07 |
+| D425 | AL-143: `App.test.tsx` uses a longer findBy/test timeout, as `AppRouter.test` already does | The heavier lazy board chunk made its first cold load flaky under the parallel suite | 2026-10-07 |
+| D426 | AL-144: Renderer `shared/config/labels.ts` (`MODEL_LABELS`, `EFFORT_LABELS`, `LANE_LABELS`, `modelEffortLabel`) is the single place that writes model, effort and lane vocabulary on screen | Card, lanes, settings and the new-ticket modal all use the same words | 2026-10-07 |
+| D427 | AL-144: Footer band priority: needs-you, then build failed, then switching; a failed build is hidden while a new build job runs | One band per card | 2026-10-07 |
+| D428 | AL-144: Gate wording by stage: approve plan / changes / fixes / QA / PR; permission reads "Needs you · allow <tool>"; QA gap reads "Needs you · N gap(s)" | Matches artboard 6 | 2026-10-07 |
+| D429 | AL-144: The ADO state is a prop (`adoState`), not read by the entity | It is TanStack Query server data (AL-066) | 2026-10-07 |
+| D430 | AL-144: A model change reads "Opus → Sonnet · High" (the new effort); an effort-only change reads "Opus · XHigh → High" | Artboard 6 | 2026-10-07 |
+| D431 | AL-144: PR open uses `formatPullRequestActivity` from contracts (D218) with progress passed / total checks; Merged shows "Merged into <base> · HH:MM" on a muted card with a green bar | Reuses the AL-064 formatter | 2026-10-07 |
+| D432 | AL-145: The dock's feed is derived from changes to the agent ticket store, not a new event channel; tickets that only appear on load (records) add no event | Any event the store takes in appears in the dock with no extra wiring | 2026-10-07 |
+| D433 | AL-145: New `shared/lib/use-frame-selector.ts` (`useFrameSelector`), a frame-throttled store subscription, with entity hooks `useLiveFeed` and `useLiveTicketCount` on top | At most one dock render per animation frame | 2026-10-07 |
+| D434 | AL-145: Each ticket store gets one feed, created on first use by `ticketFeedOf(store)` and kept for the app's life | Events still arrive while the board page is not shown | 2026-10-07 |
+| D435 | AL-146: Optional `adoWriteBack` on `RepoSettingsSchema` plus `repoAdoWriteBack(repo)`, where unset means on | Stored repos and other tests stay valid without a migration (D59) | 2026-10-07 |
+| D436 | AL-146: The panel lives in `pages/board` (`ui/SettingsPanel.tsx`, `model/settings-draft.ts`), not a features slice | Steiger's insignificant-slice rule fails a feature only one page uses; move it to `features/` when a second page opens it | 2026-10-07 |
+| D437 | AL-146: Default skills are a free-text field ("/code-review /cs-qa-wip", parsed and deduplicated) | Skill discovery (AL-114) has not landed; AL-162 can switch to chips | 2026-10-07 |
+| D438 | AL-146: Renderer hook `useRepoCommands(repoPath)` for `build:commands` in `shared/api/build-commands.ts` | Shows the detected command under each blank override | 2026-10-07 |
+| D439 | AL-146: Save sends one minimal `settings:update` patch of only what changed; when any repo changed, repos are sent whole (D64), keeping repos added or removed elsewhere while the panel was open | No lost updates from other writers | 2026-10-07 |
+| D440 | AL-160: No `processes/new-ticket` slice: the app layer hosts the modal (`app/new-ticket/NewTicketHost`, like ToastHost) and pages open it through a `shared/model` store (`openNewTicket`, `closeNewTicket`, `useNewTicketOpen`) | Steiger's recommended config enables `fsd/no-processes`, and a feature referenced only by a process trips insignificant-slice | 2026-10-07 |
+| D441 | AL-160: Launch is a prop (`onLaunch(request)`); until AL-165 the app host only raises an info toast ("Agent ticket is ready … nothing was started") | Launch is AL-165 | 2026-10-07 |
+| D442 | AL-160: The shell includes simple Model/Effort segmented controls and the Sprint / Search / No ticket control; AL-161–AL-164 plug into marked slots and dispatch into the same reducer | Form and summary work end to end now | 2026-10-07 |
+| D443 | AL-160: A description is required only for "No ticket"; otherwise a picked work item is required | Validation | 2026-10-07 |
+| D444 | AL-160: Interim primary "New agent ticket" button in the skeleton board header | Until AL-142 builds the real header | 2026-10-07 |
 
 ---
 
@@ -1561,6 +1587,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 15: merged AL-065, AL-141, AL-083 and AL-030 (done). AL-030 conflicted with AL-141 in renderer `app/entrypoint/event-routes.ts` (`agentTicketEventHandlers` + `toastEventHandlers`) and with AL-029 in `packages/ui/src/index.ts` (Modal/Tabs + Toast); kept both sides. Lockfile unchanged after `pnpm install`. Integration fix: AdoService hands every ADO client log entry to `connections.noteAdoResponse(orgId, entry)` (the batch 12 follow-up for AL-065), with a unit test. Decisions D370–D393. `pnpm verify` green (2155 unit tests), e2e 62/62. The AL-065, AL-141 and AL-083 agents could not push their branches (Git Credential Manager prompt / remote rejected); they were merged from the local branches. Follow-ups: AL-066 builds the renderer queries on the `ado:*` channels; AL-165 calls `services.worktrees.create` and shows `details.reason` and `rollback.leftovers`; AL-088/AL-090 reuse `undoWorktreeAdd`, `findRegisteredWorktree` and `inspectPath` (`main/worktrees/worktree-git.ts`); AL-103/104/106/107/109/131–133/181 each add one line in `entities/agent-ticket/model/event-handlers.ts`; AL-090 calls `agentTickets.load(records)` and AL-165 `agentTickets.upsert(record)`; AL-048/AL-211 add toast intents to `ToastIntentSchema` and `app/toasts/toast-intents.ts`; `e2e/settings.spec.ts` AL-063 state-transitions test may be flaky under load (failed once in AL-030's run). |
 | 2026-10-07 | Integrator batch 16: merged AL-133 and AL-134 (done) and AL-132 (partial: build data path done and proven in unit and e2e `build-job.spec.ts`; `buildCardState()` gives "Build failed · 3 errors" and the first error, but no agent card draws it until AL-160s). One registration conflict in `services.ts` (AL-065 `createAdoService` import + AL-133 `shell` import, kept both sides). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D394–D414. `pnpm verify` green (2229 unit tests), e2e 65/65. The first full test run had a Vitest fork crash on start-up (exit 0xC0000409) and the second timed out two `App.test.tsx` routing tests on `findBy`'s 1 s default under load from parallel agents (about 58 node processes); the file passed alone and the third full run was green. Follow-ups: AL-160s card renders `buildCardState(record.lastBuild)` and `runLabel(status)` and updates on `build:finished`/`run:status`; AL-173 Build/Run/Stop buttons call `build:start`/`run:start`/`run:stop`, show `lastBuildLabel()`, click opens `run:openUrl`, backfill with `run:list` after reload; AL-135 consumes `build:log` lines with `level`, filtered by `kind`; AL-112 uses the `build:finished` payload as next-turn context; AL-213 keeps the dispose order (runs, build queue, tickets); AL-146 could show which commands are overrides (no `--urls`); run the POSIX process-group kill on macOS/Linux CI; `App.test.tsx` may want the 15 s `asyncUtilTimeout` that `AppRouter.test.tsx` got in batch 11. |
 | 2026-10-07 | Integrator batch 17: merged AL-210 (partial: page, lane, card and panel boundaries built and tested on stand-ins; every routed page is wrapped in `PageErrorBoundary` keyed by route; the card criterion stays open until real lanes and cards exist). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D415–D419. `pnpm verify` green (2237 unit tests), e2e 65/65. AL-210's agent could not push its branch (Git Credential Manager prompt); it was merged from the local branch. Follow-ups: AL-143 wraps each lane in `LaneErrorBoundary` and AL-144 each `AgentTicketCard` in `TicketErrorBoundary` (keyed by ticket id), then tick AL-210's criterion against the real board; AL-175/AL-177/AL-192 wrap the output panel, sub-agents panel and design view host in `PanelErrorBoundary` (`output`/`subAgents`/`designView`); `React.lazy` caches a rejected chunk import, so Retry after a page chunk fails re-throws unless `pages.ts` recreates the lazy loader on reset. |
+| 2026-10-07 | Integrator batch 18: merged AL-145 and AL-160 (done), AL-143 (partial: lanes, badges, Done strip, cards and dock match artboard 1 at 1440 × 960, but the cards' ADO state text waits for AL-066, live activity for AL-103, and the header and legend for AL-142), AL-144 (partial: every artboard 6 state built and tested through store actions; the gallery is AL-032 and most agent event payloads are not wired until AL-103/AL-104/AL-106/AL-107/AL-109/AL-132) and AL-146 (partial: every setting is editable; opening from the Repo dropdown waits for AL-142). One branch, no conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D420–D444. `pnpm verify` green (2296 unit tests), e2e 70/70. Follow-ups: AL-066/AL-142 pass each card's `adoState`; AL-142 filters lanes by repo and sprint, replaces the skeleton header and the interim Settings / New agent ticket buttons, and opens Settings from the Repo dropdown; AL-090 reconciles records at start-up and AL-165 invalidates `['tickets']` after a launch, then highlights the new card; AL-210 wraps each lane in `LaneErrorBoundary` and each card in `TicketErrorBoundary`; AL-032 shows `AgentTicketCardView` per state; AL-115 respects `repoAdoWriteBack(repo)`; AL-111 reads per-repo `maxConcurrentAgents`; AL-114/AL-162 replace the default-skills text field with chips; AL-161–AL-164 fill the new-ticket modal's slots; AL-200 adds design presence to the card. |
 
 ---
 
