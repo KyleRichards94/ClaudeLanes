@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { safeStorage } from 'electron';
 import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
+import { createAdoConnectionTester, createConnectionsService, type ConnectionsService } from './connections';
+import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
@@ -34,6 +36,8 @@ export interface Services {
   readonly log: Logger;
   /** Versions, settings without secrets and recent errors, for "Copy diagnostics" (AL-214). */
   readonly diagnostics: Diagnostics;
+  /** ADO orgs, Claude and MCP servers in `<userData>/connections.json`, their tokens in `secrets` (AL-042). */
+  readonly connections: ConnectionsService;
 }
 
 export interface ServiceOptions {
@@ -82,6 +86,14 @@ export function createServices(options: ServiceOptions): Services {
     settings: () => settings.get(),
   });
 
+  const connections = createConnectionsService({
+    file: createElectronConnectionsFile(options.appDataDir),
+    secrets,
+    emit: options.emit,
+    testers: { ado: createAdoConnectionTester() },
+    warn: (message) => log.child('connections').warn(message),
+  });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -91,6 +103,7 @@ export function createServices(options: ServiceOptions): Services {
     git,
     log,
     diagnostics,
+    connections,
   };
 }
 
