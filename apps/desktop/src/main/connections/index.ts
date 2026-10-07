@@ -1,4 +1,6 @@
 export { createAdoConnectionTester, type AdoConnectionTesterOptions } from './ado-tester';
+export { createClaudeLoginDetector, describeClaudeLogin, type ClaudeLoginDetector, type ClaudeLoginDetectorOptions } from './claude-login';
+export { createClaudeConnectionTester } from './claude-tester';
 export {
   createMemoryConnectionsFile,
   type ConnectionsFile,

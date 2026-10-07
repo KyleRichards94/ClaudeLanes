@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { z } from 'zod';
 import { normalizeOrgUrl } from '@agent-lanes/ado-client';
 import {
+  ClaudeLoginDetectionSchema,
   ConnectionDraftSchema,
   ConnectionIdSchema,
   ConnectionSummarySchema,
@@ -9,6 +10,7 @@ import {
   TestConnectionRequestSchema,
   err,
   ok,
+  type ClaudeLoginDetection,
   type ConnectionDraft,
   type ConnectionKind,
   type ConnectionSummary,
@@ -72,6 +74,11 @@ export interface ConnectionsService {
    * launch, so once a connection is removed its token is in no later session's env.
    */
   sessionEnv(): Promise<Record<string, string>>;
+  /**
+   * Looks for a Claude Code login on this computer, for "Use my Claude Code login" (AL-044). Starts
+   * Claude Code without a prompt and reads its account; changes nothing.
+   */
+  detectClaudeLogin(): Promise<Result<ClaudeLoginDetection>>;
 }
 
 export interface ConnectionsServiceOptions {
@@ -80,6 +87,8 @@ export interface ConnectionsServiceOptions {
   emit: Emit;
   /** One per kind; AL-043–AL-045 provide them. A kind without one can be saved but not tested. */
   testers?: ConnectionTesters;
+  /** Finds the Claude Code login (AL-044); without it, `detectClaudeLogin` says it isn't available. Must not throw. */
+  detectClaudeLogin?: () => Promise<ClaudeLoginDetection>;
   now?: () => Date;
   /** Where start-up problems are reported; the console until the app log exists (AL-214). Never given a token. */
   warn?: (message: string) => void;
@@ -602,6 +611,15 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         const apiKey = await secrets.get(claude.secretId);
         return apiKey === undefined ? {} : { [ANTHROPIC_API_KEY_ENV]: apiKey };
       }),
+
+    async detectClaudeLogin() {
+      if (!options.detectClaudeLogin) return err('INTERNAL', "Looking for a Claude Code login isn't available in this version yet.");
+      try {
+        return ok(ClaudeLoginDetectionSchema.parse(await options.detectClaudeLogin()));
+      } catch (cause) {
+        return err('INTERNAL', `Could not look for a Claude Code login: ${describe(cause)}`);
+      }
+    },
   };
 }
 
