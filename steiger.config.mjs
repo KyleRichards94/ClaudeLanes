@@ -11,4 +11,10 @@ export default defineConfig([
       'fsd/insignificant-slice': 'off',
     },
   },
+  {
+    rules: {
+      // Design §5 keeps the processes layer for flows across pages (first run, AL-047; new ticket).
+      'fsd/no-processes': 'off',
+    },
+  },
 ]);

@@ -24,3 +24,15 @@ export {
   type ToastState,
 } from './toasts';
 export { closeNewTicket, openNewTicket, useNewTicketOpen } from './new-ticket';
+export {
+  closeConnections,
+  connectionKindOf,
+  endBlockingConnections,
+  getConnectionsModal,
+  openConnections,
+  resetConnectionsModal,
+  showConnectionsTab,
+  useConnectionsModal,
+  type ConnectionsModalState,
+  type OpenConnectionsOptions,
+} from './connections-modal';

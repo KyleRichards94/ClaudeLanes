@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { color } from './index';
-import { mutedOpacity, progressGradient, tone } from './tones';
+import { mutedFilter, mutedOpacity, progressGradient, tone } from './tones';
 
 const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
 
@@ -60,5 +60,6 @@ describe('tone tints', () => {
       `linear-gradient(90deg, ${progressGradient.from}, ${progressGradient.to})`.toLowerCase(),
     );
     expect(cssVar('muted-opacity')).toBe(String(mutedOpacity));
+    expect(cssVar('muted-filter')).toBe(mutedFilter);
   });
 });
