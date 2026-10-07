@@ -176,8 +176,138 @@ export type TicketRecord = z.infer<typeof TicketRecordSchema>;
 /** `tickets:list`: every ticket record, oldest first, so the board shows its cards after a start (AL-143; AL-090 reconciles them). */
 export const TicketRecordListSchema = z.array(TicketRecordSchema);
 
+// ── Archive (AL-088, design §9 step 6) ───────────────────────────────────────────────────────────
+//
+// Only ever started by the user (never automatically). Removes the ticket worktree and its
+// sub-worktrees, optionally deletes the branches already merged into the base, and moves the record
+// to the archive list. The record leaves the board only once every worktree is gone.
+
+export const ArchiveTicketRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  /** The user chose Archive. */
+  confirmed: z.literal(true),
+  /**
+   * The user confirmed a second time after being told about unmerged commits or uncommitted changes
+   * (the first call returns VALIDATION `unmerged-work` with what would be lost).
+   */
+  discardUnmerged: z.boolean().optional(),
+  /** Also delete the ticket branch and sub-branches already merged into the base. Unmerged ones are always kept. */
+  deleteMergedBranches: z.boolean().optional(),
+});
+export type ArchiveTicketRequest = z.infer<typeof ArchiveTicketRequestSchema>;
+
+/** Something Archive could not remove (a locked file, a long path), for the partial-removal report. */
+export const ArchiveLeftoverSchema = z.object({
+  kind: z.enum(['worktree', 'branch']),
+  /** The worktree folder or the branch name. */
+  target: z.string().min(1),
+  /** Git's or the file system's reason. */
+  reason: z.string(),
+});
+export type ArchiveLeftover = z.infer<typeof ArchiveLeftoverSchema>;
+
+/** One archived ticket in the archive list. */
+export const ArchivedTicketSchema = z.object({
+  archivedAt: EpochMsSchema,
+  /** The record as it was when archived; its worktrees are gone. */
+  record: TicketRecordSchema,
+  /** Branches deleted because they were merged into the base. */
+  deletedBranches: z.array(BranchNameSchema),
+  /** Branches kept: unmerged, or deletion not asked for. */
+  keptBranches: z.array(BranchNameSchema),
+});
+export type ArchivedTicket = z.infer<typeof ArchivedTicketSchema>;
+
+/** Unmerged work the second confirmation names (VALIDATION `unmerged-work` details). */
+export const UnmergedWorkSchema = z.object({
+  /** Branches with commits that are in neither the base nor (for a sub-branch) the ticket branch. */
+  branches: z.array(z.object({ branch: BranchNameSchema, commits: z.int().nonnegative() })),
+  /** Worktrees with uncommitted changes. */
+  dirtyWorktrees: z.array(LocalPathSchema),
+});
+export type UnmergedWork = z.infer<typeof UnmergedWorkSchema>;
+
+export const ArchiveTicketResultSchema = z.discriminatedUnion('status', [
+  /** Every worktree is gone and the record is in the archive list. */
+  z.object({ status: z.literal('archived'), archived: ArchivedTicketSchema }),
+  /** Some worktrees could not be removed (listed); the ticket stays on the board and Archive can run again. */
+  z.object({ status: z.literal('partial'), removedWorktrees: z.array(LocalPathSchema), leftovers: z.array(ArchiveLeftoverSchema) }),
+]);
+export type ArchiveTicketResult = z.infer<typeof ArchiveTicketResultSchema>;
+
+// ── Start-up reconciliation (AL-090, design §6 last bullet) ─────────────────────────────────────
+//
+// The board is rebuilt from the ticket records (stage, model/effort, session id) checked against
+// `git worktree list` for each repo, so nothing needs a database.
+
+/** A ticket (or one of its sub-branches) whose worktree git no longer has: the card shows "Worktree missing". */
+export const MissingWorktreeSchema = z.object({
+  ticketId: TicketIdSchema,
+  worktreePath: LocalPathSchema,
+  /** The sub-branch whose worktree is missing; null for the ticket worktree itself. */
+  subBranch: BranchNameSchema.nullable(),
+});
+export type MissingWorktree = z.infer<typeof MissingWorktreeSchema>;
+
+/** A worktree under a repo's worktree folder that no ticket records: offered as "Adopt" or "Ignore". */
+export const OrphanWorktreeSchema = z.object({
+  repo: LocalPathSchema,
+  worktreePath: LocalPathSchema,
+  /** Checked-out branch; null when detached (such a worktree can only be ignored). */
+  branch: BranchNameSchema.nullable(),
+  head: z.string().nullable(),
+  /** Adopt makes this ticket (the folder name), or null when it can't be used as a ticket id. */
+  ticketId: TicketIdSchema.nullable(),
+  /** A `<ticket>--<name>` sub-agent worktree of an existing ticket: Adopt adds it to that ticket's sub-branches. */
+  parentTicketId: TicketIdSchema.nullable(),
+});
+export type OrphanWorktree = z.infer<typeof OrphanWorktreeSchema>;
+
+export const TicketBoardSchema = z.object({
+  /** Every ticket record, oldest first, as saved before the restart. */
+  tickets: z.array(TicketRecordSchema),
+  missingWorktrees: z.array(MissingWorktreeSchema),
+  orphans: z.array(OrphanWorktreeSchema),
+  /** Records that could not be read at start-up (set aside, newer version, duplicate, I/O error). */
+  recordIssues: z.array(z.object({ kind: z.string(), file: z.string(), ticketId: z.string().nullable() })),
+  /** Repos git could not read (folder gone, git missing); their tickets are listed but not checked. */
+  unreadableRepos: z.array(z.object({ repo: LocalPathSchema, reason: z.string() })),
+});
+export type TicketBoard = z.infer<typeof TicketBoardSchema>;
+
+export const WorktreePathRequestSchema = z.strictObject({ worktreePath: LocalPathSchema });
+export type WorktreePathRequest = z.infer<typeof WorktreePathRequestSchema>;
+
+export const AdoptWorktreeResultSchema = z.object({
+  /** The new ticket, or the parent ticket with the sub-branch added. */
+  record: TicketRecordSchema,
+  adoptedAs: z.enum(['ticket', 'sub-branch']),
+});
+export type AdoptWorktreeResult = z.infer<typeof AdoptWorktreeResultSchema>;
+
+/** `tickets:get`: one ticket's record, for the drill-in and the design tab (AL-170, AL-192). */
+export const GetTicketRequestSchema = z.object({ ticketId: TicketIdSchema });
+export type GetTicketRequest = z.infer<typeof GetTicketRequestSchema>;
+
+/** `record` is null when no ticket has that id (never launched, archived, or unreadable at start-up). */
+export const GetTicketResponseSchema = z.object({ record: TicketRecordSchema.nullable() });
+export type GetTicketResponse = z.infer<typeof GetTicketResponseSchema>;
+
 export const ticketsInvokeContracts = {
+  /** Every ticket record, oldest first (AL-143). */
   'tickets:list': { request: z.undefined(), response: TicketRecordListSchema },
+  /** The board after reconciling records with git's worktrees. */
+  'tickets:board': { request: z.undefined(), response: TicketBoardSchema },
+  /** VALIDATION `not-an-orphan`, `detached` or `ticket-exists` / `invalid-ticket-id` (rename the folder first). */
+  'tickets:adoptWorktree': { request: WorktreePathRequestSchema, response: AdoptWorktreeResultSchema },
+  /** Hides the orphan from later reconciliations; the folder is left alone. */
+  'tickets:ignoreWorktree': { request: WorktreePathRequestSchema, response: z.object({ ignored: z.array(LocalPathSchema) }) },
+  /** VALIDATION `ticket-not-found`, or `unmerged-work` (details: UnmergedWork) until `discardUnmerged`. */
+  'tickets:archive': { request: ArchiveTicketRequestSchema, response: ArchiveTicketResultSchema },
+  /** The archive list, newest first. */
+  'tickets:archived': { request: z.undefined(), response: z.array(ArchivedTicketSchema) },
+  /** One ticket's record, or null when no ticket has that id (AL-170). */
+  'tickets:get': { request: GetTicketRequestSchema, response: GetTicketResponseSchema },
 } as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const ticketsEventContracts = {} as const satisfies Record<(typeof TICKETS_EVENT_CHANNELS)[number], z.ZodType>;

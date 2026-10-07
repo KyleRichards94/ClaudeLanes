@@ -62,6 +62,8 @@ export interface DesignViewServiceOptions {
   emit: Emit;
   /** Live views kept at once; the least recently opened one beyond this is closed. Default 3. */
   maxLiveViews?: number;
+  /** Told every change `design:view` reports, e.g. to remember the canvas page a ticket was left on (AL-193). */
+  onChange?: (view: DesignViewState, closed: boolean) => void;
 }
 
 export interface DesignViewService {
@@ -71,6 +73,8 @@ export interface DesignViewService {
   setBounds(ticketId: string, bounds: DesignViewBounds): boolean;
   /** Parks the ticket's view behind the renderer, keeping it alive. False when it has no live view. */
   hide(ticketId: string): boolean;
+  /** Loads the view's current page again (the design tab's reload button). False when it has no live view. */
+  reload(ticketId: string): boolean;
   /** Destroys the ticket's view (ticket removed, canvas unlinked). False when it has no live view. */
   close(ticketId: string): boolean;
   get(ticketId: string): DesignViewState | undefined;
@@ -107,6 +111,7 @@ export function createDesignViewService(options: DesignViewServiceOptions): Desi
 
   function publish(entry: Entry, closed = false): void {
     emit('design:view', { ...state(entry), closed });
+    options.onChange?.(state(entry), closed);
   }
 
   function applyBounds(entry: Entry): void {
@@ -230,6 +235,16 @@ export function createDesignViewService(options: DesignViewServiceOptions): Desi
       const entry = entries.get(ticketId);
       if (!entry) return false;
       setVisible(entry, false);
+      return true;
+    },
+
+    reload(ticketId) {
+      const entry = entries.get(ticketId);
+      if (!entry) return false;
+      entry.status = 'loading';
+      // The page it shows now (a sign-in page's URL without its one-time query), else the canvas.
+      entry.handle.load(entry.url !== null && policy.isAllowed(entry.url) ? entry.url : entry.canvasUrl);
+      publish(entry);
       return true;
     },
 

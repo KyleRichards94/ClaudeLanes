@@ -37,3 +37,12 @@ export {
 export { cardView, clockTime, needsYouLabel, type CardActivityTone, type CardState, type CardView } from './ui/card-view';
 export { TICKET_FEED_LIMIT, createTicketFeed, ticketFeedOf, type TicketFeed, type TicketFeedEvent, type TicketFeedState } from './model/feed';
 export { useLiveFeed, useLiveTicketCount } from './model/live-hooks';
+export {
+  mergeToMainPreviewQueryKey,
+  mergedActivityText,
+  useMergeToMain,
+  useMergeToMainPreview,
+} from './api/merge-to-main';
+export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from './api/archive';
+export { ticketBoardQueryKey, useAdoptWorktree, useIgnoreWorktree, useTicketBoard } from './api/board';
+export { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS, modelEffortLabel, stageProgressLabel } from './model/labels';

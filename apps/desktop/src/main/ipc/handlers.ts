@@ -4,11 +4,11 @@ import { createBuildHandlers } from '../build/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
 import { createDesignHandlers } from '../design/handlers';
 import { createDiagnosticsHandlers } from '../diagnostics/handlers';
-import { createGitHandlers } from '../git/handlers';
 import { createReposHandlers } from '../repos/handlers';
 import type { Services } from '../services';
 import { createSettingsHandlers } from '../settings/handlers';
 import { createTicketsHandlers } from '../tickets/handlers';
+import { createGitHandlers } from '../worktrees/handlers';
 import type { InvokeHandlers } from './handle-invoke';
 
 /**
@@ -27,7 +27,7 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createDesignHandlers(services),
     ...createAdoHandlers(services.ado),
     ...createReposHandlers(services),
-    ...createTicketsHandlers(services),
     ...createGitHandlers(services),
+    ...createTicketsHandlers(services),
   };
 }

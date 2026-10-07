@@ -72,6 +72,68 @@ describe('request', () => {
     expect(new URL(seen!.url).searchParams.get('api-version')).toBe('7.1');
   });
 
+  it('drops to the newest REST version an Azure DevOps Server supports, and keeps using it', async () => {
+    const versions: string[] = [];
+    server.use(
+      http.get(`${ORG_URL}/_apis/projects/:id`, ({ request, params }) => {
+        const version = new URL(request.url).searchParams.get('api-version') ?? '';
+        versions.push(version);
+        if (version.startsWith('7.')) {
+          return HttpResponse.json(
+            {
+              message: `The requested REST API version of ${version} is out of range for this server. The latest REST API version this server supports is 6.1.`,
+              typeKey: 'VssVersionOutOfRangeException',
+            },
+            { status: 400 },
+          );
+        }
+        return HttpResponse.json({ id: params['id'], name: 'Onsite' });
+      }),
+    );
+
+    const { client } = createTestClient();
+    expect(await client.get('/_apis/projects/p1', projectSchema)).toEqual({ ok: true, data: { id: 'p1', name: 'Onsite' } });
+    expect(await client.get('/_apis/projects/p2', projectSchema, { apiVersion: '7.1-preview.4' })).toMatchObject({ ok: true });
+    // One retry for the first call; later calls go straight to the server's version, previews included.
+    expect(versions).toEqual(['7.1', '6.1', '6.1-preview']);
+  });
+
+  it('adds -preview when the server says the version is preview-only there', async () => {
+    const versions: string[] = [];
+    server.use(
+      http.get(`${ORG_URL}/_apis/projects/:id`, ({ request }) => {
+        const version = new URL(request.url).searchParams.get('api-version') ?? '';
+        versions.push(version);
+        if (version === '7.1') {
+          return HttpResponse.json(
+            { message: 'The requested version "7.1" of the resource is under preview. The -preview flag must be supplied in the api-version for such requests.' },
+            { status: 400 },
+          );
+        }
+        return HttpResponse.json({ id: 'p1', name: 'Onsite' });
+      }),
+    );
+
+    const { client } = createTestClient();
+    expect(await client.get('/_apis/projects/p1', projectSchema)).toMatchObject({ ok: true });
+    expect(await client.get('/_apis/projects/p1', projectSchema)).toMatchObject({ ok: true });
+    expect(versions).toEqual(['7.1', '7.1-preview', '7.1-preview']);
+  });
+
+  it('does not retry a 400 that is not about the api-version', async () => {
+    let calls = 0;
+    server.use(
+      http.get(`${ORG_URL}/_apis/projects/:id`, () => {
+        calls += 1;
+        return HttpResponse.json({ message: 'TF400813: bad request' }, { status: 400 });
+      }),
+    );
+
+    const { client } = createTestClient();
+    expect(await client.get('/_apis/projects/p1', projectSchema)).toMatchObject({ ok: false });
+    expect(calls).toBe(1);
+  });
+
   it('builds the query: arrays comma-joined, empty values skipped, api-version overridable', async () => {
     let url: URL | undefined;
     server.use(

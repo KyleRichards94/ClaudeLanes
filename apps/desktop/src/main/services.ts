@@ -17,6 +17,8 @@ import {
 } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
+import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas-links';
+import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
 import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
@@ -28,6 +30,13 @@ import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
+import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
+import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
+import { createArchiveService, type ArchiveService } from './worktrees/archive';
+import { createDiffService, type DiffService } from './worktrees/diff';
+import { createKeyedQueue } from './worktrees/keyed-queue';
+import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
+import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -63,6 +72,10 @@ export interface Services {
   readonly connections: ConnectionsService;
   /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
   readonly designView: DesignViewService;
+  /** Each ticket's linked canvas and the page it was left on, in its record (AL-193). */
+  readonly designCanvases: DesignCanvasLinks;
+  /** Reads a linked canvas's artboards through a short read-only design session (AL-195, D118). */
+  readonly designArtboards: DesignArtboardReader;
   /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
   readonly ado: AdoService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
@@ -73,6 +86,18 @@ export interface Services {
   readonly claude: ClaudeLauncher;
   /** Creates a ticket's worktree and branch and records them on the ticket, or rolls everything back (AL-083). */
   readonly worktrees: TicketWorktreeService;
+  /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
+  readonly branches: BranchStatusService;
+  /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
+  readonly mergeToMain: MergeToMainService;
+  /** Archived tickets in `<userData>/tickets-archive` (AL-088). */
+  readonly ticketArchive: TicketArchive;
+  /** User-chosen Archive: removes the ticket's worktrees and moves its record to the archive list (AL-088). */
+  readonly archive: ArchiveService;
+  /** The Diff tab's files and per-file unified diffs against the base or a sub-branch (AL-089). */
+  readonly diffs: DiffService;
+  /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
+  readonly reconcile: ReconcileService;
 }
 
 export interface ServiceOptions {
@@ -141,6 +166,14 @@ export function createServices(options: ServiceOptions): Services {
   });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
+  const branches = createBranchStatusService({ git, tickets });
+  // Merges and archives in one repo run one at a time.
+  const repoQueue = createKeyedQueue();
+  const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
+  const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
+  const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
+  const diffs = createDiffService({ git, tickets });
+  const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -172,7 +205,16 @@ export function createServices(options: ServiceOptions): Services {
     platform: createElectronDesignPlatform({ window: options.mainWindow ?? (() => undefined), policy: designPolicy }),
     policy: designPolicy,
     emit: options.emit,
+    // Each signed-in canvas page is remembered on the ticket record (AL-193).
+    onChange: (view, closed) => designCanvases.noteView(view, closed),
   });
+  const designCanvases = createDesignCanvasLinks({
+    tickets,
+    designView,
+    testOrigin: options.designTestOrigin,
+    warn: (message) => log.child('design').warn(message),
+  });
+  const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
@@ -190,11 +232,19 @@ export function createServices(options: ServiceOptions): Services {
     diagnostics,
     connections,
     designView,
+    designCanvases,
+    designArtboards,
     ado,
     tickets,
     repos,
     claude,
     worktrees,
+    branches,
+    mergeToMain,
+    ticketArchive,
+    archive,
+    diffs,
+    reconcile,
   };
 }
 

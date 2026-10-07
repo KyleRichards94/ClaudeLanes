@@ -25,6 +25,12 @@ describe('location hash', () => {
     expect(routeFromHash('')).toBeUndefined();
   });
 
+  it('opens the component gallery only in builds that have it (AL-032)', () => {
+    expect(routeFromHash('#/gallery', true)).toEqual(routes.gallery());
+    expect(routeFromHash('#/gallery', false)).toBeUndefined();
+    expect(routeFromHash('#/board', false)).toEqual(routes.board());
+  });
+
   it('shows the current route in the hash, without adding browser history entries', () => {
     const router = createRouter();
     const historyLength = window.history.length;

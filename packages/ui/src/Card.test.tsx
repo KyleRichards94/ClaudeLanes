@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { Text } from 'react-native';
 import { describe, expect, it } from 'vitest';
-import { color, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, type CardFooterTone, type CardSectionTone, type CardTone } from './Card';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
@@ -42,6 +42,8 @@ function expectOutline(element: HTMLElement, cardTone: CardTone) {
   expect(style.borderTopColor).toBe(rgb(borderFor[cardTone]));
   expect(style.borderTopWidth).toBe('1px');
   expect(style.opacity).toBe(cardTone === 'muted' ? String(mutedOpacity) : '1');
+  // AL-033: the merged card fades mostly by losing colour, which keeps its text at 4.5:1.
+  if (cardTone === 'muted') expect(style.filter).toBe(mutedFilter);
 }
 
 function expectFooter(cardTestId: string, footerTone: CardFooterTone, label: string) {
