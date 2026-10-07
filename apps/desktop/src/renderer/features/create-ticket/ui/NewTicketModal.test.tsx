@@ -1,4 +1,4 @@
-import { defaultSettings, modelId, type Settings } from '@agent-lanes/contracts';
+import { SDK_MODEL_IDS, defaultSettings, type Settings } from '@agent-lanes/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
@@ -128,7 +128,7 @@ describe('NewTicketModal', () => {
     await waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
     const request = onLaunch.mock.calls[0]![0];
     expect(request).toMatchObject({ model: 'opus', effort: 'xhigh' });
-    expect(modelId(request.model)).toBe('claude-opus-5-5');
+    expect(SDK_MODEL_IDS[request.model]).toBe('claude-opus-5-5');
   });
 
   it('closes on Cancel without launching', async () => {

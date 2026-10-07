@@ -1,4 +1,4 @@
-import { MODEL_IDS, modelId, type Model } from '@agent-lanes/contracts';
+import { SDK_MODEL_IDS, type Model } from '@agent-lanes/contracts';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
@@ -43,8 +43,7 @@ describe('ModelPicker', () => {
     fireEvent.click(screen.getByRole('radio', { name }));
     expect(onChange).toHaveBeenCalledWith(model);
     expect(checked(name)).toBe('true');
-    expect(modelId(model)).toBe(id);
-    expect(MODEL_IDS[model]).toBe(id);
+    expect(SDK_MODEL_IDS[model]).toBe(id);
   });
 
   it('has one Tab stop and moves with the arrow keys, Home and End', async () => {
