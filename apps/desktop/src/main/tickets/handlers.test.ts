@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
+import type { Services } from '../services';
 import { createTicketsHandlers } from './handlers';
 import { createTicketRecordStore } from './record-store';
 import { createTempDir, newTicketInput } from './testing';
@@ -13,7 +14,9 @@ describe('tickets IPC handlers', () => {
       const second = await tickets.create(newTicketInput(temp.dir, { id: '71288', title: 'Job grid filter drops date range' }));
       expect(first.ok && second.ok).toBe(true);
 
-      const handlers = createTicketsHandlers({ tickets });
+      // Archive (AL-088) and reconciliation (AL-090) have their own tests; tickets:list doesn't touch them.
+      const unused = {} as Pick<Services, 'archive' | 'ticketArchive' | 'reconcile'>;
+      const handlers = createTicketsHandlers({ tickets, ...unused });
       const listed = await handleInvoke('tickets:list', undefined, handlers['tickets:list']);
       expect(listed.ok).toBe(true);
       expect(listed.ok && listed.data.map((record) => record.id)).toEqual(['71273', '71288']);
