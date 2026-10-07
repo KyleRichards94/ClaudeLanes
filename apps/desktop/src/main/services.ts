@@ -34,6 +34,7 @@ import { createArchiveService, type ArchiveService } from './worktrees/archive';
 import { createDiffService, type DiffService } from './worktrees/diff';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
+import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -85,6 +86,8 @@ export interface Services {
   readonly archive: ArchiveService;
   /** The Diff tab's files and per-file unified diffs against the base or a sub-branch (AL-089). */
   readonly diffs: DiffService;
+  /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
+  readonly reconcile: ReconcileService;
 }
 
 export interface ServiceOptions {
@@ -144,6 +147,7 @@ export function createServices(options: ServiceOptions): Services {
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
   const diffs = createDiffService({ git, tickets });
+  const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -201,6 +205,7 @@ export function createServices(options: ServiceOptions): Services {
     ticketArchive,
     archive,
     diffs,
+    reconcile,
   };
 }
 

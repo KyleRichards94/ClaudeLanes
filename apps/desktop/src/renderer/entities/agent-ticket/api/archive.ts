@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ArchiveTicketResult } from '@agent-lanes/contracts';
 import { branchesQueryKey, invoke, unwrap } from '@/shared/api';
 import { agentTickets, type AgentTicketStore } from '../model/store';
+import { ticketBoardQueryKey } from './board';
 
 /** The archive list (AL-088). */
 export const archivedTicketsQueryKey = ['tickets', 'archived'] as const;
@@ -26,6 +27,7 @@ export function useArchiveTicket(store: AgentTicketStore = agentTickets) {
     onSuccess: (result: ArchiveTicketResult, { ticketId }) => {
       if (result.status === 'archived') {
         store.remove(ticketId);
+        void queryClient.invalidateQueries({ queryKey: ticketBoardQueryKey });
         queryClient.removeQueries({ queryKey: branchesQueryKey(ticketId) });
         void queryClient.invalidateQueries({ queryKey: archivedTicketsQueryKey });
       } else {

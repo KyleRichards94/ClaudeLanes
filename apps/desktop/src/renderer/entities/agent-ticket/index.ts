@@ -35,3 +35,4 @@ export {
   useMergeToMainPreview,
 } from './api/merge-to-main';
 export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from './api/archive';
+export { ticketBoardQueryKey, useAdoptWorktree, useIgnoreWorktree, useTicketBoard } from './api/board';
