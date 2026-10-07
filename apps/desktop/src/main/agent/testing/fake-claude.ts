@@ -5,6 +5,9 @@ import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
  * A stand-in for the Agent SDK's `query()` (AL-044): no process starts and nothing leaves the
  * machine. Each call follows a script and is recorded, so tests can check the options and env a
  * `claude` process would have been given, what was sent to it, and that it was closed.
+ *
+ * Agent sessions (AL-100) use `live` scripts: the stream stays open like a running `claude` process,
+ * the test pushes messages onto it and sees what the app sent, interrupted or changed.
  */
 
 export interface FakeClaudeScript {
@@ -18,6 +21,14 @@ export interface FakeClaudeScript {
   hang?: boolean;
   /** Written to the `stderr` option before anything else. */
   stderr?: string;
+  /**
+   * A live session (AL-100): after `messages` the stream stays open, yields what `call.push()` adds
+   * and what `onSend` answers each sent user message with, and ends on `call.end()`, `call.fail()`
+   * or close.
+   */
+  live?: boolean;
+  /** What a live session answers each sent user message with (e.g. an assistant reply and a result). */
+  onSend?: (message: SDKUserMessage, call: FakeClaudeCall) => SDKMessage[];
 }
 
 export interface FakeClaudeCall {
@@ -27,6 +38,20 @@ export interface FakeClaudeCall {
   /** Messages an input stream (streaming-input mode) sent. */
   sent: SDKUserMessage[];
   closed: boolean;
+  /** Live sessions: the stream yields these, as the `claude` process would. */
+  push(...messages: SDKMessage[]): void;
+  /** Live sessions: the stream ends normally, like a process that exited. */
+  end(): void;
+  /** Live sessions: the stream throws, like a process that died. */
+  fail(error: Error): void;
+  /** Resolves once the input stream has delivered `count` messages in all. */
+  sentCount(count: number): Promise<void>;
+  /** Calls to `interrupt()`. */
+  interrupts: number;
+  /** Arguments of each `setModel()` call. */
+  models: Array<string | undefined>;
+  /** Arguments of each `applyFlagSettings()` call. */
+  flagSettings: Array<Record<string, unknown>>;
 }
 
 export interface FakeClaude {
@@ -38,18 +63,59 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
   const calls: FakeClaudeCall[] = [];
 
   const query: ClaudeQueryFunction = ({ prompt, options = {} }) => {
-    const call: FakeClaudeCall = { options, prompt: typeof prompt === 'string' ? prompt : undefined, sent: [], closed: false };
+    const pending: SDKMessage[] = [];
+    let ended = false;
+    let failure: Error | undefined;
+    let wakeStream: (() => void) | undefined;
+    const wake = () => {
+      const resolve = wakeStream;
+      wakeStream = undefined;
+      resolve?.();
+    };
+    const sentWaiters: Array<{ count: number; resolve: () => void }> = [];
+
+    const call: FakeClaudeCall = {
+      options,
+      prompt: typeof prompt === 'string' ? prompt : undefined,
+      sent: [],
+      closed: false,
+      push(...messages) {
+        pending.push(...messages);
+        wake();
+      },
+      end() {
+        ended = true;
+        wake();
+      },
+      fail(error) {
+        failure = error;
+        wake();
+      },
+      sentCount(count) {
+        return call.sent.length >= count ? Promise.resolve() : new Promise((resolve) => sentWaiters.push({ count, resolve }));
+      },
+      interrupts: 0,
+      models: [],
+      flagSettings: [],
+    };
     calls.push(call);
     const plan = typeof script === 'function' ? script(call) : script;
-    let wake: (() => void) | undefined;
+    let wakeClosed: (() => void) | undefined;
     const closed = new Promise<void>((resolve) => {
-      wake = resolve;
+      wakeClosed = resolve;
     });
 
     if (plan.stderr) options.stderr?.(plan.stderr);
     if (typeof prompt !== 'string') {
       void (async () => {
-        for await (const message of prompt) call.sent.push(message);
+        for await (const message of prompt) {
+          call.sent.push(message);
+          for (const waiter of sentWaiters.filter((w) => call.sent.length >= w.count)) {
+            sentWaiters.splice(sentWaiters.indexOf(waiter), 1);
+            waiter.resolve();
+          }
+          if (plan.live && plan.onSend) call.push(...plan.onSend(message, call));
+        }
       })();
     }
     const account: Promise<AccountInfo> =
@@ -66,6 +132,19 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
         yield message;
       }
       if (plan.failWith) throw plan.failWith;
+      if (plan.live) {
+        for (;;) {
+          if (call.closed) return;
+          const next = pending.shift();
+          if (next) {
+            yield next;
+            continue;
+          }
+          if (failure) throw failure;
+          if (ended) return;
+          await new Promise<void>((resolve) => (wakeStream = resolve));
+        }
+      }
       if (plan.hang) await closed;
     }
 
@@ -73,7 +152,18 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       accountInfo: () => account,
       close: () => {
         call.closed = true;
-        wake?.();
+        wakeClosed?.();
+        wake();
+      },
+      interrupt: async () => {
+        call.interrupts += 1;
+        return undefined;
+      },
+      setModel: async (model?: string) => {
+        call.models.push(model);
+      },
+      applyFlagSettings: async (settings: Record<string, unknown>) => {
+        call.flagSettings.push(settings);
       },
     });
     options.abortController?.signal.addEventListener('abort', () => fake.close(), { once: true });
@@ -119,4 +209,25 @@ export function fakeResult(fields: { result?: string; is_error?: boolean; api_er
 /** A result that ended without a successful turn (`error_during_execution`, `error_max_turns`, …). */
 export function fakeErrorResult(subtype: string, fields: { errors?: string[]; startup_failure_reason?: string } = {}): SDKResultMessage {
   return { ...fakeResult(), subtype, is_error: true, errors: fields.errors ?? [], ...fields } as unknown as SDKResultMessage;
+}
+
+/** The `system/init` message a session starts with; `session_id` is what `resume` takes (AL-100, AL-110). */
+export function fakeInit(sessionId: string, fields: { cwd?: string; model?: string } = {}): SDKMessage {
+  return {
+    type: 'system',
+    subtype: 'init',
+    apiKeySource: 'none',
+    claude_code_version: '0.0.0-fake',
+    cwd: fields.cwd ?? '',
+    tools: [],
+    mcp_servers: [],
+    model: fields.model ?? 'claude-opus-5-5',
+    permissionMode: 'acceptEdits',
+    slash_commands: [],
+    output_style: 'default',
+    skills: [],
+    plugins: [],
+    uuid: ids.uuid,
+    session_id: sessionId,
+  } as unknown as SDKMessage;
 }
