@@ -35,6 +35,8 @@ export default defineConfig(({ command }) => ({
       alias: {
         '@': resolve(__dirname, 'src/renderer'),
         'react-native': 'react-native-web',
+        // react-native-svg's web build asks for RN's asset registry, which RN no longer installs.
+        '@react-native/assets-registry/registry': 'react-native-web/dist/modules/AssetRegistry',
       },
       extensions: webExtensions,
     },
