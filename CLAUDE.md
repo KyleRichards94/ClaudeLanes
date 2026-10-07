@@ -8,7 +8,8 @@ against Azure DevOps work items at once, one git worktree per ticket.
 - `docs/TICKETS.md` is the build plan and the status tracker. Pick work from it, update its status
   table as you go, and add to its Decisions and Change log sections when you deviate.
 - `docs/design/DESIGN.md` is the local copy of the design brief (section ids `§1`–`§13`, R1–R11).
-  Screens are in `docs/design/screens/`. Tickets cite these ids; open the cited section before
+  The add-on brief for the team board and drag-to-agent is `docs/design/DESIGN-team-board.md`
+  (cited as TB§n, T1–T9; epic E14). Screens are in `docs/design/screens/`. Tickets cite these ids; open the cited section before
   building a ticket.
 
 ## Working a ticket
