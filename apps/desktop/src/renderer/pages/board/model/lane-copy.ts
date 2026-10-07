@@ -28,3 +28,8 @@ export function ticketCount(count: number): string {
 export function laneBadgeLabel(count: number, needsYou: number): string {
   return needsYou > 0 ? `${ticketCount(count)}, ${needsYou} ${needsYou === 1 ? 'needs' : 'need'} you` : ticketCount(count);
 }
+
+/** An empty lane while the board shows only the tickets that need the user (AL-142). */
+export function needsYouEmptyCopy(name: string): { title: string; body: string } {
+  return { title: `Nothing in ${name} needs you`, body: 'Show all tickets to see the rest.' };
+}

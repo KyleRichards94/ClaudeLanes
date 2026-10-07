@@ -9,10 +9,10 @@ export const LANES_MIN_WIDTH = (LANES.length - 1) * LANE_MIN_WIDTH + COLLAPSED_L
 
 /**
  * The board's lanes, left to right: Queued, Planning, Implementing, Code review, QA, Create PR, then
- * Done (collapsed to a strip by default). They share the width; in a narrower window the row keeps
+ * Done (collapsed to a strip by default). With `needsYouOnly` each lane shows only its cards that need the user. They share the width; in a narrower window the row keeps
  * its minimum width and scrolls horizontally (artboard 1).
  */
-export function BoardLanes({ store = agentTickets }: { store?: AgentTicketStore }) {
+export function BoardLanes({ store = agentTickets, needsYouOnly = false }: { store?: AgentTicketStore; needsYouOnly?: boolean }) {
   return (
     <ScrollView
       horizontal
@@ -23,7 +23,7 @@ export function BoardLanes({ store = agentTickets }: { store?: AgentTicketStore 
     >
       <View style={styles.row}>
         {LANES.map((lane) => (
-          <Lane key={lane} lane={lane} store={store} />
+          <Lane key={lane} lane={lane} store={store} needsYouOnly={needsYouOnly} />
         ))}
       </View>
     </ScrollView>
