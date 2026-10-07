@@ -48,7 +48,7 @@ function ticket(base: string): TicketRecord {
 
 function invoke<T>(page: Page, channel: string, payload?: unknown): Promise<Result<T>> {
   return page.evaluate(
-    ([name, body]) => (window as unknown as { agentLanes: Bridge }).agentLanes.invoke(name as string, body),
+    ([name, body]) => (globalThis as unknown as { agentLanes: Bridge }).agentLanes.invoke(name as string, body),
     [channel, payload] as const,
   ) as Promise<Result<T>>;
 }
