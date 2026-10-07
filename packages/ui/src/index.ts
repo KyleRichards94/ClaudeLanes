@@ -14,3 +14,4 @@ export { TextField, type SecureTextFieldHandle, type TextFieldHandle, type TextF
 export { Modal, type ModalIconTone, type ModalProps } from './Modal';
 export { TabPanel, Tabs, tabId, tabPanelId, type TabItem, type TabPanelProps, type TabStatus, type TabsProps } from './Tabs';
 export { Toast, toastTones, toastWidth, type ToastAction, type ToastProps, type ToastTone } from './Toast';
+export { stepIndex } from './SegmentedControl';

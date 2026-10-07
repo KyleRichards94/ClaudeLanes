@@ -1,10 +1,10 @@
-import { EFFORTS, MODELS, defaultAgentDefaults } from '@agent-lanes/contracts';
+import { EFFORTS, defaultAgentDefaults } from '@agent-lanes/contracts';
 import { useReducer, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, SegmentedControl, Text, TextField, type TextFieldHandle } from '@agent-lanes/ui';
 import { useSettings } from '@/shared/api';
-import { EFFORT_LABELS, MODEL_LABELS } from '@/shared/config';
+import { EFFORT_LABELS } from '@/shared/config';
 import {
   initialForm,
   launchRequest,
@@ -15,6 +15,7 @@ import {
   type NewTicketRequest,
   type WorkItemSource,
 } from '../model/form';
+import { ModelPicker } from './ModelPicker';
 
 export interface NewTicketModalProps {
   visible: boolean;
@@ -42,7 +43,6 @@ const SOURCE_OPTIONS: readonly { value: WorkItemSource; label: string }[] = [
   { value: 'search', label: 'Search' },
   { value: 'none', label: 'No ticket' },
 ];
-const MODEL_OPTIONS = MODELS.map((model) => ({ value: model, label: MODEL_LABELS[model] }));
 const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_LABELS[effort] }));
 
 function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'visible'>) {
@@ -163,7 +163,7 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
             <Text variant="title" size="md">
               Model
             </Text>
-            <SegmentedControl label="Model" options={MODEL_OPTIONS} value={form.model} onChange={(model) => dispatch({ type: 'model', model })} fill />
+            <ModelPicker value={form.model} onChange={(model) => dispatch({ type: 'model', model })} />
           </View>
           <View style={styles.section}>
             <View style={styles.sectionHead}>
