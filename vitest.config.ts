@@ -23,7 +23,7 @@ export default defineConfig({
         test: {
           name: 'main',
           environment: 'node',
-          include: ['apps/desktop/src/main/**/*.test.ts', 'apps/desktop/src/preload/**/*.test.ts'],
+          include: ['apps/desktop/src/main/**/*.test.ts', 'apps/desktop/src/preload/**/*.test.ts', 'apps/desktop/scripts/**/*.test.ts'],
         },
       },
       {

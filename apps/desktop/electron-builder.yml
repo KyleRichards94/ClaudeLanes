@@ -1,6 +1,10 @@
 # Packaging config (ticket AL-007). Windows first; macOS/Linux targets come later.
+# `pnpm package` → release/<version>/Agent Lanes-<version>-setup.exe. The version comes from
+# apps/desktop/package.json; electron-builder stamps it into the exe, the installer and
+# app.getVersion(), so bumping that one field is the whole release-version change.
 appId: au.com.companionsystems.agentlanes
 productName: Agent Lanes
+copyright: Copyright © 2026 Companion Systems
 directories:
   output: release/${version}
   buildResources: build
@@ -8,6 +12,7 @@ files:
   - out/**
   - package.json
 # The Agent SDK launches its native `claude` binary from disk, so it cannot live inside app.asar.
+# The main process resolves it from app.asar.unpacked (src/main/agent/claude-executable.ts).
 asarUnpack:
   - "**/node_modules/@anthropic-ai/claude-agent-sdk*/**"
 # Third-party licence notices, installed next to Electron's LICENSE files (AL-021: the SIL OFL
@@ -16,6 +21,7 @@ extraFiles:
   - from: licenses
     to: licenses
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -25,3 +31,11 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Agent Lanes
+  uninstallDisplayName: Agent Lanes
+  # Drops the installer copy electron-builder leaves in %LOCALAPPDATA% for an auto-updater we do not use.
+  include: build/installer.nsh
+  # Uninstall removes the program folder, shortcuts and registry entries and keeps the user's app
+  # data folder (%APPDATA%\Agent Lanes: connections, settings, ticket records).
+  deleteAppDataOnUninstall: false
