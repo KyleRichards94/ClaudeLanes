@@ -28,6 +28,43 @@ export const ADO_SCOPES = ['work-items', 'code', 'build'] as const;
 export const AdoScopeSchema = z.enum(ADO_SCOPES);
 export type AdoScope = z.infer<typeof AdoScopeSchema>;
 
+/** Read or write access to one PAT area (AL-043). */
+export const ADO_SCOPE_ACCESS = ['read', 'write'] as const;
+export const AdoScopeAccessSchema = z.enum(ADO_SCOPE_ACCESS);
+export type AdoScopeAccess = z.infer<typeof AdoScopeAccessSchema>;
+
+/**
+ * What the app knows about one area and access (AL-043). `granted`: a call that needs it worked.
+ * `missing`: Azure DevOps refused one (401/403 on a test probe, 403 on a later call). `unverified`:
+ * not proven either way. Write access can't be tested without writing, so it stays unverified
+ * until the first write ("verified on first write"); a read probe that failed for another reason
+ * (a timeout, a 404) stays unverified too.
+ */
+export const ADO_SCOPE_CHECK_STATUSES = ['granted', 'missing', 'unverified'] as const;
+export const AdoScopeCheckStatusSchema = z.enum(ADO_SCOPE_CHECK_STATUSES);
+export type AdoScopeCheckStatus = z.infer<typeof AdoScopeCheckStatusSchema>;
+
+export const AdoScopeCheckSchema = z.object({
+  scope: AdoScopeSchema,
+  access: AdoScopeAccessSchema,
+  status: AdoScopeCheckStatusSchema,
+});
+export type AdoScopeCheck = z.infer<typeof AdoScopeCheckSchema>;
+
+/** Design §8: Work Items (read & write), Code (read & write) and Build (read), in chip order. */
+export const REQUIRED_ADO_SCOPE_ACCESS: ReadonlyArray<{ readonly scope: AdoScope; readonly access: AdoScopeAccess }> = [
+  { scope: 'work-items', access: 'read' },
+  { scope: 'work-items', access: 'write' },
+  { scope: 'code', access: 'read' },
+  { scope: 'code', access: 'write' },
+  { scope: 'build', access: 'read' },
+];
+
+/** The areas with any access missing, in chip order: what `missingScopes` holds. */
+export function missingScopesOf(checks: ReadonlyArray<Pick<AdoScopeCheck, 'scope' | 'status'>>): AdoScope[] {
+  return ADO_SCOPES.filter((scope) => checks.some((check) => check.scope === scope && check.status === 'missing'));
+}
+
 /** Claude signs in with the user's existing Claude Code login, or an API key given to sessions as `ANTHROPIC_API_KEY` (Q4, AL-044). */
 export const CLAUDE_AUTH_MODES = ['login', 'api-key'] as const;
 export const ClaudeAuthModeSchema = z.enum(CLAUDE_AUTH_MODES);
@@ -109,7 +146,10 @@ export const AdoConnectionSummarySchema = ConnectionRowSchema.extend({
   /** Normalised, e.g. `https://dev.azure.com/CompanionSystems`. */
   orgUrl: z.string().min(1),
   defaultProject: z.string().min(1).nullable(),
-  /** Scopes the last test found missing; empty when untested or when all are there. */
+  /**
+   * Scopes the last test found missing, plus any a later call was refused with 403 (a write the test
+   * could not check, AL-043); empty when untested or when all are there.
+   */
   missingScopes: z.array(AdoScopeSchema),
 });
 export type AdoConnectionSummary = z.infer<typeof AdoConnectionSummarySchema>;
@@ -211,6 +251,17 @@ export const ConnectionTestResultSchema = z.object({
   message: z.string().nullable(),
   /** ADO only (AL-043); always empty for Claude and MCP servers. */
   missingScopes: z.array(AdoScopeSchema),
+  /**
+   * ADO only (AL-043): each required area and access (`REQUIRED_ADO_SCOPE_ACCESS`) with what the
+   * test found; write access is `unverified` unless the read already failed. Empty for Claude and
+   * MCP servers, and when the token itself was refused.
+   */
+  scopes: z.array(AdoScopeCheckSchema),
+  /**
+   * ADO only (AL-043): names of the projects the token can see, for the Default project dropdown.
+   * Null when they weren't loaded: not ADO, a failed test, or a token that may not list projects.
+   */
+  projects: z.array(z.string().min(1)).nullable(),
   testedAt: z.iso.datetime(),
 });
 export type ConnectionTestResult = z.infer<typeof ConnectionTestResultSchema>;
