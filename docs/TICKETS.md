@@ -57,7 +57,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-022 | GlassPanel | E2 | S | AL-020 | done |
 | AL-023 | Text primitives | E2 | S | AL-021 | done |
 | AL-024 | Button | E2 | S | AL-023 | todo |
-| AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | todo |
+| AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | done |
 | AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | todo |
 | AL-027 | TextField | E2 | S | AL-023 | todo |
 | AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
@@ -94,7 +94,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-089 | Diff provider | E5 | S | AL-083 | todo |
 | AL-090 | Start-up reconciliation | E5 | M | AL-083, AL-101 | todo |
 | AL-100 | Session manager core | E6 | L | AL-083, AL-044 | todo |
-| AL-101 | Ticket records | E6 | M | AL-041 | todo |
+| AL-101 | Ticket records | E6 | M | AL-041 | done |
 | AL-102 | Output normalisation and transcript buffer | E6 | L | AL-100, AL-012 | todo |
 | AL-103 | Stage protocol: `agent_lanes` MCP server | E6 | M | AL-100 | todo |
 | AL-104 | Stage gates | E6 | M | AL-103 | todo |
@@ -335,8 +335,8 @@ colour alone.
 - **Design:** artboards 1, 6 · **Depends on:** AL-023
 - **Scope:** `Pill` (tone: claude, ado, ok, attention, danger, neutral; optional dot); `Badge` (lane counts, amber variant); `StatusBadge` with fixed words — Running, Done, Queued, Needs you, Switching · next turn; `IdChip` (mono `#71273` on ADO tint).
 - **Acceptance criteria:**
-  - [ ] Every status pill carries a word, not only a colour.
-  - [ ] Matches the "Status badges" block on artboard 6.
+  - [x] Every status pill carries a word, not only a colour.
+  - [x] Matches the "Status badges" block on artboard 6.
 
 #### AL-026 · SegmentedControl and Switch
 - **Design:** artboards 2, 3 · **Depends on:** AL-023
@@ -611,8 +611,8 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §6, R2, Decision D8 · **Depends on:** AL-041
 - **Scope:** App-written JSON per ticket in `<userData>/tickets/<repoKey>/<ticketId>.json`: ADO ref, repo, branch, worktree path, sub-branches, stage + stage timestamps, gates, model, effort, skills, session id, last build/run, design link + spec versions (E11). Atomic write (temp + rename), zod-validated on read, debounced writes.
 - **Acceptance criteria:**
-  - [ ] Killing the app mid-write never corrupts a record (test with interrupted write).
-  - [ ] Nothing is written inside a worktree (keeps it clean for GIT_DIRTY).
+  - [x] Killing the app mid-write never corrupts a record (test with interrupted write).
+  - [x] Nothing is written inside a worktree (keeps it clean for GIT_DIRTY).
 
 #### AL-102 · Output normalisation and transcript buffer
 - **Design:** §6 Live events, artboard 3 Output · **Depends on:** AL-100, AL-012
@@ -1348,6 +1348,33 @@ implementation agent, mid-run if needed.
 | D250 | AL-191: Electron code sits in `design/electron-platform.ts` behind `DesignViewPlatform`; `view-service.ts` and `guards.ts` are plain logic tested with fakes | Testable in the Vitest main project | 2026-10-07 |
 | D251 | AL-191: Renderer piece is `useDesignViewSlot(ticketId, url)` in `shared/api/design-view.ts`, not a new FSD slice | A slice nothing imports fails Steiger's insignificant-slice rule; AL-192 uses it | 2026-10-07 |
 | D252 | AL-191: `services.ts` gains `designView` plus options `mainWindow` and `designTestOrigin`; `disposeServices` closes the views and calls `cookies.flushStore()`; `main/index.ts` passes these options | The service needs the window; sign-in survives restarts | 2026-10-07 |
+| D253 | AL-025: Every tone in `packages/tokens/src/tones.ts` gains a `dot` colour (claude #5B4BC4, ado #0369A1, attention #D97706, danger #B91C1C, ok #059669), mirrored as `--al-tone-*-dot`; tests check they equal the matching `color` tokens. Status dots use the tone's strong colour, not its text colour | Matches the artboard 6 dots | 2026-10-07 |
+| D254 | AL-025: New `neutral` tone (band #F1F5F9, text #475569, dot #94A3B8, sampled from artboard 6 "Queued") in tones.ts and the CSS; text about 6.9:1 on its band | §11 had no grey for idle states | 2026-10-07 |
+| D255 | AL-025: `PillTone` is the tokens `Tone` type (claude, ado, ok, attention, danger, neutral); `Pill` defaults to neutral, size `sm`, no dot | One tone vocabulary for tokens and UI | 2026-10-07 |
+| D256 | AL-025: Pill sizes `sm` = 22 px, bold 12/16, 8 px sides (artboard 6 status badges) and `md` = 28 px, 14/20 body weight, 10 px sides (artboard 1 header counts such as "4 running", "MCP online"; the artboard looks ~13 px, 14 is the nearest fontSize step) | Both artboard sizes are needed | 2026-10-07 |
+| D257 | AL-025: Pill `label` is a required string (no icon-only or empty form); the dot is `aria-hidden`, so a screen reader reads only the word | No colour-only pill is possible through the API | 2026-10-07 |
+| D258 | AL-025: Pill and IdChip text is one line (`numberOfLines={1}`), `alignSelf: flex-start`, `flexShrink: 0` | A pill hugs its label and its word is never squeezed or cut | 2026-10-07 |
+| D259 | AL-025: StatusBadge statuses are kebab-case `running \| done \| queued \| needs-you \| switching` (`BadgeStatus`, `badgeStatuses`, `statusLabel()`); "Switching · next turn" uses the ado tone with no dot, as on the artboard | Matches contracts' vocabulary style | 2026-10-07 |
+| D260 | AL-025: One colour set per tone, from the artboard 6 status badges; artboard 1's slightly darker header-pill text ("1 queued" #334155, "MCP online" #065F46) is not copied | One-off differences; one source of truth | 2026-10-07 |
+| D261 | AL-025: `Badge` is white with neutral text, or amber (attention band and text); minWidth 40, 24 px tall, bold 12 px. Negative or non-finite counts show 0, fractions are floored | Artboard 1/6 lane badges | 2026-10-07 |
+| D262 | AL-025: `Badge` has role="img" and an accessible name: the count, plus ", needs you" for amber by default, and an optional `label` prop for a fuller name (e.g. "3 tickets, 1 needs you") | The amber is never the only signal | 2026-10-07 |
+| D263 | AL-025: `IdChip` is mono 11 px weight 400, #0369A1 on #E0F2FE, radius 8 (chip), 6 px sides, 19 px tall. The artboard's id looks bold, but only JetBrains Mono 400 is bundled (§11, AL-021) | Sizes measured from artboards 1 and 6 | 2026-10-07 |
+| D264 | AL-025: `IdChip` takes a number or string id and drops a leading "#" and spaces | Callers can pass either form | 2026-10-07 |
+| D265 | AL-101: `TicketIdSchema` (contracts `events.ts`) tightened as D37 asked: AL-082's folder format, lowercase ASCII words joined by single dashes, at most 64 chars, never a Windows device name (`con`, `nul`, …); `TICKET_ID_PATTERN` and `TICKET_ID_MAX_LENGTH` exported. The build queue's `ticketId: z.string().min(1)` is unchanged | The id is used as a file and folder name; queue tests still use 'AL-1' ids | 2026-10-07 |
+| D266 | AL-101: `TicketRecordSchema` (version 1) lives in `contracts/src/domains/tickets.schemas.ts`; no IPC channels added. Fields: id, title, ado {orgUrl, project, workItemId} or null, repo, baseBranch, branch, worktreePath, subBranches, stage, stageHistory, gates (settings `StageGatesSchema`), model, effort, skills, sessionId, lastBuild, lastRun, design, createdAt, updatedAt | Scope is storage only | 2026-10-07 |
+| D267 | AL-101: Record has a `title` (beyond the scope list) | A "No ticket" card can be rebuilt after a restart without asking ADO | 2026-10-07 |
+| D268 | AL-101: Timestamps are epoch milliseconds | Same as events (D36) | 2026-10-07 |
+| D269 | AL-101: Stage times are a `stageHistory` list capped at 200 entries; callers only set `stage`, the store adds the history entry and stamps `updatedAt` | Code review and QA can send a ticket back to Implementing (§9), so a stage can be entered more than once | 2026-10-07 |
+| D270 | AL-101: `repoKey` = the repo folder name made file-safe plus 12 hex chars of the SHA-256 of its normalized path (lowercased on Windows), e.g. `onsite-companion-3f2a9c1b04d7` | Readable, and same-named repos never share a folder | 2026-10-07 |
+| D271 | AL-101: Ticket ids are unique across all repos; `create` refuses an id that exists in another repo | Events and the renderer identify tickets by id alone | 2026-10-07 |
+| D272 | AL-101: Writes debounced: 250 ms after the last change, at most 1 s after the first unsaved change. `create`/`delete` reach disk before resolving; `flush(id?)` writes now; `dispose()` flushes all (in `disposeServices` after the build queue) and later writes are immediate. A failed write stays in memory, retries after 5 s, and `flush` reports INTERNAL | Fewer writes without losing changes on quit | 2026-10-07 |
+| D273 | AL-101: A record that is not valid JSON or fails the schema is renamed `<id>.corrupt-<time>.json` and reported by `issues()`; a newer-version record is left alone and never overwritten; `create` never replaces a file the loader did not read; when one id has records in two repo folders the newer `updatedAt` wins and the other is reported | Never lose or clobber data | 2026-10-07 |
+| D274 | AL-101: The store refuses (VALIDATION) non-absolute repo or worktree paths, and any record whose file would land inside its repo, worktree or a sub-branch worktree | The keep-out-of-worktrees check needs absolute paths | 2026-10-07 |
+| D275 | AL-101: `design` holds AL-190's `DesignCanvasRefSchema`, `lastViewUrl` (https://claude.ai/ only) and one entry per shipped spec version (version, shippedAt, approvedBy, artboardCount, usedAt), versions increasing; spec content is AL-197's. Embed mode stays in settings `ui.embedModeByTicket` (AL-041) | One home per value | 2026-10-07 |
+| D276 | AL-101: `lastBuild` = {outcome succeeded/failed/cancelled, startedAt, finishedAt, errors, warnings}; `lastRun` = {startedAt, stoppedAt, exitCode, url} | What the card and drill-in show after a restart | 2026-10-07 |
+| D277 | AL-101: `tickets/atomic-file.ts` has its own small rename-with-retry helper rather than exporting AL-040's private one | No refactoring other tickets' code | 2026-10-07 |
+| D278 | AL-101: The kill test runs the real store in a plain Node child via Node's type stripping and a resolve hook (`testing/strip-types-hooks.mjs`); needs Node ≥ 22.15 for `registerHooks` | No tsx/esbuild dependency; fits `>=22.18` | 2026-10-07 |
+| D279 | AL-101: e2e `tickets.spec.ts` checks start-up loading, corrupt records set aside, temp files removed, and no rewrite of unchanged records on quit. Test helpers for AL-090/AL-110 in `src/main/tickets/testing`: `newTicketInput`, `createTempDir`, `listTree`, `createMemoryRecordFs`, `createCrashingFs` | Proves the store is wired into the real app | 2026-10-07 |
 
 ---
 
@@ -1385,6 +1412,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 6: merged AL-140, AL-080 and AL-062 (done). AL-080 conflicted with AL-012/AL-041/AL-131 in `main/index.ts` and `services.ts` (kept both sides: `emit`, `settings`, `buildQueue` + `git`); AL-062 conflicted with AL-061 in `ado.schemas.ts` and `ado-client/src/index.ts` (kept both: sprint block, then work-item block above the channel contracts). Integration fix: AL-140's placeholder pages render text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. D13 implemented (now dated). Decisions D159–D192. `pnpm verify` green (908 unit tests), e2e 31/31. AL-080's agent could not push its branch (Git Credential Manager account prompt); it was merged from the local branch. Drive C: had about 1.6 GB free. |
 | 2026-10-07 | Integrator batch 7: merged AL-214 (done). Registration conflicts kept both sides: `services.ts` (`settings`, `buildQueue`, `git` + `log`, `diagnostics`), `ipc/handlers.ts` (settings, build + diagnostics), renderer `shared/api/index.ts` (settings/event-handler + diagnostics exports) and `main.tsx` (`startEventHub()` + `installErrorReporting()` and the `AppErrorRoot` wrapper). At merge, AL-214's follow-ups for AL-041 were applied: diagnostics read `settings.get()` and the settings service warns to the log. Integration fix: `ErrorFallback` renders text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. Decisions D193–D206. `pnpm verify` green (1031 unit tests), e2e 34/34. Follow-ups: AL-210 reuses `ErrorBoundary`/`ErrorFallback`; swap `ActionButton` for AL-024's Button; later services take `services.log.child('<scope>')`. |
 | 2026-10-07 | Integrator batch 8: merged AL-042 and AL-191 (done), AL-063 (partial: "visible in ADO" needs one manual check against a real org) and AL-064 (partial: card text and move to Done wait for AL-065/AL-144/AL-181; data side done). Registration conflicts kept both sides: `ado-client/src/index.ts` (AL-061/062 sprint and work-item exports + AL-064 PRs + AL-063 write-back), `contracts/src/index.ts` (`ado.pull-requests` + `ado.write-back`), `services.ts` (`git`, `log`, `diagnostics` + `connections` + `designView`), `ipc/handlers.ts` (build, diagnostics + connections + design) and `main/index.ts` (AL-214 logger wiring + AL-191 `mainWindow`/`designTestOrigin` options). At merge the connections service's warnings go to `log.child('connections')`. Integration fix: AL-063/AL-064 DTOs use AL-062's `WorkItemIdSchema` (D219). Lockfile unchanged after `pnpm install`. Decisions D207–D252. `pnpm verify` green (1337 unit tests), e2e 44/44. Follow-ups: AL-065 registers `createWorkItemWriteBack` and the PR channels; AL-047 raises Reconnect for `needsReconnect` rows (closes AL-040). |
+| 2026-10-07 | Integrator batch 9: merged AL-025 and AL-101 (done). AL-101 conflicted in `services.ts` (kept both sides: `git`, `log`, `diagnostics`, `connections`, `designView` + `tickets`; `disposeServices` flushes tickets after the build queue, then closes the design views). At merge the ticket store's warnings go to `log.child('tickets')` (AL-101 follow-up for AL-214). Integration fix: real-git `record-store.worktree.test.ts` gets the 60 s timeouts `src/main/git` uses, and `AppRouter.test.tsx` 30 s (its cold first import passed 5 s under the full suite). Lockfile unchanged after `pnpm install`. Decisions D253–D279. `pnpm verify` green (1506 unit tests), e2e 45/45. Follow-ups: live-dock "Live" pill needs a filled Pill variant; drill-in may want an `xs` Pill and larger IdChip; AL-021's fonts e2e can point at IdChip once AL-144 lands; AL-032's gallery can use `pillTones`/`badgeStatuses`; `tickets:*` IPC channels for AL-090/AL-141/AL-165; same work item in two repos gives a duplicate ticket id (AL-083/AL-161); AL-197 stores specs outside `<repoKey>/<ticketId>.json`; AL-088's archive list not built (`delete` exists for AL-083 rollback); AL-100/AL-110 call `services.tickets.flush(id)` for must-save values; `nameSubAgent` and `BuildJobSchema.ticketId` can reuse `TICKET_ID_PATTERN`/`TicketIdSchema`. |
 
 ---
 
