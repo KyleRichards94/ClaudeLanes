@@ -340,3 +340,34 @@ describe('SecretStore', () => {
     });
   });
 });
+
+describe('SecretStore onPlaintext (AL-214)', () => {
+  it('reports each secret it saves or decrypts, so the log can redact it', async () => {
+    const seen: string[] = [];
+    const store = openStore({ onPlaintext: (secret) => seen.push(secret) });
+    await store.put('ado:contoso', PAT);
+    await store.get('ado:contoso');
+    await store.get('ado:missing');
+    await store.list();
+
+    expect(seen).toEqual([PAT, PAT]);
+  });
+
+  it('reports a secret even when it cannot be encrypted, and survives a throwing listener', async () => {
+    const seen: string[] = [];
+    safeStorage.available = false;
+    await expect(openStore({ onPlaintext: (secret) => seen.push(secret) }).put('claude:api-key', API_KEY)).rejects.toMatchObject({
+      code: 'ENCRYPTION_UNAVAILABLE',
+    });
+    expect(seen).toEqual([API_KEY]);
+
+    safeStorage.available = true;
+    const throwing = openStore({
+      onPlaintext: () => {
+        throw new Error('listener failed');
+      },
+    });
+    await throwing.put('ado:contoso', PAT);
+    await expect(throwing.get('ado:contoso')).resolves.toBe(PAT);
+  });
+});
