@@ -53,7 +53,7 @@ async function readText(path: string): Promise<string | null> {
     try {
       const stats = await handle.stat();
       if (!stats.isFile() || stats.size > MAX_DETECT_FILE_BYTES) return null;
-      return (await handle.readFile({ encoding: 'utf8' })).replace(/^﻿/, '');
+      return (await handle.readFile({ encoding: 'utf8' })).replace(/^\uFEFF/, '');
     } finally {
       await handle.close();
     }

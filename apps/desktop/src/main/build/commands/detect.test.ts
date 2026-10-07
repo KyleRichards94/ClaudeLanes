@@ -29,7 +29,7 @@ const FOLDER = '{2150E333-8FDC-42A3-9474-1A3956D46DE8}';
 
 function sln(projects: ReadonlyArray<[type: string, name: string, path: string]>): string {
   return (
-    '﻿' +
+    '\uFEFF' +
     SLN_HEADER +
     projects.map(([type, name, path], i) => `Project("${type}") = "${name}", "${path}", "{0000000${i}-0000-0000-0000-000000000000}"\r\nEndProject\r\n`).join('') +
     'Global\r\nEndGlobal\r\n'
