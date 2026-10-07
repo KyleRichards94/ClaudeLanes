@@ -1,4 +1,4 @@
-import { defaultSettings, err } from '@agent-lanes/contracts';
+import { defaultSettings, err, ok } from '@agent-lanes/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createBuildCommands } from './commands';
@@ -12,7 +12,8 @@ function handlers(concurrency = 2) {
   return createBuildHandlers({
     buildQueue: queue,
     buildCommands: createBuildCommands({ settings: { get: defaultSettings } }),
-    builds: { build: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)) },
+    builds: { build: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), isStale: () => Promise.resolve(true) },
+    runs: { start: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), list: () => [], openUrl: () => Promise.resolve(ok({ opened: false })) },
   });
 }
 

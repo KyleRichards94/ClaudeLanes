@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { invokeContracts, eventContracts } from '../schemas';
-import { buildCardState, buildFailedLabel, diagnosticActivity, lastBuildLabel, shortDiagnosticMessage } from './build.display';
+import { buildCardState, buildFailedLabel, diagnosticActivity, lastBuildLabel, runLabel, runUrlHost, shortDiagnosticMessage } from './build.display';
 import { BuildLogEventSchema, BuildResultSchema, type BuildDiagnostic } from './build.schemas';
 import { TicketLastBuildSchema } from './tickets.schemas';
 
@@ -86,5 +86,43 @@ describe('build contracts (AL-132)', () => {
       finishedAt: 2,
     });
     expect(result.errors).toBe(3);
+  });
+});
+
+describe('run label (AL-133)', () => {
+  it('shows "Running · localhost:5080" for a web app and "Running" for a desktop app', () => {
+    expect(runLabel({ state: 'running', url: 'http://localhost:5080/' })).toBe('Running · localhost:5080');
+    expect(runLabel({ state: 'running', url: null })).toBe('Running');
+    expect(runUrlHost('https://127.0.0.1:7001/swagger?x=1')).toBe('127.0.0.1:7001');
+  });
+
+  it('says what a run is doing, and "Not running" without one', () => {
+    expect(runLabel(null)).toBe('Not running');
+    expect(runLabel({ state: 'building', url: null })).toBe('Building…');
+    expect(runLabel({ state: 'starting', url: null })).toBe('Starting…');
+    expect(runLabel({ state: 'stopping', url: 'http://localhost:5080/' })).toBe('Stopping…');
+    expect(runLabel({ state: 'stopped', url: 'http://localhost:5080/' })).toBe('Not running');
+    expect(runLabel({ state: 'failed', url: null })).toBe('Run failed');
+  });
+
+  it('declares run:start, run:list and run:openUrl, and a full run:status payload', () => {
+    expect(invokeContracts['run:start'].request.safeParse({ ticketId: '71273' }).success).toBe(true);
+    expect(invokeContracts['run:list'].response.safeParse({ runs: [] }).success).toBe(true);
+    expect(invokeContracts['run:openUrl'].response.safeParse({ opened: true }).success).toBe(true);
+    const status = {
+      ticketId: '71273',
+      runId: 'r1',
+      state: 'running',
+      runKind: 'web',
+      port: 5080,
+      url: 'http://localhost:5080/',
+      startedAt: 1,
+      stoppedAt: null,
+      exitCode: null,
+      message: null,
+    };
+    expect(eventContracts['run:status'].safeParse({ ...status, at: 2 }).success).toBe(true);
+    expect(eventContracts['run:status'].safeParse({ ...status, ticketId: undefined, at: 2 }).success).toBe(false);
+    expect(eventContracts['run:status'].safeParse({ ...status, port: 70_000, at: 2 }).success).toBe(false);
   });
 });

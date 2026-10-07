@@ -4,6 +4,9 @@ export const BUILD_INVOKE_CHANNELS = [
   'build:cancel',
   'build:commands',
   'build:start',
+  'run:start',
+  'run:list',
+  'run:openUrl',
 ] as const;
 export const BUILD_EVENT_CHANNELS = [
   'build:log',
