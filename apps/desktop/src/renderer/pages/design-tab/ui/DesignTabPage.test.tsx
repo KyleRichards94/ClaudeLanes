@@ -98,6 +98,28 @@ describe('DesignTabPage', () => {
     }
   });
 
+  it('offers the design thread in every stage, Planning included, in MCP link mode (AL-196, R11)', async () => {
+    const thread = { ticketId: '71273', status: 'idle', reason: null, messages: [], approval: null };
+    for (const stage of LANES) {
+      agentTickets.load([]);
+      useUiPrefs.setState({ embedModeByTicket: { '71273': 'mcp-link' } });
+      const { bridge } = renderPage(linkedRecord({ stage }), {
+        'design:getThread': { ok: true, data: thread },
+        'design:listArtboards': { ok: true, data: { status: 'ok', artboards: [], readAt: 1 } },
+      });
+      expect(await screen.findByRole('textbox', { name: 'Message to the design side' })).toBeTruthy();
+      await waitFor(() => expect(calls(bridge, 'design:getThread')).toEqual([{ ticketId: '71273' }]));
+      cleanup();
+    }
+  });
+
+  it('uses the in-app design thread when the webview cannot sign in', async () => {
+    renderPage(linkedRecord(), { 'design:getThread': { ok: true, data: { ticketId: '71273', status: 'idle', reason: null, messages: [], approval: null } } });
+    expect(await screen.findByTestId('design-thread-canvas-chat')).toBeTruthy();
+    viewEvent('signed-out');
+    expect(await screen.findByRole('textbox', { name: 'Message to the design side' })).toBeTruthy();
+  });
+
   it('asks main to open the linked canvas over the placeholder', async () => {
     const { bridge } = renderPage(linkedRecord());
     await screen.findByTestId('design-canvas-slot');

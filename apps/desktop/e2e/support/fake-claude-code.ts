@@ -9,7 +9,11 @@ export interface FakeClaudeState {
   apiKeys?: string[];
   log?: string;
   /** Claude Design access, and the artboards a design session answers with (AL-195). */
-  design?: { artboards: { id: string; name: string; width: number | null; height: number | null }[] };
+  design?: {
+    artboards: { id: string; name: string; width: number | null; height: number | null }[];
+    /** What the design thread's session answers each message with (AL-196); `{prompt}` is the message. */
+    reply?: string;
+  };
 }
 
 export const FAKE_LOGIN = { email: 'kyle@example.com', organization: 'Example', subscriptionType: 'max' } as const;

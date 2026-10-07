@@ -9,7 +9,8 @@ import { setDesignViewState, useDesignViewState, useEmbedMode, useUiPrefs } from
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { BrowserBar } from './BrowserBar';
 import { DesignHeader } from './DesignHeader';
-import { EmbedModeSection } from './EmbedModeSection';
+import { DesignThreadSection } from './DesignThreadSection';
+import { EmbedModeSection, webviewSignInFailed } from './EmbedModeSection';
 import { HandOffSection } from './HandOffSection';
 import { LinkCanvasForm } from './LinkCanvasForm';
 import { AttachedSection } from './SideSection';
@@ -85,6 +86,7 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
         <ScrollView style={styles.side} contentContainerStyle={styles.sideContent} testID="design-side-panel">
           <EmbedModeSection mode={mode} onChange={(next) => setEmbedMode(ticketId, next)} status={view?.status} />
           <HandOffSection ticketId={ticketId} canvasUrl={canvas?.url} />
+          <DesignThreadSection ticketId={ticketId} canvasLinked={canvas !== null} inApp={mode === 'mcp-link' || webviewSignInFailed(view?.status)} />
           <AttachedSection specs={record?.design.specs ?? []} />
         </ScrollView>
       </View>

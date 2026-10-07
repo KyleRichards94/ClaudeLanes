@@ -44,3 +44,10 @@ export {
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
+export {
+  designThreadEventHandlers,
+  designThreadQueryKey,
+  useAnswerDesignApproval,
+  useDesignThread,
+  useSendDesignMessage,
+} from './design-thread';
