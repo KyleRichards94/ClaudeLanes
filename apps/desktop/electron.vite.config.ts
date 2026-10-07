@@ -50,6 +50,8 @@ export default defineConfig(({ command }) => ({
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
       },
+      // Bundled fonts (AL-021) stay files: the CSP allows `font-src 'self'` only, so no data: URIs.
+      assetsInlineLimit: (filePath: string) => (/\.woff2?$/.test(filePath) ? false : undefined),
     },
     plugins: [
       react({

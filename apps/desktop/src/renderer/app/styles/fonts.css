@@ -1,0 +1,11 @@
+/*
+ * Bundled fonts (AL-021, design §11 Type): Plus Jakarta Sans 500 / 700 / 800 and JetBrains Mono 400.
+ * The woff2 files are bundled into the renderer build and load from the app itself (CSP
+ * `font-src 'self'`), so text renders the same with no network. The family names match
+ * `font.sans` / `font.mono` in @agent-lanes/tokens.
+ * Both fonts are SIL OFL 1.1; their licences ship with the app from apps/desktop/licenses/.
+ */
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+@import '@fontsource/plus-jakarta-sans/800.css';
+@import '@fontsource/jetbrains-mono/400.css';
