@@ -13,3 +13,4 @@ export { Button, buttonSizes, buttonVariants, type ButtonProps, type ButtonSize,
 export { TextField, type SecureTextFieldHandle, type TextFieldHandle, type TextFieldProps, type TextFieldVariant } from './TextField';
 export { Modal, type ModalIconTone, type ModalProps } from './Modal';
 export { TabPanel, Tabs, tabId, tabPanelId, type TabItem, type TabPanelProps, type TabStatus, type TabsProps } from './Tabs';
+export { Toast, toastTones, toastWidth, type ToastAction, type ToastProps, type ToastTone } from './Toast';
