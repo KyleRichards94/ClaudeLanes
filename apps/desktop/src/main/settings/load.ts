@@ -49,6 +49,13 @@ function toCurrent(document: unknown, dropped: string[]): Settings {
     repos: salvageRepos(stored['repos'], dropped),
     defaults: salvageObject(AgentDefaultsSchema, stored['defaults'], fallback.defaults, 'defaults', dropped),
     buildQueueSize: salvageValue(SettingsSchema.shape.buildQueueSize, stored['buildQueueSize'], fallback.buildQueueSize, 'buildQueueSize', dropped),
+    adoStateTransitions: salvageValue(
+      SettingsSchema.shape.adoStateTransitions,
+      stored['adoStateTransitions'],
+      fallback.adoStateTransitions,
+      'adoStateTransitions',
+      dropped,
+    ),
     ui: salvageObject(UiPrefsSchema, stored['ui'], fallback.ui, 'ui', dropped),
   };
   // Valid by construction; parse anyway so a mistake here fails loudly instead of saving bad settings.

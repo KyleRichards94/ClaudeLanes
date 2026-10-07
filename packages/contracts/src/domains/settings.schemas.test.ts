@@ -27,6 +27,13 @@ describe('settings contract', () => {
     expect(settings.buildQueueSize).toBe(2);
   });
 
+  it('leaves ADO state transitions off by default (AL-063)', () => {
+    expect(defaultSettings().adoStateTransitions).toBe(false);
+    expect(SettingsPatchSchema.parse({ adoStateTransitions: true })).toEqual({ adoStateTransitions: true });
+    expect(SettingsPatchSchema.safeParse({ adoStateTransitions: 'yes' }).success).toBe(false);
+    expect(SettingsSchema.safeParse({ ...defaultSettings(), adoStateTransitions: undefined }).success).toBe(false);
+  });
+
   it('gates Planning and Create PR by default, as design §9 says', () => {
     expect(defaultStageGates()).toEqual({
       planning: 'approval',

@@ -37,6 +37,7 @@ const expectedV2: Settings = {
     skills: [],
   },
   buildQueueSize: 2,
+  adoStateTransitions: false,
   ui: { lastRepo: repoPath, lastSprint: null, collapsedLanes: ['queued', 'done'], embedModeByTicket: {} },
 };
 

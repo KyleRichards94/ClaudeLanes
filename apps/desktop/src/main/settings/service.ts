@@ -81,7 +81,7 @@ function load(file: SettingsFile, warn: (message: string) => void): Settings {
 function applyPatch(settings: Settings, patch: SettingsPatch): Settings {
   return {
     ...settings,
-    ...definedEntries({ repos: patch.repos, buildQueueSize: patch.buildQueueSize }),
+    ...definedEntries({ repos: patch.repos, buildQueueSize: patch.buildQueueSize, adoStateTransitions: patch.adoStateTransitions }),
     defaults: { ...settings.defaults, ...definedEntries(patch.defaults) },
     ui: { ...settings.ui, ...definedEntries(patch.ui) },
   };

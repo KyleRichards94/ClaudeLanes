@@ -89,6 +89,11 @@ export const SettingsSchema = z.object({
   repos: ReposSchema,
   defaults: AgentDefaultsSchema,
   buildQueueSize: z.int().min(1).max(BUILD_QUEUE_SIZE_LIMIT),
+  /**
+   * Let the app move work items to another state in ADO (AL-063, design §7). Off by default: until
+   * the user turns it on (AL-146), only comments are written back.
+   */
+  adoStateTransitions: z.boolean(),
   ui: UiPrefsSchema,
 });
 export type Settings = z.infer<typeof SettingsSchema>;
@@ -101,6 +106,7 @@ export const SettingsPatchSchema = z.strictObject({
   repos: ReposSchema.optional(),
   defaults: z.strictObject(AgentDefaultsSchema.shape).partial().optional(),
   buildQueueSize: SettingsSchema.shape.buildQueueSize.optional(),
+  adoStateTransitions: SettingsSchema.shape.adoStateTransitions.optional(),
   ui: z.strictObject(UiPrefsSchema.shape).partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
@@ -128,6 +134,7 @@ export function defaultSettings(): Settings {
     repos: [],
     defaults: defaultAgentDefaults(),
     buildQueueSize: DEFAULT_BUILD_QUEUE_SIZE,
+    adoStateTransitions: false,
     ui: defaultUiPrefs(),
   };
 }
