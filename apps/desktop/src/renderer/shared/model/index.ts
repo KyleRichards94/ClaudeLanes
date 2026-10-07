@@ -31,3 +31,4 @@ export {
   type TicketPageTab,
   type TicketTab,
 } from './ticket-tabs';
+export { designViewEventHandlers, resetDesignViews, setDesignViewState, useDesignViewState } from './design-views';

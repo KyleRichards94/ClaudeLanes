@@ -5,6 +5,7 @@ export const DESIGN_INVOKE_CHANNELS = [
   'design:hide', // AL-191
   'design:close', // AL-191
   'design:getView', // AL-191
+  'design:reload', // AL-192
 ] as const;
 export const DESIGN_EVENT_CHANNELS = [
   'design:spec',

@@ -1,71 +1,169 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { color, minTarget, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel, Text } from '@agent-lanes/ui';
-import { routes, useNavigation } from '@/shared/routing';
+import { useEffect } from 'react';
+import { Linking, ScrollView, StyleSheet, View } from 'react-native';
+import type { TicketRecord } from '@agent-lanes/contracts';
+import { color, radius, shadow, space } from '@agent-lanes/tokens';
+import { Text } from '@agent-lanes/ui';
+import { agentTickets, ticketFromRecord, useAgentTicket } from '@/entities/agent-ticket';
+import { invoke, useDesignViewSlot, useTicketRecord } from '@/shared/api';
+import { setDesignViewState, useDesignViewState, useEmbedMode } from '@/shared/model';
+import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
+import { BrowserBar } from './BrowserBar';
+import { DesignHeader } from './DesignHeader';
+import { AttachedSection } from './SideSection';
 
 export interface DesignTabPageProps {
   ticketId: string;
 }
 
 /**
- * Route `ticket/:id/design`, the ticket's Claude Design tab (artboard 4). Only the top bar and the
- * way back to the ticket so far; AL-192 builds the page and its lazily loaded webview.
+ * Route `ticket/:id/design`, the ticket's Claude Design tab (artboard 4): a compact ticket header,
+ * the drill-in's tab bar, a browser-style bar over the canvas, and the side panel. In webview mode
+ * main draws the ticket's live canvas view over the canvas placeholder (AL-191); leaving the tab
+ * only hides it. The tab works the same in every stage, Queued to Done (R11): nothing here waits on
+ * or pauses the agent.
  */
 export function DesignTabPage({ ticketId }: DesignTabPageProps) {
-  const { navigate } = useNavigation();
+  const live = useAgentTicket(ticketId);
+  const recordQuery = useTicketRecord(ticketId);
+  const record = recordQuery.data ?? undefined;
+  const ticket = live ?? (record ? ticketFromRecord(record) : undefined);
+  const mode = useEmbedMode(ticketId);
+  const view = useDesignViewState(ticketId);
+
+  useEffect(() => {
+    if (record && !agentTickets.getState().byId.has(record.id)) agentTickets.upsert(record);
+  }, [record]);
+
+  // A view opened earlier (another visit, before a reload of the renderer) reports its state now.
+  useEffect(() => {
+    let cancelled = false;
+    void invoke('design:getView', { ticketId }).then((result) => {
+      if (!cancelled && result.ok) setDesignViewState(ticketId, result.data.view);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ticketId]);
+
+  const canvas = record?.design.canvas ?? null;
+  const canvasUrl = canvas ? (record?.design.lastViewUrl ?? canvas.url) : null;
 
   return (
     <View style={styles.page} testID="design-tab-page">
-      <GlassPanel style={styles.topBar}>
-        <Pressable role="button" style={styles.button} onPress={() => navigate(routes.board())}>
-          <Text variant="title">← Board</Text>
-        </Pressable>
-        <View style={styles.idChip}>
-          <Text variant="mono" color={color.ado}>#{ticketId}</Text>
-        </View>
-        <Text variant="display" size="lg" role="heading" aria-level={1}>
-          Claude Design
-        </Text>
-      </GlassPanel>
+      <DesignHeader ticketId={ticketId} ticket={ticket} />
+      <TicketTabBar ticketId={ticketId} value="design" style={styles.tabs} />
 
-      <View style={styles.actions}>
-        <Pressable role="link" style={styles.button} onPress={() => navigate(routes.ticket(ticketId))}>
-          <Text variant="title">Output</Text>
-        </Pressable>
+      <View style={styles.body}>
+        <View style={styles.canvasCard}>
+          <BrowserBar
+            label={canvas ? `claude.ai/design · ${ticketId} canvas` : null}
+            mode={mode}
+            status={view?.status}
+            onReload={mode === 'webview' && view ? () => void invoke('design:reload', { ticketId }) : undefined}
+            onOpenExternal={canvasUrl ? () => void Linking.openURL(canvasUrl) : undefined}
+          />
+          <ErrorBoundary name="design:canvas" label="the canvas">
+            <CanvasArea ticketId={ticketId} record={record} loading={recordQuery.isPending} webview={mode === 'webview'} url={canvasUrl} />
+          </ErrorBoundary>
+        </View>
+
+        <ScrollView style={styles.side} contentContainerStyle={styles.sideContent} testID="design-side-panel">
+          <AttachedSection specs={record?.design.specs ?? []} />
+        </ScrollView>
       </View>
     </View>
   );
+}
+
+interface CanvasAreaProps {
+  ticketId: string;
+  record: TicketRecord | undefined;
+  loading: boolean;
+  webview: boolean;
+  url: string | null;
+}
+
+function CanvasArea({ ticketId, record, loading, webview, url }: CanvasAreaProps) {
+  if (loading) {
+    return (
+      <View style={styles.empty} aria-busy>
+        <Text variant="meta" size="md">
+          Loading the ticket…
+        </Text>
+      </View>
+    );
+  }
+  if (!record) {
+    return (
+      <View style={styles.empty}>
+        <Text variant="meta" size="md" testID="design-missing">
+          This ticket isn&apos;t on the board, so it has no canvas.
+        </Text>
+      </View>
+    );
+  }
+  if (!url) {
+    return (
+      <View style={styles.empty} testID="design-no-canvas">
+        <Text variant="title" size="lg">
+          No canvas linked yet
+        </Text>
+        <Text variant="meta" size="md">
+          Link this ticket to a Claude Design canvas to see it here beside the agent.
+        </Text>
+      </View>
+    );
+  }
+  if (!webview) return null;
+  return <CanvasSlot ticketId={ticketId} url={url} />;
+}
+
+/** The placeholder main draws the live canvas view over (AL-191). */
+function CanvasSlot({ ticketId, url }: { ticketId: string; url: string }) {
+  const slot = useDesignViewSlot(ticketId, url);
+  return <View ref={slot} style={styles.slot} testID="design-canvas-slot" />;
 }
 
 const styles = StyleSheet.create({
   page: {
     flex: 1,
     padding: space.xl,
-    gap: space.xl,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: space.lg,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
   },
-  button: {
-    minHeight: minTarget,
-    justifyContent: 'center',
-    paddingHorizontal: space.lg,
-    borderRadius: radius.control,
+  tabs: {
+    alignSelf: 'flex-start',
+  },
+  body: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: space.lg,
+    minHeight: 0,
+  },
+  canvasCard: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    borderRadius: radius.panel,
     borderWidth: 1,
     borderColor: color.line,
-    backgroundColor: color.surface,
+    backgroundColor: color.bg,
+    boxShadow: shadow.card,
   },
-  idChip: {
-    paddingHorizontal: space.sm,
-    paddingVertical: space.xs,
-    borderRadius: radius.chip,
-    backgroundColor: color.adoTint,
+  slot: {
+    flex: 1,
   },
-  actions: {
-    flexDirection: 'row',
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    padding: space.xl,
+  },
+  side: {
+    width: 340,
+    flexGrow: 0,
+  },
+  sideContent: {
+    gap: space.lg,
   },
 });

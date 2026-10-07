@@ -11,6 +11,7 @@ function fakeService(): DesignViewService {
     open: vi.fn(() => ok(VIEW)),
     setBounds: vi.fn(() => true),
     hide: vi.fn(() => true),
+    reload: vi.fn(() => true),
     close: vi.fn(() => false),
     get: vi.fn(() => undefined),
     list: vi.fn(() => []),
@@ -57,6 +58,7 @@ describe('design IPC handlers', () => {
     expect(await handleInvoke('design:setBounds', { ticketId: '71273', bounds }, handlers['design:setBounds'])).toEqual(ok({ found: true }));
     expect(await handleInvoke('design:hide', { ticketId: '71273' }, handlers['design:hide'])).toEqual(ok({ found: true }));
     expect(await handleInvoke('design:close', { ticketId: '71273' }, handlers['design:close'])).toEqual(ok({ found: false }));
+    expect(await handleInvoke('design:reload', { ticketId: '71273' }, handlers['design:reload'])).toEqual(ok({ found: true }));
   });
 
   it('design:getView returns null when the ticket has no live view', async () => {
