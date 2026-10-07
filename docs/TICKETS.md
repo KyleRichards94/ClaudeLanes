@@ -29,6 +29,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M2 Control** | Gates, model/effort switching, messaging, sub-agents, crash recovery, queueing | AL-104, AL-106–AL-111, AL-113–AL-115, AL-171, AL-172, AL-176, AL-177 | Approve a plan; switch Opus→Sonnet mid-run; kill the session process and see it resume |
 | **M3 Ship** | Build/run per worktree, both merges, diff, ADO tab, PR stage, archive | E7, AL-084–AL-090, AL-112, AL-173, AL-174, AL-178–AL-181 | Two tickets build and run side by side; sub-branches merge; a PR is created with checks on the card |
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
+| **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -156,10 +157,22 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-212 | Performance pass | E12 | M | AL-143, AL-175 | todo |
 | AL-213 | App lifecycle | E12 | S | AL-100, AL-134 | todo |
 | AL-214 | Logging and diagnostics | E12 | S | AL-040 | done |
+| AL-230 | Drop rules (`allowedLanes`) | E14 | S | AL-141 | todo |
+| AL-231 | ADO team board data (`ado:teamBoard`) | E14 | M | AL-065, AL-061 | todo |
+| AL-232 | Active PRs with thread counts (`ado:activePrs`) | E14 | M | AL-064, AL-065 | todo |
+| AL-233 | Backlog data (`ado:backlog`) | E14 | M | AL-065 | todo |
+| AL-234 | Team board widget | E14 | L | AL-230, AL-231, AL-232, AL-066, AL-143 | todo |
+| AL-235 | Drag to lane (dnd-kit + keyboard) | E14 | L | AL-230, AL-234 | todo |
+| AL-236 | Launch from ADO transaction (`agent:launchFromAdo`) | E14 | L | AL-230, AL-100, AL-083, AL-063, AL-111, AL-165 | todo |
+| AL-237 | Undo a launch (`agent:undoLaunch`) | E14 | M | AL-236, AL-030 | todo |
+| AL-238 | PR launches: review and answer comments | E14 | M | AL-236, AL-232 | todo |
+| AL-239 | Backlog popout | E14 | L | AL-233, AL-235, AL-236, AL-029 | todo |
+| AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | todo |
+| AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | todo |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | todo |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | todo |
-| AL-223 | Visual QA against the artboards | E13 | M | E8–E11 | todo |
+| AL-223 | Visual QA against the artboards | E13 | M | E8–E11, AL-234, AL-239 | todo |
 | AL-224 | Release build and signing | E13 | M | AL-007 | blocked (Q7) |
 | AL-225 | User guide | E13 | S | AL-047 | todo |
 | AL-226 | Register in the ai-tools index | E13 | S | — | blocked (Q8) |
@@ -1068,7 +1081,7 @@ implementation agent, mid-run if needed.
   - [ ] Runs in CI in under 5 minutes.
 
 #### AL-223 · Visual QA against the artboards
-- **Depends on:** E8–E11
+- **Depends on:** E8–E11, AL-234, AL-239 (artboards 08–12 too)
 - **Scope:** Capture each screen and state at 1440 × 960 and compare side by side with `docs/design/screens/*`; log differences as tickets or Decisions.
 - **Acceptance criteria:**
   - [ ] All seven artboards reviewed and signed off.
@@ -1090,6 +1103,98 @@ implementation agent, mid-run if needed.
 - **Scope:** Per the company check-before-building process: shared applications live in `tools/<name>/` in the `ai-tools` repo (Tools project) with an owner line and an index row. Decide with the owner of `ticket-tracker` (Kyle) whether Agent Lanes replaces it.
 - **Acceptance criteria:**
   - [ ] Index row added, or a recorded decision to keep it separate.
+
+---
+
+### E14 — Team board and drag-to-agent (add-on brief, `docs/design/DESIGN-team-board.md`)
+
+Requirements T1–T9 from the 2026-10-08 add-on brief. The team's Azure DevOps board sits under the
+agent lanes; dragging a card onto a lane starts the right agent. **Only one drop changes ADO:** a To
+Do or Failed item dropped on Planning or Implementing is assigned to you and moved to In Progress
+(T5, T9). Artboards 08–12.
+
+#### AL-230 · Drop rules (`allowedLanes`)
+- **Design:** TB§3, TB§6 · **Depends on:** AL-141
+- **Scope:** Pure, zod-free `allowedLanes(card, me) → Partial<Record<Lane, DropAction>>` in `packages/contracts`, so the renderer's drag highlighting, the keyboard "Send to lane" menu and the main-process recheck run the same code; re-exported from `entities/agent-ticket` as `drop-rules`. Card kinds: board item (column, assignee, has agent, linked PR, branch), backlog item, open PR (author, unresolved threads). Each action carries its label ("start agentic review", "answer 4 comments"), whether it changes ADO, the worktree source (main, item branch, PR source branch, read-only PR branch) and the lane's default skill · model · effort.
+- **Acceptance criteria:**
+  - [ ] Every row of the TB§3 table is a test case, including the refusals (assigned to someone else, already has an agent, no linked PR → "No linked PR", PR with 0 threads not on Implementing, Queued and Create PR never accept).
+  - [ ] Open PRs can be dropped on Code review by anyone, several people at once.
+
+#### AL-231 · ADO team board data (`ado:teamBoard`)
+- **Design:** T1, TB§6 · **Depends on:** AL-065, AL-061
+- **Scope:** ado-client calls for the user's teams (default = the team in the user's ADO profile; identity from the Connections token test), the team's board columns (Work › Boards API) and the items on it for a sprint, mapped to To Do, In Progress, Code Review, Testing, Failed. The board's own column names win; unknown columns are shown, not dropped. Channel `ado:teamBoard({ org, project, team, sprint })` plus the team list for the dropdown. Must work against Azure DevOps Server through the client's api-version negotiation.
+- **Acceptance criteria:**
+  - [ ] MSW fixtures for the artboard 08 board (OSC Developers, sprint 42) round-trip through the channel.
+  - [ ] Each item carries id, type, title, points, column, assignee (name + initials), branch and linked PR id when present.
+
+#### AL-232 · Active PRs with thread counts (`ado:activePrs`)
+- **Design:** T1, T3, T4 · **Depends on:** AL-064, AL-065
+- **Scope:** Open PRs for the team's repositories with author, reviewers, source branch, repository and unresolved comment-thread count (active threads only). Channel `ado:activePrs({ org, project, team })`.
+- **Acceptance criteria:**
+  - [ ] Thread counts ignore resolved, closed and system threads.
+  - [ ] A PR in a repo that isn't registered in Agent Lanes is flagged so the drop can refuse with "Add repo" (TB§7).
+
+#### AL-233 · Backlog data (`ado:backlog`)
+- **Design:** T6, TB§5 · **Depends on:** AL-065
+- **Scope:** The profile team's backlog in backlog order, grouped by parent Feature, paged; filters for type, priority, area, tags, free text (id, title, tag) and "include items already in a sprint". Channel `ado:backlog({ org, project, team, filters, page })`.
+- **Acceptance criteria:**
+  - [ ] Artboard 11's 48-item backlog fixture pages and groups correctly.
+  - [ ] Filters combine (AND) and are applied server-side where WIQL allows.
+
+#### AL-234 · Team board widget
+- **Design:** T1, T7, TB§2, artboard 08 · **Depends on:** AL-230, AL-231, AL-232, AL-066, AL-143
+- **Scope:** `widgets/team-board` under the agent lanes: header (org, "Team board", team dropdown "· from your ADO profile", Everyone / Me / Unassigned, hint, Backlog button with count), columns To Do, In Progress, Code Review, Testing, Failed and Active PRs with counts; cards with grip, id chip, type, title, points, avatar; a lock row with the assignee's name on others' items; an "Agent in <lane>" tag on items that have an agent; PR cards with `!id`, title, "N comments" (amber) and avatar. Queries `['ado','teamBoard',team,sprint]` and `['ado','activePrs',team]`, every 60 s and on focus.
+- **Acceptance criteria:**
+  - [ ] Matches artboard 08 at 1440 × 960.
+  - [ ] The filter and team choice persist for the session; lock and "Agent in …" never rely on colour alone.
+
+#### AL-235 · Drag to lane (dnd-kit + keyboard)
+- **Design:** T2, TB§7 Accessibility, artboards 09 and 12 · **Depends on:** AL-230, AL-234
+- **Scope:** `features/drag-to-lane` with `@dnd-kit/core`: lanes that accept the card light up with the action label and a dashed border, the rest dim; "No linked PR" on Code review when relevant. Keyboard sensor (Space picks up, arrows move between lanes, Space drops, Esc cancels) with announcements ("Over Code review: start agentic review"); Tab + Enter opens a "Send to lane" menu listing only allowed lanes. A drop calls AL-236. Optimistic query updates, invalidated when the main process confirms.
+- **Acceptance criteria:**
+  - [ ] Dragging PR !10571 lights Implementing and Code review only (artboard 09).
+  - [ ] Every drop is possible from the keyboard alone, and announced.
+
+#### AL-236 · Launch from ADO transaction (`agent:launchFromAdo`)
+- **Design:** T3–T5, T9, TB§4, TB§7 · **Depends on:** AL-230, AL-100, AL-083, AL-063, AL-111, AL-165
+- **Scope:** `features/launch-from-ado` plus the main handler for `agent:launchFromAdo({ source, lane, overrides? })`: re-fetch the card and re-run `allowedLanes` (refuse with "Moved to Testing — refreshed" etc.); for a To Do or Failed item on Planning/Implementing only, assign to the signed-in identity and move to In Progress; create the worktree (from main, the item's branch, or the PR's source branch; read-only for reviews); create the ticket and start the session with the lane's default skill, model, effort and gates (Planning keeps the plan gate, Implementing skips it; QA runs /cs-qa-wip on Sonnet Med); queue when over the concurrency cap. A failing step rolls back the earlier ones. Returns the ticket id and an undo token. A missing scope is refused by name with "Open Connections".
+- **Acceptance criteria:**
+  - [ ] No other drop ever writes to ADO (a test asserts zero ADO write calls for every other TB§3 row).
+  - [ ] A failure after the ADO update restores the item's assignee and state.
+  - [ ] A PR from an unregistered repo is refused with an "Add repo" action.
+
+#### AL-237 · Undo a launch (`agent:undoLaunch`)
+- **Design:** T8, TB§4, artboard 10 · **Depends on:** AL-236, AL-030
+- **Scope:** A success toast (polite live region) saying what changed ("#71318 assigned to you and moved to In Progress · agent started in Planning") with a real Undo button for 10 s or until the agent's first turn ends. `agent:undoLaunch(token)` reverts the assignment and state, removes the worktree and ends the session. Not offered once the agent has pushed or a review agent has posted comments; the toast then says what to revert by hand.
+- **Acceptance criteria:**
+  - [ ] Undo within 10 s leaves ADO and disk exactly as before the drop.
+  - [ ] Undo is reachable by keyboard for the full 10 s.
+
+#### AL-238 · PR launches: review and answer comments
+- **Design:** T3, T4, TB§3 · **Depends on:** AL-236, AL-232
+- **Scope:** `features/answer-pr-comments` and the review path. Code review drop → read-only worktree on the PR's source branch; the first turn runs /code-review and posts through /pr-comment-actioner (Opus High); several reviewers may review one PR at once. Implementing drop by the PR's author → worktree on the source branch; the first turn carries the open threads and runs /pr-comment-actioner (Sonnet High), which replies, resolves and pushes. The app itself changes no ADO state or assignment.
+- **Acceptance criteria:**
+  - [ ] Two users can start reviews of the same PR at once without sharing a worktree.
+  - [ ] The first turn lists every unresolved thread with its file and line.
+
+#### AL-239 · Backlog popout
+- **Design:** T6, TB§5, artboards 11 and 12 · **Depends on:** AL-233, AL-235, AL-236, AL-029
+- **Scope:** `widgets/backlog-popout`: modal over the lower board with search, type segmented control, priority/area/tag filters and the "in a sprint" toggle; rows grouped by Feature with grip, checkbox, id, type pill, title, tag, points and priority; shift-click multi-select (one agent per item, extras Queued); while dragging, the modal fades to 35 % and lets the pointer through; rows keep an "Agent in Planning" tag after a drop; Esc, close or an outside click closes it; search and filters are remembered for the session. Pop out moves it to its own window, with native HTML5 drag back to the main window.
+- **Acceptance criteria:**
+  - [ ] Matches artboards 11 and 12.
+  - [ ] Dragging two selected rows onto Planning starts two agents (or queues the second at the cap).
+
+#### AL-240 · Per-lane drop defaults and Alt launch sheet
+- **Design:** TB§3 · **Depends on:** AL-146, AL-236
+- **Scope:** A "Drops" section in Settings with each lane's default skill(s), model and effort (seeded from TB§3). Holding Alt while dropping opens a launch sheet (skills, model, effort, gates) before anything changes.
+- **Acceptance criteria:**
+  - [ ] Cancelling the Alt sheet changes nothing in ADO or on disk.
+
+#### AL-241 · E2E: team board drops
+- **Design:** E14 · **Depends on:** AL-237, AL-238, AL-239, AL-240
+- **Scope:** Playwright against fake ADO and a fake Agent SDK: Failed item → Planning (assign, In Progress, Undo), PR → Code review (no ADO writes), own PR → Implementing, backlog multi-drag, a drop refused by the recheck, and a keyboard-only drop.
+- **Acceptance criteria:**
+  - [ ] All six flows pass in CI.
 
 ---
 
@@ -1697,6 +1802,7 @@ implementation agent, mid-run if needed.
 | 2026-10-08 | Integrator batch 1 (b11): merged AL-100 (partial: the packaged app was not run against a real Claude install), AL-102 (partial: tool rows covered by recorded-shape fake SDK messages only), AL-103 (partial: card move within one frame not measured with a live agent), AL-104 (partial: "no tokens while waiting" not measured against a real account) and AL-105 (partial: `/code-review` running the skill needs a real session). The branch also carried an AL-030 e2e fix (pointer moved off the toast stack). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D538–D548. `pnpm verify`: typecheck, lint and build green; 2686/2687 unit tests passed in the full run, AL-085's `branch-status.test.ts` timed out under machine load (every git call slow while other agents' suites ran) and passed 10/10 when rerun alone. E2E: E2E_RESULT. |
 
 | 2026-10-08 | Merged AL-100, AL-102, AL-103, AL-104, AL-105 (batch b11: session manager, output normalisation, stage protocol, gates, messages) as partial; open criteria need a real Claude session. Integration was interrupted by a pause for a Git upgrade (2.56.0) and finished by hand: `pnpm verify` green (2,687 tests), e2e 105/105 on rerun; 3 e2e tests failed once under load and passed on rerun, to be hardened under AL-220. |
+| 2026-10-08 | Added epic E14 (AL-230–AL-241) from the add-on brief "Team Board & Drag-to-Agent" (Kyle, rev 27): team ADO board under the lanes, drag-to-agent with drop rules, Backlog popout, 10 s Undo; only To Do/Failed → Planning/Implementing changes ADO. Copy in `docs/design/DESIGN-team-board.md`, artboards 08–12. |
 ---
 
 ## 7. Parallel build rules
