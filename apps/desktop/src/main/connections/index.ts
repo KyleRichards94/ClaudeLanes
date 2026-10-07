@@ -1,11 +1,14 @@
 export { createAdoConnectionTester, type AdoConnectionTesterOptions } from './ado-tester';
 export { ADO_MCP_PACKAGE, ADO_MCP_TOKEN_ENV, adoMcpCredential, adoMcpServerFor, type AdoMcpServerFactory, type BuiltInMcpServer } from './ado-mcp';
+export { createClaudeLoginDetector, describeClaudeLogin, type ClaudeLoginDetector, type ClaudeLoginDetectorOptions } from './claude-login';
+export { createClaudeConnectionTester } from './claude-tester';
 export {
   createMemoryConnectionsFile,
   type ConnectionsFile,
   type ConnectionsFileRead,
   type MemoryConnectionsFile,
 } from './connections-file';
+export type { AdoResponseNote } from './ado-scopes';
 export { createConnectionsHandlers } from './handlers';
 export { ADO_SESSION_SERVER_NAME, toMcpSessionConfig, type McpSessionConfig } from './mcp-session';
 export { createMcpConnectionTester, type McpConnectionTesterOptions } from './mcp-tester';

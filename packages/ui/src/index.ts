@@ -3,3 +3,11 @@ export { Card, CardSection, type CardFooter, type CardFooterTone, type CardProps
 export { ProgressBar, type ProgressBarProps, type ProgressTone } from './ProgressBar';
 export { Icon, IconProvider, iconNames, type IconName, type IconProps, type IconProviderProps } from './Icon';
 export { Text, textStyle, textVariants, type TextProps, type TextSize, type TextVariant } from './Text';
+export { Pill, pillTones, type PillProps, type PillSize, type PillTone } from './Pill';
+export { Badge, type BadgeProps, type BadgeTone } from './Badge';
+export { StatusBadge, badgeStatuses, statusLabel, type BadgeStatus, type StatusBadgeProps } from './StatusBadge';
+export { IdChip, type IdChipProps } from './IdChip';
+export { SegmentedControl, type SegmentedControlProps, type SegmentedOption, type SegmentedTone, type SegmentedVariant } from './SegmentedControl';
+export { Switch, type SwitchProps, type SwitchStateText } from './Switch';
+export { Button, buttonSizes, buttonVariants, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
+export { TextField, type SecureTextFieldHandle, type TextFieldHandle, type TextFieldProps, type TextFieldVariant } from './TextField';

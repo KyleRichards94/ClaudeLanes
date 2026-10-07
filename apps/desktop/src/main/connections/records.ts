@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   AdoConnectionSummarySchema,
+  AdoScopeCheckSchema,
   ClaudeConnectionSummarySchema,
   MASKED_TOKEN_BULLETS,
   MASKED_TOKEN_VISIBLE_CHARS,
@@ -20,7 +21,15 @@ const secretRef = {
 };
 
 export const StoredConnectionSchema = z.discriminatedUnion('kind', [
-  AdoConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
+  AdoConnectionSummarySchema.omit({ needsReconnect: true }).extend({
+    ...secretRef,
+    /**
+     * What the last test found per area and access, updated by later calls (AL-043): a write that
+     * worked verifies write access, one refused with 403 marks it missing. Kept in the file only;
+     * the row shows the outcome as `missingScopes`. Records written before AL-043 have none.
+     */
+    scopes: z.array(AdoScopeCheckSchema).default([]),
+  }),
   ClaudeConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
   // Built-in MCP servers (AL-045) are derived from the ADO connections when listing, never stored.
   McpConnectionSummarySchema.omit({ needsReconnect: true, builtInFor: true }).extend(secretRef),

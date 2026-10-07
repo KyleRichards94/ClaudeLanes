@@ -56,10 +56,10 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-021 | Bundled fonts | E2 | S | AL-020 | partial |
 | AL-022 | GlassPanel | E2 | S | AL-020 | done |
 | AL-023 | Text primitives | E2 | S | AL-021 | done |
-| AL-024 | Button | E2 | S | AL-023 | todo |
-| AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | todo |
-| AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | todo |
-| AL-027 | TextField | E2 | S | AL-023 | todo |
+| AL-024 | Button | E2 | S | AL-023 | done |
+| AL-025 | Pill, Badge, StatusBadge, IdChip | E2 | S | AL-023 | done |
+| AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | done |
+| AL-027 | TextField | E2 | S | AL-023 | done |
 | AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
 | AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | todo |
 | AL-030 | Toast and ToastHost | E2 | S | AL-024 | todo |
@@ -69,8 +69,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | partial |
 | AL-041 | Settings store and UI prefs | E3 | M | AL-011 | done |
 | AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | done |
-| AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | todo |
-| AL-044 | Claude connection | E3 | M | AL-042 | todo |
+| AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | partial |
+| AL-044 | Claude connection | E3 | M | AL-042 | partial |
 | AL-045 | MCP server entries | E3 | M | AL-042 | todo |
 | AL-046 | Connections modal UI | E3 | L | AL-043, AL-044, AL-045, AL-027, AL-029 | todo |
 | AL-047 | First-run flow and repo picker | E3 | M | AL-046, AL-081 | todo |
@@ -83,7 +83,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-065 | Main ADO service, IPC and MSW fixtures | E4 | M | AL-061–AL-064, AL-042 | todo |
 | AL-066 | Renderer ADO queries and refetch policy | E4 | S | AL-065 | todo |
 | AL-080 | Git runner | E5 | S | AL-001 | done |
-| AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | todo |
+| AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | done |
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | todo |
 | AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
@@ -94,7 +94,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-089 | Diff provider | E5 | S | AL-083 | todo |
 | AL-090 | Start-up reconciliation | E5 | M | AL-083, AL-101 | todo |
 | AL-100 | Session manager core | E6 | L | AL-083, AL-044 | todo |
-| AL-101 | Ticket records | E6 | M | AL-041 | todo |
+| AL-101 | Ticket records | E6 | M | AL-041 | done |
 | AL-102 | Output normalisation and transcript buffer | E6 | L | AL-100, AL-012 | todo |
 | AL-103 | Stage protocol: `agent_lanes` MCP server | E6 | M | AL-100 | todo |
 | AL-104 | Stage gates | E6 | M | AL-103 | todo |
@@ -327,30 +327,30 @@ colour alone.
 - **Design:** §11 Primitives, artboard 7 · **Depends on:** AL-023
 - **Scope:** Variants `primary` (Claude violet), `strong` (ink), `secondary` (white + line), `soft` (Claude tint pill); sizes; optional leading icon; `loading` and `disabled`; hover lifts 3 px with the deeper shadow over 150–220 ms ease-out; pressed state; focus ring; min 44 px target.
 - **Acceptance criteria:**
-  - [ ] All four variants match artboard 7.
-  - [ ] Keyboard: Tab focuses with the violet ring; Enter/Space activates.
-  - [ ] `disabled` blocks presses and is announced (`aria-disabled`).
+  - [x] All four variants match artboard 7.
+  - [x] Keyboard: Tab focuses with the violet ring; Enter/Space activates.
+  - [x] `disabled` blocks presses and is announced (`aria-disabled`).
 
 #### AL-025 · Pill, Badge, StatusBadge, IdChip
 - **Design:** artboards 1, 6 · **Depends on:** AL-023
 - **Scope:** `Pill` (tone: claude, ado, ok, attention, danger, neutral; optional dot); `Badge` (lane counts, amber variant); `StatusBadge` with fixed words — Running, Done, Queued, Needs you, Switching · next turn; `IdChip` (mono `#71273` on ADO tint).
 - **Acceptance criteria:**
-  - [ ] Every status pill carries a word, not only a colour.
-  - [ ] Matches the "Status badges" block on artboard 6.
+  - [x] Every status pill carries a word, not only a colour.
+  - [x] Matches the "Status badges" block on artboard 6.
 
 #### AL-026 · SegmentedControl and Switch
 - **Design:** artboards 2, 3 · **Depends on:** AL-023
 - **Scope:** `SegmentedControl` (Sprint/Search/No ticket; Low/Med/High/XHigh/Max; Output/Diff/…) with arrow-key navigation and `radiogroup` semantics; `Switch` with label and "Auto / Needs approval" side text.
 - **Acceptance criteria:**
-  - [ ] Arrow keys move selection; selected segment is white with the violet text where the artboard shows it.
-  - [ ] Switch toggles with Space and exposes `role="switch"` + `aria-checked`.
+  - [x] Arrow keys move selection; selected segment is white with the violet text where the artboard shows it.
+  - [x] Switch toggles with Space and exposes `role="switch"` + `aria-checked`.
 
 #### AL-027 · TextField
 - **Design:** artboards 2, 5 · **Depends on:** AL-023
 - **Scope:** Single-line, multiline (job description), `secure` (PAT/API key: masked, no autocomplete, no spellcheck, never echoed into logs or state outside the form), search variant with leading icon; label, help text, error text.
 - **Acceptance criteria:**
-  - [ ] Secure fields clear their value from component state after submit.
-  - [ ] Error text is linked with `aria-describedby`.
+  - [x] Secure fields clear their value from component state after submit.
+  - [x] Error text is linked with `aria-describedby`.
 
 #### AL-028 · Card and ProgressBar
 - **Design:** artboards 1, 6 · **Depends on:** AL-022
@@ -424,17 +424,17 @@ colour alone.
 - **Design:** §8 ("tested with GET /_apis/connectionData … which required scopes are missing") · **Depends on:** AL-042, AL-060
 - **Scope:** `GET {org}/_apis/connectionData` → signed-in identity; scope probes with read calls per area — Work Items (`_apis/wit/wiql` on a trivial query), Code (`_apis/git/repositories?$top=1`), Build (`_apis/build/builds?$top=1`); a 401/403 marks that scope missing. Write scopes cannot be proven without writing: mark them "verified on first write" and map a later 403 to `ADO_SCOPE_MISSING`. Load projects for the Default project dropdown after a successful test.
 - **Acceptance criteria:**
-  - [ ] Saved row shows "signed in as <name>" and masked token, as on artboard 5.
-  - [ ] A PAT without Build (read) shows the Build scope chip as missing.
-  - [ ] Expiry shown when known (Q10).
+  - [ ] Saved row shows "signed in as <name>" and masked token, as on artboard 5. (open: data side done, rows carry `identity` and `maskedToken` and `formatAdoConnectionDetails` returns the artboard text, proven by unit and e2e tests; drawing the row is AL-046)
+  - [ ] A PAT without Build (read) shows the Build scope chip as missing. (open: data side done, `missingScopes: ['build']` and `adoScopeChips()` give the missing state; drawing the chip is AL-046; Kyle to confirm against a real org that a PAT without vso.build gets 401/403 on `{project}/_apis/build/builds?$top=1`)
+  - [ ] Expiry shown when known (Q10). (open: data side done, optional user-entered `expiresAt` is stored and `formatTokenExpiry`/`tokenExpiryState` warn 7 days before; the date input and its display are AL-046)
 - **Tests:** MSW handlers for each probe outcome.
 
 #### AL-044 · Claude connection
 - **Design:** §7, §8, Q4 · **Depends on:** AL-042
 - **Scope:** Detect an existing Claude Code login (start a throwaway SDK query and read `accountInfo()` / the auth status message, or the documented auth probe) and offer "Use my Claude Code login"; or store an API key (passed to sessions as `ANTHROPIC_API_KEY` env, AL-100). Test = one-token request (`maxTurns: 1`, tiny prompt) and report account/org.
 - **Acceptance criteria:**
-  - [ ] With a logged-in Claude Code on the machine, the tab shows "Connected · using your Claude Code login" with no key entered.
-  - [ ] An invalid API key shows a clear error and stays red.
+  - [ ] With a logged-in Claude Code on the machine, the tab shows "Connected · using your Claude Code login" with no key entered. (open: data path done, `connections:detectClaude`, the login test and `claudeConnectionStatusLine` returning exactly this text are proven in unit tests and e2e against a fake `claude` CLI; the Claude tab is AL-046; Kyle to confirm real `accountInfo()` fields and the login test with a claude.ai subscription)
+  - [ ] An invalid API key shows a clear error and stays red. (open: data path done, the test returns "Anthropic refused this API key…" and the saved row keeps status `error` through re-tests and a relaunch (e2e); the red row is AL-046; the real CLI's output for a revoked key is modelled on SDK 0.3.292 types, not observed)
 
 #### AL-045 · MCP server entries
 - **Design:** §7 MCP servers, §8 · **Depends on:** AL-042
@@ -530,7 +530,7 @@ colour alone.
 - **Design:** §8 ("Repo paths are picked with a native folder dialog"), artboard 1 Repo dropdown · **Depends on:** AL-080, AL-041
 - **Scope:** `repos:add` opens `dialog.showOpenDialog` in main, validates a git work tree, detects default branch (`origin/HEAD`, fallback `main`), stores the repo; `repos:list`, `repos:remove`; worktree root defaults to `<repo>/../.agent-lanes/` (§9).
 - **Acceptance criteria:**
-  - [ ] Picking a non-git folder shows an error and stores nothing.
+  - [x] Picking a non-git folder shows an error and stores nothing.
 
 #### AL-082 · Branch and worktree naming
 - **Design:** §9, artboard 2 Workspace ("Worktree 71273-cutover-frmjobcontrol-to") · **Depends on:** —
@@ -611,8 +611,8 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §6, R2, Decision D8 · **Depends on:** AL-041
 - **Scope:** App-written JSON per ticket in `<userData>/tickets/<repoKey>/<ticketId>.json`: ADO ref, repo, branch, worktree path, sub-branches, stage + stage timestamps, gates, model, effort, skills, session id, last build/run, design link + spec versions (E11). Atomic write (temp + rename), zod-validated on read, debounced writes.
 - **Acceptance criteria:**
-  - [ ] Killing the app mid-write never corrupts a record (test with interrupted write).
-  - [ ] Nothing is written inside a worktree (keeps it clean for GIT_DIRTY).
+  - [x] Killing the app mid-write never corrupts a record (test with interrupted write).
+  - [x] Nothing is written inside a worktree (keeps it clean for GIT_DIRTY).
 
 #### AL-102 · Output normalisation and transcript buffer
 - **Design:** §6 Live events, artboard 3 Output · **Depends on:** AL-100, AL-012
@@ -1348,6 +1348,106 @@ implementation agent, mid-run if needed.
 | D250 | AL-191: Electron code sits in `design/electron-platform.ts` behind `DesignViewPlatform`; `view-service.ts` and `guards.ts` are plain logic tested with fakes | Testable in the Vitest main project | 2026-10-07 |
 | D251 | AL-191: Renderer piece is `useDesignViewSlot(ticketId, url)` in `shared/api/design-view.ts`, not a new FSD slice | A slice nothing imports fails Steiger's insignificant-slice rule; AL-192 uses it | 2026-10-07 |
 | D252 | AL-191: `services.ts` gains `designView` plus options `mainWindow` and `designTestOrigin`; `disposeServices` closes the views and calls `cookies.flushStore()`; `main/index.ts` passes these options | The service needs the window; sign-in survives restarts | 2026-10-07 |
+| D253 | AL-025: Every tone in `packages/tokens/src/tones.ts` gains a `dot` colour (claude #5B4BC4, ado #0369A1, attention #D97706, danger #B91C1C, ok #059669), mirrored as `--al-tone-*-dot`; tests check they equal the matching `color` tokens. Status dots use the tone's strong colour, not its text colour | Matches the artboard 6 dots | 2026-10-07 |
+| D254 | AL-025: New `neutral` tone (band #F1F5F9, text #475569, dot #94A3B8, sampled from artboard 6 "Queued") in tones.ts and the CSS; text about 6.9:1 on its band | §11 had no grey for idle states | 2026-10-07 |
+| D255 | AL-025: `PillTone` is the tokens `Tone` type (claude, ado, ok, attention, danger, neutral); `Pill` defaults to neutral, size `sm`, no dot | One tone vocabulary for tokens and UI | 2026-10-07 |
+| D256 | AL-025: Pill sizes `sm` = 22 px, bold 12/16, 8 px sides (artboard 6 status badges) and `md` = 28 px, 14/20 body weight, 10 px sides (artboard 1 header counts such as "4 running", "MCP online"; the artboard looks ~13 px, 14 is the nearest fontSize step) | Both artboard sizes are needed | 2026-10-07 |
+| D257 | AL-025: Pill `label` is a required string (no icon-only or empty form); the dot is `aria-hidden`, so a screen reader reads only the word | No colour-only pill is possible through the API | 2026-10-07 |
+| D258 | AL-025: Pill and IdChip text is one line (`numberOfLines={1}`), `alignSelf: flex-start`, `flexShrink: 0` | A pill hugs its label and its word is never squeezed or cut | 2026-10-07 |
+| D259 | AL-025: StatusBadge statuses are kebab-case `running \| done \| queued \| needs-you \| switching` (`BadgeStatus`, `badgeStatuses`, `statusLabel()`); "Switching · next turn" uses the ado tone with no dot, as on the artboard | Matches contracts' vocabulary style | 2026-10-07 |
+| D260 | AL-025: One colour set per tone, from the artboard 6 status badges; artboard 1's slightly darker header-pill text ("1 queued" #334155, "MCP online" #065F46) is not copied | One-off differences; one source of truth | 2026-10-07 |
+| D261 | AL-025: `Badge` is white with neutral text, or amber (attention band and text); minWidth 40, 24 px tall, bold 12 px. Negative or non-finite counts show 0, fractions are floored | Artboard 1/6 lane badges | 2026-10-07 |
+| D262 | AL-025: `Badge` has role="img" and an accessible name: the count, plus ", needs you" for amber by default, and an optional `label` prop for a fuller name (e.g. "3 tickets, 1 needs you") | The amber is never the only signal | 2026-10-07 |
+| D263 | AL-025: `IdChip` is mono 11 px weight 400, #0369A1 on #E0F2FE, radius 8 (chip), 6 px sides, 19 px tall. The artboard's id looks bold, but only JetBrains Mono 400 is bundled (§11, AL-021) | Sizes measured from artboards 1 and 6 | 2026-10-07 |
+| D264 | AL-025: `IdChip` takes a number or string id and drops a leading "#" and spaces | Callers can pass either form | 2026-10-07 |
+| D265 | AL-101: `TicketIdSchema` (contracts `events.ts`) tightened as D37 asked: AL-082's folder format, lowercase ASCII words joined by single dashes, at most 64 chars, never a Windows device name (`con`, `nul`, …); `TICKET_ID_PATTERN` and `TICKET_ID_MAX_LENGTH` exported. The build queue's `ticketId: z.string().min(1)` is unchanged | The id is used as a file and folder name; queue tests still use 'AL-1' ids | 2026-10-07 |
+| D266 | AL-101: `TicketRecordSchema` (version 1) lives in `contracts/src/domains/tickets.schemas.ts`; no IPC channels added. Fields: id, title, ado {orgUrl, project, workItemId} or null, repo, baseBranch, branch, worktreePath, subBranches, stage, stageHistory, gates (settings `StageGatesSchema`), model, effort, skills, sessionId, lastBuild, lastRun, design, createdAt, updatedAt | Scope is storage only | 2026-10-07 |
+| D267 | AL-101: Record has a `title` (beyond the scope list) | A "No ticket" card can be rebuilt after a restart without asking ADO | 2026-10-07 |
+| D268 | AL-101: Timestamps are epoch milliseconds | Same as events (D36) | 2026-10-07 |
+| D269 | AL-101: Stage times are a `stageHistory` list capped at 200 entries; callers only set `stage`, the store adds the history entry and stamps `updatedAt` | Code review and QA can send a ticket back to Implementing (§9), so a stage can be entered more than once | 2026-10-07 |
+| D270 | AL-101: `repoKey` = the repo folder name made file-safe plus 12 hex chars of the SHA-256 of its normalized path (lowercased on Windows), e.g. `onsite-companion-3f2a9c1b04d7` | Readable, and same-named repos never share a folder | 2026-10-07 |
+| D271 | AL-101: Ticket ids are unique across all repos; `create` refuses an id that exists in another repo | Events and the renderer identify tickets by id alone | 2026-10-07 |
+| D272 | AL-101: Writes debounced: 250 ms after the last change, at most 1 s after the first unsaved change. `create`/`delete` reach disk before resolving; `flush(id?)` writes now; `dispose()` flushes all (in `disposeServices` after the build queue) and later writes are immediate. A failed write stays in memory, retries after 5 s, and `flush` reports INTERNAL | Fewer writes without losing changes on quit | 2026-10-07 |
+| D273 | AL-101: A record that is not valid JSON or fails the schema is renamed `<id>.corrupt-<time>.json` and reported by `issues()`; a newer-version record is left alone and never overwritten; `create` never replaces a file the loader did not read; when one id has records in two repo folders the newer `updatedAt` wins and the other is reported | Never lose or clobber data | 2026-10-07 |
+| D274 | AL-101: The store refuses (VALIDATION) non-absolute repo or worktree paths, and any record whose file would land inside its repo, worktree or a sub-branch worktree | The keep-out-of-worktrees check needs absolute paths | 2026-10-07 |
+| D275 | AL-101: `design` holds AL-190's `DesignCanvasRefSchema`, `lastViewUrl` (https://claude.ai/ only) and one entry per shipped spec version (version, shippedAt, approvedBy, artboardCount, usedAt), versions increasing; spec content is AL-197's. Embed mode stays in settings `ui.embedModeByTicket` (AL-041) | One home per value | 2026-10-07 |
+| D276 | AL-101: `lastBuild` = {outcome succeeded/failed/cancelled, startedAt, finishedAt, errors, warnings}; `lastRun` = {startedAt, stoppedAt, exitCode, url} | What the card and drill-in show after a restart | 2026-10-07 |
+| D277 | AL-101: `tickets/atomic-file.ts` has its own small rename-with-retry helper rather than exporting AL-040's private one | No refactoring other tickets' code | 2026-10-07 |
+| D278 | AL-101: The kill test runs the real store in a plain Node child via Node's type stripping and a resolve hook (`testing/strip-types-hooks.mjs`); needs Node ≥ 22.15 for `registerHooks` | No tsx/esbuild dependency; fits `>=22.18` | 2026-10-07 |
+| D279 | AL-101: e2e `tickets.spec.ts` checks start-up loading, corrupt records set aside, temp files removed, and no rewrite of unchanged records on quit. Test helpers for AL-090/AL-110 in `src/main/tickets/testing`: `newTicketInput`, `createTempDir`, `listTree`, `createMemoryRecordFs`, `createCrashingFs` | Proves the store is wired into the real app | 2026-10-07 |
+| D280 | AL-026: New token group `selection` in `packages/tokens/src/selection.ts` (track #EEF2F7, label #475569, switchOff #CBD5E1, thumbShadow, pillShadow, disabledOpacity 0.5) with a matching `--al-selection-*` CSS block; `selection.test.ts` checks the CSS sync and 4.5:1 label contrast | Values sampled from artboards 2 and 3; a separate file avoids colliding with other E2 tickets editing `color` | 2026-10-07 |
+| D281 | AL-026: One label colour (#475569) for unselected track segments, unselected effort pills and switch side text | Artboard 3's pills use a slightly darker slate (#334155), but one token keeps the set small | 2026-10-07 |
+| D282 | AL-026: `SegmentedControl` has `variant: 'track' \| 'pills'`; `pills` is artboard 3's effort pills | Beyond the ticket text, but AL-171 needs it | 2026-10-07 |
+| D283 | AL-026: `SegmentedControl` has `tone: 'claude' \| 'ink'` (default claude): violet text for Effort and model, ink for Sprint / Search / No ticket | Meets "violet text where the artboard shows it" | 2026-10-07 |
+| D284 | AL-026: `fill` prop stretches equal-width segments across the row (Effort, model); without it the track hugs its labels (work item control) | Both layouts appear on the artboards | 2026-10-07 |
+| D285 | AL-026: Track labels are bold (700) in every state; pills go from 500 to 700 when selected | Artboard labels look semibold and 600 isn't bundled; constant weight stops neighbours reflowing on selection | 2026-10-07 |
+| D286 | AL-026: Track is 44 px (artboards draw 42 and 46) with a 4 px thumb inset; each whole slot is the radio, so every segment is a 44 px target; effort pills stay 34 px tall inside a 44 px slot | Min target size | 2026-10-07 |
+| D287 | AL-026: The focus ring is the app's global `:focus-visible` outline with an inline `outlineOffset: -2`, ringing the visible thumb or pill rather than the 44 px slot | react-native-web inserts its stylesheet first in `<head>`, so a class would lose to global.css | 2026-10-07 |
+| D288 | AL-026: `Switch` is the whole artboard row (label, side text, 38×22 toggle with 16 px knob, 48 px tall, 14 px side padding) with `stateText: {on, off}`; its accessible name comes from `aria-labelledby` on label plus state text (e.g. "Planning Needs approval") | React Native's types have no `aria-describedby` | 2026-10-07 |
+| D289 | AL-026: Space toggles the switch on keydown and ignores key repeat; Enter works through react-native-web's PressResponder; `SegmentedControl` handles Space itself | PressResponder only handles Space for buttons | 2026-10-07 |
+| D290 | AL-026: Knob slide, track colour and thumb fill use the design's 150 ms ease-out through `selectionMotion.web.ts`; native `selectionMotion.ts` has no transitions; the web file needs one cast | React Native's style types don't list CSS transition properties | 2026-10-07 |
+| D291 | AL-026: Switch off track #CBD5E1 is under 3:1 on white, as on the artboard; state is never shown by colour alone (knob position and side-text word) | Matches the artboard; AL-033 should review against WCAG 1.4.11 | 2026-10-07 |
+| D292 | AL-024: Fifth Button variant `danger` (white fill, `tone.danger.border` outline, `color.danger` label) for artboard 5's Remove button | AL-046 doesn't need its own button | 2026-10-07 |
+| D293 | AL-024: Sizes `md` (44 px tall, 18 px sides, 14 px bold label, 16 px icon) and `sm` (38 px visible surface, 14 px sides, 12 px label, 14 px icon, as Replace/Remove on artboard 5); both keep a pressable target of at least 44×44 by putting the surface inside the target | The artboard's sm label measures about 13 px, which is not on the fontSize scale | 2026-10-07 |
+| D294 | AL-024: `trailingIcon`, `iconOnly` (label becomes the aria-label; a union type makes `icon` required) and `justify: 'center' \| 'between'` | Covers "Launch agent →", the Connections icon button and the drill-in's full-width merge buttons | 2026-10-07 |
+| D295 | AL-024: New `control` token group in `packages/tokens/src/controls.ts` with a mirrored `:root` block: `ink` #334155, primary violet shadows at rest and on hover, `pressedFilter` brightness(0.94), `disabledOpacity` 0.5; `controls.test.ts` checks the CSS mirror and text contrast | Values sampled from artboards 3, 5 and 7 | 2026-10-07 |
+| D296 | AL-024: Only the primary button has a shadow at rest (violet); on hover primary takes a deeper violet shadow and the others take `shadow.lifted` | Sampled from artboard 7 | 2026-10-07 |
+| D297 | AL-024: Only the inner surface lifts 3 px on hover, not the pressable target; one 220 ms (`motion.slowMs`) transition with `motion.easing` covers transform, box-shadow and filter; pressing drops the lift and applies `pressedFilter` | The pointer never slips off the edge, so hover doesn't flicker; react-native-web's added `-webkit-filter` breaks a per-property duration list | 2026-10-07 |
+| D298 | AL-024: `variant` defaults to `secondary`, `size` to `md` | Neutral default; primary is chosen explicitly | 2026-10-07 |
+| D299 | AL-024: react-native-web renders `role="button"` as a native `<button type="button">` (Enter/Space activate natively); disabled sets the `disabled` attribute plus `aria-disabled="true"`, so Tab skips it | Announced as unavailable; if disabled buttons should stay focusable Button would need a non-`<button>` element | 2026-10-07 |
+| D300 | AL-024: `loading` doesn't disable the button: it removes onPress, sets `aria-busy`, shows an ActivityIndicator in the leading-icon slot, keeps the label and doesn't fade | A natively disabled button loses keyboard focus | 2026-10-07 |
+| D301 | AL-024: The focus ring (focusRing tokens: 2 px violet, 2 px offset) is drawn on the surface and shows only for keyboard focus, tracked with capture-phase keydown/pointerdown listeners in `interaction.web.ts` | jsdom gets `:focus-visible` wrong on a second Tab; in Electron the result matched Chromium's `:focus-visible` | 2026-10-07 |
+| D302 | AL-024: The target's own global `:focus-visible` outline is turned off with an inline `outlineWidth: 0` so only one ring shows | react-native-web inserts its class rules ahead of the app CSS, so a class would lose to the global rule | 2026-10-07 |
+| D303 | AL-024: Web-only code (keyboard tracking, CSS transitions) is in `packages/ui/src/interaction.web.ts`; native `interaction.ts` always shows the ring and has no transitions; `isFocusVisible` and `liftTransition` are reusable by AL-026/AL-029 | Keeps DOM code out of the native build | 2026-10-07 |
+| D304 | AL-024: `@testing-library/user-event` is a devDependency of `packages/ui` | Tests press Tab, Shift+Tab, Enter and Space and hover like a real user | 2026-10-07 |
+| D305 | AL-081: A refused folder is not an error Result: main shows a native error box parented to the window ("\"Downloads\" is not a git repository.", "Choose another folder…" / "Cancel"), and on Cancel `repos:add` returns ok `{ status: 'rejected', reason, folder, repos }` | The picker is native and owned by main, the error is visible without AL-030's ToastHost, and callers never show it twice | 2026-10-07 |
+| D306 | AL-081: The `repos:add` outcome is a union `added \| existing \| cancelled \| rejected`, each carrying the full `repos` list; error Results are kept for git missing or too old (checked with `ensureSupported` before the dialog opens, INTERNAL with gitCode) and a failed settings save | Callers report only real failures | 2026-10-07 |
+| D307 | AL-081: "Choose another folder…" reopens the picker in the refused folder; the first picker opens in the parent of the last registered repo | Repos usually sit side by side | 2026-10-07 |
+| D308 | AL-081: The registered path is always the repo's main checkout: a sub-folder resolves to its work tree root (`rev-parse --show-toplevel`), a linked worktree to the main worktree (first `worktree list` entry when `--git-dir` ≠ `--git-common-dir`) | D63: a repo is identified by its main checkout, so it is registered only once | 2026-10-07 |
+| D309 | AL-081: Folder problems are typed `RepoFolderProblem`: not-a-repo, bare-repo, git-dir (inside .git), bare-main (linked worktree of a bare repo) and unreadable (git COMMAND_FAILED, CWD_NOT_FOUND, TIMEOUT; shows git's stderr, e.g. "dubious ownership") | Precise messages per cause | 2026-10-07 |
+| D310 | AL-081: Default-branch detection: `origin/HEAD` (symbolic-ref, never contacts the remote), then `main` if it exists locally or on origin, then `master`, then `main`; if detection fails `main` is used and the repo is still registered | A local-only or older repo with only `master` would otherwise get a base branch that doesn't exist | 2026-10-07 |
+| D311 | AL-081: Repo paths compare case-insensitively and ignore a trailing separator on Windows and macOS (`repoPathKey`/`isSameRepoPath`), for the "existing" check and `repos:remove` | Case-insensitive file systems | 2026-10-07 |
+| D312 | AL-081: Only one folder picker opens at a time; a second `repos:add` meanwhile gets the same promise and outcome | No stacked native dialogs | 2026-10-07 |
+| D313 | AL-081: Dialogs are an injectable `RepoDialogs` interface; the Electron version (`repos/electron-dialogs.ts`) finds its parent at call time (focused window, else first visible) and reads `dialog.*` at call time | Services hold no window (D42), `main/index.ts` unchanged, e2e can stub showOpenDialog/showMessageBox in main | 2026-10-07 |
+| D314 | AL-081: `repos:remove` only removes the settings entry, touches nothing on disk, returns `{ removed: false }` for an unknown path without writing, and doesn't clear `ui.lastRepo` | The renderer's persisted Zustand store owns `ui` and would write a stale value back | 2026-10-07 |
+| D315 | AL-081: The `repos` domain imports `RepoSettingsSchema`/`ReposSchema` from settings.schemas (repos stay in the settings document); `repos/*.ts` import `../git/git-error` and `../git/git-service`, not the git index | No second store; main-project tests don't load `electron` (the git index re-exports git-dialog) | 2026-10-07 |
+| D316 | AL-081: Renderer hooks `useRepos`/`useAddRepo`/`useRemoveRepo` (query key `['repos']`, staleTime Infinity) in `shared/api/repos.ts`; the mutations update both the repos cache and the cached settings' `repos`. No UI: the Repo dropdown is AL-142, the first-run picker step AL-047 | Ready for AL-142 and AL-047 | 2026-10-07 |
+| D317 | AL-081: e2e `repos.spec.ts` builds its git fixture with execFileSync and an isolated config instead of importing `src/main/git/testing` | No existing spec imports runtime code from src/ through Playwright's transform | 2026-10-07 |
+| D318 | AL-027: Variants are one `variant` prop (`text`, `multiline`, `secure`, `search`), not boolean flags | Impossible combinations such as a secure multiline field cannot be written | 2026-10-07 |
+| D319 | AL-027: A secure field has no `value`, `defaultValue` or `onChangeText` (blocked by its types). The form reads the secret through a `SecureTextFieldHandle` ref: `read()` leaves it in place (Test connection), `take()` returns and clears it (Save or Enter), `clear()` empties it (Cancel); `onSecretChange(filled)` reports only whether the field is empty | Keeps the token out of parent state, stores and logs | 2026-10-07 |
+| D320 | AL-027: The secure input is uncontrolled and holds the secret in a single `useRef`, not `useState` | A probe showed React copies a controlled input's value into the DOM `value` attribute (token in the markup); a ref leaves no stale copy in React's previous render | 2026-10-07 |
+| D321 | AL-027: The 'cleared from component state' test walks React's committed tree (props and hook state) for the secret, after first checking the secret is found while typed | If React internals change, the test fails instead of passing silently | 2026-10-07 |
+| D322 | AL-027: Secure fields render `type=password`, `autocomplete=off`, `autocorrect=off`, `autocapitalize=none`, `spellcheck=false` | `off` rather than `new-password`: Electron has no password manager | 2026-10-07 |
+| D323 | AL-027: The violet focus ring (`focusRing` token: 2 px, offset 2) is drawn on the whole box while the input has focus; the input's own outline is removed with an inline style (beats the global `:focus-visible` rule) | Otherwise the search field's ring would sit between the icon and the text | 2026-10-07 |
+| D324 | AL-027: `aria-describedby` lists the error first, then the help text. The error also sets `aria-invalid`, a red box border and an alert icon | The state is not shown by colour alone | 2026-10-07 |
+| D325 | AL-027: The field is named by its visible label through `aria-labelledby` (ids from `useId`); the types require `label` or `aria-label`. The search variant gets `role=searchbox` and `enterKeyHint=search` | The search field on artboard 2 has no visible label | 2026-10-07 |
+| D326 | AL-027: Sizes from artboards 2 and 5: 46 px box (44 inside a 1 px `line` border), radius 12, 12 px inset, 16 px muted search icon, value in `body` type, placeholder in `muted`; labels use Text `title` at 14 px in ink | Artboard 2 matches; artboard 5's labels measure about 13 px in #334155, which is not a token | 2026-10-07 |
+| D327 | AL-027: The disabled fill uses `color.bg` (#F4F7FB), not artboard 5's #F8FAFC; disabled fields are not editable and set `aria-disabled` | Avoids a new token; React Native's TextInput types have no `disabled` prop | 2026-10-07 |
+| D328 | AL-027: Multiline is a textarea with `rows` (default 5), min height rows × 20 + 28, `resize: vertical` on web; Enter adds a new line and never submits | Artboard 2 shows a resizable job description | 2026-10-07 |
+| D329 | AL-027: An `accessory` prop (beyond scope) puts a control on the box's row and keeps label and help text aligned to the box; in single-line fields Enter calls `onSubmitEditing` and focus stays in the field (`blurOnSubmit` false) | Artboard 5's 'Test connection' sits beside the PAT | 2026-10-07 |
+| D330 | AL-044: New invoke channel `connections:detectClaude` (request undefined → `ClaudeLoginDetection {found, identity, email, organization, plan, provider, message, checkedAt}`) in the connections domain, served by `ConnectionsService.detectClaudeLogin()` | The ticket named no channel; a separate domain would have meant more shared registration files | 2026-10-07 |
+| D331 | AL-044: Claude-specific contract pieces live in `packages/contracts/src/domains/connections.claude.ts` (detection schema, `CLAUDE_LOGIN_CONNECTED_TEXT`, `claudeConnectionStatusLine(row)`), exported with one line in contracts `index.ts` | Keeps `connections.schemas.ts` edits to two lines; AL-046 renders the status line from it | 2026-10-07 |
+| D332 | AL-044: Detection starts Claude Code with a streaming input that never sends a message and reads `accountInfo()` from the SDK's initialize handshake; it runs only when asked, never on start-up | No model request is made | 2026-10-07 |
+| D333 | AL-044: A login counts as found when `tokenSource` is set (claude.ai or OAuth token), when `apiKeySource` is '/login managed key' or 'apiKeyHelper', or when `apiProvider` is not firstParty (Bedrock, Vertex, Foundry, gateway). An `ANTHROPIC_API_KEY` from the environment never counts | Those are the cases where Claude Code authenticates itself | 2026-10-07 |
+| D334 | AL-044: `claudeProcessEnv` drops an inherited `ANTHROPIC_API_KEY` in login mode; in API-key mode it sets the saved key and drops `ANTHROPIC_AUTH_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` | The credential the user chose is the one tested and used; an exported key would otherwise silently override the login in headless mode | 2026-10-07 |
+| D335 | AL-044: Check processes (detect and test) run with `settingSources: []`, `strictMcpConfig`, `mcpServers: {}`, `tools: []`, `persistSession: false` and cwd = OS temp | A throwaway check runs none of the user's hooks, plugins or MCP servers and leaves no transcript. Side effect: a setup only in ~/.claude/settings.json (apiKeyHelper, env block) is not seen by detection | 2026-10-07 |
+| D336 | AL-044: The test uses model alias 'haiku' (not D10's pinned id), a short custom system prompt, `thinking: disabled`, `maxTurns: 1` and the prompt 'Reply with the single word OK.'; `error_max_turns` and `max_output_tokens` count as a working credential | Cheapest model, an alias that follows whatever Haiku the account can use, small input; a turn was answered | 2026-10-07 |
+| D337 | AL-044: Identity format: login = `email (organization)`; API key = organization or email when Claude Code knows it, else null | The artboard row already uses ' · ' between fields | 2026-10-07 |
+| D338 | AL-044: Reusable `apps/desktop/src/main/agent/claude-sdk.ts` (`createClaudeLauncher`, `claudeProcessEnv`, `loadClaudeQuery`, `ClaudeLaunchError`) loads the ESM-only SDK with a dynamic `import()` (kept in the CommonJS main bundle by electron-vite); exposed as `services.claude` for AL-100 | One launcher for checks and sessions | 2026-10-07 |
+| D339 | AL-044: `ServiceOptions.claudeExecutable`, set from `AGENT_LANES_CLAUDE_EXECUTABLE` in `main/index.ts` only when `!app.isPackaged` | Lets e2e start the fake CLI instead of the real binary (same pattern as D247) | 2026-10-07 |
+| D340 | AL-044: Test helper `apps/desktop/src/main/agent/testing/fake-claude.ts` (`createFakeClaude`, `fakeAssistant`, `fakeResult`, `fakeErrorResult`) is a scriptable stand-in for the SDK's `query()` that records options, env, sent messages and close | Other tickets can reuse it | 2026-10-07 |
+| D341 | AL-044: The e2e fake (`e2e/fixtures/fake-claude-code.mjs`) speaks the SDK 0.3.292 stream-json control protocol and is run by the real SDK through `node`; its logs record only whether a key was accepted, never the key; the spec checks the fake's identity before any prompt is sent | The real SDK runs in e2e without touching an account, and a misconfigured run cannot prompt the real binary | 2026-10-07 |
+| D342 | AL-043: The tester runs connectionData first (a refused token fails the test), then the projects list (`_apis/projects`, wellFormed, continuation-token paging, sorted names), then the three probes in parallel | The Build probe can run inside a project | 2026-10-07 |
+| D343 | AL-043: Probes run in the default project when the token can see it, otherwise in the first project listed, otherwise at org level | Builds are listed per project in REST 7.1, so the org-level Build probe may come back unverified | 2026-10-07 |
+| D344 | AL-043: Probes: Work Items POST `{project}/_apis/wit/wiql?$top=1` with 'SELECT [System.Id] FROM WorkItems WHERE [System.Id] = 0'; Code GET `_apis/git/repositories?$top=1`; Build GET `_apis/build/builds?$top=1`. Nothing is written to prove a write scope | Read-only checks | 2026-10-07 |
+| D345 | AL-043: Probe results: 2xx granted; 401, 403 or a sign-in page (203 or HTML) missing; anything else (404, 5xx, timeout, network) `unverified`. Missing scopes don't fail the test: status stays ok and `missingScopes` lists them | Other answers prove nothing about scopes | 2026-10-07 |
+| D346 | AL-043: New contract types `AdoScopeAccess` (read/write), `AdoScopeCheck` {scope, access, status: granted \| missing \| unverified}, `REQUIRED_ADO_SCOPE_ACCESS` (5 checks in chip order) and `missingScopesOf()`; `ConnectionTestResult` gains `scopes` (empty for Claude/MCP or a refused token) and `projects` (string[] or null) | Additions inside connections.schemas.ts only | 2026-10-07 |
+| D347 | AL-043: `ConnectionSummary` is unchanged: per-access checks are stored only in connections.json (the ADO record gets `scopes`, default [] so older files still load); the row keeps showing `missingScopes` | Other branches' `ConnectionSummary` literals keep compiling after merge | 2026-10-07 |
+| D348 | AL-043: `adoScopeOfRequest(method, url)` maps an API area to scope + access (wit/work → Work Items, git/policy → Code, build → Build; GET, WIQL and workitemsbatch are reads). `ConnectionsService.noteAdoResponse(id, logEntry)` takes ADO client log entries: a 2xx write marks write granted; a 403 or sign-in page marks the area missing and emits `connections:changed` once; a 401 is ignored (AL-048); updatedAt is not bumped and nothing is written when nothing changed | 'Map a later 403 to ADO_SCOPE_MISSING' (ado-client already returns that code for a 403) | 2026-10-07 |
+| D349 | AL-043: Re-testing a saved connection replaces its stored checks, so write access goes back to 'verified on first write' | ADO lets a PAT's scopes change without changing the token, so an old write-missing mark could be stale | 2026-10-07 |
+| D350 | AL-043: connectionData returning the anonymous identity (aaaaaaaa-…) is treated as ADO_UNAUTHORIZED; `CONNECTION_DATA_API_VERSION` moved into ado-client (`connection-test.ts`) and is re-exported by the main tester | Existing imports still work | 2026-10-07 |
+| D351 | AL-043: Display helpers live in contracts (`connections.display.ts`, one export line): `formatAdoConnectionDetails`, `displayOrgUrl`, `formatTokenExpiry`, `tokenExpiryState` (TOKEN_EXPIRY_WARNING_DAYS = 7, local calendar day, the date counts as the last valid day, year left out within 183 days or in the same year), `adoScopeChips`, `ADO_SCOPE_LABELS`, `adoScopeRequirement` | Follows AL-064's `formatPullRequestActivity` precedent; Q10 default | 2026-10-07 |
+| D352 | AL-043: AL-042's e2e (`connections.spec.ts`) now counts only authorized connectionData requests (still 3) | Each passing test now also makes project and probe requests to that fake | 2026-10-07 |
 
 ---
 
@@ -1385,6 +1485,10 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 6: merged AL-140, AL-080 and AL-062 (done). AL-080 conflicted with AL-012/AL-041/AL-131 in `main/index.ts` and `services.ts` (kept both sides: `emit`, `settings`, `buildQueue` + `git`); AL-062 conflicted with AL-061 in `ado.schemas.ts` and `ado-client/src/index.ts` (kept both: sprint block, then work-item block above the channel contracts). Integration fix: AL-140's placeholder pages render text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. D13 implemented (now dated). Decisions D159–D192. `pnpm verify` green (908 unit tests), e2e 31/31. AL-080's agent could not push its branch (Git Credential Manager account prompt); it was merged from the local branch. Drive C: had about 1.6 GB free. |
 | 2026-10-07 | Integrator batch 7: merged AL-214 (done). Registration conflicts kept both sides: `services.ts` (`settings`, `buildQueue`, `git` + `log`, `diagnostics`), `ipc/handlers.ts` (settings, build + diagnostics), renderer `shared/api/index.ts` (settings/event-handler + diagnostics exports) and `main.tsx` (`startEventHub()` + `installErrorReporting()` and the `AppErrorRoot` wrapper). At merge, AL-214's follow-ups for AL-041 were applied: diagnostics read `settings.get()` and the settings service warns to the log. Integration fix: `ErrorFallback` renders text with AL-023's `Text` primitive (lint rule). Lockfile unchanged after `pnpm install`. Decisions D193–D206. `pnpm verify` green (1031 unit tests), e2e 34/34. Follow-ups: AL-210 reuses `ErrorBoundary`/`ErrorFallback`; swap `ActionButton` for AL-024's Button; later services take `services.log.child('<scope>')`. |
 | 2026-10-07 | Integrator batch 8: merged AL-042 and AL-191 (done), AL-063 (partial: "visible in ADO" needs one manual check against a real org) and AL-064 (partial: card text and move to Done wait for AL-065/AL-144/AL-181; data side done). Registration conflicts kept both sides: `ado-client/src/index.ts` (AL-061/062 sprint and work-item exports + AL-064 PRs + AL-063 write-back), `contracts/src/index.ts` (`ado.pull-requests` + `ado.write-back`), `services.ts` (`git`, `log`, `diagnostics` + `connections` + `designView`), `ipc/handlers.ts` (build, diagnostics + connections + design) and `main/index.ts` (AL-214 logger wiring + AL-191 `mainWindow`/`designTestOrigin` options). At merge the connections service's warnings go to `log.child('connections')`. Integration fix: AL-063/AL-064 DTOs use AL-062's `WorkItemIdSchema` (D219). Lockfile unchanged after `pnpm install`. Decisions D207–D252. `pnpm verify` green (1337 unit tests), e2e 44/44. Follow-ups: AL-065 registers `createWorkItemWriteBack` and the PR channels; AL-047 raises Reconnect for `needsReconnect` rows (closes AL-040). |
+| 2026-10-07 | Integrator batch 9: merged AL-025 and AL-101 (done). AL-101 conflicted in `services.ts` (kept both sides: `git`, `log`, `diagnostics`, `connections`, `designView` + `tickets`; `disposeServices` flushes tickets after the build queue, then closes the design views). At merge the ticket store's warnings go to `log.child('tickets')` (AL-101 follow-up for AL-214). Integration fix: real-git `record-store.worktree.test.ts` gets the 60 s timeouts `src/main/git` uses, and `AppRouter.test.tsx` 30 s (its cold first import passed 5 s under the full suite). Lockfile unchanged after `pnpm install`. Decisions D253–D279. `pnpm verify` green (1506 unit tests), e2e 45/45. Follow-ups: live-dock "Live" pill needs a filled Pill variant; drill-in may want an `xs` Pill and larger IdChip; AL-021's fonts e2e can point at IdChip once AL-144 lands; AL-032's gallery can use `pillTones`/`badgeStatuses`; `tickets:*` IPC channels for AL-090/AL-141/AL-165; same work item in two repos gives a duplicate ticket id (AL-083/AL-161); AL-197 stores specs outside `<repoKey>/<ticketId>.json`; AL-088's archive list not built (`delete` exists for AL-083 rollback); AL-100/AL-110 call `services.tickets.flush(id)` for must-save values; `nameSubAgent` and `BuildJobSchema.ticketId` can reuse `TICKET_ID_PATTERN`/`TicketIdSchema`. |
+| 2026-10-07 | Integrator batch 10: merged AL-026, AL-024 and AL-081 (done). Registration conflicts kept both sides: `packages/ui/src/index.ts` (AL-025 Pill/Badge/StatusBadge/IdChip + AL-026 SegmentedControl/Switch + AL-024 Button), `packages/tokens/src/index.ts` and `agent-lanes-tokens.css` (AL-026 `selection` + AL-024 `control` token groups, each its own `:root` block), `services.ts` (`git`, `log`, `diagnostics`, `connections`, `designView`, `tickets` + `repos`), `ipc/handlers.ts` (diagnostics, connections, design + repos) and renderer `shared/api/index.ts` (design-view and diagnostics exports + repos hooks). `pnpm-lock.yaml` took main's side and was regenerated (adds `@testing-library/user-event` to `packages/ui`). No integration fixes needed. Decisions D280–D317. `pnpm verify` green (1634 unit tests), e2e 47/47. Follow-ups: AL-032 gallery renders Button, SegmentedControl and Switch (plus real-Chromium keyboard e2e); AL-033 checks the Switch off-track contrast; AL-029 reuses `selection` tokens and `interaction(.web).ts`; AL-214's `ActionButton` (D206) and AL-140's plain Pressables (D165) can switch to Button; AL-142/AL-047 fall back when `ui.lastRepo` is gone and treat `rejected` like `cancelled`; AL-146 invalidates `['repos']` after editing `settings.repos`; `repos:remove` should guard repos with live tickets once AL-141 lands. |
+| 2026-10-07 | Integrator batch 11: merged AL-027 (done). One registration conflict in `packages/ui/src/index.ts` (AL-025/AL-026/AL-024 exports + AL-027 TextField, kept both sides). Lockfile unchanged after `pnpm install`. Integration fix: `AppRouter.test.tsx` sets Testing Library's `asyncUtilTimeout` to 15 s, because under the full suite the lazy page chunk outlasted `findBy`'s 1 s default (the batch 9 fix raised only the Vitest test timeout). Decisions D318–D329. `pnpm verify` green (1662 unit tests), e2e 47/47. Follow-ups: AL-046 holds a `useRef<SecureTextFieldHandle>` for the PAT (`read()` for Test connection, `take()` for Save, `onSecretChange` to reset tested state, Test connection in `accessory`, ref `focus()` or `autoFocus` for a Reconnect toast); AL-032 gallery shows TextField's four variants plus error, help and disabled states (no in-app page renders TextField yet, so no e2e); AL-033 checks the `line` border (#E2E8F0 on white, about 1.2:1, below WCAG 1.4.11's 3:1). |
+| 2026-10-07 | Integrator batch 12: merged AL-044 and AL-043 (both partial: data paths done and proven through IPC in unit and e2e tests; the Claude tab, saved ADO row, scope chips and expiry input are AL-046, and each needs a manual check by Kyle against a real Claude Code login / ADO org). Registration conflicts kept both sides: `services.ts` (`tickets`, `repos` + `claude`), `contracts/src/index.ts` (`connections.claude` + `connections.display`) and `connections/service.ts` (`detectClaudeLogin` + `noteAdoResponse` in the interface and the service object). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D330–D352. `pnpm verify` green (1787 unit tests), e2e 53/53. Follow-ups: AL-046 builds the Claude tab on `connections:detectClaude` ("Use my Claude Code login", render `claudeConnectionStatusLine`, red while status is error) and the ADO row/chips/expiry with `formatAdoConnectionDetails`, `tokenExpiryState`, `adoScopeChips(result.scopes)`, the Default project dropdown from `result.projects` (free text when null) and an optional expiry date input; AL-065 passes `log: (entry) => void services.connections.noteAdoResponse(orgId, entry)` to the per-org ADO client; AL-100 starts sessions with `services.claude.launch({ credential, ... })` or `claudeProcessEnv`, not `process.env` + `sessionEnv()` (an inherited ANTHROPIC_API_KEY would override the login), and may unify the test model with D10; AL-048 tells a refused write (ADO may answer 401 TF400813) from a revoked token; AL-047/AL-048 own any near-expiry toast; re-run `e2e/claude-connection.spec.ts` on an Agent SDK upgrade (fake follows 0.3.292). |
 
 ---
 

@@ -7,6 +7,10 @@
  * - `band`: footer band and status-pill background.
  * - `text`: text on a `band` (meets 4.5:1 on it).
  * - `fill`: progress bar fill (claude is a gradient, see `progressGradient`).
+ * - `dot`: the status dot in a pill (the "Status badges" block), the tone's strong colour.
+ *
+ * `neutral` is the grey of "Queued" and other idle states (status badges on artboard 6, the
+ * "1 queued" count on artboard 1).
  *
  * Values that repeat a `color` token are spelled out rather than imported, because index.ts
  * re-exports this file (an import back would be circular); tones.test.ts checks they still match.
@@ -18,17 +22,20 @@ export const tone = {
     wash: '#F6F5FF',
     band: '#EEEBFF', // color.claudeTint
     text: '#4A3BB0', // color.claudeText
+    dot: '#5B4BC4', // color.claude
   },
   ado: {
     wash: '#F0F9FF',
     band: '#E0F2FE', // color.adoTint
     text: '#0369A1', // color.ado
     fill: '#38BDF8', // color.skyGlow
+    dot: '#0369A1', // color.ado
   },
   attention: {
     border: '#FCD34D',
     band: '#FEF3C7',
     text: '#92400E',
+    dot: '#D97706', // color.attention
   },
   danger: {
     border: '#FECACA',
@@ -36,12 +43,19 @@ export const tone = {
     band: '#FEE2E2',
     text: '#991B1B',
     fill: '#F87171',
+    dot: '#B91C1C', // color.danger
   },
   ok: {
     wash: '#ECFDF5',
     band: '#D1FAE5',
     text: '#047857',
     fill: '#10B981',
+    dot: '#059669', // color.ok
+  },
+  neutral: {
+    band: '#F1F5F9',
+    text: '#475569',
+    dot: '#94A3B8',
   },
 } as const;
 
