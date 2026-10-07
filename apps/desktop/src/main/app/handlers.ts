@@ -1,19 +1,10 @@
-import { app } from 'electron';
-import { ok, type APP_INVOKE_CHANNELS } from '@agent-lanes/contracts';
+import { ok } from '@agent-lanes/contracts';
 import type { HandlersFor } from '../ipc/handle-invoke';
+import { readAppInfo } from './app-info';
 
-export function createAppHandlers(): HandlersFor<(typeof APP_INVOKE_CHANNELS)[number]> {
+/** `app:getInfo`. The app domain's diagnostics channels live in `diagnostics/handlers.ts` (AL-214). */
+export function createAppHandlers(): HandlersFor<'app:getInfo'> {
   return {
-    'app:getInfo': () =>
-      ok({
-        name: app.getName(),
-        version: app.getVersion(),
-        platform: process.platform,
-        versions: {
-          electron: process.versions.electron,
-          chrome: process.versions.chrome,
-          node: process.versions.node,
-        },
-      }),
+    'app:getInfo': () => ok(readAppInfo()),
   };
 }

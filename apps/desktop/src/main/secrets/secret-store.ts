@@ -87,6 +87,11 @@ export interface SecretStoreOptions {
   now?: () => Date;
   /** Receives one line per problem; never a secret or ciphertext. Defaults to console.warn. */
   warn?: (message: string) => void;
+  /**
+   * Called with each plaintext secret the store saves or decrypts, before anyone else holds it, so
+   * the app log can redact it wherever it later appears (AL-214). It must not keep it for anything else.
+   */
+  onPlaintext?: (secret: string) => void;
 }
 
 /** Ids name a connection's secret, e.g. `ado:contoso`, `claude:api-key`, `mcp:github`. */
@@ -119,6 +124,13 @@ export function createSecretStore(options: SecretStoreOptions): SecretStore {
   const { filePath, safeStorage } = options;
   const now = options.now ?? (() => new Date());
   const warn = options.warn ?? ((message: string) => console.warn(`[secrets] ${message}`));
+  const onPlaintext = (secret: string) => {
+    try {
+      options.onPlaintext?.(secret);
+    } catch {
+      // A failing listener must not stop a token from being saved or used.
+    }
+  };
 
   const fileIssues: SecretStoreIssue[] = [];
   const entryIssues = new Map<string, SecretStoreIssue>();
@@ -258,6 +270,7 @@ export function createSecretStore(options: SecretStoreOptions): SecretStore {
       if (typeof secret !== 'string' || secret.length === 0 || secret.length > MAX_SECRET_LENGTH) {
         throw new SecretStoreError('INVALID_SECRET', `The secret for ${id} is empty or too long.`);
       }
+      onPlaintext(secret);
       if (!encryptionAvailable()) {
         throw new SecretStoreError(
           'ENCRYPTION_UNAVAILABLE',
@@ -286,13 +299,16 @@ export function createSecretStore(options: SecretStoreOptions): SecretStore {
       if (!isValidSecretId(id)) return undefined;
       const entry = (await load()).entries.get(id);
       if (!entry || !encryptionAvailable()) return undefined;
+      let secret: string;
       try {
-        return safeStorage.decryptString(Buffer.from(entry.ciphertext, 'base64'));
+        secret = safeStorage.decryptString(Buffer.from(entry.ciphertext, 'base64'));
       } catch {
         if (!entryIssues.has(id)) warn(`Secret ${id} could not be decrypted on this machine; it is treated as missing.`);
         entryIssues.set(id, { kind: 'entry-undecryptable', id });
         return undefined;
       }
+      onPlaintext(secret);
+      return secret;
     },
 
     async delete(id) {

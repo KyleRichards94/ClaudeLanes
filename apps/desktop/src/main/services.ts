@@ -1,8 +1,11 @@
 import { join } from 'node:path';
 import { safeStorage } from 'electron';
+import { readAppInfo } from './app/app-info';
 import { createJobQueue, type JobQueue } from './build';
-import type { Emit } from './ipc/emit';
+import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
+import type { Emit } from './ipc/emit';
+import { LOG_DIRECTORY_NAME, createLogger, type Logger } from './logging';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
@@ -27,6 +30,10 @@ export interface Services {
   readonly buildQueue: JobQueue;
   /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
   readonly git: GitService;
+  /** Rotating, redacted log in `<userData>/logs` (AL-214). Hand each service `log.child('<scope>')`. */
+  readonly log: Logger;
+  /** Versions, settings without secrets and recent errors, for "Copy diagnostics" (AL-214). */
+  readonly diagnostics: Diagnostics;
 }
 
 export interface ServiceOptions {
@@ -34,15 +41,23 @@ export interface ServiceOptions {
   /** Electron's safeStorage unless a test passes a fake (`./secrets/testing`). */
   safeStorage?: SafeStorageLike;
   emit: Emit;
+  /** The app log; index.ts creates it before anything else so start-up problems are logged. */
+  log?: Logger;
 }
 
 export function createServices(options: ServiceOptions): Services {
+  const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
     safeStorage: options.safeStorage ?? safeStorage,
+    warn: (message) => log.child('secrets').warn(message),
+    onPlaintext: (secret) => log.redactor.addSecret(secret),
   });
 
-  const settingsStore = createSettingsService({ file: createElectronSettingsFile(options.appDataDir) });
+  const settingsStore = createSettingsService({
+    file: createElectronSettingsFile(options.appDataDir),
+    warn: (message) => log.child('settings').warn(message),
+  });
   // Concurrency follows the `buildQueueSize` setting (AL-041), read at each scheduling decision.
   const buildQueue = createJobQueue({ concurrency: () => settingsStore.get().buildQueueSize });
   const settings: SettingsService = {
@@ -59,6 +74,14 @@ export function createServices(options: ServiceOptions): Services {
 
   const git = createGitService();
 
+  const diagnostics = createDiagnostics({
+    appInfo: readAppInfo,
+    log,
+    secrets,
+    // The settings service's current settings (AL-041); diagnostics redact them before reporting.
+    settings: () => settings.get(),
+  });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
@@ -66,6 +89,8 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     buildQueue,
     git,
+    log,
+    diagnostics,
   };
 }
 

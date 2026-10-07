@@ -8,3 +8,6 @@ export function App() {
     </AppProviders>
   );
 }
+
+export { AppErrorRoot } from './entrypoint/AppErrorRoot';
+export { installErrorReporting } from './entrypoint/error-reporting';
