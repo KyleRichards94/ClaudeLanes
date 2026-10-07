@@ -83,6 +83,8 @@ describe('NewTicketModal', () => {
       effort: 'xhigh',
       gates: settings().defaults.stageGates,
       worktreeName: null,
+      // No repo registered in this profile.
+      repo: null,
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
