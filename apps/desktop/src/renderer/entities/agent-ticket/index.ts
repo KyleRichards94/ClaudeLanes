@@ -28,3 +28,4 @@ export {
 } from './model/selectors';
 export { useAgentTicket, useAgentTicketCount, useLaneNeedsYouCount, useLaneTicketIds } from './model/hooks';
 export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
+export { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS, modelEffortLabel, stageProgressLabel } from './model/labels';

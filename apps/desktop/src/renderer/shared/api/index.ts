@@ -13,3 +13,5 @@ export {
   type RendererErrorSource,
 } from './diagnostics';
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
+export { ticketRecordQueryKey, useTicketRecord } from './tickets';
+export { useWorkItem, workItemQueryKey } from './work-item';
