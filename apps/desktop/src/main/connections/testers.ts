@@ -10,6 +10,8 @@ export interface ConnectionTestOutcome {
   message: string | null;
   /** ADO only (AL-043). */
   missingScopes?: AdoScope[];
+  /** MCP only (AL-045): names of the tools the server listed. */
+  tools?: string[];
 }
 
 /**
