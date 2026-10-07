@@ -10,3 +10,5 @@ export {
   type JobQueueOptions,
   type JobRequest,
 } from './job-queue';
+export { createGitFingerprint, type WorktreeFingerprint } from './freshness';
+export { createRunService, type RunService, type RunServiceOptions } from './run/run-service';

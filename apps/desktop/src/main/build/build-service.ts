@@ -12,6 +12,7 @@ import {
 import type { Emit } from '../ipc/emit';
 import type { TicketRecordStore } from '../tickets';
 import type { BuildCommands } from './commands';
+import type { WorktreeFingerprint } from './freshness';
 import type { JobQueue } from './job-queue';
 import { createBatcher, clampLine, DEFAULT_LOG_BATCH_MS } from './log/lines';
 import { createDiagnosticCollector, stripAnsi } from './log/parse';
@@ -30,6 +31,11 @@ export interface BuildService {
    * of Run (AL-133) in the queue. VALIDATION when the ticket, its worktree or a build command is missing.
    */
   build(ticketId: string, options?: { kind?: BuildJobKind }): Promise<Result<BuildResult>>;
+  /**
+   * Whether Run must build first (AL-133): true unless the ticket's last build in this session
+   * succeeded and its worktree still has the fingerprint it had when that build started.
+   */
+  isStale(ticketId: string): Promise<boolean>;
 }
 
 export interface BuildServiceOptions {
@@ -44,6 +50,8 @@ export interface BuildServiceOptions {
   /** Whether the worktree folder exists; tests pass a fake. */
   folderExists?: (path: string) => Promise<boolean>;
   warn?: (message: string) => void;
+  /** Reads a worktree's state, so Run can skip a build that is still fresh (AL-133); without it every Run builds. */
+  fingerprint?: WorktreeFingerprint;
 }
 
 async function isFolder(path: string): Promise<boolean> {
@@ -63,6 +71,9 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
   const startCommand = options.startCommand ?? defaultStartCommand;
   const now = options.now ?? Date.now;
   const folderExists = options.folderExists ?? isFolder;
+  const fingerprint = options.fingerprint ?? (() => Promise.resolve(null));
+  /** Ticket id → the worktree fingerprint taken as its last successful build started. */
+  const fresh = new Map<string, string>();
   const warn = options.warn ?? ((message: string) => console.warn(`[build] ${message}`));
 
   async function saveLastBuild(record: TicketRecord, result: BuildResult): Promise<void> {
@@ -95,8 +106,11 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
       let jobId = '';
       let startedAt: number | null = null;
 
+      let before: string | null = null;
       const run = async (signal: AbortSignal): Promise<ProcessRun> => {
         startedAt = now();
+        fresh.delete(ticketId);
+        before = await fingerprint(record.worktreePath);
         const batcher = createBatcher<BuildLogLine>({
           intervalMs: options.logBatchMs ?? DEFAULT_LOG_BATCH_MS,
           send: (lines) => options.emit('build:log', { ticketId, jobId, kind, lines }),
@@ -142,10 +156,18 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
       };
       if (outcome.status === 'error') warn(`Build job ${jobId} of ticket ${ticketId} threw: ${String(outcome.error)}`);
 
+      if (result.outcome === 'succeeded' && before !== null) fresh.set(ticketId, before);
       await saveLastBuild(record, result);
       options.emit('build:finished', { ...result, at: finishedAt });
 
       return result.outcome === 'failed' ? err('BUILD_FAILED', buildFailedLabel(result.errors), result) : ok(result);
+    },
+
+    async isStale(ticketId) {
+      const builtAt = fresh.get(ticketId);
+      const record = await options.tickets.get(ticketId);
+      if (!builtAt || !record || record.lastBuild?.outcome !== 'succeeded') return true;
+      return (await fingerprint(record.worktreePath)) !== builtAt;
     },
   };
 }

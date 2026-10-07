@@ -34,7 +34,7 @@ describe('event contracts', () => {
   });
 
   it('puts ticketId and at on every ticket event', () => {
-    for (const channel of ['agent:output', 'agent:stage', 'agent:subagent', 'agent:gate', 'agent:status', 'run:status', 'design:spec'] as const) {
+    for (const channel of ['agent:output', 'agent:stage', 'agent:subagent', 'agent:gate', 'agent:status', 'design:spec'] as const) {
       const schema = eventContracts[channel];
       expect(schema.safeParse({ ticketId: '71273', at: 1_760_000_000_000 }).success, channel).toBe(true);
       expect(schema.safeParse({ at: 1_760_000_000_000 }).success, `${channel} without ticketId`).toBe(false);

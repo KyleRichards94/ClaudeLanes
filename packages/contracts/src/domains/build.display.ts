@@ -1,4 +1,4 @@
-import type { BuildDiagnostic } from './build.schemas';
+import type { BuildDiagnostic, RunStatus } from './build.schemas';
 import type { TicketLastBuild } from './tickets.schemas';
 
 /**
@@ -70,4 +70,31 @@ export function lastBuildLabel(
   if (!lastBuild) return null;
   const outcome = lastBuild.outcome === 'failed' && lastBuild.errors > 0 ? `failed · ${plural(lastBuild.errors, 'error', 'errors')}` : lastBuild.outcome;
   return `Last build ${formatTime(lastBuild.finishedAt)} · ${outcome}`;
+}
+
+/** "localhost:5080" for `http://localhost:5080/`: what the card shows of a run's URL. */
+export function runUrlHost(url: string): string {
+  const withoutScheme = url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
+  return withoutScheme.split(/[/?#]/, 1)[0] || withoutScheme;
+}
+
+/**
+ * The card's and Worktree panel's run line (AL-133, design §10): "Running · localhost:5080" for a web
+ * project, "Running" for a desktop app, "Not running" before a run or after it stopped.
+ */
+export function runLabel(status: Pick<RunStatus, 'state' | 'url'> | null): string {
+  switch (status?.state) {
+    case 'building':
+      return 'Building…';
+    case 'starting':
+      return 'Starting…';
+    case 'running':
+      return status.url ? `Running · ${runUrlHost(status.url)}` : 'Running';
+    case 'stopping':
+      return 'Stopping…';
+    case 'failed':
+      return 'Run failed';
+    default:
+      return 'Not running';
+  }
 }

@@ -1,9 +1,9 @@
 import { join } from 'node:path';
-import { app, safeStorage, type BrowserWindow } from 'electron';
+import { app, safeStorage, shell, type BrowserWindow } from 'electron';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
 import { readAppInfo } from './app/app-info';
-import { createBuildService, createJobQueue, type BuildService, type JobQueue } from './build';
+import { createBuildService, createGitFingerprint, createJobQueue, createRunService, type BuildService, type JobQueue, type RunService } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
 import {
   adoMcpServerFor,
@@ -49,6 +49,8 @@ export interface Services {
   readonly buildCommands: BuildCommands;
   /** Build jobs in ticket worktrees: batched `build:log`, diagnostics, last build on the ticket (AL-132). */
   readonly builds: BuildService;
+  /** Run jobs: build if stale, start in the worktree, free port and URL for web projects (AL-133). */
+  readonly runs: RunService;
   /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
   readonly git: GitService;
   /** Rotating, redacted log in `<userData>/logs` (AL-214). Hand each service `log.child('<scope>')`. */
@@ -114,9 +116,23 @@ export function createServices(options: ServiceOptions): Services {
     warn: (message) => log.child('tickets').warn(message),
   });
 
-  const builds = createBuildService({ tickets, buildCommands, queue: buildQueue, emit: options.emit, warn: (message) => log.child('build').warn(message) });
-
   const git = createGitService();
+  const builds = createBuildService({
+    tickets,
+    buildCommands,
+    queue: buildQueue,
+    emit: options.emit,
+    fingerprint: createGitFingerprint(git),
+    warn: (message) => log.child('build').warn(message),
+  });
+  const runs = createRunService({
+    tickets,
+    buildCommands,
+    builds,
+    emit: options.emit,
+    openExternal: (url) => shell.openExternal(url),
+    warn: (message) => log.child('run').warn(message),
+  });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
 
   const diagnostics = createDiagnostics({
@@ -159,6 +175,7 @@ export function createServices(options: ServiceOptions): Services {
     buildQueue,
     buildCommands,
     builds,
+    runs,
     git,
     log,
     diagnostics,

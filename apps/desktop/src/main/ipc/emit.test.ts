@@ -112,7 +112,7 @@ describe('emit', () => {
 
       for (const frame of [undefined, gone.frame, loading.frame]) {
         const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log });
-        emit('run:status', { ticketId: '71273', at: 5 });
+        emit('agent:gate', { ticketId: '71273', at: 5 });
       }
 
       expect(gone.send).not.toHaveBeenCalled();

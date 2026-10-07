@@ -234,7 +234,62 @@ export type BuildResult = z.infer<typeof BuildResultSchema>;
 export const StartBuildRequestSchema = z.strictObject({ ticketId: z.string().min(1) });
 export type StartBuildRequest = z.infer<typeof StartBuildRequestSchema>;
 
+// ── Run jobs (AL-133, AL-134, design §10 Run and Stop) ─────────────────────────────────────────────
+
+/**
+ * Where a ticket's run is: `building` (its build step, when the last build is stale), `starting`
+ * (process up, a web project's URL not seen yet), `running`, `stopping`, then `stopped` (it exited or
+ * was stopped) or `failed` (the build failed, it could not start, or it exited with an error).
+ */
+export const RUN_STATES = ['building', 'starting', 'running', 'stopping', 'stopped', 'failed'] as const;
+export const RunStateSchema = z.enum(RUN_STATES);
+export type RunState = z.infer<typeof RunStateSchema>;
+
+/** A run that is still going (Stop applies); the others are final. */
+export const ACTIVE_RUN_STATES: readonly RunState[] = ['building', 'starting', 'running', 'stopping'];
+
+export const RunStatusSchema = z.object({
+  ticketId: z.string().min(1),
+  runId: z.string().min(1),
+  state: RunStateSchema,
+  /** What the run command starts (AL-130); null for an override the app could not classify. */
+  runKind: RunTargetKindSchema.nullable(),
+  /** The free port given to a web project (`ASPNETCORE_URLS` / `PORT`); null for desktop and console apps. */
+  port: z.int().min(1).max(65_535).nullable(),
+  /** Where the app listens, e.g. `http://localhost:5080/`; null until seen, and for desktop apps. */
+  url: z.string().min(1).max(2048).nullable(),
+  startedAt: EpochMsSchema,
+  /** Null while it runs. */
+  stoppedAt: EpochMsSchema.nullable(),
+  /** Null while it runs, or when it was killed. */
+  exitCode: z.int().nullable(),
+  /** Why it failed or stopped, e.g. "Build failed · 3 errors"; null otherwise. */
+  message: z.string().max(1000).nullable(),
+});
+export type RunStatus = z.infer<typeof RunStatusSchema>;
+
+export const RunTicketRequestSchema = z.strictObject({ ticketId: z.string().min(1) });
+export type RunTicketRequest = z.infer<typeof RunTicketRequestSchema>;
+
+/** `run:list`: every run started since the app opened, newest status per ticket. */
+export const RunListSchema = z.object({ runs: z.array(RunStatusSchema) });
+export type RunList = z.infer<typeof RunListSchema>;
+
+/** `run:openUrl`: false when the ticket has no running web app with a URL. */
+export const OpenRunUrlResponseSchema = z.object({ opened: z.boolean() });
+export type OpenRunUrlResponse = z.infer<typeof OpenRunUrlResponseSchema>;
+
 export const buildInvokeContracts = {
+  /**
+   * Runs the ticket's app: builds first when the last build is stale, then starts the run command in
+   * its worktree; a web project gets a free port. Resolves once the process started (state
+   * `starting` or `running`); BUILD_FAILED when the build step failed; VALIDATION when the ticket, its
+   * worktree or a run command is missing. A ticket that is already running returns its status (AL-133).
+   */
+  'run:start': { request: RunTicketRequestSchema, response: RunStatusSchema },
+  'run:list': { request: z.undefined(), response: RunListSchema },
+  /** Opens the ticket's running web app in the default browser ("Running · localhost:5080" click). */
+  'run:openUrl': { request: RunTicketRequestSchema, response: OpenRunUrlResponseSchema },
   /**
    * Queues a build of the ticket's worktree and settles when it ends: ok with the result when it
    * succeeded or was cancelled, BUILD_FAILED with the result as `details` when it failed, VALIDATION
@@ -257,8 +312,8 @@ export const BuildLogEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type BuildLogEvent = z.infer<typeof BuildLogEventSchema>;
 
-/** `run:status`: the ticket's run job started, found its URL, or stopped (AL-133, AL-134). */
-export const RunStatusEventSchema = TicketEventEnvelopeSchema.extend({});
+/** `run:status`: the ticket's run job changed state, found its URL, or stopped (AL-133, AL-134). */
+export const RunStatusEventSchema = RunStatusSchema.extend(TicketEventEnvelopeSchema.shape);
 export type RunStatusEvent = z.infer<typeof RunStatusEventSchema>;
 
 /** `build:finished`: a build ended; the card shows "Build failed · 3 errors" and the first error (AL-132). */

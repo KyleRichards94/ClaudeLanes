@@ -194,6 +194,28 @@ describe('build service', () => {
     expect(stored.lastBuild?.outcome).toBe('cancelled');
   });
 
+  it('counts a build fresh for Run until the worktree changes or a build fails (AL-133)', async () => {
+    const child = fakeProcess();
+    let state = 'head-1';
+    const builds = service({ startCommand: child.start, fingerprint: () => Promise.resolve(state) });
+    expect(await builds.isStale('71273')).toBe(true);
+
+    const first = builds.build('71273');
+    await vi.waitFor(() => expect(child.started).toHaveLength(1));
+    child.exit(0);
+    await first;
+    expect(await builds.isStale('71273')).toBe(false);
+
+    state = 'head-1 + edited a.cs';
+    expect(await builds.isStale('71273')).toBe(true);
+
+    const second = builds.build('71273');
+    await vi.waitFor(() => expect(child.started).toHaveLength(2));
+    child.exit(1);
+    await second;
+    expect(await builds.isStale('71273')).toBe(true);
+  });
+
   it('refuses unknown tickets, repos without a build command and missing worktrees', async () => {
     const child = fakeProcess();
     await expect(service({ startCommand: child.start }).build('99999')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
