@@ -40,4 +40,28 @@ describe('handleInvoke', () => {
     const failure = err('ADO_UNAUTHORIZED', 'PAT expired');
     await expect(handleInvoke('app:getInfo', undefined, () => failure)).resolves.toEqual(failure);
   });
+
+  it('reports refused requests, invalid responses and throws to the log (AL-214)', async () => {
+    const lines: Array<[string, string, unknown]> = [];
+    const log = {
+      warn: (message: string, detail?: unknown) => lines.push(['warn', message, detail]),
+      error: (message: string, detail?: unknown) => lines.push(['error', message, detail]),
+    };
+    const boom = new Error('boom');
+
+    await handleInvoke('app:getInfo', { unexpected: true }, () => ok(appInfo), log);
+    await handleInvoke('app:getInfo', undefined, () => ok({ name: 'only a name' } as never), log);
+    await handleInvoke('app:getInfo', undefined, () => {
+      throw boom;
+    }, log);
+    await handleInvoke('app:getInfo', undefined, () => err('ADO_UNAUTHORIZED', 'PAT expired'), log);
+
+    expect(lines.map(([level, message]) => [level, message])).toEqual([
+      ['warn', 'Refused app:getInfo: the request breaks its contract'],
+      ['error', 'Handler for app:getInfo returned an invalid response'],
+      ['error', 'app:getInfo failed: boom'],
+    ]);
+    expect(lines[2]?.[2]).toBe(boom);
+  });
 });
+
