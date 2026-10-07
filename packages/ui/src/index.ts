@@ -11,3 +11,4 @@ export { SegmentedControl, type SegmentedControlProps, type SegmentedOption, typ
 export { Switch, type SwitchProps, type SwitchStateText } from './Switch';
 export { Button, buttonSizes, buttonVariants, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
 export { TextField, type SecureTextFieldHandle, type TextFieldHandle, type TextFieldProps, type TextFieldVariant } from './TextField';
+export { Toast, toastTones, toastWidth, type ToastAction, type ToastProps, type ToastTone } from './Toast';
