@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { color, font, fontSize, fontWeight, minTarget, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel } from '@agent-lanes/ui';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { color, minTarget, radius, space } from '@agent-lanes/tokens';
+import { GlassPanel, Text } from '@agent-lanes/ui';
 import { routes, useNavigation } from '@/shared/routing';
 
 export interface DesignTabPageProps {
@@ -18,19 +18,19 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
     <View style={styles.page} testID="design-tab-page">
       <GlassPanel style={styles.topBar}>
         <Pressable role="button" style={styles.button} onPress={() => navigate(routes.board())}>
-          <Text style={styles.buttonLabel}>← Board</Text>
+          <Text variant="title">← Board</Text>
         </Pressable>
         <View style={styles.idChip}>
-          <Text style={styles.idChipLabel}>#{ticketId}</Text>
+          <Text variant="mono" color={color.ado}>#{ticketId}</Text>
         </View>
-        <Text style={styles.title} role="heading" aria-level={1}>
+        <Text variant="display" size="lg" role="heading" aria-level={1}>
           Claude Design
         </Text>
       </GlassPanel>
 
       <View style={styles.actions}>
         <Pressable role="link" style={styles.button} onPress={() => navigate(routes.ticket(ticketId))}>
-          <Text style={styles.buttonLabel}>Output</Text>
+          <Text variant="title">Output</Text>
         </Pressable>
       </View>
     </View>
@@ -59,29 +59,11 @@ const styles = StyleSheet.create({
     borderColor: color.line,
     backgroundColor: color.surface,
   },
-  buttonLabel: {
-    color: color.ink,
-    fontFamily: font.sans,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.heading,
-  },
   idChip: {
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
     borderRadius: radius.chip,
     backgroundColor: color.adoTint,
-  },
-  idChipLabel: {
-    color: color.ado,
-    fontFamily: font.mono,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.heading,
-  },
-  title: {
-    color: color.ink,
-    fontFamily: font.sans,
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.display,
   },
   actions: {
     flexDirection: 'row',
