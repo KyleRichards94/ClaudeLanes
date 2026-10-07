@@ -1,10 +1,10 @@
 import { join } from 'node:path';
-import { app, safeStorage, type BrowserWindow } from 'electron';
+import { app, safeStorage, shell, type BrowserWindow } from 'electron';
 import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
 import { readAppInfo } from './app/app-info';
-import { createJobQueue, type JobQueue } from './build';
+import { createBuildService, createGitFingerprint, createJobQueue, createRunService, type BuildService, type JobQueue, type RunService } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
 import {
   adoMcpServerFor,
@@ -49,6 +49,10 @@ export interface Services {
   readonly buildQueue: JobQueue;
   /** Build and run commands per repo: detected from its files, overridden by its settings (AL-130). */
   readonly buildCommands: BuildCommands;
+  /** Build jobs in ticket worktrees: batched `build:log`, diagnostics, last build on the ticket (AL-132). */
+  readonly builds: BuildService;
+  /** Run jobs: build if stale, start in the worktree, free port and URL for web projects (AL-133). */
+  readonly runs: RunService;
   /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
   readonly git: GitService;
   /** Rotating, redacted log in `<userData>/logs` (AL-214). Hand each service `log.child('<scope>')`. */
@@ -119,6 +123,22 @@ export function createServices(options: ServiceOptions): Services {
   });
 
   const git = createGitService();
+  const builds = createBuildService({
+    tickets,
+    buildCommands,
+    queue: buildQueue,
+    emit: options.emit,
+    fingerprint: createGitFingerprint(git),
+    warn: (message) => log.child('build').warn(message),
+  });
+  const runs = createRunService({
+    tickets,
+    buildCommands,
+    builds,
+    emit: options.emit,
+    openExternal: (url) => shell.openExternal(url),
+    warn: (message) => log.child('run').warn(message),
+  });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
 
@@ -163,6 +183,8 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     buildQueue,
     buildCommands,
+    builds,
+    runs,
     git,
     log,
     diagnostics,
@@ -179,6 +201,8 @@ export function createServices(options: ServiceOptions): Services {
 /** Stops child processes and flushes state on quit (AL-213 fills this in). */
 export async function disposeServices(services: Services): Promise<void> {
   void services;
+  // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
+  await services.runs.dispose();
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();
