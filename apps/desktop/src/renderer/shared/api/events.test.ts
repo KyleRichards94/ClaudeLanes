@@ -13,9 +13,10 @@ describe('subscribe', () => {
     const received: EventPayload<'agent:stage'>[] = [];
     subscribe('agent:stage', (payload) => received.push(payload));
 
-    bridge.emit('agent:stage', { ticketId: '71273', at: 1_760_000_000_000 });
+    const stage = { ticketId: '71273', at: 1_760_000_000_000, change: 'stage', stage: 'implementing', from: 'planning', activity: 'Plan approved', progress: 0 } as const;
+    bridge.emit('agent:stage', stage);
 
-    expect(received).toEqual([{ ticketId: '71273', at: 1_760_000_000_000 }]);
+    expect(received).toEqual([stage]);
   });
 
   it('only hears its own channel', () => {
@@ -47,9 +48,10 @@ describe('subscribe', () => {
     const listener = vi.fn();
     subscribe('agent:output', listener);
 
-    bridge.emit('agent:output', { ticketId: '71273', at: 3, extra: 'not in the contract' });
+    const event = { ticketId: '71273', at: 3, seq: 1, item: { kind: 'system', text: 'Plan approved', parentToolUseId: null } } as const;
+    bridge.emit('agent:output', { ...event, extra: 'not in the contract', item: { ...event.item, secret: 'not in the contract' } });
 
-    expect(listener).toHaveBeenCalledExactlyOnceWith({ ticketId: '71273', at: 3 });
+    expect(listener).toHaveBeenCalledExactlyOnceWith(event);
   });
 
   it('returns an unsubscribe function that stops delivery', () => {
