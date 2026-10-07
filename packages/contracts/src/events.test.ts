@@ -38,7 +38,9 @@ describe('event contracts', () => {
   it('puts ticketId and at on every ticket event', () => {
     for (const channel of ['agent:output', 'agent:stage', 'agent:subagent', 'agent:gate', 'agent:status', 'design:spec'] as const) {
       const schema = eventContracts[channel];
-      expect(schema.safeParse({ ticketId: '71273', at: 1_760_000_000_000 }).success, channel).toBe(true);
+      // The envelope fields are there whatever the owning ticket added (AL-100 onwards).
+      expect(Object.keys(schema.shape), channel).toEqual(expect.arrayContaining(['ticketId', 'at']));
+      expect(schema.shape.ticketId.safeParse('71273').success, channel).toBe(true);
       expect(schema.safeParse({ at: 1_760_000_000_000 }).success, `${channel} without ticketId`).toBe(false);
     }
   });
@@ -63,8 +65,8 @@ describe('event envelope', () => {
   });
 
   it('drops fields a contract does not declare, so they never cross IPC', () => {
-    const payload = { ticketId: '71273', at: 42, token: 'not-a-real-secret' };
-    expect(eventContracts['agent:status'].parse(payload)).toEqual({ ticketId: '71273', at: 42 });
+    const status = { ticketId: '71273', at: 42, state: 'idle', sessionId: null, message: null } as const;
+    expect(eventContracts['agent:status'].parse({ ...status, token: 'not-a-real-secret' })).toEqual(status);
   });
 });
 

@@ -18,7 +18,14 @@ const apiKey = process.env.ANTHROPIC_API_KEY;
 const keyAccepted = apiKey !== undefined && (state.apiKeys ?? []).includes(apiKey);
 // The SDK resumes a session with `--resume=<id>`; the resumed session keeps its id, as the real CLI's does.
 const sessionId = process.argv.find((arg) => arg.startsWith('--resume='))?.slice('--resume='.length) ?? randomUUID();
-const record = { argv: process.argv.slice(2), apiKey: apiKey === undefined ? null : keyAccepted ? 'accepted' : 'refused', prompts: [] };
+const record = {
+  argv: process.argv.slice(2),
+  apiKey: apiKey === undefined ? null : keyAccepted ? 'accepted' : 'refused',
+  prompts: [],
+  // Which worktree and process this was (AL-100's session tests).
+  cwd: process.cwd(),
+  pid: process.pid,
+};
 
 function writeLog() {
   if (state.log) appendFileSync(state.log, `${JSON.stringify(record)}\n`);
