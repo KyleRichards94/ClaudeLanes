@@ -77,7 +77,13 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId(APP_ID);
     // Invalid event payloads throw while developing and are logged and dropped in the installed app.
     const emit = createEmitter({ frame: mainWindowFrame, renderer, strict: !app.isPackaged });
-    services = createServices({ appDataDir: app.getPath('userData'), emit });
+    services = createServices({
+      appDataDir: app.getPath('userData'),
+      emit,
+      mainWindow: () => mainWindow,
+      // e2e points the design view at a local fake claude.ai (AL-191); never honoured in the installed app.
+      designTestOrigin: app.isPackaged ? undefined : process.env['AGENT_LANES_DESIGN_TEST_ORIGIN'],
+    });
     registerInvokeHandlers(createInvokeHandlers(services), renderer);
     mainWindow = createMainWindow();
 

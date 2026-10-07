@@ -1,6 +1,8 @@
 import { join } from 'node:path';
-import { safeStorage } from 'electron';
+import { safeStorage, type BrowserWindow } from 'electron';
 import { createJobQueue, type JobQueue } from './build';
+import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
+import { createElectronDesignPlatform } from './design/electron-platform';
 import type { Emit } from './ipc/emit';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
@@ -24,6 +26,8 @@ export interface Services {
   readonly settings: SettingsService;
   /** Build and run job queue (AL-131): FIFO, one job per worktree, `buildQueueSize` jobs at once. */
   readonly buildQueue: JobQueue;
+  /** Claude Design canvas views over the design tab (AL-191): hidden, never destroyed, on tab switches. */
+  readonly designView: DesignViewService;
 }
 
 export interface ServiceOptions {
@@ -31,6 +35,10 @@ export interface ServiceOptions {
   /** Electron's safeStorage unless a test passes a fake (`./secrets/testing`). */
   safeStorage?: SafeStorageLike;
   emit: Emit;
+  /** The main window the design views are drawn in (AL-191); undefined while there is none. */
+  mainWindow?: () => BrowserWindow | null | undefined;
+  /** Extra origin the design view treats as claude.ai: the e2e fake site, unpackaged builds only (AL-191). */
+  designTestOrigin?: string;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -54,12 +62,20 @@ export function createServices(options: ServiceOptions): Services {
   // Queue transitions reach the renderer as `build:queued` (AL-012).
   buildQueue.subscribe((event) => options.emit('build:queued', event));
 
+  const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
+  const designView = createDesignViewService({
+    platform: createElectronDesignPlatform({ window: options.mainWindow ?? (() => undefined), policy: designPolicy }),
+    policy: designPolicy,
+    emit: options.emit,
+  });
+
   return {
     appDataDir: options.appDataDir,
     secrets,
     emit: options.emit,
     settings,
     buildQueue,
+    designView,
   };
 }
 
@@ -67,4 +83,6 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   void services;
   await services.buildQueue.dispose();
+  // Closes the canvas views and flushes the claude.ai sign-in cookies to disk (D112).
+  await services.designView.dispose();
 }
