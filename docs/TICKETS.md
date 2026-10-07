@@ -66,7 +66,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-031 | Icons | E2 | S | AL-020 | todo |
 | AL-032 | Component gallery (dev route) | E2 | S | AL-023–AL-031 | todo |
 | AL-033 | Accessibility checks | E2 | S | AL-032 | todo |
-| AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | todo |
+| AL-040 | Secret store (safeStorage) | E3 | M | AL-011 | partial |
 | AL-041 | Settings store and UI prefs | E3 | M | AL-011 | todo |
 | AL-042 | Connections service and IPC | E3 | M | AL-040, AL-041 | todo |
 | AL-043 | ADO connection test | E3 | M | AL-042, AL-060 | todo |
@@ -400,9 +400,9 @@ colour alone.
 - **Design:** §8 Storage · **Depends on:** AL-011
 - **Scope:** Main-only `SecretStore`: `put(id, secret)`, `get(id)`, `delete(id)`, `list()` (ids + metadata only). Encrypted with `safeStorage.encryptString` (DPAPI / Keychain / libsecret) into `<userData>/secrets.json`; refuse to store if `safeStorage.isEncryptionAvailable()` is false (no plaintext fallback). Only other main services can read; no IPC channel returns a secret.
 - **Acceptance criteria:**
-  - [ ] File on disk contains no plaintext token (test greps the file).
-  - [ ] No contract schema contains a secret field in any response (contract test).
-  - [ ] Corrupt file → secrets treated as missing, user prompted to reconnect, nothing crashes.
+  - [x] File on disk contains no plaintext token (test greps the file).
+  - [x] No contract schema contains a secret field in any response (contract test).
+  - [ ] Corrupt file → secrets treated as missing, user prompted to reconnect, nothing crashes. (open: missing-secret handling and no-crash are done and e2e-tested; the reconnect prompt needs AL-042/AL-047 to read `secrets.status().issues` and raise a Reconnect toast)
 - **Tests:** main unit tests with a fake `safeStorage`.
 
 #### AL-041 · Settings store and UI prefs
@@ -1106,6 +1106,15 @@ implementation agent, mid-run if needed.
 | D17 | CI runs on GitHub Actions (answers Q6) | The repo now lives at github.com/KyleRichards94/ClaudeLanes | 2026-10-07 |
 | D18 | Headless permission policy for the first build: `acceptEdits`, plus a Bash allow-list of git read commands and the repo's detected build and test commands; anything else asks through `canUseTool` ("Needs you · permission"). Editable in settings (provisional answer to Q9) | Lets AL-109 proceed; the user can tighten or loosen it later | 2026-10-07 |
 | D19 | IPC channels and main-process handlers are split per domain (`contracts/src/domains/*`, `src/main/<domain>/handlers.ts`, composition root `src/main/services.ts`) | ~110 parallel branches would otherwise collide on two files | 2026-10-07 |
+| D20 | AL-040: `SecretStore` API is async: `put` → `SecretMetadata`, `get` → `string \| undefined`, `delete` → `boolean`, `list` → `{id, createdAt, updatedAt}[]`, plus `status()` → `{encryptionAvailable, issues}` | The store needs a way to report a corrupt file or undecryptable entry so a later ticket can prompt a reconnect | 2026-10-07 |
+| D21 | AL-040: `put`/`delete` throw a typed `SecretStoreError` (ENCRYPTION_UNAVAILABLE, ENCRYPTION_FAILED, INVALID_ID, INVALID_SECRET, STORE_UNREADABLE, WRITE_FAILED) whose message never contains the secret; `get`/`list`/`status` never throw | contracts' `ErrorCode` has no secrets code; the caller maps the error to a `Result` | 2026-10-07 |
+| D22 | AL-040: The Linux `basic_text` safeStorage backend counts as unavailable, like `isEncryptionAvailable() === false` | It uses a hard-coded key, which amounts to a plaintext fallback | 2026-10-07 |
+| D23 | AL-040: `secrets.json` format is `{version: 1, secrets: {<id>: {ciphertext (base64), createdAt, updatedAt}}}`; ids match `/^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,199}$/` (e.g. `ado:contoso`, `claude:api-key`); secrets are capped at 64 KiB | Blocks `__proto__` and path tricks; bounded input | 2026-10-07 |
+| D24 | AL-040: A corrupt or newer-version file is renamed to `secrets.corrupt-<timestamp>.json` and the store starts empty; malformed entries are dropped one by one; a file unreadable for an I/O reason is left alone and writes are refused (STORE_UNREADABLE) | A temporary lock must not wipe the other secrets | 2026-10-07 |
+| D25 | AL-040: Writes go one at a time through a queue and are atomic (write + fsync a temp file, rename with EPERM/EBUSY/EACCES retry on Windows, mode 0o600); memory changes only after the write succeeds | No torn or half-applied files | 2026-10-07 |
+| D26 | AL-040: Secrets are decrypted on every `get()`, no plaintext is cached, `list()` never decrypts; the store reads the file when created, so corruption is moved aside and reported at start-up | Shortest plaintext lifetime; start-up gets the issue list | 2026-10-07 |
+| D27 | AL-040: `services.ts` uses Electron's `safeStorage` by default with an optional `ServiceOptions.safeStorage`; a reusable AES-GCM fake (`createFakeSafeStorage`) lives in `src/main/secrets/testing` | Other tickets' tests can encrypt for real without Electron | 2026-10-07 |
+| D28 | AL-040: The no-secret contract test checks output-side JSON Schema (`z.toJSONSchema`) of every invoke response and event payload; fields showing part of a token must start with `masked` (e.g. `maskedToken`), other false positives go in `SAFE_FIELD_NAMES` with a reason, plural `tokens` (LLM counts) is allowed, request schemas are not checked | Save requests legitimately carry the token | 2026-10-07 |
 
 ---
 
@@ -1135,6 +1144,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Plan created from the design doc (rev 14) and its seven artboards. Added R11 (Kyle, hard requirement): design section usable at any stage, approve & ship design to the implementation agent at any time → epic E11 rewritten around it (AL-191, AL-196–AL-200). |
 | 2026-10-07 | Environment prepared: pnpm/Turborepo monorepo, electron-vite 5 + Electron 44, React 19 + react-native-web 0.21 + React Compiler, typed IPC with zod, tokens package, GlassPanel, ESLint + Steiger, Vitest (45 tests), Playwright smoke e2e (3 tests, isolated profile). Done: AL-001–AL-006, AL-009–AL-011, AL-013, AL-014, AL-020, AL-022. AL-007 in progress (config only). |
 | 2026-10-07 | Repo pushed to github.com/KyleRichards94/ClaudeLanes. Prepared for the parallel build: IPC contracts and main handlers split per domain (D19), composition root `src/main/services.ts`, quit waits for `disposeServices`. Q6 answered (GitHub Actions, D17); Q9 built with the default (D18); AL-008 and AL-109 unblocked. Rules in §7. |
+| 2026-10-07 | Integrator batch 1: merged AL-040 (partial: the reconnect prompt waits for AL-042/AL-047). Decisions D20–D28. `pnpm verify` green (107 unit tests), e2e 4/4. |
 
 ---
 
