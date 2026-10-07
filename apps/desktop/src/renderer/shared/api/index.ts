@@ -13,3 +13,15 @@ export {
   type RendererErrorSource,
 } from './diagnostics';
 export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
+export {
+  claudeLoginQueryKey,
+  connectionsEventHandlers,
+  connectionsQueryKey,
+  useClaudeLoginDetection,
+  useConnections,
+  useRemoveConnection,
+  useReplaceConnection,
+  useSaveConnection,
+  useTestConnection,
+  type ConnectionDraftInput,
+} from './connections';
