@@ -6,9 +6,13 @@ import type { Services } from '../services';
 export function createTicketsHandlers({
   archive,
   ticketArchive,
-}: Pick<Services, 'archive' | 'ticketArchive'>): HandlersFor<(typeof TICKETS_INVOKE_CHANNELS)[number]> {
+  reconcile,
+}: Pick<Services, 'archive' | 'ticketArchive' | 'reconcile'>): HandlersFor<(typeof TICKETS_INVOKE_CHANNELS)[number]> {
   return {
     'tickets:archive': ({ ticketId, discardUnmerged, deleteMergedBranches }) => archive.archive(ticketId, { discardUnmerged, deleteMergedBranches }),
     'tickets:archived': async () => ok(await ticketArchive.list()),
+    'tickets:board': () => reconcile.board(),
+    'tickets:adoptWorktree': ({ worktreePath }) => reconcile.adopt(worktreePath),
+    'tickets:ignoreWorktree': ({ worktreePath }) => reconcile.ignore(worktreePath),
   };
 }

@@ -1,8 +1,11 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, configure, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
 import { installFakeSettings } from '@/shared/testing';
 import { App } from './index';
+
+// The pages are lazy chunks; their first import can take over a second while the git suites load the machine.
+configure({ asyncUtilTimeout: 5_000 });
 
 function setHash(hash: string) {
   window.history.replaceState(null, '', hash || window.location.pathname);

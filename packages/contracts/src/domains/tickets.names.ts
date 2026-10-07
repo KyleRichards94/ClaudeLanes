@@ -3,5 +3,9 @@ export const TICKETS_INVOKE_CHANNELS = [
   // Archive: remove the ticket's worktrees and move its record to the archive list (AL-088).
   'tickets:archive',
   'tickets:archived',
+  // Start-up reconciliation: the board from records and git's worktrees, and what to do with orphans (AL-090).
+  'tickets:board',
+  'tickets:adoptWorktree',
+  'tickets:ignoreWorktree',
 ] as const;
 export const TICKETS_EVENT_CHANNELS = [] as const;
