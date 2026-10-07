@@ -1,6 +1,7 @@
 import { Suspense, useDeferredValue, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRoute, type Route } from '@/shared/routing';
+import { routeToPath, useRoute, type Route } from '@/shared/routing';
+import { PageErrorBoundary } from '@/shared/ui';
 import { BoardPage, DesignTabPage, TicketPage } from './pages';
 
 /**
@@ -8,13 +9,18 @@ import { BoardPage, DesignTabPage, TicketPage } from './pages';
  *
  * The route is deferred: moving to a page whose chunk hasn't loaded yet keeps the current page on
  * screen until it has, instead of blanking to the fallback. The fallback only shows at start-up.
+ *
+ * Each page has its own error boundary (design §12, AL-210), keyed by the route's path so moving to
+ * another page or ticket starts with a fresh boundary instead of the last page's fallback.
  */
 export function AppRouter() {
   const route = useDeferredValue(useRoute());
 
   return (
     <Suspense fallback={<PageFallback />}>
-      <RoutePage route={route} />
+      <PageErrorBoundary key={routeToPath(route)} page={route.name} label={pageLabel(route)}>
+        <RoutePage route={route} />
+      </PageErrorBoundary>
     </Suspense>
   );
 }
@@ -28,6 +34,18 @@ function RoutePage({ route }: { route: Route }): ReactElement {
       return <TicketPage ticketId={route.ticketId} />;
     case 'ticketDesign':
       return <DesignTabPage ticketId={route.ticketId} />;
+  }
+}
+
+/** What a page's error fallback says failed. */
+function pageLabel(route: Route): string {
+  switch (route.name) {
+    case 'board':
+      return 'the board';
+    case 'ticket':
+      return `ticket #${route.ticketId}`;
+    case 'ticketDesign':
+      return `the Claude Design tab of #${route.ticketId}`;
   }
 }
 
