@@ -101,7 +101,7 @@ describe('emit', () => {
     it('refuses a different local file when packaged', () => {
       const { frame, send } = fakeFrame(pathToFileURL(rendererFile.replace('index.html', 'evil.html')).href);
       const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log: vi.fn() });
-      emit('build:log', { ticketId: '71273', at: 5 });
+      emit('agent:status', { ticketId: '71273', at: 5 });
       expect(send).not.toHaveBeenCalled();
     });
 
@@ -112,7 +112,7 @@ describe('emit', () => {
 
       for (const frame of [undefined, gone.frame, loading.frame]) {
         const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log });
-        emit('run:status', { ticketId: '71273', at: 5 });
+        emit('agent:gate', { ticketId: '71273', at: 5 });
       }
 
       expect(gone.send).not.toHaveBeenCalled();
