@@ -138,6 +138,19 @@ export function createFakeAdoOrg(options: FakeAdoOrgOptions = {}): FakeAdoOrg {
       }),
     ),
 
+    // ── Connection test (AL-043): the projects list and the project-level Code and Build read probes ──
+    http.get(`${orgUrl}/_apis/projects`, () =>
+      HttpResponse.json({ count: 1, value: [{ id: ADO_FIXTURE_PROJECT_ID, name: ADO_FIXTURE_PROJECT, state: 'wellFormed' }] }),
+    ),
+    http.get(`${orgUrl}/:project/_apis/git/repositories`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound(params['project']);
+      return HttpResponse.json({ count: 1, value: [{ id: ADO_FIXTURE_REPOSITORY.id, name: ADO_FIXTURE_REPOSITORY.name, defaultBranch: 'refs/heads/main' }] });
+    }),
+    http.get(`${orgUrl}/:project/_apis/build/builds`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound(params['project']);
+      return HttpResponse.json({ count: 0, value: [] });
+    }),
+
     // ── Teams and sprints (AL-061) ──
     http.get(`${orgUrl}/_apis/projects/:project/teams`, ({ request, params }) => {
       if (!isProject(params['project'])) return projectNotFound(params['project']);
