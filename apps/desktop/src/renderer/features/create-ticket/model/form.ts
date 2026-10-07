@@ -1,4 +1,4 @@
-import type { AgentDefaults, Effort, Gate, Model, Stage, StageGates } from '@agent-lanes/contracts';
+import type { AgentDefaults, Effort, Gate, Model, Stage, StageGates, WorktreePreviewSubject } from '@agent-lanes/contracts';
 import { modelEffortLabel } from '@/shared/config';
 
 /**
@@ -86,7 +86,7 @@ export function newTicketReducer(form: NewTicketForm, action: NewTicketAction): 
   }
 }
 
-export type NewTicketField = 'workItem' | 'description';
+export type NewTicketField = 'workItem' | 'description' | 'worktree';
 export type NewTicketErrors = Partial<Record<NewTicketField, string>>;
 
 /** The longest job description sent as the agent's first turn. */
@@ -112,11 +112,17 @@ export interface NewTicketRequest {
   readonly model: Model;
   readonly effort: Effort;
   readonly gates: StageGates;
+  /** The branch name as the user edited it (validated by the workspace preview); null uses the generated name. */
   readonly worktreeName: string | null;
+  /** The repo the workspace preview showed (the board's repo); null when none is registered. */
+  readonly repo: string | null;
 }
 
 /** The launch request, or the errors that block it. */
-export function launchRequest(form: NewTicketForm): { ok: true; request: NewTicketRequest } | { ok: false; errors: NewTicketErrors } {
+export function launchRequest(
+  form: NewTicketForm,
+  repo: string | null = null,
+): { ok: true; request: NewTicketRequest } | { ok: false; errors: NewTicketErrors } {
   const errors = validateForm(form);
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
@@ -128,7 +134,9 @@ export function launchRequest(form: NewTicketForm): { ok: true; request: NewTick
       model: form.model,
       effort: form.effort,
       gates: { ...form.gates },
-      worktreeName: form.worktreeName?.trim() || null,
+      // Exactly what the workspace preview validated; launch validates it again (AL-083).
+      worktreeName: form.worktreeName,
+      repo,
     },
   };
 }
@@ -140,4 +148,13 @@ export function launchRequest(form: NewTicketForm): { ok: true; request: NewTick
 export function launchSummary(form: NewTicketForm): string {
   const link = form.source === 'none' ? 'No work item linked.' : form.workItem ? `Linked to #${form.workItem.id}.` : 'No work item picked yet.';
   return `Launch starts a headless Claude Code session in its own worktree via the MCP bridge. ${link} ${modelEffortLabel(form.model, form.effort)}.`;
+}
+
+/**
+ * What the workspace preview names the worktree after (AL-164): the picked work item, the job
+ * description for "No ticket", or nothing yet.
+ */
+export function worktreeSubject(form: Pick<NewTicketForm, 'source' | 'workItem' | 'description'>): WorktreePreviewSubject | null {
+  if (form.source === 'none') return { kind: 'no-ticket', description: form.description };
+  return form.workItem ? { kind: 'work-item', workItemId: form.workItem.id, title: form.workItem.title } : null;
 }
