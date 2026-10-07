@@ -1,4 +1,4 @@
-import type { AdoScope, ConnectionDraft, ConnectionKind } from '@agent-lanes/contracts';
+import type { AdoScope, AdoScopeCheck, ConnectionDraft, ConnectionKind } from '@agent-lanes/contracts';
 
 /** A validated draft of one kind, with an ADO org URL already normalised. */
 export type DraftOf<K extends ConnectionKind> = Extract<ConnectionDraft, { kind: K }>;
@@ -10,6 +10,10 @@ export interface ConnectionTestOutcome {
   message: string | null;
   /** ADO only (AL-043). */
   missingScopes?: AdoScope[];
+  /** ADO only (AL-043): each required area and access with what the probes found. */
+  scopes?: AdoScopeCheck[];
+  /** ADO only (AL-043): project names for the Default project dropdown; null when they couldn't be listed. */
+  projects?: string[] | null;
 }
 
 /**

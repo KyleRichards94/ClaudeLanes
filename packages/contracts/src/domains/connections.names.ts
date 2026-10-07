@@ -5,6 +5,7 @@ export const CONNECTIONS_INVOKE_CHANNELS = [
   'connections:save',
   'connections:replace',
   'connections:remove',
+  'connections:detectClaude',
 ] as const;
 export const CONNECTIONS_EVENT_CHANNELS = [
   'connections:changed',
