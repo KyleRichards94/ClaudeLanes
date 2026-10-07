@@ -13,7 +13,10 @@ function handlers(concurrency = 2) {
     buildQueue: queue,
     buildCommands: createBuildCommands({ settings: { get: defaultSettings } }),
     builds: { build: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), isStale: () => Promise.resolve(true) },
-    runs: { start: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), list: () => [], openUrl: () => Promise.resolve(ok({ opened: false })) },
+    runs: { start: (ticketId) => Promise.resolve(err('VALIDATION', 'No ticket ' + ticketId)), list: () => [], openUrl: () => Promise.resolve(ok({ opened: false })),
+      stop: () => Promise.resolve(ok({ stopped: false })),
+      dispose: () => Promise.resolve(),
+    },
   });
 }
 

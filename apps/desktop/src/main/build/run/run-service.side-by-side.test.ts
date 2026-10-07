@@ -9,7 +9,8 @@ import { createRunService, type RunService } from './run-service';
 
 /**
  * AL-133 acceptance: two tickets run the same web app side by side on different ports. Real child
- * processes: a small node web server that listens on $PORT and says which worktree it serves.
+ * processes: a small node web server that listens on $PORT and says which worktree it serves. AL-134:
+ * Stop and quit leave none of them behind.
  */
 
 const SERVER = `
@@ -67,16 +68,21 @@ beforeEach(() => {
   });
 });
 
-afterEach(async () => {
-  // Stop (AL-134) is not part of this ticket: end the servers by their own pids.
-  for (const pid of pids.splice(0)) {
-    try {
-      process.kill(pid);
-    } catch {
-      // Already gone.
-    }
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (cause) {
+    return (cause as NodeJS.ErrnoException).code === 'EPERM';
   }
-  await new Promise((resolve) => setTimeout(resolve, 200));
+}
+
+afterEach(async () => {
+  await service.dispose();
+  // Belt and braces: never leave a test server behind, even when a test failed before Stop.
+  for (const pid of pids.splice(0)) {
+    if (isAlive(pid)) process.kill(pid);
+  }
   rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
@@ -107,6 +113,25 @@ describe('run service, side by side', () => {
     const fetchText = async (port: number | null) => (await fetch(`http://127.0.0.1:${port}/`)).text();
     await expect(fetchText(first.port)).resolves.toBe('served from 71273');
     await expect(fetchText(second.port)).resolves.toBe('served from 71288');
-    await vi.waitFor(() => expect(pids).toHaveLength(2));
+    await vi.waitFor(() => expect(pids).toHaveLength(2), { timeout: 10_000 });
+  });
+
+  it('leaves no orphan node process after Stop or quit (AL-134)', { timeout: 30_000 }, async () => {
+    await service.start('71273');
+    await service.start('71288');
+    await running('71273');
+    await running('71288');
+    await vi.waitFor(() => expect(pids).toHaveLength(2), { timeout: 10_000 });
+    const [first, second] = pids as [number, number];
+    expect(isAlive(first) && isAlive(second)).toBe(true);
+
+    await expect(service.stop('71273')).resolves.toEqual({ ok: true, data: { stopped: true } });
+    expect(isAlive(first)).toBe(false);
+    expect(isAlive(second)).toBe(true);
+    expect(service.list().find((run) => run.ticketId === '71273')).toMatchObject({ state: 'stopped', exitCode: null });
+
+    await service.dispose();
+    expect(isAlive(second)).toBe(false);
+    expect(service.list().every((run) => run.state === 'stopped')).toBe(true);
   });
 });

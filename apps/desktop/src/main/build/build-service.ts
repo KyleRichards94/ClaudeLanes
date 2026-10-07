@@ -28,9 +28,10 @@ import { startCommand as defaultStartCommand, type StartCommand } from './proces
 export interface BuildService {
   /**
    * Builds the ticket's worktree and settles when the build ends. `kind: 'run'` marks the build step
-   * of Run (AL-133) in the queue. VALIDATION when the ticket, its worktree or a build command is missing.
+   * of Run (AL-133) in the queue; aborting `signal` cancels the job (AL-134). VALIDATION when the ticket,
+   * its worktree or a build command is missing.
    */
-  build(ticketId: string, options?: { kind?: BuildJobKind }): Promise<Result<BuildResult>>;
+  build(ticketId: string, options?: { kind?: BuildJobKind; signal?: AbortSignal }): Promise<Result<BuildResult>>;
   /**
    * Whether Run must build first (AL-133): true unless the ticket's last build in this session
    * succeeded and its worktree still has the fingerprint it had when that build started.
@@ -41,7 +42,7 @@ export interface BuildService {
 export interface BuildServiceOptions {
   tickets: Pick<TicketRecordStore, 'get' | 'update'>;
   buildCommands: Pick<BuildCommands, 'forRepo'>;
-  queue: Pick<JobQueue, 'enqueue'>;
+  queue: Pick<JobQueue, 'enqueue' | 'cancel'>;
   emit: Emit;
   startCommand?: StartCommand;
   now?: () => number;
@@ -93,7 +94,7 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
   }
 
   return {
-    async build(ticketId, { kind = 'build' } = {}) {
+    async build(ticketId, { kind = 'build', signal } = {}) {
       const record = await options.tickets.get(ticketId);
       if (!record) return err('VALIDATION', 'No ticket has that id.');
       const commands = await options.buildCommands.forRepo(record.repo, { dir: record.worktreePath });
@@ -136,7 +137,12 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
 
       const job = options.queue.enqueue({ ticketId, worktreePath: record.worktreePath, kind, run });
       jobId = job.jobId;
+      // Stop on a run that is still building (AL-134) cancels its build job, queued or running.
+      const cancel = (): void => void options.queue.cancel(jobId);
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
       const outcome = await job.outcome;
+      signal?.removeEventListener('abort', cancel);
       const finishedAt = now();
 
       const exitCode = outcome.status === 'finished' ? outcome.value.exitCode : null;

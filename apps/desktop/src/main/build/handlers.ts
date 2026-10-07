@@ -16,5 +16,6 @@ export function createBuildHandlers({
     'run:start': ({ ticketId }) => runs.start(ticketId),
     'run:list': () => ok({ runs: runs.list() }),
     'run:openUrl': ({ ticketId }) => runs.openUrl(ticketId),
+    'run:stop': ({ ticketId }) => runs.stop(ticketId),
   };
 }

@@ -216,6 +216,19 @@ describe('build service', () => {
     expect(await builds.isStale('71273')).toBe(true);
   });
 
+  it('cancels the job and kills its process when the caller aborts (Stop on a building run, AL-134)', async () => {
+    const child = fakeProcess();
+    const builds = service({ startCommand: child.start });
+    const controller = new AbortController();
+    const pending = builds.build('71273', { kind: 'run', signal: controller.signal });
+    await vi.waitFor(() => expect(child.started).toHaveLength(1));
+
+    controller.abort();
+    await expect(pending).resolves.toMatchObject({ ok: true, data: { outcome: 'cancelled', kind: 'run' } });
+    expect(child.kill).toHaveBeenCalledOnce();
+    expect(queue.list()).toEqual([]);
+  });
+
   it('refuses unknown tickets, repos without a build command and missing worktrees', async () => {
     const child = fakeProcess();
     await expect(service({ startCommand: child.start }).build('99999')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });

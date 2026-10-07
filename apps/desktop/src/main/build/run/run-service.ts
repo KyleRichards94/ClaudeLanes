@@ -26,7 +26,8 @@ import { createPortAllocator, isListening as defaultIsListening, type PortAlloca
  * (`ASPNETCORE_URLS` / `PORT`, and `--urls` on a detected `dotnet run`), and its listening URL is read
  * from its output (or found by probing the port), so the card shows "Running · localhost:5080" and two
  * tickets run the same app side by side. A desktop app opens its own window. Every change is a
- * `run:status` event; output goes to `build:log` with kind `run`.
+ * `run:status` event; output goes to `build:log` with kind `run`. Stop and app quit kill the whole
+ * process tree (AL-134).
  */
 export interface RunService {
   /** Builds if stale, then starts the run; a ticket that is already running returns its status. */
@@ -35,6 +36,13 @@ export interface RunService {
   list(): RunStatus[];
   /** Opens the running web app's URL in the default browser; false when there is none. */
   openUrl(ticketId: string): Promise<Result<{ opened: boolean }>>;
+  /**
+   * Stop (AL-134): cancels a run that is still building, or kills the run's whole process tree, and
+   * resolves once it is gone. False when the ticket has no active run.
+   */
+  stop(ticketId: string): Promise<Result<{ stopped: boolean }>>;
+  /** App quit: stops every run this app started and refuses new ones; waits at most `graceMs`. */
+  dispose(options?: { graceMs?: number }): Promise<void>;
 }
 
 export interface RunServiceOptions {
@@ -61,7 +69,15 @@ export interface RunServiceOptions {
 interface Run {
   status: RunStatus;
   process: CommandProcess | null;
+  /** Aborted by Stop: cancels the build step, and tells the exit handler the end was asked for. */
+  controller: AbortController;
+  /** Settles once the run reached `stopped` or `failed`. */
+  done: Promise<void>;
+  markDone: () => void;
 }
+
+/** How long quitting waits for runs to die before letting the app go (D100's limit for build jobs). */
+const DEFAULT_DISPOSE_GRACE_MS = 5_000;
 
 async function isFolder(path: string): Promise<boolean> {
   try {
@@ -88,6 +104,7 @@ export function createRunService(options: RunServiceOptions): RunService {
   const warn = options.warn ?? ((message: string) => console.warn(`[run] ${message}`));
 
   const runs = new Map<string, Run>();
+  let disposed = false;
 
   function publish(run: Run): void {
     options.emit('run:status', { ...run.status, at: now() });
@@ -105,7 +122,22 @@ export function createRunService(options: RunServiceOptions): RunService {
     run.status = { ...run.status, state, stoppedAt: now(), exitCode: fields.exitCode ?? null, message: fields.message ?? null };
     run.process = null;
     publish(run);
+    run.markDone();
     void saveLastRun(run);
+  }
+
+  function isActive(run: Run | undefined): run is Run {
+    return run !== undefined && ACTIVE_RUN_STATES.includes(run.status.state);
+  }
+
+  async function stopRun(run: Run): Promise<void> {
+    if (run.status.state !== 'stopping') {
+      run.status = { ...run.status, state: 'stopping' };
+      publish(run);
+      run.controller.abort();
+    }
+    await run.process?.kill();
+    await run.done;
   }
 
   function setUrl(run: Run, url: string | null): void {
@@ -133,8 +165,9 @@ export function createRunService(options: RunServiceOptions): RunService {
 
   return {
     async start(ticketId) {
+      if (disposed) return err('VALIDATION', 'Agent Lanes is closing.');
       const current = runs.get(ticketId);
-      if (current && ACTIVE_RUN_STATES.includes(current.status.state)) return ok({ ...current.status });
+      if (isActive(current)) return ok({ ...current.status });
 
       const record = await options.tickets.get(ticketId);
       if (!record) return err('VALIDATION', 'No ticket has that id.');
@@ -160,13 +193,21 @@ export function createRunService(options: RunServiceOptions): RunService {
           message: null,
         },
         process: null,
+        controller: new AbortController(),
+        done: Promise.resolve(),
+        markDone: () => undefined,
       };
+      run.done = new Promise<void>((resolve) => (run.markDone = resolve));
       runs.set(ticketId, run);
       publish(run);
 
       // Build first when the last build is stale (or never happened in this session).
       if (commands.data.build && (await options.builds.isStale(ticketId))) {
-        const built = await options.builds.build(ticketId, { kind: 'run' });
+        const built = await options.builds.build(ticketId, { kind: 'run', signal: run.controller.signal });
+        if (run.controller.signal.aborted) {
+          finish(run, 'stopped');
+          return ok({ ...run.status });
+        }
         if (!built.ok) {
           finish(run, 'failed', { message: built.message });
           return built;
@@ -175,6 +216,11 @@ export function createRunService(options: RunServiceOptions): RunService {
           finish(run, 'stopped', { message: 'Build cancelled' });
           return ok({ ...run.status });
         }
+      }
+
+      if (run.controller.signal.aborted) {
+        finish(run, 'stopped');
+        return ok({ ...run.status });
       }
 
       let port: number | null = null;
@@ -226,8 +272,11 @@ export function createRunService(options: RunServiceOptions): RunService {
         if (runs.get(ticketId) !== run) return;
         if (exit.error) {
           finish(run, 'failed', { message: `Could not start "${command}": ${exit.error.message}` });
-        } else if (run.status.state === 'stopping' || exit.exitCode === 0) {
-          finish(run, 'stopped', { exitCode: exit.exitCode });
+        } else if (run.status.state === 'stopping') {
+          // Stopped by the user or by quitting: the tree was killed, so there is no exit code of its own.
+          finish(run, 'stopped');
+        } else if (exit.exitCode === 0) {
+          finish(run, 'stopped', { exitCode: 0 });
         } else {
           finish(run, 'failed', { exitCode: exit.exitCode, message: exit.exitCode === null ? 'The app was killed' : `The app exited with code ${exit.exitCode}` });
         }
@@ -239,6 +288,26 @@ export function createRunService(options: RunServiceOptions): RunService {
 
     list() {
       return [...runs.values()].map((run) => ({ ...run.status }));
+    },
+
+    async stop(ticketId) {
+      const run = runs.get(ticketId);
+      if (!isActive(run)) return ok({ stopped: false });
+      await stopRun(run);
+      return ok({ stopped: true });
+    },
+
+    async dispose({ graceMs = DEFAULT_DISPOSE_GRACE_MS } = {}) {
+      disposed = true;
+      const active = [...runs.values()].filter(isActive);
+      if (active.length === 0) return;
+      let timer: NodeJS.Timeout | undefined;
+      const timeout = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, graceMs);
+        timer.unref();
+      });
+      await Promise.race([Promise.all(active.map((run) => stopRun(run).catch(() => undefined))), timeout]);
+      clearTimeout(timer);
     },
 
     async openUrl(ticketId) {

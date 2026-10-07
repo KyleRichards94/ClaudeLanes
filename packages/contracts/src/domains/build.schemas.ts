@@ -279,6 +279,10 @@ export type RunList = z.infer<typeof RunListSchema>;
 export const OpenRunUrlResponseSchema = z.object({ opened: z.boolean() });
 export type OpenRunUrlResponse = z.infer<typeof OpenRunUrlResponseSchema>;
 
+/** `run:stop`: false when the ticket had no active run. */
+export const StopRunResponseSchema = z.object({ stopped: z.boolean() });
+export type StopRunResponse = z.infer<typeof StopRunResponseSchema>;
+
 export const buildInvokeContracts = {
   /**
    * Runs the ticket's app: builds first when the last build is stale, then starts the run command in
@@ -290,6 +294,11 @@ export const buildInvokeContracts = {
   'run:list': { request: z.undefined(), response: RunListSchema },
   /** Opens the ticket's running web app in the default browser ("Running · localhost:5080" click). */
   'run:openUrl': { request: RunTicketRequestSchema, response: OpenRunUrlResponseSchema },
+  /**
+   * Stop (AL-134): kills the run's whole process tree (`taskkill /T /F` on Windows, the process group
+   * elsewhere), or cancels its build step, and resolves once it is gone.
+   */
+  'run:stop': { request: RunTicketRequestSchema, response: StopRunResponseSchema },
   /**
    * Queues a build of the ticket's worktree and settles when it ends: ok with the result when it
    * succeeded or was cancelled, BUILD_FAILED with the result as `details` when it failed, VALIDATION
