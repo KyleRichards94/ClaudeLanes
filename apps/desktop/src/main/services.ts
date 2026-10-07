@@ -3,7 +3,7 @@ import { app, safeStorage, type BrowserWindow } from 'electron';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, type ClaudeLauncher } from './agent/claude-sdk';
 import { readAppInfo } from './app/app-info';
-import { createJobQueue, type JobQueue } from './build';
+import { createBuildService, createJobQueue, type BuildService, type JobQueue } from './build';
 import { createBuildCommands, type BuildCommands } from './build/commands';
 import {
   adoMcpServerFor,
@@ -47,6 +47,8 @@ export interface Services {
   readonly buildQueue: JobQueue;
   /** Build and run commands per repo: detected from its files, overridden by its settings (AL-130). */
   readonly buildCommands: BuildCommands;
+  /** Build jobs in ticket worktrees: batched `build:log`, diagnostics, last build on the ticket (AL-132). */
+  readonly builds: BuildService;
   /** `git(args, { cwd })`, porcelain reads and the version check (AL-080). Main-only; no IPC channel of its own. */
   readonly git: GitService;
   /** Rotating, redacted log in `<userData>/logs` (AL-214). Hand each service `log.child('<scope>')`. */
@@ -112,6 +114,8 @@ export function createServices(options: ServiceOptions): Services {
     warn: (message) => log.child('tickets').warn(message),
   });
 
+  const builds = createBuildService({ tickets, buildCommands, queue: buildQueue, emit: options.emit, warn: (message) => log.child('build').warn(message) });
+
   const git = createGitService();
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
 
@@ -154,6 +158,7 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     buildQueue,
     buildCommands,
+    builds,
     git,
     log,
     diagnostics,
