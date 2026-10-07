@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
-import { installFakeSettings } from '@/shared/testing';
+import { fakeTicketRecord, installFakeSettings } from '@/shared/testing';
 import { App } from './index';
 
 function setHash(hash: string) {
@@ -20,7 +20,10 @@ describe('App routing', () => {
   beforeEach(() => {
     setHash('');
     // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here.
-    installFakeSettings(defaultSettings(), { 'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' } });
+    installFakeSettings(defaultSettings(), {
+      'app:getInfo': { ok: false, code: 'INTERNAL', message: 'not needed here' },
+      'tickets:get': { ok: true, data: { record: fakeTicketRecord() } },
+    });
   });
 
   it('opens at the board and shows it in the location hash', async () => {
@@ -42,7 +45,7 @@ describe('App routing', () => {
     await navigateHash('#/ticket/71273');
     expect(await screen.findByTestId('ticket-page')).toBeTruthy();
 
-    fireEvent.click(screen.getByText('Claude Design ↗'));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Claude Design' }));
     expect(await screen.findByTestId('design-tab-page')).toBeTruthy();
     expect(window.location.hash).toBe('#/ticket/71273/design');
 

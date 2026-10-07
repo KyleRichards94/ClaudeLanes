@@ -170,6 +170,18 @@ export const TicketRecordSchema = z
   });
 export type TicketRecord = z.infer<typeof TicketRecordSchema>;
 
-export const ticketsInvokeContracts = {} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
+// ── Channels ─────────────────────────────────────────────────────────────────
+
+/** `tickets:get`: one ticket's record, for the drill-in and the design tab (AL-170, AL-192). */
+export const GetTicketRequestSchema = z.object({ ticketId: TicketIdSchema });
+export type GetTicketRequest = z.infer<typeof GetTicketRequestSchema>;
+
+/** `record` is null when no ticket has that id (never launched, archived, or unreadable at start-up). */
+export const GetTicketResponseSchema = z.object({ record: TicketRecordSchema.nullable() });
+export type GetTicketResponse = z.infer<typeof GetTicketResponseSchema>;
+
+export const ticketsInvokeContracts = {
+  'tickets:get': { request: GetTicketRequestSchema, response: GetTicketResponseSchema },
+} as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const ticketsEventContracts = {} as const satisfies Record<(typeof TICKETS_EVENT_CHANNELS)[number], z.ZodType>;

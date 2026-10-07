@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { e2eTicketRecord, seedTicketRecords } from './support/ticket-records';
 
 /** AL-140: typed router, lazy pages, browser-style Back and Forward. */
 const rendererOut = join(__dirname, '..', 'out', 'renderer');
@@ -44,6 +45,7 @@ test.describe('in the app', () => {
 
   test.beforeAll(async () => {
     userDataDir = mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-router-'));
+    seedTicketRecords(userDataDir, [e2eTicketRecord()]);
     app = await electron.launch({
       args: [join(__dirname, '..')],
       env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir },
@@ -89,7 +91,7 @@ test.describe('in the app', () => {
 
     await openHash('#/ticket/71273');
     await expect(page.getByTestId('ticket-page')).toBeVisible();
-    await expect(page.getByRole('heading', { name: '#71273' })).toBeVisible();
+    await expect(page.getByTestId('ticket-breadcrumb')).toHaveText('onsite-companion / #71273');
     expect(wasRequested('ticket')).toBe(true);
     expect(wasRequested('design-tab')).toBe(false);
   });
@@ -98,7 +100,7 @@ test.describe('in the app', () => {
     await openHash('#/ticket/71273');
     await expect(page.getByTestId('ticket-page')).toBeVisible();
 
-    await page.getByText('Claude Design ↗').click();
+    await page.getByRole('tab', { name: 'Claude Design' }).click();
     await expect(page.getByTestId('design-tab-page')).toBeVisible();
     expect(await currentHash()).toBe('#/ticket/71273/design');
 

@@ -23,3 +23,11 @@ export {
   type ToastInput,
   type ToastState,
 } from './toasts';
+export {
+  TICKET_TABS,
+  resetTicketPageTabs,
+  setTicketPageTab,
+  useTicketPageTab,
+  type TicketPageTab,
+  type TicketTab,
+} from './ticket-tabs';
