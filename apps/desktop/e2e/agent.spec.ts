@@ -87,3 +87,7 @@ test('agent:getStatus reports a ticket without a session and refuses a bad ticke
   });
   expect(await invoke(page, 'agent:getStatus', { ticketId: '../../etc' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
+
+test('agent:getTranscript backfills an empty transcript for a ticket with no output yet (AL-102)', async () => {
+  expect(await invoke(page, 'agent:getTranscript', { ticketId: '71273' })).toEqual({ ok: true, data: { ticketId: '71273', events: [], lastSeq: 0 } });
+});
