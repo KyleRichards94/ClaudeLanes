@@ -1,4 +1,4 @@
-import { Suspense, useDeferredValue } from 'react';
+import { Suspense, useDeferredValue, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRoute, type Route } from '@/shared/routing';
 import { BoardPage, DesignTabPage, TicketPage } from './pages';
@@ -19,7 +19,8 @@ export function AppRouter() {
   );
 }
 
-function RoutePage({ route }: { route: Route }) {
+/** Every route name needs a case here; a missing one fails the build (no implicit return). */
+function RoutePage({ route }: { route: Route }): ReactElement {
   switch (route.name) {
     case 'board':
       return <BoardPage />;
