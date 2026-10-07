@@ -1,4 +1,5 @@
 import { agentTicketEventHandlers } from '@/entities/agent-ticket';
+import { buildLogEventHandlers } from '@/entities/build-log';
 import type { EventHandlers } from '@/shared/api';
 import { toastEventHandlers } from '@/shared/model';
 
@@ -9,6 +10,8 @@ import { toastEventHandlers } from '@/shared/model';
  */
 export const appEventHandlers: readonly EventHandlers[] = [
   agentTicketEventHandlers,
+  // `build:log` → each ticket's Build log tab (AL-135).
+  buildLogEventHandlers,
   // `toast` from main → the toast stack the app's ToastHost shows (AL-030).
   toastEventHandlers,
 ];

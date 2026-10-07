@@ -1,15 +1,18 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, minTarget, radius, space } from '@agent-lanes/tokens';
 import { GlassPanel, Text } from '@agent-lanes/ui';
+import { BuildLog } from '@/entities/build-log';
 import { routes, useNavigation } from '@/shared/routing';
+import { ErrorBoundary } from '@/shared/ui';
 
 export interface TicketPageProps {
   ticketId: string;
 }
 
 /**
- * Route `ticket/:id`, the ticket drill-in (artboard 3). Only the top bar and the way into the
- * Claude Design tab so far; AL-170 builds the page frame.
+ * Route `ticket/:id`, the ticket drill-in (artboard 3). Only the top bar, the way into the Claude
+ * Design tab and the Build log (AL-135) so far; AL-170 builds the page frame and puts the Build log
+ * behind its tab.
  */
 export function TicketPage({ ticketId }: TicketPageProps) {
   const { navigate } = useNavigation();
@@ -29,6 +32,15 @@ export function TicketPage({ ticketId }: TicketPageProps) {
         <Pressable role="link" style={styles.button} onPress={() => navigate(routes.ticketDesign(ticketId))}>
           <Text variant="title">Claude Design ↗</Text>
         </Pressable>
+      </View>
+
+      <View style={styles.section}>
+        <Text variant="title" role="heading" aria-level={2}>
+          Build log
+        </Text>
+        <ErrorBoundary name="panel:build-log" label="the build log">
+          <BuildLog ticketId={ticketId} />
+        </ErrorBoundary>
       </View>
     </View>
   );
@@ -58,5 +70,9 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+  },
+  section: {
+    flex: 1,
+    gap: space.md,
   },
 });

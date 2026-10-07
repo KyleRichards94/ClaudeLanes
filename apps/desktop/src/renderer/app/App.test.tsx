@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { defaultSettings } from '@agent-lanes/contracts';
 import { installFakeSettings } from '@/shared/testing';
 import { App } from './index';
@@ -17,6 +17,11 @@ async function navigateHash(hash: string) {
 }
 
 describe('App routing', () => {
+  // The pages are lazy chunks; transforming them cold can outlast findBy's 1 s on a busy machine.
+  beforeAll(async () => {
+    await Promise.all([import('@/pages/board'), import('@/pages/ticket'), import('@/pages/design-tab')]);
+  }, 60_000);
+
   beforeEach(() => {
     setHash('');
     // Saved UI prefs load before the app renders (AL-041); the runtime line isn't needed here.
