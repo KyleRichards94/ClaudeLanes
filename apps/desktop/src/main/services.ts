@@ -28,6 +28,13 @@ import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
+import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
+import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
+import { createArchiveService, type ArchiveService } from './worktrees/archive';
+import { createDiffService, type DiffService } from './worktrees/diff';
+import { createKeyedQueue } from './worktrees/keyed-queue';
+import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
+import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -73,6 +80,18 @@ export interface Services {
   readonly claude: ClaudeLauncher;
   /** Creates a ticket's worktree and branch and records them on the ticket, or rolls everything back (AL-083). */
   readonly worktrees: TicketWorktreeService;
+  /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
+  readonly branches: BranchStatusService;
+  /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
+  readonly mergeToMain: MergeToMainService;
+  /** Archived tickets in `<userData>/tickets-archive` (AL-088). */
+  readonly ticketArchive: TicketArchive;
+  /** User-chosen Archive: removes the ticket's worktrees and moves its record to the archive list (AL-088). */
+  readonly archive: ArchiveService;
+  /** The Diff tab's files and per-file unified diffs against the base or a sub-branch (AL-089). */
+  readonly diffs: DiffService;
+  /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
+  readonly reconcile: ReconcileService;
 }
 
 export interface ServiceOptions {
@@ -141,6 +160,14 @@ export function createServices(options: ServiceOptions): Services {
   });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
+  const branches = createBranchStatusService({ git, tickets });
+  // Merges and archives in one repo run one at a time.
+  const repoQueue = createKeyedQueue();
+  const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
+  const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
+  const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
+  const diffs = createDiffService({ git, tickets });
+  const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -195,6 +222,12 @@ export function createServices(options: ServiceOptions): Services {
     repos,
     claude,
     worktrees,
+    branches,
+    mergeToMain,
+    ticketArchive,
+    archive,
+    diffs,
+    reconcile,
   };
 }
 
