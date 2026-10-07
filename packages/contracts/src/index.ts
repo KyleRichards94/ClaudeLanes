@@ -1,4 +1,5 @@
 export * from './contract';
+export * from './events';
 export * from './names';
 export * from './result';
 export * from './schemas';
