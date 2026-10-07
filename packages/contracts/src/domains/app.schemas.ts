@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { APP_EVENT_CHANNELS, APP_INVOKE_CHANNELS } from './app.names';
+import { ERROR_CODES } from '../result';
 import { ConnectionIdSchema } from './connections.schemas';
 
 export const AppInfoSchema = z.object({
@@ -118,6 +119,14 @@ export const ToastIntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('navigate'), route: ToastRouteSchema }),
   // AL-046: Reconnect opens the Connections modal on that row, with its token field focused (design §8).
   z.object({ type: z.literal('openConnections'), connectionId: ConnectionIdSchema.optional() }),
+  // AL-211: the recovery the renderer's central map defines for an error code (design §12), for the
+  // ticket or connection the error is about.
+  z.object({
+    type: z.literal('recover'),
+    code: z.enum(ERROR_CODES),
+    ticketId: TicketIdSchema.optional(),
+    connectionId: ConnectionIdSchema.optional(),
+  }),
 ]);
 export type ToastIntent = z.infer<typeof ToastIntentSchema>;
 

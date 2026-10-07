@@ -52,3 +52,12 @@ export {
   toggleArtboard,
   useSelectedArtboards,
 } from './artboard-selection';
+export {
+  ERROR_TITLES,
+  filesIn,
+  recoveryFor,
+  showErrorRecovery,
+  type RecoverableError,
+  type Recovery,
+  type RecoveryContext,
+} from './error-recovery';

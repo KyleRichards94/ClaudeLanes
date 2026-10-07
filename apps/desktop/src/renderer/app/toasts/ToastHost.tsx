@@ -6,12 +6,12 @@ import {
   INFO_TOAST_DURATION_MS,
   autoDismisses,
   dismissToast,
-  openConnections,
   useToasts,
   type ToastActionInput,
   type ToastEntry,
 } from '@/shared/model';
 import { useRouter } from '@/shared/routing';
+import { createRecoveryEnvironment } from './recovery-environment';
 import { runToastIntent, type ToastIntentContext } from './toast-intents';
 
 /** How many toasts show at once. Later ones wait, in order, and appear as earlier ones close. */
@@ -34,7 +34,7 @@ export function ToastHost() {
   const waiting = toasts.length - visible.length;
 
   function run(entry: ToastEntry, action: ToastActionInput) {
-    const context: ToastIntentContext = { navigate: router.navigate, openConnections };
+    const context: ToastIntentContext = { ...createRecoveryEnvironment(router.navigate), navigate: router.navigate };
     try {
       if ('onPress' in action) action.onPress();
       else runToastIntent(action.intent, context);
