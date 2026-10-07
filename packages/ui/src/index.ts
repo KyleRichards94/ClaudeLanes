@@ -10,5 +10,6 @@ export { IdChip, type IdChipProps } from './IdChip';
 export { SegmentedControl, type SegmentedControlProps, type SegmentedOption, type SegmentedTone, type SegmentedVariant } from './SegmentedControl';
 export { Switch, type SwitchProps, type SwitchStateText } from './Switch';
 export { Button, buttonSizes, buttonVariants, type ButtonProps, type ButtonSize, type ButtonVariant } from './Button';
+export { TextField, type SecureTextFieldHandle, type TextFieldHandle, type TextFieldProps, type TextFieldVariant } from './TextField';
 export { Modal, type ModalIconTone, type ModalProps } from './Modal';
 export { TabPanel, Tabs, tabId, tabPanelId, type TabItem, type TabPanelProps, type TabStatus, type TabsProps } from './Tabs';
