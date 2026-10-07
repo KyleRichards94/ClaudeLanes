@@ -95,6 +95,8 @@ async function launch(): Promise<Page> {
   await page.evaluate(() => {
     (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273';
   });
+  // The log lives in the drill-in's Build log tab (AL-170).
+  await page.getByRole('tab', { name: 'Build log' }).click();
   await expect(page.getByTestId('build-log')).toBeVisible();
   return page;
 }
@@ -123,6 +125,8 @@ test('a 50,000-line build log streams in, highlights errors and scrolls smoothly
   // Scroll the whole log top to bottom with the wheel, timing every frame.
   await lines.evaluate((node) => node.scrollTo({ top: 0 }));
   await expect(log.getByText('line 0', { exact: true })).toBeVisible();
+  // The drill-in scrolls (AL-170): bring the whole log into the window so the wheel lands on it.
+  await lines.scrollIntoViewIfNeeded();
   const box = (await lines.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.evaluate(() => {
@@ -140,6 +144,9 @@ test('a 50,000-line build log streams in, highlights errors and scrolls smoothly
   const contentHeight = await lines.evaluate((node) => node.scrollHeight);
   const step = 4_000;
   for (let y = 0; y < contentHeight; y += step) await page.mouse.wheel(0, step);
+  // Chromium can coalesce wheel events; finish the trip to the end of the log.
+  const atEnd = () => lines.evaluate((node) => node.scrollTop + node.clientHeight >= node.scrollHeight - 1);
+  for (let extra = 0; extra < 100 && !(await atEnd()); extra += 1) await page.mouse.wheel(0, step);
   const frames = await page.evaluate(() => {
     const scope = globalThis as unknown as { __frames: number[]; __recording: boolean };
     scope.__recording = false;
