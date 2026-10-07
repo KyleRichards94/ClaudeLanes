@@ -44,3 +44,29 @@
   --al-duration-fast: 150ms;
   --al-duration-slow: 220ms;
 }
+
+/* Tone tints from the "Agent card states" artboard. Mirrors src/tones.ts. */
+:root {
+  --al-tone-claude-border: #8b80e0;
+  --al-tone-claude-wash: #f6f5ff;
+  --al-tone-claude-band: #eeebff;
+  --al-tone-claude-text: #4a3bb0;
+  --al-tone-ado-wash: #f0f9ff;
+  --al-tone-ado-band: #e0f2fe;
+  --al-tone-ado-text: #0369a1;
+  --al-tone-ado-fill: #38bdf8;
+  --al-tone-attention-border: #fcd34d;
+  --al-tone-attention-band: #fef3c7;
+  --al-tone-attention-text: #92400e;
+  --al-tone-danger-border: #fecaca;
+  --al-tone-danger-wash: #fef2f2;
+  --al-tone-danger-band: #fee2e2;
+  --al-tone-danger-text: #991b1b;
+  --al-tone-danger-fill: #f87171;
+  --al-tone-ok-wash: #ecfdf5;
+  --al-tone-ok-band: #d1fae5;
+  --al-tone-ok-text: #047857;
+  --al-tone-ok-fill: #10b981;
+  --al-progress-gradient: linear-gradient(90deg, #5b4bc4, #38bdf8);
+  --al-muted-opacity: 0.75;
+}
