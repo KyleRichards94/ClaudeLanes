@@ -1,3 +1,4 @@
+import { agentTicketEventHandlers } from '@/entities/agent-ticket';
 import type { EventHandlers } from '@/shared/api';
 
 /**
@@ -5,4 +6,6 @@ import type { EventHandlers } from '@/shared/api';
  * into the Zustand stores). Each entity slice exports its handler map from its `index.ts`, for
  * example `agentTicketEventHandlers` from `@/entities/agent-ticket` (AL-141), and adds one line here.
  */
-export const appEventHandlers: readonly EventHandlers[] = [];
+export const appEventHandlers: readonly EventHandlers[] = [
+  agentTicketEventHandlers,
+];
