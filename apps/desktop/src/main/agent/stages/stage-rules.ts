@@ -1,4 +1,4 @@
-import type { Lane, Stage } from '@agent-lanes/contracts';
+import type { Lane, Stage, StageGates } from '@agent-lanes/contracts';
 
 /**
  * Which stage moves an agent may make with `set_stage` (AL-103, design §9 diagram):
@@ -47,4 +47,27 @@ export function checkStageTransition(from: Lane, to: Stage): StageTransitionChec
     ok: false,
     reason: `Cannot move from ${LANE_LABELS[from]} to ${LANE_LABELS[to]}. From ${LANE_LABELS[from]} you can move to ${allowed}. Stages go one step forward at a time; Code review and QA may send the work back to Implementing.`,
   };
+}
+
+/** What a gate on each stage asks the user to approve: "Plan approved by Kyle", "approve PR". */
+export const GATE_SUBJECTS: Record<Stage, string> = {
+  planning: 'Plan',
+  implementing: 'Implementation',
+  'code-review': 'Code review',
+  qa: 'QA',
+  'create-pr': 'PR',
+};
+
+/**
+ * The gate a stage move waits on (AL-104, design §9 step 2), or null when it goes ahead.
+ *
+ * A gate on a stage means the stage's work needs the user's approval before the ticket moves on:
+ * Planning "Needs approval" holds Planning → Implementing until the plan is approved. Create PR is the
+ * last stage, so its gate holds the move into it: nothing is pushed or opened before the user approves.
+ * Going back to Implementing, and the session start (Queued → Planning), are never gated.
+ */
+export function gateFor(gates: StageGates, from: Lane, to: Stage): Stage | null {
+  if (from === 'queued' || from === 'done' || (to === 'implementing' && (from === 'code-review' || from === 'qa'))) return null;
+  if (to === 'create-pr' && gates['create-pr'] === 'approval') return 'create-pr';
+  return gates[from] === 'approval' ? from : null;
 }

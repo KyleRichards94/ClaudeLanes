@@ -174,6 +174,8 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
     extras: (record) => stageExtras(record),
+    // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
+    onEnded: (ticketId) => stages.cancelGate(ticketId),
   });
   const transcripts = createTranscriptService({
     sessions,

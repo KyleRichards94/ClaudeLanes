@@ -6,12 +6,13 @@ import { agentTickets, type AgentTicketStore } from './store';
  * registers `agentTicketEventHandlers` once; the hub hands `agent:output` over as one batch per
  * animation frame, so a burst of output is one store commit per frame.
  *
- * `agent:stage` (AL-103) is delivered as each event arrives, so a `set_stage` call moves the card in
- * the next frame. Only channels whose payloads carry something the store uses are handled; the tickets
- * that add fields to the other ticket events add a line here calling the matching store action:
- * `agent:gate` → `openGate` / `resolveGate` (AL-104), `agent:status` → `setNeedsYou` for permissions (AL-109) and `applyModelChange` (AL-106),
- * `agent:subagent` → `setSubAgentCounts` (AL-107), `run:status` → `setRun` (AL-133), the build result
- * → `setLastBuild` (AL-132), and the pull request → `setPullRequest` (AL-181).
+ * `agent:stage` (AL-103) and `agent:gate` (AL-104) are delivered as each event arrives, so a
+ * `set_stage` call moves the card, and a waiting gate turns it amber, in the next frame. Only channels
+ * whose payloads carry something the store uses are handled; the tickets that add fields to the other
+ * ticket events add a line here calling the matching store action: `agent:status` → `setNeedsYou` for
+ * permissions (AL-109) and `applyModelChange` (AL-106), `agent:subagent` → `setSubAgentCounts`
+ * (AL-107), `run:status` → `setRun` (AL-133), the build result → `setLastBuild` (AL-132), and the pull
+ * request → `setPullRequest` (AL-181).
  */
 export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHandlers {
   return {
@@ -24,6 +25,10 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       } else if (event.activity !== null) {
         store.setActivity(event.ticketId, { text: event.activity, progress: event.progress ?? undefined }, event.at);
       }
+    },
+    'agent:gate': (event) => {
+      if (event.state === 'waiting') store.openGate(event.ticketId, event.stage, event.at);
+      else store.resolveGate(event.ticketId);
     },
     'build:queued': (event) => store.applyBuildJob(event),
   };

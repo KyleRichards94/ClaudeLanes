@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
-import { LaneSchema, type Model } from '../vocabulary';
+import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
+import { StageGatesSchema } from './settings.schemas';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -159,9 +160,61 @@ export const AgentTranscriptSchema = z.object({
 });
 export type AgentTranscript = z.infer<typeof AgentTranscriptSchema>;
 
+// ── Stage gates (AL-104, design §9 step 2, artboard 2 Stage gates, artboard 6 "Needs approval") ──
+
+/**
+ * A stage gate waiting for the user. `stage` is the gated stage whose approval is awaited: `planning`
+ * ("approve plan") holds the move to Implementing, `create-pr` ("approve PR") the move into Create PR.
+ */
+export const PendingGateSchema = z.object({
+  stage: StageSchema,
+  /** The move the agent asked for with `set_stage`. */
+  from: LaneSchema,
+  to: StageSchema,
+  /** The agent's summary of the work to approve ("Plan ready: …"). */
+  summary: z.string().max(1000).nullable(),
+  openedAt: z.int().nonnegative(),
+});
+export type PendingGate = z.infer<typeof PendingGateSchema>;
+
+/** How a gate ended: approved (by the user, or by switching the gate off), sent back, or the session ended first. */
+export const GATE_OUTCOMES = ['approved', 'changes-requested', 'cancelled'] as const;
+export const GateOutcomeSchema = z.enum(GATE_OUTCOMES);
+export type GateOutcome = z.infer<typeof GateOutcomeSchema>;
+
+/** `agent:resolveGate`: Approve, or Request changes with a note the agent reads. */
+export const ResolveGateRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  decision: z.enum(['approve', 'request-changes']),
+  /** What to change; sent to the agent as the tool result. */
+  note: z.string().max(4000).optional(),
+});
+export type ResolveGateRequest = z.infer<typeof ResolveGateRequestSchema>;
+
+/** `resolved` is false when no gate was waiting (e.g. it was already decided). */
+export const ResolveGateResponseSchema = z.object({ resolved: z.boolean() });
+
+/** `agent:setGate`: switch one stage of a ticket between Auto and Needs approval (drill-in, AL-171). */
+export const SetGateRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  stage: StageSchema,
+  gate: GateSchema,
+});
+export type SetGateRequest = z.infer<typeof SetGateRequestSchema>;
+
+/** The ticket's gates after the change; `released` when switching a gate off let a waiting move through. */
+export const SetGateResponseSchema = z.object({ gates: StageGatesSchema, released: z.boolean() });
+export type SetGateResponse = z.infer<typeof SetGateResponseSchema>;
+
+/** `agent:getGate`: the gate waiting for the user, for a renderer that reloads while one waits. */
+export const GetGateResponseSchema = z.object({ gate: PendingGateSchema.nullable() });
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
+  'agent:resolveGate': { request: ResolveGateRequestSchema, response: ResolveGateResponseSchema },
+  'agent:setGate': { request: SetGateRequestSchema, response: SetGateResponseSchema },
+  'agent:getGate': { request: AgentTicketRequestSchema, response: GetGateResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -192,8 +245,19 @@ export type AgentStageEvent = z.infer<typeof AgentStageEventSchema>;
 export const AgentSubagentEventSchema = TicketEventEnvelopeSchema.extend({});
 export type AgentSubagentEvent = z.infer<typeof AgentSubagentEventSchema>;
 
-/** `agent:gate`: a stage gate is waiting for the user, or was resolved (AL-104). */
-export const AgentGateEventSchema = TicketEventEnvelopeSchema.extend({});
+/**
+ * `agent:gate` (AL-104): a stage gate started waiting for the user (the card turns amber with
+ * "Needs you · approve plan"), or it ended.
+ */
+export const AgentGateEventSchema = TicketEventEnvelopeSchema.extend({
+  state: z.enum(['waiting', ...GATE_OUTCOMES]),
+  stage: PendingGateSchema.shape.stage,
+  from: PendingGateSchema.shape.from,
+  to: PendingGateSchema.shape.to,
+  summary: PendingGateSchema.shape.summary,
+  /** The user's note when changes were requested; null otherwise. */
+  note: z.string().max(4000).nullable(),
+});
 export type AgentGateEvent = z.infer<typeof AgentGateEventSchema>;
 
 /** `agent:status`: the session's run state changed (AL-100; queued and paused come with AL-111, AL-105). */

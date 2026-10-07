@@ -1,14 +1,21 @@
+import { STAGES, defaultStageGates, type StageGates } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { memoryTickets, recordingEmit } from '../testing/sessions';
-import { createStageService } from './stage-service';
+import { eventually, memoryTickets, recordingEmit } from '../testing/sessions';
+import { DEFAULT_CHANGES_NOTE, createStageService, firstName } from './stage-service';
 
-async function setup(stage: 'queued' | 'planning' | 'implementing' | 'qa' = 'planning') {
-  const tickets = await memoryTickets({ id: '71273', stage });
+const ALL_AUTO = Object.fromEntries(STAGES.map((stage) => [stage, 'auto'])) as StageGates;
+
+/** Stage moves without gates by default (AL-103); the gate tests pass the defaults (AL-104). */
+async function setup(stage: 'queued' | 'planning' | 'implementing' | 'code-review' | 'qa' = 'planning', gates: StageGates = ALL_AUTO) {
+  const tickets = await memoryTickets({ id: '71273', stage, gates });
   const events = recordingEmit();
   const appendSystem = vi.fn();
-  const stages = createStageService({ tickets, emit: events.emit, transcripts: { appendSystem } });
+  const stages = createStageService({ tickets, emit: events.emit, transcripts: { appendSystem }, userName: () => 'Kyle', now: () => 9_000 });
   return { tickets, events, appendSystem, stages };
 }
+
+/** Lets pending promise callbacks run. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 describe('stage service (AL-103)', () => {
   it('moves the ticket, saves the stage on its record, emits agent:stage and adds a line to the output', async () => {
@@ -83,5 +90,118 @@ describe('stage service (AL-103)', () => {
     const { stages } = await setup();
     await expect(stages.setStage('99999', 'implementing', 'x')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
     await expect(stages.reportActivity('99999', 'x', null)).resolves.toMatchObject({ ok: false });
+  });
+});
+
+describe('stage gates (AL-104)', () => {
+  it('holds a gated move until the user approves: the card waits, then moves with "Plan approved by Kyle"', async () => {
+    const { tickets, events, appendSystem, stages } = await setup('planning', defaultStageGates());
+    let settled = false;
+    const moving = stages.setStage('71273', 'implementing', 'Plan ready: cut over frmJobFilter').then((result) => {
+      settled = true;
+      return result;
+    });
+    await settle();
+
+    expect(settled).toBe(false);
+    expect((await tickets.get('71273'))?.stage).toBe('planning');
+    expect(stages.pendingGate('71273')).toEqual({ stage: 'planning', from: 'planning', to: 'implementing', summary: 'Plan ready: cut over frmJobFilter', openedAt: 9_000 });
+    expect(events.of('agent:gate')).toEqual([
+      { ticketId: '71273', state: 'waiting', stage: 'planning', from: 'planning', to: 'implementing', summary: 'Plan ready: cut over frmJobFilter', note: null },
+    ]);
+    expect(events.of('agent:stage')).toEqual([]);
+
+    expect(stages.resolveGate('71273', { approve: true })).toBe(true);
+    await expect(moving).resolves.toEqual({
+      ok: true,
+      data: { from: 'planning', to: 'implementing', changed: true, gate: { stage: 'planning', outcome: 'approved', note: null, by: 'Kyle' } },
+    });
+    expect((await tickets.get('71273'))?.stage).toBe('implementing');
+    expect(events.of('agent:gate').at(-1)).toMatchObject({ state: 'approved', stage: 'planning' });
+    expect(events.of('agent:stage')).toEqual([expect.objectContaining({ change: 'stage', stage: 'implementing', from: 'planning' })]);
+    expect(appendSystem).toHaveBeenLastCalledWith('71273', 'Plan approved by Kyle · moved to Implementing');
+    expect(stages.pendingGate('71273')).toBeNull();
+  });
+
+  it('Request changes returns the note and leaves the ticket where it was', async () => {
+    const { tickets, events, appendSystem, stages } = await setup('planning', defaultStageGates());
+    const moving = stages.setStage('71273', 'implementing', 'Plan ready');
+    await eventually(() => stages.pendingGate('71273') !== null);
+
+    stages.resolveGate('71273', { approve: false, note: 'Keep frmJobNotes in WinForms.' });
+    await expect(moving).resolves.toEqual({
+      ok: true,
+      data: { from: 'planning', to: 'planning', changed: false, gate: { stage: 'planning', outcome: 'changes-requested', note: 'Keep frmJobNotes in WinForms.', by: 'Kyle' } },
+    });
+    expect((await tickets.get('71273'))?.stage).toBe('planning');
+    expect(events.of('agent:gate').at(-1)).toMatchObject({ state: 'changes-requested', note: 'Keep frmJobNotes in WinForms.' });
+    expect(appendSystem).toHaveBeenLastCalledWith('71273', 'Changes requested by Kyle · Keep frmJobNotes in WinForms.');
+
+    // An empty note still tells the agent something.
+    const again = stages.setStage('71273', 'implementing', 'Plan v2');
+    await eventually(() => stages.pendingGate('71273') !== null);
+    stages.resolveGate('71273', { approve: false, note: '   ' });
+    await expect(again).resolves.toMatchObject({ data: { gate: { note: DEFAULT_CHANGES_NOTE } } });
+  });
+
+  it('waits on the Create PR gate before the move into Create PR', async () => {
+    const { stages } = await setup('qa', defaultStageGates());
+    const moving = stages.setStage('71273', 'create-pr', 'QA passed: 5 of 5 criteria');
+    await eventually(() => stages.pendingGate('71273') !== null);
+    expect(stages.pendingGate('71273')).toMatchObject({ stage: 'create-pr', from: 'qa', to: 'create-pr' });
+    stages.resolveGate('71273', { approve: true });
+    await expect(moving).resolves.toMatchObject({ data: { changed: true, to: 'create-pr' } });
+  });
+
+  it('lets Auto stages and moves back to Implementing through without waiting', async () => {
+    const implementing = await setup('implementing', defaultStageGates());
+    await expect(implementing.stages.setStage('71273', 'code-review', 'Done')).resolves.toMatchObject({ data: { changed: true } });
+    expect(implementing.events.of('agent:gate')).toEqual([]);
+
+    const qa = await setup('qa', { ...defaultStageGates(), qa: 'approval' });
+    await expect(qa.stages.setStage('71273', 'implementing', '1 gap')).resolves.toMatchObject({ data: { changed: true } });
+    expect(qa.events.of('agent:gate')).toEqual([]);
+  });
+
+  it('turning the waiting gate off releases it as approved; another gate leaves it waiting', async () => {
+    const { tickets, appendSystem, stages } = await setup('planning', defaultStageGates());
+    const moving = stages.setStage('71273', 'implementing', 'Plan ready');
+    await eventually(() => stages.pendingGate('71273') !== null);
+
+    await expect(stages.setGate('71273', 'create-pr', 'auto')).resolves.toMatchObject({ ok: true, data: { released: false } });
+    expect(stages.pendingGate('71273')).not.toBeNull();
+
+    await expect(stages.setGate('71273', 'planning', 'auto')).resolves.toMatchObject({ ok: true, data: { released: true, gates: { planning: 'auto', 'create-pr': 'auto' } } });
+    await expect(moving).resolves.toMatchObject({ data: { changed: true, gate: { outcome: 'approved', by: null } } });
+    expect((await tickets.get('71273'))?.stage).toBe('implementing');
+    expect(appendSystem).toHaveBeenLastCalledWith('71273', 'Plan approved (gate switched off) · moved to Implementing');
+  });
+
+  it('saves gate changes on the ticket record', async () => {
+    const { tickets, stages } = await setup('implementing', defaultStageGates());
+    await stages.setGate('71273', 'qa', 'approval');
+    expect((await tickets.get('71273'))?.gates).toEqual({ ...defaultStageGates(), qa: 'approval' });
+    await expect(stages.setGate('99999', 'qa', 'auto')).resolves.toMatchObject({ ok: false });
+  });
+
+  it('closes the gate when the turn is interrupted or the session ends', async () => {
+    const { events, stages } = await setup('planning', defaultStageGates());
+    const abort = new AbortController();
+    const interrupted = stages.setStage('71273', 'implementing', 'Plan ready', { signal: abort.signal });
+    await eventually(() => stages.pendingGate('71273') !== null);
+    abort.abort();
+    await expect(interrupted).resolves.toMatchObject({ data: { changed: false, gate: { outcome: 'cancelled' } } });
+    expect(events.of('agent:gate').at(-1)).toMatchObject({ state: 'cancelled' });
+
+    const ended = stages.setStage('71273', 'implementing', 'Plan ready');
+    await eventually(() => stages.pendingGate('71273') !== null);
+    stages.cancelGate('71273');
+    await expect(ended).resolves.toMatchObject({ data: { changed: false, gate: { outcome: 'cancelled' } } });
+    expect(stages.resolveGate('71273', { approve: true })).toBe(false);
+  });
+
+  it('names the approver by first name', () => {
+    expect(firstName('Kyle.Richards')).toBe('Kyle');
+    expect(firstName('kyle')).toBe('Kyle');
   });
 });

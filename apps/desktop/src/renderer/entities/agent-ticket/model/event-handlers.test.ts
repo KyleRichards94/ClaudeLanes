@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeOutputEvent, fakeStageEvent, fakeTicketRecord } from '@/shared/testing';
+import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, fakeTicketRecord } from '@/shared/testing';
 import { agentTicketEventHandlers, createAgentTicketEventHandlers } from './event-handlers';
-import { selectTicket } from './selectors';
+import { selectLaneNeedsYouCount, selectTicket, ticketNeedsYou } from './selectors';
 import { createAgentTicketStore } from './store';
 
 function setup() {
@@ -13,8 +13,29 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage and build:queued', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:output', 'agent:stage', 'build:queued']);
+  it('handles the batched agent:output channel, agent:stage, agent:gate and build:queued', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued']);
+  });
+
+  it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {
+    const { store, handlers } = setup();
+    store.setStage('71273', 'planning', 1_500);
+
+    handlers['agent:gate']?.(fakeGateEvent('71273', 3_000));
+    const waiting = selectTicket(store.getState(), '71273');
+    expect(waiting?.gate).toEqual({ stage: 'planning', openedAt: 3_000 });
+    expect(waiting && ticketNeedsYou(waiting)).toBe(true);
+    expect(waiting?.needsYou).toEqual([{ kind: 'approval', stage: 'planning', since: 3_000 }]);
+    expect(selectLaneNeedsYouCount(store.getState(), 'planning')).toBe(1);
+
+    handlers['agent:gate']?.(fakeGateEvent('71273', 3_500, { state: 'changes-requested', note: 'Keep frmJobNotes' }));
+    const decided = selectTicket(store.getState(), '71273');
+    expect(decided?.gate).toBeNull();
+    expect(decided && ticketNeedsYou(decided)).toBe(false);
+
+    handlers['agent:gate']?.(fakeGateEvent('71273', 4_000));
+    handlers['agent:gate']?.(fakeGateEvent('71273', 4_100, { state: 'cancelled' }));
+    expect(selectTicket(store.getState(), '71273')?.gate).toBeNull();
   });
 
   it('agent:stage moves the card to its new lane and shows the stage summary as its activity (AL-103)', () => {

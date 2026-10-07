@@ -7,7 +7,7 @@ import {
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { createStore } from 'zustand/vanilla';
 import type { EventHandler } from '@/shared/api';
-import { fakeOutputEvent, fakeStageEvent, installFakeBridge, type FakeBridge } from '@/shared/testing';
+import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, installFakeBridge, type FakeBridge } from '@/shared/testing';
 import { HIDDEN_FLUSH_DELAY_MS, createEventHub, startEventHub, stopEventHub, type EventHub } from './EventHub';
 
 let bridge: FakeBridge;
@@ -140,12 +140,12 @@ describe('EventHub', () => {
     bridge.emit('agent:output', 'not an event');
     bridge.emit('agent:output', fakeOutputEvent('71273', 4));
     bridge.emit('agent:gate', { at: 5 });
-    bridge.emit('agent:gate', { ticketId: '71273', at: 6 });
+    bridge.emit('agent:gate', fakeGateEvent('71273', 6));
     vi.advanceTimersToNextFrame();
 
     expect(times()).toEqual([1, 4]);
     expect(commits).toHaveBeenCalledOnce();
-    expect(onGate).toHaveBeenCalledExactlyOnceWith({ ticketId: '71273', at: 6 });
+    expect(onGate).toHaveBeenCalledExactlyOnceWith(fakeGateEvent('71273', 6));
     expect(warn).toHaveBeenCalledTimes(3);
     expect(warn).toHaveBeenCalledWith('Dropped an invalid agent:output event', expect.any(Array));
     expect(warn).toHaveBeenCalledWith('Dropped an invalid agent:gate event', expect.any(Array));

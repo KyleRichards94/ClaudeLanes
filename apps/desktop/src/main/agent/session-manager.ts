@@ -93,6 +93,8 @@ export interface SessionManagerOptions {
   log?: Pick<Logger, 'info' | 'warn' | 'debug'>;
   /** Per-session additions, asked for at each start. */
   extras?: (record: TicketRecord) => SessionExtras | Promise<SessionExtras>;
+  /** A session ended (stopped or lost): e.g. a stage gate waiting on it closes (AL-104). */
+  onEnded?: (ticketId: string, state: 'stopped' | 'lost') => void;
 }
 
 interface Session {
@@ -221,6 +223,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       log?.warn(`The session of ticket ${session.ticketId} ended without being stopped${failure ? `: ${failure}` : ''}`);
       setState(session, 'lost', SESSION_ENDED_MESSAGE);
     }
+    options.onEnded?.(session.ticketId, session.stopping ? 'stopped' : 'lost');
     // Make sure the process is gone even when the stream ended on its own.
     query.close();
   }

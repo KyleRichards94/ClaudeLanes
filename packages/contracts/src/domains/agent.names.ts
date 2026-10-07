@@ -2,6 +2,9 @@
 export const AGENT_INVOKE_CHANNELS = [
   'agent:getStatus', // AL-100
   'agent:getTranscript', // AL-102
+  'agent:resolveGate', // AL-104
+  'agent:setGate', // AL-104
+  'agent:getGate', // AL-104
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',
