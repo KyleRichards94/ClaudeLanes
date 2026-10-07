@@ -10,6 +10,7 @@ import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
 import { LOG_DIRECTORY_NAME, createLogger, type Logger } from './logging';
+import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from './repos';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
@@ -45,6 +46,8 @@ export interface Services {
   readonly designView: DesignViewService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
   readonly tickets: TicketRecordStore;
+  /** Registered repos in settings, added through the native folder picker (AL-081). */
+  readonly repos: RepoRegistry;
 }
 
 export interface ServiceOptions {
@@ -92,6 +95,7 @@ export function createServices(options: ServiceOptions): Services {
   });
 
   const git = createGitService();
+  const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
 
   const diagnostics = createDiagnostics({
     appInfo: readAppInfo,
@@ -128,6 +132,7 @@ export function createServices(options: ServiceOptions): Services {
     connections,
     designView,
     tickets,
+    repos,
   };
 }
 

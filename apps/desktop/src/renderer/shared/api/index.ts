@@ -12,3 +12,4 @@ export {
   type RendererErrorContext,
   type RendererErrorSource,
 } from './diagnostics';
+export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
