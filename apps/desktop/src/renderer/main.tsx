@@ -4,10 +4,21 @@ import { AppRegistry } from 'react-native-web';
 import '@agent-lanes/tokens/agent-lanes-tokens.css';
 import './app/styles/fonts.css';
 import './app/styles/global.css';
-import { App } from './app';
+import { App, AppErrorRoot, installErrorReporting } from './app';
 
 const rootTag = document.getElementById('root');
 if (!rootTag) throw new Error('index.html is missing #root');
 
-AppRegistry.registerComponent('AgentLanes', () => App);
+// Uncaught errors and rejections go to the main-process log; render errors to the boundaries (AL-214).
+installErrorReporting();
+
+function Root() {
+  return (
+    <AppErrorRoot>
+      <App />
+    </AppErrorRoot>
+  );
+}
+
+AppRegistry.registerComponent('AgentLanes', () => Root);
 AppRegistry.runApplication('AgentLanes', { rootTag });

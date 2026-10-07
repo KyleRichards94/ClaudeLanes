@@ -4,6 +4,7 @@ import { color } from '@agent-lanes/tokens';
 import { createEmitter, type EventFrame } from './ipc/emit';
 import { createInvokeHandlers } from './ipc/handlers';
 import { registerInvokeHandlers, type RendererLocation } from './ipc/router';
+import { LOG_DIRECTORY_NAME, captureConsole, captureProcessErrors, createLogger } from './logging';
 import { createServices, disposeServices, type Services } from './services';
 
 const APP_ID = 'au.com.companionsystems.agentlanes';
@@ -67,6 +68,27 @@ function createMainWindow(): BrowserWindow {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  // The log comes first, so anything that goes wrong from here on is on disk, redacted (AL-214).
+  const log = createLogger({
+    directory: join(app.getPath('userData'), LOG_DIRECTORY_NAME),
+    level: app.isPackaged ? 'info' : 'debug',
+    mirror: app.isPackaged ? undefined : console,
+  });
+  captureProcessErrors(log);
+  captureConsole(log);
+  log.info(`${app.getName()} ${app.getVersion()} starting`, {
+    electron: process.versions.electron,
+    platform: process.platform,
+    arch: process.arch,
+    packaged: app.isPackaged,
+  });
+  app.on('render-process-gone', (_event, _contents, details) => {
+    log.log(details.reason === 'clean-exit' ? 'info' : 'error', 'A renderer process ended', details);
+  });
+  app.on('child-process-gone', (_event, details) => {
+    log.log(details.reason === 'clean-exit' ? 'info' : 'error', `The ${details.type} process ended`, details);
+  });
+
   app.on('second-instance', () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -76,9 +98,15 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(() => {
     app.setAppUserModelId(APP_ID);
     // Invalid event payloads throw while developing and are logged and dropped in the installed app.
-    const emit = createEmitter({ frame: mainWindowFrame, renderer, strict: !app.isPackaged });
-    services = createServices({ appDataDir: app.getPath('userData'), emit });
-    registerInvokeHandlers(createInvokeHandlers(services), renderer);
+    const eventsLog = log.child('events');
+    const emit = createEmitter({
+      frame: mainWindowFrame,
+      renderer,
+      strict: !app.isPackaged,
+      log: (message, issues) => eventsLog.error(message, issues),
+    });
+    services = createServices({ appDataDir: app.getPath('userData'), emit, log });
+    registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
     mainWindow = createMainWindow();
 
     app.on('activate', () => {
@@ -95,6 +123,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('before-quit', (event) => {
     if (disposed || !services) return;
     event.preventDefault();
+    log.info('Quitting: stopping services');
     void disposeServices(services).finally(() => {
       disposed = true;
       setImmediate(() => app.quit());
