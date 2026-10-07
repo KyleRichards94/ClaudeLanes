@@ -61,7 +61,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-026 | SegmentedControl and Switch | E2 | S | AL-023 | done |
 | AL-027 | TextField | E2 | S | AL-023 | done |
 | AL-028 | Card and ProgressBar | E2 | S | AL-022 | done |
-| AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | todo |
+| AL-029 | Modal and Tabs | E2 | M | AL-022, AL-024 | done |
 | AL-030 | Toast and ToastHost | E2 | S | AL-024 | todo |
 | AL-031 | Icons | E2 | S | AL-020 | done |
 | AL-032 | Component gallery (dev route) | E2 | S | AL-023–AL-031 | todo |
@@ -362,8 +362,8 @@ colour alone.
 - **Design:** artboards 2, 3, 5 · **Depends on:** AL-022, AL-024
 - **Scope:** `Modal` (glass xl, radius 28, header icon + title + subtitle, close button, footer slot; focus trap; Esc closes unless `blocking`; restores focus on close; backdrop blur); `Tabs` (pill tab bar as on the drill-in, optional trailing ↗ icon, status dot per tab as on Connections).
 - **Acceptance criteria:**
-  - [ ] Focus stays inside an open modal; Esc closes non-blocking modals only.
-  - [ ] A `blocking` modal (first-run Connections) cannot be dismissed.
+  - [x] Focus stays inside an open modal; Esc closes non-blocking modals only.
+  - [x] A `blocking` modal (first-run Connections) cannot be dismissed.
 
 #### AL-030 · Toast and ToastHost
 - **Design:** artboard 6 "Toast · error" · **Depends on:** AL-024
@@ -1448,6 +1448,13 @@ implementation agent, mid-run if needed.
 | D350 | AL-043: connectionData returning the anonymous identity (aaaaaaaa-…) is treated as ADO_UNAUTHORIZED; `CONNECTION_DATA_API_VERSION` moved into ado-client (`connection-test.ts`) and is re-exported by the main tester | Existing imports still work | 2026-10-07 |
 | D351 | AL-043: Display helpers live in contracts (`connections.display.ts`, one export line): `formatAdoConnectionDetails`, `displayOrgUrl`, `formatTokenExpiry`, `tokenExpiryState` (TOKEN_EXPIRY_WARNING_DAYS = 7, local calendar day, the date counts as the last valid day, year left out within 183 days or in the same year), `adoScopeChips`, `ADO_SCOPE_LABELS`, `adoScopeRequirement` | Follows AL-064's `formatPullRequestActivity` precedent; Q10 default | 2026-10-07 |
 | D352 | AL-043: AL-042's e2e (`connections.spec.ts`) now counts only authorized connectionData requests (still 3) | Each passing test now also makes project and probe requests to that fake | 2026-10-07 |
+| D353 | AL-029: Modal is built on React Native's `Modal`, which react-native-web renders as role=dialog with aria-modal | Gives the focus trap, Esc for the topmost modal only and focus return to the opener without custom code | 2026-10-07 |
+| D354 | AL-029: Clicking the backdrop never closes a modal; only the close button or Esc closes a non-blocking modal | A stray click cannot lose a half-filled form | 2026-10-07 |
+| D355 | AL-029: A `blocking` modal has no close button, ignores Esc, and makes `onClose` optional in its props type | First-run Connections cannot be dismissed | 2026-10-07 |
+| D356 | AL-029: New `overlay` token group (scrim colour, scrim blur, drop shadow) in `packages/tokens/src/overlay.ts` and `agent-lanes-tokens.css`, sampled from artboards 2 and 5; a test keeps the two in sync | CLAUDE.md puts values in packages/tokens | 2026-10-07 |
+| D357 | AL-029: `Tabs` follows the WAI-ARIA tabs pattern with one Tab stop; selection follows arrow-key focus except on tabs marked `opensElsewhere` (the drill-in's Claude Design tab, shown with ↗) | Standard keyboard behaviour; a tab that opens elsewhere must not fire on arrow focus | 2026-10-07 |
+| D358 | AL-029: A tab's status dot is decorative; its word is part of the tab's accessible name | Status never depends on colour alone | 2026-10-07 |
+| D359 | AL-029: `TabPanel` helper and `tabId`/`tabPanelId` functions are exported to link tabs to their panels | Callers get correct aria-controls/aria-labelledby wiring | 2026-10-07 |
 
 ---
 
@@ -1489,6 +1496,7 @@ implementation agent, mid-run if needed.
 | 2026-10-07 | Integrator batch 10: merged AL-026, AL-024 and AL-081 (done). Registration conflicts kept both sides: `packages/ui/src/index.ts` (AL-025 Pill/Badge/StatusBadge/IdChip + AL-026 SegmentedControl/Switch + AL-024 Button), `packages/tokens/src/index.ts` and `agent-lanes-tokens.css` (AL-026 `selection` + AL-024 `control` token groups, each its own `:root` block), `services.ts` (`git`, `log`, `diagnostics`, `connections`, `designView`, `tickets` + `repos`), `ipc/handlers.ts` (diagnostics, connections, design + repos) and renderer `shared/api/index.ts` (design-view and diagnostics exports + repos hooks). `pnpm-lock.yaml` took main's side and was regenerated (adds `@testing-library/user-event` to `packages/ui`). No integration fixes needed. Decisions D280–D317. `pnpm verify` green (1634 unit tests), e2e 47/47. Follow-ups: AL-032 gallery renders Button, SegmentedControl and Switch (plus real-Chromium keyboard e2e); AL-033 checks the Switch off-track contrast; AL-029 reuses `selection` tokens and `interaction(.web).ts`; AL-214's `ActionButton` (D206) and AL-140's plain Pressables (D165) can switch to Button; AL-142/AL-047 fall back when `ui.lastRepo` is gone and treat `rejected` like `cancelled`; AL-146 invalidates `['repos']` after editing `settings.repos`; `repos:remove` should guard repos with live tickets once AL-141 lands. |
 | 2026-10-07 | Integrator batch 11: merged AL-027 (done). One registration conflict in `packages/ui/src/index.ts` (AL-025/AL-026/AL-024 exports + AL-027 TextField, kept both sides). Lockfile unchanged after `pnpm install`. Integration fix: `AppRouter.test.tsx` sets Testing Library's `asyncUtilTimeout` to 15 s, because under the full suite the lazy page chunk outlasted `findBy`'s 1 s default (the batch 9 fix raised only the Vitest test timeout). Decisions D318–D329. `pnpm verify` green (1662 unit tests), e2e 47/47. Follow-ups: AL-046 holds a `useRef<SecureTextFieldHandle>` for the PAT (`read()` for Test connection, `take()` for Save, `onSecretChange` to reset tested state, Test connection in `accessory`, ref `focus()` or `autoFocus` for a Reconnect toast); AL-032 gallery shows TextField's four variants plus error, help and disabled states (no in-app page renders TextField yet, so no e2e); AL-033 checks the `line` border (#E2E8F0 on white, about 1.2:1, below WCAG 1.4.11's 3:1). |
 | 2026-10-07 | Integrator batch 12: merged AL-044 and AL-043 (both partial: data paths done and proven through IPC in unit and e2e tests; the Claude tab, saved ADO row, scope chips and expiry input are AL-046, and each needs a manual check by Kyle against a real Claude Code login / ADO org). Registration conflicts kept both sides: `services.ts` (`tickets`, `repos` + `claude`), `contracts/src/index.ts` (`connections.claude` + `connections.display`) and `connections/service.ts` (`detectClaudeLogin` + `noteAdoResponse` in the interface and the service object). Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D330–D352. `pnpm verify` green (1787 unit tests), e2e 53/53. Follow-ups: AL-046 builds the Claude tab on `connections:detectClaude` ("Use my Claude Code login", render `claudeConnectionStatusLine`, red while status is error) and the ADO row/chips/expiry with `formatAdoConnectionDetails`, `tokenExpiryState`, `adoScopeChips(result.scopes)`, the Default project dropdown from `result.projects` (free text when null) and an optional expiry date input; AL-065 passes `log: (entry) => void services.connections.noteAdoResponse(orgId, entry)` to the per-org ADO client; AL-100 starts sessions with `services.claude.launch({ credential, ... })` or `claudeProcessEnv`, not `process.env` + `sessionEnv()` (an inherited ANTHROPIC_API_KEY would override the login), and may unify the test model with D10; AL-048 tells a refused write (ADO may answer 401 TF400813) from a revoked token; AL-047/AL-048 own any near-expiry toast; re-run `e2e/claude-connection.spec.ts` on an Agent SDK upgrade (fake follows 0.3.292). |
+| 2026-10-07 | Integrator batch 13: merged AL-029 (done). No conflicts; lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D353–D359. `pnpm verify` green (1837 unit tests), e2e 53/53. Follow-ups: AL-032 gallery shows Modal (normal and blocking) and Tabs (status dots and the ↗ tab); AL-046, AL-135, AL-146 and AL-160 can now build on Modal/Tabs. |
 
 ---
 
