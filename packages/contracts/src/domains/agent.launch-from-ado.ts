@@ -104,3 +104,34 @@ export type LaunchFromAdoResponse = z.infer<typeof LaunchFromAdoResponseSchema>;
  */
 export const LAUNCH_REFUSALS = ['refused', 'moved', 'not-found', 'add-repo', 'no-repo'] as const;
 export type LaunchRefusal = (typeof LAUNCH_REFUSALS)[number];
+
+// ── Undo a launch (AL-237, T8, TB§4, artboard 10) ──────────────────────────────────────────────
+
+/** Undo pressed just inside the 10 s still counts when it reaches main a moment later. */
+export const UNDO_GRACE_MS = 2_000;
+
+/**
+ * Why Undo was refused, in `details.reason` of its VALIDATION error; the message says what to revert by hand:
+ * - `expired`: 10 s passed, or the launch was already undone;
+ * - `turn-ended`: the agent's first turn ended;
+ * - `pushed`: the agent pushed its branch;
+ * - `commented`: the agent posted to Azure DevOps (a review's comments, thread replies).
+ */
+export const UNDO_REFUSALS = ['expired', 'turn-ended', 'pushed', 'commented'] as const;
+export type UndoRefusal = (typeof UNDO_REFUSALS)[number];
+
+/** `agent:undoLaunch`: the `undoId` a launch from the team board returned. */
+export const UndoLaunchRequestSchema = z.strictObject({ undoId: z.string().min(16).max(128) });
+export type UndoLaunchRequest = z.infer<typeof UndoLaunchRequestSchema>;
+
+export const UndoLaunchResponseSchema = z.object({
+  ticketId: TicketIdSchema,
+  /** The session, worktree, the branch the launch made and the ticket are gone; false lists what is left. */
+  worktreeRemoved: z.boolean(),
+  leftovers: z.array(z.string()),
+  /** The work item's assignee and state are back as they were; null when the launch changed nothing in ADO. */
+  adoRestored: z.boolean().nullable(),
+  /** For the toast: "#71318 is back in Failed UAT, unassigned · the worktree and agent are gone". */
+  summary: z.string().max(1000),
+});
+export type UndoLaunchResponse = z.infer<typeof UndoLaunchResponseSchema>;

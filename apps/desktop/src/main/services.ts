@@ -47,6 +47,7 @@ import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discov
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketLauncher, type TicketLauncher } from './tickets/launch';
 import { createAdoLauncher, type AdoLauncher } from './agent/launch-from-ado';
+import { createLaunchUndo, type LaunchUndo } from './agent/undo-launch';
 import { findRegisteredRepo } from './ado/registered-repos';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
@@ -152,6 +153,8 @@ export interface Services {
   readonly ticketLauncher: TicketLauncher;
   /** Launch from the team board: recheck, the one ADO change, worktree, ticket and session, with rollback (AL-236). */
   readonly adoLauncher: AdoLauncher;
+  /** Undo of a team board launch for 10 s or until the first turn ends; watches each session for a push or a comment (AL-237). */
+  readonly launchUndo: LaunchUndo;
 }
 
 export interface ServiceOptions {
@@ -396,6 +399,7 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('launch'),
   });
   late.adoLauncher = adoLauncher;
+  const launchUndo = createLaunchUndo({ launcher: adoLauncher, sessions, launches, worktrees, ado, emit: options.emit, log: log.child('launch') });
 
   return {
     appDataDir: options.appDataDir,
@@ -440,6 +444,7 @@ export function createServices(options: ServiceOptions): Services {
     credentialFailures: credentialFailureService,
     ticketLauncher,
     adoLauncher,
+    launchUndo,
   };
 }
 
@@ -450,6 +455,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
   services.claude.closeAll();
   services.mcpStatus.dispose();
+  services.launchUndo.dispose();
   services.transcripts.dispose();
   services.credentialFailures.dispose();
   services.subagents.dispose();
