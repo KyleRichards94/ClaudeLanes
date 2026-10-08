@@ -104,12 +104,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-107 | Sub-agent tracking | E6 | M | AL-102 | done |
 | AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | partial |
 | AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | partial |
-| AL-110 | Crash recovery | E6 | M | AL-100, AL-101 | todo |
-| AL-111 | Concurrency cap and Queued lane | E6 | S | AL-100 | todo |
-| AL-112 | Build result as next-turn context | E6 | S | AL-100, AL-132 | todo |
-| AL-113 | Usage, tokens and session pill | E6 | S | AL-102 | todo |
-| AL-114 | Skill discovery | E6 | S | AL-100 | todo |
-| AL-115 | ADO write-back on stage change | E6 | S | AL-103, AL-063 | todo |
+| AL-110 | Crash recovery | E6 | M | AL-100, AL-101 | partial |
+| AL-111 | Concurrency cap and Queued lane | E6 | S | AL-100 | done |
+| AL-112 | Build result as next-turn context | E6 | S | AL-100, AL-132 | partial |
+| AL-113 | Usage, tokens and session pill | E6 | S | AL-102 | done |
+| AL-114 | Skill discovery | E6 | S | AL-100 | partial |
+| AL-115 | ADO write-back on stage change | E6 | S | AL-103, AL-063 | done |
 | AL-130 | Build/run command detection and overrides | E7 | S | AL-081 | done |
 | AL-131 | Job queue | E7 | S | AL-011 | done |
 | AL-132 | Build job and log parsing | E7 | M | AL-130, AL-131, AL-012 | partial |
@@ -125,12 +125,12 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-146 | Settings panel (repo and defaults) | E8 | M | AL-041, AL-130, AL-029 | partial |
 | AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | done |
 | AL-161 | Work item picker | E9 | M | AL-160, AL-066 | done |
-| AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | todo |
+| AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | partial |
 | AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | done |
 | AL-164 | Workspace preview and stage gates | E9 | S | AL-160, AL-082 | done |
 | AL-165 | Launch | E9 | M | AL-161–AL-164, AL-083, AL-100, AL-111 | todo |
 | AL-170 | Ticket page frame | E10 | M | AL-140, AL-141 | done |
-| AL-171 | Stage stepper and gate actions | E10 | M | AL-104, AL-170 | todo |
+| AL-171 | Stage stepper and gate actions | E10 | M | AL-104, AL-170 | done |
 | AL-172 | Agent panel (model and effort) | E10 | S | AL-106, AL-170 | todo |
 | AL-173 | Worktree panel (Build, Run, Stop) | E10 | S | AL-134, AL-170 | done |
 | AL-174 | Merge panel, confirm and conflict flows | E10 | M | AL-086, AL-087, AL-170 | todo |
@@ -686,37 +686,37 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §12 ("restarted from its saved session id in the same worktree"), artboard 6 toast · **Depends on:** AL-100, AL-101
 - **Scope:** Detect session loss (stream error, process exit, no output past a watchdog while "running") → `SESSION_LOST` → toast "MCP bridge lost the session · cc-71288 stopped responding. The worktree is intact." with Reconnect / Dismiss; Reconnect = new `query()` with `resume: sessionId`, same cwd. Auto-retry once before asking. Never deletes the worktree.
 - **Acceptance criteria:**
-  - [ ] Killing the `claude` process mid-run leads to a resumed session with the history intact.
+  - [ ] Killing the `claude` process mid-run leads to a resumed session with the history intact. (open: tested with the fake SDK only: a failed stream, an exit or a watchdog stall starts a new `query()` with `resume` = the saved session id and `cwd` = the worktree, plus a "continue" turn when lost mid-turn; killing a real `claude` and checking the history needs a real account)
 
 #### AL-111 · Concurrency cap and Queued lane
 - **Design:** §13 risk ("per-repo cap on concurrent agents, and a queued lane"), Q5 · **Depends on:** AL-100
 - **Scope:** Per-repo max running agents (setting, default 3); extra launches land in Queued with "Waiting for a free slot"; FIFO start when a slot frees; manual "Start now" overrides.
 - **Acceptance criteria:**
-  - [ ] Never more running sessions per repo than the cap.
+  - [x] Never more running sessions per repo than the cap.
 
 #### AL-112 · Build result as next-turn context
 - **Design:** §10 last bullet · **Depends on:** AL-100, AL-132
 - **Scope:** When a build finishes, push an `SDKUserMessage` with `shouldQuery: false` (Decision D11) containing the result summary and the first N errors, so it rides along with the agent's next turn without starting one.
 - **Acceptance criteria:**
-  - [ ] After a user-started failed build, the agent's next turn mentions the errors without being told.
+  - [ ] After a user-started failed build, the agent's next turn mentions the errors without being told. (open: the fake-SDK test shows the errors reach the session's input with `shouldQuery: false`, ahead of the user's next message, without starting a turn; whether the model mentions them needs a real Claude session)
 
 #### AL-113 · Usage, tokens and session pill
 - **Design:** artboard 3 ("Session cc-71273 · 1h 12m · 412k tokens"), Lead agent "212k tokens" · **Depends on:** AL-102
 - **Scope:** Aggregate usage from result/assistant messages per session and per sub-agent; elapsed time; context usage via `getContextUsage()`; cost (shown in a tooltip only).
 - **Acceptance criteria:**
-  - [ ] Totals match the SDK's result usage within rounding.
+  - [x] Totals match the SDK's result usage within rounding.
 
 #### AL-114 · Skill discovery
 - **Design:** artboard 2 Skills, artboard 3 shortcuts · **Depends on:** AL-100
 - **Scope:** `skills:list(repo)` from `supportedCommands()` of a session started with the repo's config (cached per repo, refreshed on demand); returns name + description; filters to skills.
 - **Acceptance criteria:**
-  - [ ] The repo's own `.claude/skills` and the user's skills both appear.
+  - [ ] The repo's own `.claude/skills` and the user's skills both appear. (open: merging and filtering are tested with the fake Agent SDK and the e2e fake `claude`; whether real Claude Code lists both through `supportedCommands()` needs a real login on a repo with `.claude/skills`)
 
 #### AL-115 · ADO write-back on stage change
 - **Design:** §7 ADO write-back · **Depends on:** AL-103, AL-063
 - **Scope:** On each stage change post a short comment ("Agent Lanes · Implementing — plan approved by Kyle"); rate-limited; off switch per repo.
 - **Acceptance criteria:**
-  - [ ] One comment per stage change, never duplicated after a resume.
+  - [x] One comment per stage change, never duplicated after a resume.
 
 ---
 
@@ -825,7 +825,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 2 · **Depends on:** AL-160, AL-114
 - **Scope:** "What should the agent do?" multiline field (prefilled from the work item's description/acceptance criteria as a quoted block the user can edit); Skills chips (mono, toggle, violet when selected) from AL-114, defaults from settings.
 - **Acceptance criteria:**
-  - [ ] Selected skills are passed to the session and listed in its first turn.
+  - [ ] Selected skills are passed to the session and listed in its first turn. (open: the launch request carries the skills and AL-100's `buildFirstTurn` lists them, but the modal's Launch still goes to `launchNotReady` until AL-165 passes `NewTicketRequest.skills` into the session launch)
 
 #### AL-163 · Model and effort pickers
 - **Design:** artboard 2 right column · **Depends on:** AL-160, AL-026
@@ -859,7 +859,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 3 stepper, §9 · **Depends on:** AL-104, AL-170
 - **Scope:** Five steps: done (check + duration "12m"), current (number + "46%"), upcoming; gated step shows Approve / Request changes when waiting; gate toggles per stage.
 - **Acceptance criteria:**
-  - [ ] Approving here and on the card are the same action and stay in sync.
+  - [x] Approving here and on the card are the same action and stay in sync.
 
 #### AL-172 · Agent panel (model and effort)
 - **Design:** artboard 3 Agent panel, R7 · **Depends on:** AL-106, AL-170
@@ -1805,6 +1805,36 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D601 | AL-233: Default page size 50, maximum 200 (one batch read); a query returns at most 5,000 ids | ADO batch and WIQL limits | 2026-10-08 |
 | D602 | AL-142: At integration the header's MCP pill is AL-108's live `McpStatusPill` (the running sessions' servers, amber with names on hover) instead of AL-142's pill from the saved servers' last test; `mcpStatusOf` and its test were removed | Both branches built the same pill; AL-142's own comment said AL-108's live status would replace it | 2026-10-08 |
 | D603 | AL-084: At integration the session extras compose through AL-108's `combineSessionExtras`, which now also merges SDK hooks per event; AL-084's `mergeSessionExtras` was dropped and its test moved to `combineSessionExtras` | One composition path for the stage server, MCP servers, permission policy, sub-agent worktree hooks and sub-agent tracking hooks | 2026-10-08 |
+| D604 | AL-113: Cost appears only in the drill-in session pill's tooltip, never inline | Ticket scope: "cost (shown in a tooltip only)" | 2026-10-08 |
+| D605 | AL-113: Token totals were checked against faked SDK result and assistant messages only, never a real Claude account | No real accounts in tests (§7); a manual check against a real session's `/cost` is a follow-up | 2026-10-08 |
+| D606 | AL-114: The skills list is cached in memory per repo for the app's lifetime and refreshed only on request (`refresh: true`) | Opening the New ticket modal does not start a Claude Code session every time | 2026-10-08 |
+| D607 | AL-115: Duplicate stage comments are prevented twice: an in-memory key per stage entry, plus a read of the work item's newest Agent Lanes comment before posting | Covers a resumed session and an app restart | 2026-10-08 |
+| D608 | AL-115: Stage comments go out one at a time per work item, at least 5 s apart; waiting comments beyond the per-work-item limit are dropped oldest first; the off switch is the existing Settings › Repos `adoWriteBack` | A burst of moves keeps the newest stage; no new setting | 2026-10-08 |
+| D609 | AL-162: The skill chips come from the board's repo (`ui.lastRepo`, else the first registered repo), the same repo AL-164's workspace preview uses | One repo per modal | 2026-10-08 |
+| D610 | AL-162: A default skill from settings that the repo does not list still gets a chip | So the user can turn it off | 2026-10-08 |
+| D611 | AL-162: The renderer has its own small HTML-to-text helper (`features/create-ticket/lib/quote.ts`) for the work item quote, cut at 4,000 characters like main's `plainText` | The renderer may not import main code | 2026-10-08 |
+| D612 | AL-171: Gate actions are a new feature slice (`features/resolve-gate`); `useResolveGate` and `useSetGate` live in `entities/agent-ticket/api` beside merge-to-main | The card and the stepper share one action and one store entry | 2026-10-08 |
+| D613 | AL-171: The agent ticket store gained `setGates()` (`withGates` in `ticket.ts`) so a gate toggle shows at once; turning off a waiting gate also clears it once main reports it released | Immediate feedback without waiting for an event | 2026-10-08 |
+| D614 | AL-171: Artboard 3 shows no gate toggles, so each step pill gets a small chip after it ("Approval" with a lock, or "Auto"), with the switch role, its state in the text and `hitSlop` for the touch area | Accessible without relying on colour | 2026-10-08 |
+| D615 | AL-171: On the board, Approve / Request changes sit under the card next to AL-109's permission prompt, not inside it | Buttons inside the card's pressable would nest interactive controls | 2026-10-08 |
+| D616 | AL-171: The gate mutation hook mounts only while a gate is waiting | Cards without a gate need no extra QueryClient work | 2026-10-08 |
+| D617 | AL-110: The watchdog counts a session lost after 10 minutes without output while running (`SESSION_WATCHDOG_MS`), suspended while a gate or permission request waits on the user | Long silent builds are not cut off | 2026-10-08 |
+| D618 | AL-110: A session lost mid-turn gets a `RECOVERED_MESSAGE` user turn after the resume; one lost while idle is resumed silently | It carries on with the turn it lost | 2026-10-08 |
+| D619 | AL-110: Automatic retry happens once per 10-minute window per ticket (`RETRY_WINDOW_MS`); a second loss inside it shows the toast instead | No retry loops | 2026-10-08 |
+| D620 | AL-110: A lost session with no saved session id (died before init) goes straight to the toast, saying it cannot be resumed | Nothing to resume from | 2026-10-08 |
+| D621 | AL-110: The earlier attempt's work was recovered from the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a" without changing the stash, and its `recovery.test.ts` prefer-const lint errors were fixed | The stash is now fully contained in the branch and can be dropped | 2026-10-08 |
+| D622 | AL-111: A session counts against the per-repo cap while its `claude` process is live (starting, running, idle or paused) | An idle session still holds its process and context | 2026-10-08 |
+| D623 | AL-111: `queued` added to `AGENT_SESSION_STATES`; `agent:getStatus` answers from the launch queue, so a queued ticket reads as queued over IPC and in `agent:status` | One status source for queued and live tickets | 2026-10-08 |
+| D624 | AL-111: No `agent:start` channel added: AL-165 owns the launch flow and should call `services.launches.launch()`; until then only crash recovery and Start now use the queue | Avoids a second launch path | 2026-10-08 |
+| D625 | AL-111: Start now (no artboard) is a small notice with a primary button on the drill-in under the permission prompt (`features/start-queued-agent`); none on the board card | Artboard 1's queued card has no button | 2026-10-08 |
+| D626 | AL-111: The launch queue lives in memory: queued launches and their job description do not survive an app restart | The ticket record does not store the job description; AL-165 may persist it | 2026-10-08 |
+| D627 | AL-111: Crash-recovery restarts (AL-110) go to the front of the queue when the repo is full, and the "continue" turn is sent once they start | A lost session should not wait behind new launches | 2026-10-08 |
+| D628 | AL-111: The card shows "Waiting for a free slot" for any ticket whose record stage is `queued`, even after its session starts, until the agent calls `set_stage` | AL-143/AL-144 should drive it from session state | 2026-10-08 |
+| D629 | AL-112: Every finished build is sent to the live session, successes and Run's build step included; only cancelled builds are skipped | The agent always has the latest result (design §10) | 2026-10-08 |
+| D630 | AL-112: At most 10 errors are listed as `file(line,col): CODE: message` (`BUILD_CONTEXT_MAX_ERRORS`), then "First 10 of N errors"; warnings are counted, not listed | Keeps the message short | 2026-10-08 |
+| D631 | AL-112: Nothing is sent when the ticket has no live session; a paused session holds the message until Resume; a throwing hook never fails the build | The result is already on the ticket record (AL-132) | 2026-10-08 |
+| D632 | AL-112: The message tells the agent no reply is needed now and to rebuild to check the current state before fixing anything | The build may be stale by the next turn | 2026-10-08 |
+| D633 | AL-110: At integration, both the `reconnectSession` toast intent and AL-211's SESSION_LOST recovery go through `createRecoveryEnvironment().reconnectSession`, which calls `agent:reconnect` and shows "Couldn't reconnect <id>" on failure; this replaces D554's Output-tab stand-in and AL-110's own helper in `ToastHost` | One Reconnect path for both toasts | 2026-10-08 |
 
 ---
 
@@ -1861,6 +1891,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Merged AL-163, AL-164 (batch b16: model and effort pickers, workspace preview and stage gates), both done. The run that merged them stopped on a usage limit before recording them; verified by hand: `pnpm verify` green (2,705 tests), e2e 106/106 on rerun (one load-related flake on the first run, tracked under AL-220). |
 | 2026-10-08 | Integrator batch 1 (b35): merged AL-108 (partial: ADO MCP server injected per work item org and the header MCP pill with auto-reconnect are in; reading and commenting on the work item needs a live session against a real ADO org) and AL-109 (partial: D18 policy, `canUseTool` "Needs you · permission" prompt and settings are in and unit-tested on the fake SDK; both criteria need a real Claude session). AL-110 (uncommitted, kept in the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a"), AL-111 and AL-112 were not on the branch and stay `todo`. No conflicts on main (the branch had already merged main); lockfile unchanged after `pnpm install`. No integration fixes needed. Decision D549. `pnpm verify`: typecheck, lint and build green; 2736/2738 unit tests in the full run, with load-related timeouts in real-git `ticket-worktree.test.ts` and `repos/registry.test.ts` (and `archive`, `merge-to-main`, `service.mcp` in an earlier run), none touched by this merge; each passed when rerun alone. E2E 106/106. The b35 worktree held a conflicted `sub-worktree.ts` and an untracked `subagent-tracker.ts` from another branch's stash; copies were saved before the worktree was removed. |
 | 2026-10-08 | Integrator batch 2 (b24, b23, b39, b34, b38): merged AL-196, AL-211, AL-142, AL-161, AL-173, AL-179, AL-180, AL-221, AL-048, AL-086, AL-106, AL-107, AL-213, AL-230, AL-231, AL-232 and AL-233 (done), AL-225 (partial: the README guide is written, but no teammate has yet followed it end to end on a clean machine with a real org and Claude account) and AL-084 (partial: sub-branches are recorded with ahead counts; the Sub-branches panel is AL-178). Nothing rejected. Conflicts: b24 with AL-108/AL-109 in renderer `AppProviders.tsx` and `shared/api/index.ts` (kept both); b23 in `entities/agent-ticket/model/event-handlers(.test).ts` (kept AL-109 `agent:permission` + AL-173 `run:status`/`build:finished`) and `pages/board/ui/BoardPage.tsx` (took AL-142's header; AL-108's `McpStatusPill` moved into `BoardHeader`, D602); b34 in `agent.names.ts`/`agent.schemas.ts`, `agent/handlers(.test).ts`, `session-messages.test.ts`, renderer `ipc.ts` and `event-handlers(.test).ts` (kept both), `session-manager.ts` (SessionExtras keeps AL-109 `permissionMode`/`canUseTool` and AL-084 `hooks`) and `services.ts` (one `combineSessionExtras` path for stage, MCP, permissions, sub-worktree and sub-agent hooks, D603); b38 in `ado/service.ts`, `services.ts` (`onUnauthorized` + `registeredRemotes`) and `entities/agent-ticket/index.ts` (kept both). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements AL-108's `mcpServerStatus`/`reconnectMcpServer`; `BoardPage.test.tsx` feeds the live MCP status. Decisions D550–D603. `pnpm verify` green (3049 unit tests). E2E: 115/116 in the first full run, the one failure a Playwright worker crash (0xC0000409) in `accessibility.spec.ts`, which passed 2/2 alone; the full rerun was 116/116. Follow-ups: AL-197 sends design-thread messages to the implementation agent on ship; AL-110 replaces `reconnectSession` in `renderer/app/toasts/recovery-environment.ts`; AL-177 renders the sub-agent tree from `agent:getSubagents` + `agent:subagent`; AL-178 renders recorded sub-branches; check ClaudeDesign tool names and `finalize_plan` against a real account; `e2e/first-run.spec.ts` "a fresh profile reaches the board…" is flaky under load (pick-repo dialog close, AL-220). |
+| 2026-10-08 | Integrator batch 3 (b36, b49): merged AL-113, AL-115, AL-171 and AL-111 (done), AL-114 (partial: both skill sources listed through `supportedCommands()` needs a real Claude Code login), AL-162 (partial: the launch request carries the selected skills, but Launch goes to `launchNotReady` until AL-165), AL-110 (partial: tested with the fake SDK only; killing a real `claude` mid-run needs a real account) and AL-112 (partial: whether the model mentions the build errors needs a real session). Nothing rejected. Conflicts: b36 with AL-106/AL-107/AL-161/AL-195/AL-196/AL-213/AL-233 in `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts` (`midTurn` + `contextUsage`), `services.ts` (stage comments + sub-agents + merge sub-branches), `AppProviders.tsx`, `entities/agent-ticket/index.ts`, `NewTicketModal.tsx` (AL-161's `WorkItemPicker` and sprint menu + AL-162's prefill and skill chips; the picker's `workItem` dispatch now fires the prefill), `TicketPage.tsx`, the e2e fake `claude` (design `reply` + `commands`) and `agent.spec.ts` (kept both); b49 in `agent.names.ts`, `app.schemas.ts` (`recover` + `reconnectSession` intents), `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts`, `services.ts`, `AppProviders.tsx`, `TicketPage.tsx` (kept both) and `toast-intents.ts`/`ToastHost.tsx` (AL-211's recovery environment kept, D633). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements `getContextUsage`/`supportedCommands`; Reconnect calls `agent:reconnect` from `recovery-environment.ts` and `recovery.test.tsx` checks it (D633). Decisions D604–D633. `pnpm verify` green (3109 unit tests). E2E: 114/118 in the first full run (`git.spec.ts` launch failure and three `logging.spec.ts` tests, all passing alone) and 117/118 in the second (`text.spec.ts` mouse selection, 3/3 alone), under load from other agents (about 46 node processes); the third full run was 118/118. Follow-ups: AL-165 calls `services.launches.launch({ ticketId, jobDescription, workItem })` and passes `NewTicketRequest.skills` into the launch; AL-088 calls `services.launches.cancel(ticketId)` on archive; AL-143/AL-144 drive the queued card from session state `queued` and may show "Session lost · Reconnect" and Start now on the card; AL-222 approves a real gate through the stepper; manual checks with a real account: token totals against `/cost`, skills from `.claude/skills`, crash resume, build errors in the next turn; the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a" is fully merged and can be dropped by Kyle. |
 ---
 
 ## 7. Parallel build rules
