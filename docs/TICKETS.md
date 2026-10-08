@@ -125,17 +125,17 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-146 | Settings panel (repo and defaults) | E8 | M | AL-041, AL-130, AL-029 | partial |
 | AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | done |
 | AL-161 | Work item picker | E9 | M | AL-160, AL-066 | done |
-| AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | partial |
+| AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | done |
 | AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | done |
 | AL-164 | Workspace preview and stage gates | E9 | S | AL-160, AL-082 | done |
-| AL-165 | Launch | E9 | M | AL-161–AL-164, AL-083, AL-100, AL-111 | todo |
+| AL-165 | Launch | E9 | M | AL-161–AL-164, AL-083, AL-100, AL-111 | done |
 | AL-170 | Ticket page frame | E10 | M | AL-140, AL-141 | done |
 | AL-171 | Stage stepper and gate actions | E10 | M | AL-104, AL-170 | done |
 | AL-172 | Agent panel (model and effort) | E10 | S | AL-106, AL-170 | done |
 | AL-173 | Worktree panel (Build, Run, Stop) | E10 | S | AL-134, AL-170 | done |
 | AL-174 | Merge panel, confirm and conflict flows | E10 | M | AL-086, AL-087, AL-170 | done |
 | AL-175 | Output stream | E10 | L | AL-102, AL-170 | done |
-| AL-176 | Composer | E10 | S | AL-105, AL-106, AL-175 | todo |
+| AL-176 | Composer | E10 | S | AL-105, AL-106, AL-175 | done |
 | AL-177 | Sub-agents panel | E10 | M | AL-107, AL-170 | done |
 | AL-178 | Sub-branches panel | E10 | S | AL-085, AL-177 | done |
 | AL-179 | Diff tab | E10 | M | AL-089, AL-170 | done |
@@ -151,10 +151,10 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-197 | Approve & ship design at any time (R11) | E11 | L | AL-195, AL-198, AL-100 | partial |
 | AL-198 | Agent-side design tools | E11 | M | AL-103 | done |
 | AL-199 | Design specs attached to the ticket | E11 | S | AL-197 | done |
-| AL-200 | Design presence on card and drill-in | E11 | S | AL-197, AL-144 | todo |
+| AL-200 | Design presence on card and drill-in | E11 | S | AL-197, AL-144 | done |
 | AL-210 | Error boundaries | E12 | S | AL-140 | partial |
 | AL-211 | Error recovery actions | E12 | M | AL-030, AL-046 | done |
-| AL-212 | Performance pass | E12 | M | AL-143, AL-175 | todo |
+| AL-212 | Performance pass | E12 | M | AL-143, AL-175 | partial |
 | AL-213 | App lifecycle | E12 | S | AL-100, AL-134 | done |
 | AL-214 | Logging and diagnostics | E12 | S | AL-040 | done |
 | AL-230 | Drop rules (`allowedLanes`) | E14 | S | AL-141 | done |
@@ -163,11 +163,11 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-233 | Backlog data (`ado:backlog`) | E14 | M | AL-065 | done |
 | AL-234 | Team board widget | E14 | L | AL-230, AL-231, AL-232, AL-066, AL-143 | partial |
 | AL-235 | Drag to lane (dnd-kit + keyboard) | E14 | L | AL-230, AL-234 | todo |
-| AL-236 | Launch from ADO transaction (`agent:launchFromAdo`) | E14 | L | AL-230, AL-100, AL-083, AL-063, AL-111, AL-165 | todo |
-| AL-237 | Undo a launch (`agent:undoLaunch`) | E14 | M | AL-236, AL-030 | todo |
-| AL-238 | PR launches: review and answer comments | E14 | M | AL-236, AL-232 | todo |
+| AL-236 | Launch from ADO transaction (`agent:launchFromAdo`) | E14 | L | AL-230, AL-100, AL-083, AL-063, AL-111, AL-165 | done |
+| AL-237 | Undo a launch (`agent:undoLaunch`) | E14 | M | AL-236, AL-030 | done |
+| AL-238 | PR launches: review and answer comments | E14 | M | AL-236, AL-232 | done |
 | AL-239 | Backlog popout | E14 | L | AL-233, AL-235, AL-236, AL-029 | todo |
-| AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | todo |
+| AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | todo |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
@@ -825,7 +825,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 2 · **Depends on:** AL-160, AL-114
 - **Scope:** "What should the agent do?" multiline field (prefilled from the work item's description/acceptance criteria as a quoted block the user can edit); Skills chips (mono, toggle, violet when selected) from AL-114, defaults from settings.
 - **Acceptance criteria:**
-  - [ ] Selected skills are passed to the session and listed in its first turn. (open: the launch request carries the skills and AL-100's `buildFirstTurn` lists them, but the modal's Launch still goes to `launchNotReady` until AL-165 passes `NewTicketRequest.skills` into the session launch)
+  - [x] Selected skills are passed to the session and listed in its first turn. (AL-165's `tickets:launch` saves the selected skills on the record and the session's `buildFirstTurn` lists them)
 
 #### AL-163 · Model and effort pickers
 - **Design:** artboard 2 right column · **Depends on:** AL-160, AL-026
@@ -843,7 +843,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §9 step 1 · **Depends on:** AL-161–AL-164, AL-083, AL-100, AL-111
 - **Scope:** Create worktree → write ticket record → start session (or queue) → card in Planning (or Queued) → modal closes, board highlights the new card. Errors map to recovery (AL-211).
 - **Acceptance criteria:**
-  - [ ] From a sprint item to a running Planning card in under a minute of user time.
+  - [x] From a sprint item to a running Planning card in under a minute of user time. (e2e `launch.spec.ts`: #71273 from Sprint 42 → Launch → highlighted card in Planning, worktree and branch on disk, 17.7 s in total)
 
 ---
 
@@ -889,7 +889,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 3 footer · **Depends on:** AL-105, AL-106, AL-175
 - **Scope:** `features/send-message`: message box ("Message the agent — steer, answer, or add context"), Send, Pause/Resume, skill shortcut chips, "Apply model now"; Ctrl+Enter sends; "Steer now" option sends with `priority: 'now'`.
 - **Acceptance criteria:**
-  - [ ] Messages sent while paused are queued and delivered on Resume.
+  - [x] Messages sent while paused are queued and delivered on Resume. (`Composer.test.tsx` with a fake session, main's `session-messages.test.ts`, e2e `composer.spec.ts`)
 
 #### AL-177 · Sub-agents panel
 - **Design:** artboard 3 right column · **Depends on:** AL-107, AL-170
@@ -1021,7 +1021,7 @@ implementation agent, mid-run if needed.
 - **Depends on:** AL-197, AL-144
 - **Scope:** Small "Design v2" indicator on the card when a spec is attached (amber "Design v3 not yet used" while unacknowledged); design events in the live dock and Output stream; "Claude Design ↗" tab badge when the design thread has unread replies.
 - **Acceptance criteria:**
-  - [ ] The user can see from the board which tickets have an unacknowledged design.
+  - [x] The user can see from the board which tickets have an unacknowledged design. (e2e `design-presence.spec.ts`; `AgentTicketCard.test.tsx`)
 
 ---
 
@@ -1043,8 +1043,8 @@ implementation agent, mid-run if needed.
 - **Design:** §12 Performance · **Depends on:** AL-143, AL-175
 - **Scope:** Profile the board with 8 streaming tickets and 3 builds; split the renderer bundle (1.09 MB single chunk on 2026-10-07) by page; verify rAF batching, selector isolation, lazy design tab; manual memo only where the profiler shows a hot spot.
 - **Acceptance criteria:**
-  - [ ] Board stays ≥ 50 fps with 8 streaming tickets; input latency < 100 ms.
-  - [ ] Initial renderer chunk < 500 kB.
+  - [ ] Board stays ≥ 50 fps with 8 streaming tickets; input latency < 100 ms. (open: input latency is met, 1.6–3.7 ms asserted in e2e `performance.spec.ts`, and the median frame is about 56 fps with no renderer long tasks; but 250–900 ms stalls in the GPU process's `DXGISwapChainImageBacking::Present` pull the average to 29–43 fps on this loaded machine. Re-measure on an unloaded machine; if they persist, find why each activity update repaints the full 1440×960 window)
+  - [x] Initial renderer chunk < 500 kB. (215 kB after minifying and splitting vendor chunks; asserted in `performance.spec.ts`)
 
 #### AL-213 · App lifecycle
 - **Design:** §10 ("Closing the app stops every run it started") · **Depends on:** AL-100, AL-134
@@ -1159,23 +1159,23 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 - **Design:** T3–T5, T9, TB§4, TB§7 · **Depends on:** AL-230, AL-100, AL-083, AL-063, AL-111, AL-165
 - **Scope:** `features/launch-from-ado` plus the main handler for `agent:launchFromAdo({ source, lane, overrides? })`: re-fetch the card and re-run `allowedLanes` (refuse with "Moved to Testing — refreshed" etc.); for a To Do or Failed item on Planning/Implementing only, assign to the signed-in identity and move to In Progress; create the worktree (from main, the item's branch, or the PR's source branch; read-only for reviews); create the ticket and start the session with the lane's default skill, model, effort and gates (Planning keeps the plan gate, Implementing skips it; QA runs /cs-qa-wip on Sonnet Med); queue when over the concurrency cap. A failing step rolls back the earlier ones. Returns the ticket id and an undo token. A missing scope is refused by name with "Open Connections".
 - **Acceptance criteria:**
-  - [ ] No other drop ever writes to ADO (a test asserts zero ADO write calls for every other TB§3 row).
-  - [ ] A failure after the ADO update restores the item's assignee and state.
-  - [ ] A PR from an unregistered repo is refused with an "Add repo" action.
+  - [x] No other drop ever writes to ADO (a test asserts zero ADO write calls for every other TB§3 row). (`launch-from-ado.test.ts`)
+  - [x] A failure after the ADO update restores the item's assignee and state. (worktree and session failures both restore #71335)
+  - [x] A PR from an unregistered repo is refused with an "Add repo" action.
 
 #### AL-237 · Undo a launch (`agent:undoLaunch`)
 - **Design:** T8, TB§4, artboard 10 · **Depends on:** AL-236, AL-030
 - **Scope:** A success toast (polite live region) saying what changed ("#71318 assigned to you and moved to In Progress · agent started in Planning") with a real Undo button for 10 s or until the agent's first turn ends. `agent:undoLaunch(token)` reverts the assignment and state, removes the worktree and ends the session. Not offered once the agent has pushed or a review agent has posted comments; the toast then says what to revert by hand.
 - **Acceptance criteria:**
-  - [ ] Undo within 10 s leaves ADO and disk exactly as before the drop.
-  - [ ] Undo is reachable by keyboard for the full 10 s.
+  - [x] Undo within 10 s leaves ADO and disk exactly as before the drop. (`undo-launch.test.ts` with real git, the real worktree service and ticket store, and the fake ADO org)
+  - [x] Undo is reachable by keyboard for the full 10 s. (`app/toasts/launch-undo.test.tsx`; the full drop-and-Undo flow in the real app is AL-241)
 
 #### AL-238 · PR launches: review and answer comments
 - **Design:** T3, T4, TB§3 · **Depends on:** AL-236, AL-232
 - **Scope:** `features/answer-pr-comments` and the review path. Code review drop → read-only worktree on the PR's source branch; the first turn runs /code-review and posts through /pr-comment-actioner (Opus High); several reviewers may review one PR at once. Implementing drop by the PR's author → worktree on the source branch; the first turn carries the open threads and runs /pr-comment-actioner (Sonnet High), which replies, resolves and pushes. The app itself changes no ADO state or assignment.
 - **Acceptance criteria:**
-  - [ ] Two users can start reviews of the same PR at once without sharing a worktree.
-  - [ ] The first turn lists every unresolved thread with its file and line.
+  - [x] Two users can start reviews of the same PR at once without sharing a worktree. (`ticket-worktree.test.ts` with real git: `pr-10598-review` and `pr-10598-review-2`)
+  - [x] The first turn lists every unresolved thread with its file and line. (`launch-from-ado.test.ts`: all 6 open threads of !10571)
 
 #### AL-239 · Backlog popout
 - **Design:** T6, TB§5, artboards 11 and 12 · **Depends on:** AL-233, AL-235, AL-236, AL-029
@@ -1188,7 +1188,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 - **Design:** TB§3 · **Depends on:** AL-146, AL-236
 - **Scope:** A "Drops" section in Settings with each lane's default skill(s), model and effort (seeded from TB§3). Holding Alt while dropping opens a launch sheet (skills, model, effort, gates) before anything changes.
 - **Acceptance criteria:**
-  - [ ] Cancelling the Alt sheet changes nothing in ADO or on disk.
+  - [x] Cancelling the Alt sheet changes nothing in ADO or on disk. (`LaunchSheet.test.tsx`: Cancel resolves null and `agent:launchFromAdo` is never invoked)
 
 #### AL-241 · E2E: team board drops
 - **Design:** E14 · **Depends on:** AL-237, AL-238, AL-239, AL-240
@@ -1875,6 +1875,47 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D671 | AL-234: Added `grip` (GripVertical) and `backlog` (List) glyphs to `packages/ui` Icon | Artboard 08 cards and Backlog button | 2026-10-08 |
 | D672 | AL-234: e2e `startFakeAdoServer({ teamBoard: true })` layers `createFakeTeamOrg` over the fixture org with `FAKE_TEAM_PAT`; team routes answer first and a 501 falls through. `ado.spec.ts`'s Team menu test ignores the team board's team read, which the fixture org does not serve | Reuse the fixture org for everything but the team board | 2026-10-08 |
 | D673 | AL-234: With no ADO organisation connected the widget says so with an Open Connections button; a failed board read shows the error with Retry | Clear empty and error states | 2026-10-08 |
+| D674 | AL-165: New invoke channel `tickets:launch` (request: repo, workItem `{id,title}` or null, description, skills, model, effort, gates, worktreeName; response: `{record, status}`) | D386/D624 left Launch without a channel | 2026-10-08 |
+| D675 | AL-165: Main reads the work item from ADO again for its project, org URL, description and acceptance criteria; the renderer sends only id and title | Nothing ADO-derived beyond id and title crosses IPC from the renderer | 2026-10-08 |
+| D676 | AL-165: An empty job description on a work item launch gets a default job ("Work on #id as its description and acceptance criteria say…") | The session refuses an empty first turn | 2026-10-08 |
+| D677 | AL-165: A session that can't start rolls back the worktree, the branch and the ticket record through a new `TicketWorktreeService.discard`, using undo plans kept in memory for tickets created this app run | A failed launch leaves nothing behind | 2026-10-08 |
+| D678 | AL-165: VALIDATION refusals show only under the modal summary; other codes also raise the AL-211 recovery toast (Reconnect, Copy diagnostics). The new card gets the focus-ring outline for 6 s through a `launched-ticket` store in `shared/model` | Input mistakes stay in the modal; environment failures get a recovery | 2026-10-08 |
+| D679 | AL-165: `new-ticket.spec.ts` now expects the real Launch outcome: with no repo, "Add a repo in Settings…"; with no Claude connection, the "Connect Claude…" refusal with nothing left behind. D626 still applies: queued launches and their job description are in memory only | Launch is real now | 2026-10-08 |
+| D680 | AL-236: `AgentSessionStatusSchema` and `AGENT_SESSION_STATES` moved to `agent.status.ts` (exported from the index as before) | Avoids a tickets↔agent schema import cycle | 2026-10-08 |
+| D681 | AL-236: The undo handle is called `undoId`, not "undo token" | The no-secret-fields contract test refuses any response field named `*token*` | 2026-10-08 |
+| D682 | AL-236: `agent:launchFromAdo` request is `{org?, project?, source, lane, repo?, overrides?}`. A board-item source carries team, sprint and the column the board showed, so main reads that board again and can say "Moved to X — refreshed"; a PR is read again through `ado:activePrs` | The recheck needs the same view the user dropped from | 2026-10-08 |
+| D683 | AL-236: "Assign to me" uses the `_apis/connectionData` identity, with its Account property as the sign-in name; "In Progress" is the first state in the type's InProgress category. The drop is not gated by Settings › ADO state transitions | T5 makes it the explicit, user-initiated change. Needs one manual check against a real org | 2026-10-08 |
+| D684 | AL-236: PR tickets are `pr-<id>` (answer comments) and `pr-<id>-review`, `-review-2`, …, with `ado` null. The worktree service gained a `checkout` input (existing branch, or detached for a review); a rollback never deletes a branch that existed before | Several reviewers per PR; never lose a user's branch | 2026-10-08 |
+| D685 | AL-236: `stage-service.sessionStarting` takes an optional `startLane` hook, so a drop's ticket enters Implementing, Code review or QA from Queued instead of Planning | Drops start in the lane they were dropped on | 2026-10-08 |
+| D686 | AL-236: AL-115 stage comments still post on the Queued→lane move for work item tickets | They are the agent lifecycle, not the drop transaction (the zero-writes test covers the transaction) | 2026-10-08 |
+| D687 | AL-236: Two drops of the same card run one after the other (keyed queue) | The second sees the first's changes | 2026-10-08 |
+| D688 | AL-236: The fake team org gained connectionData, a project-scoped work item GET, a revision-guarded PATCH that moves the board column with the state, and `rev` on `FakeWorkItem`. The success summary says "moved to In Progress" for Agile's Active state and the raw state name for other processes | Tests the transaction end to end without a real org | 2026-10-08 |
+| D689 | AL-237: Main allows a 2 s grace past the 10 s Undo window | An Undo pressed at 9.9 s still works when it arrives | 2026-10-08 |
+| D690 | AL-237: "Before the first turn ends" is detected from the SDK `result` message. An irreversible step is a Bash `git push`, `az repos pr`, or an `mcp__*` tool whose name writes a comment or thread (create, add, reply, update, resolve, post, edit, delete); reads don't count | T8 drops Undo once the agent has changed something outside the machine | 2026-10-08 |
+| D691 | AL-237: Main emits the replacement toast under the launch toast's id (`launch-from-ado:<ticket>`) with the steps to revert by hand; the renderer only drops Undo while its own toast still shows it | One toast per launch | 2026-10-08 |
+| D692 | AL-237: Restoring is a guarded patch: if the item changed in ADO since the drop, Undo reports `adoRestored: false` and says to set it back by hand | Never overwrite someone else's change | 2026-10-08 |
+| D693 | AL-238: The PR launch (first-turn payloads in `main/agent/pr-launch.ts`, the thread reader `listOpenThreads` in ado-client) lives in main, not a renderer `features/answer-pr-comments` slice | The thread payload needs ADO with the PAT; the renderer path is the same `useLaunchFromAdo` drop | 2026-10-08 |
+| D694 | AL-238: "Read-only" for a review is a detached checkout at the PR's source commit plus first-turn instructions (change no files, commit nothing, push nothing); the AL-109 permission policy does not enforce it | Follow-up: deny edits and pushes for `pr-*-review` tickets in AL-109's policy | 2026-10-08 |
+| D695 | AL-238: The fake team org's open threads carry `threadContext` (file and line) and comment authors; thread counts are unchanged | The first turn lists file and line | 2026-10-08 |
+| D696 | AL-240: Implementing has two Settings rows ("answer-comments" for your own PR, "implementing" for items); a test checks every row against the drop rules' own defaults | TB§3 gives them different defaults | 2026-10-08 |
+| D697 | AL-240: `dropDefaults` (contracts `settings.drops.ts`) is optional and saved whole (all five rows), like `agentPermissions`; unset means TB§3's defaults and a bad stored row is salvaged back to its default | Same pattern as other structured settings | 2026-10-08 |
+| D698 | AL-240: The launch sheet's skills are a text field (like Settings › Default skills), not the New-ticket chips | Features can't import each other | 2026-10-08 |
+| D699 | AL-240: The Steiger insignificant-slice override added in AL-236 for `features/launch-from-ado` is removed; `LaunchSheetHost` is mounted in `app/index.tsx` | The app now references the slice | 2026-10-08 |
+| D700 | AL-176: `useSessionStatus`, `sessionStatusQueryKey` and `sessionStatusEventHandlers` moved from `features/start-queued-agent` to `shared/api/session-status.ts`; start-queued-agent re-exports them | The composer needs the session state and features cannot import each other | 2026-10-08 |
+| D701 | AL-176: The composer is split into a wired `Composer` and a props-only `ComposerView`, shown in three gallery blocks (Running, Paused · 2 queued, No session) | Steiger fails a feature referenced from only one page | 2026-10-08 |
+| D702 | AL-176: Ctrl+Enter is caught with `onKeyDownCapture` on a wrapper View | react-native-web's TextInput stops keydown from bubbling (RNW #612) | 2026-10-08 |
+| D703 | AL-176: The message box is one line high to line up with the 44 px Pause and Send buttons (the artboard draws all three at about 56 px) | Button's inner surface is fixed at 44 px | 2026-10-08 |
+| D704 | AL-176: Skill chips are drawn 34 px tall, as on the artboard, inside a 44 px press target | AL-033 target-size audit | 2026-10-08 |
+| D705 | AL-176: Steer now is a toggle chip (role checkbox) at the right of the chip row and applies to one message; Apply model now is disabled unless a model or effort switch is pending on a live, unpaused session | Artboard 3; no-op actions stay disabled | 2026-10-08 |
+| D706 | AL-176: The Output stream's fixed height went from 620 to 560 px | The stream and composer fit in the card | 2026-10-08 |
+| D707 | AL-200: The Output stream already carried the design events from AL-197/AL-198, so nothing was added there | No duplicate rows | 2026-10-08 |
+| D708 | AL-200: "Unread" design replies are tracked in renderer memory (`shared/model/design-thread-seen.ts`); replies written before the app started count as read; opening the design tab marks all read | No contracts change; follow-up: a per-ticket last-seen time in UiPrefs if it should survive a restart | 2026-10-08 |
+| D709 | AL-200: `TicketTabBar` reads the thread with `useDesignThread(ticketId, !onDesignPage)` | On the design page it reuses the panel's cached copy instead of fetching twice | 2026-10-08 |
+| D710 | AL-200: The card's Design pill sits under the title, not in the id row | "Design v3 not yet used" does not fit beside the id chip and ADO state on a 196 px card | 2026-10-08 |
+| D711 | AL-212: The performance e2e asserts median frame < 20 ms, no renderer long task over 100 ms and input < 100 ms; it logs the average fps and the GPU stalls but does not assert on them | The stalls are in the GPU process's Present call, outside app code | 2026-10-08 |
+| D712 | AL-212: The renderer is minified (`minify: 'esbuild'`) and node_modules are split by package into vendor-react, vendor-rnw, vendor-data and vendor chunks (`manualChunks`); any other package goes to `vendor`, so no vendor chunk imports app code (checked in e2e) | Entry chunk 1,828 kB → 215 kB | 2026-10-08 |
+| D713 | AL-212: The New ticket and Connections modals were not lazy-loaded | AL-165 was editing them in parallel and the size target was already met; optional follow-up | 2026-10-08 |
+| D714 | AL-212: No manual memo was added; rAF batching, selector isolation and the lazy design tab were already covered by AL-141/AL-175/AL-140 tests | The profiler found no renderer hot spot | 2026-10-08 |
 
 ---
 
@@ -1934,6 +1975,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Integrator batch 3 (b36, b49): merged AL-113, AL-115, AL-171 and AL-111 (done), AL-114 (partial: both skill sources listed through `supportedCommands()` needs a real Claude Code login), AL-162 (partial: the launch request carries the selected skills, but Launch goes to `launchNotReady` until AL-165), AL-110 (partial: tested with the fake SDK only; killing a real `claude` mid-run needs a real account) and AL-112 (partial: whether the model mentions the build errors needs a real session). Nothing rejected. Conflicts: b36 with AL-106/AL-107/AL-161/AL-195/AL-196/AL-213/AL-233 in `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts` (`midTurn` + `contextUsage`), `services.ts` (stage comments + sub-agents + merge sub-branches), `AppProviders.tsx`, `entities/agent-ticket/index.ts`, `NewTicketModal.tsx` (AL-161's `WorkItemPicker` and sprint menu + AL-162's prefill and skill chips; the picker's `workItem` dispatch now fires the prefill), `TicketPage.tsx`, the e2e fake `claude` (design `reply` + `commands`) and `agent.spec.ts` (kept both); b49 in `agent.names.ts`, `app.schemas.ts` (`recover` + `reconnectSession` intents), `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts`, `services.ts`, `AppProviders.tsx`, `TicketPage.tsx` (kept both) and `toast-intents.ts`/`ToastHost.tsx` (AL-211's recovery environment kept, D633). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements `getContextUsage`/`supportedCommands`; Reconnect calls `agent:reconnect` from `recovery-environment.ts` and `recovery.test.tsx` checks it (D633). Decisions D604–D633. `pnpm verify` green (3109 unit tests). E2E: 114/118 in the first full run (`git.spec.ts` launch failure and three `logging.spec.ts` tests, all passing alone) and 117/118 in the second (`text.spec.ts` mouse selection, 3/3 alone), under load from other agents (about 46 node processes); the third full run was 118/118. Follow-ups: AL-165 calls `services.launches.launch({ ticketId, jobDescription, workItem })` and passes `NewTicketRequest.skills` into the launch; AL-088 calls `services.launches.cancel(ticketId)` on archive; AL-143/AL-144 drive the queued card from session state `queued` and may show "Session lost · Reconnect" and Start now on the card; AL-222 approves a real gate through the stepper; manual checks with a real account: token totals against `/cost`, skills from `.claude/skills`, crash resume, build errors in the next turn; the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a" is fully merged and can be dropped by Kyle. |
 | 2026-10-08 | Integrator batch 4 (b37): merged AL-175, AL-198 and AL-199 (done), AL-181 (partial: the PR is created linked to the work item against the MSW fake ADO org; the push to a real Azure Repos remote, `workItemRefs` and the artifact link with real PAT scopes need a manual check by Kyle) and AL-197 (partial: delivery to the running session with priority `now` is proven with the fake SDK; that a real agent's next output names the spec version, and that shipping in Planning changes the plan, need a real Claude session). Nothing rejected. Conflicts kept both sides: `contracts/src/names.ts`/`schemas.ts` (AL-114 `skills` + AL-181 `pr` domain), `ipc/handlers.ts` (skills + pr handlers), renderer `AppProviders.tsx` (AL-113 `agent:usage` + AL-198 `design:spec` handlers) and `shared/api/index.ts` (`reconnectSession` + design-spec hooks); `services.ts` keeps AL-115's stage comments on `createStageService` and adds the PR, design-spec and design-ship services, with AL-198's `designSpecs` passed to AL-110's `stageSessionExtras` call; `TicketPage.tsx` imports both AL-171's `useSetGate` and AL-175's `OutputStream`. Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D634–D649. `pnpm verify` green (3186 unit tests). E2E: 120/122 in the first full run, the failure the known `first-run.spec.ts` pick-repo dialog flake under load (AL-220; 2/2 alone), the full rerun 122/122. Follow-ups: AL-064's "PR !n · x / y checks" card text and move to Done are now rendered by AL-181 and can be re-checked; AL-192/AL-194's open notes about shipping and the "Agent is watching" note can be re-checked now AL-197/AL-198 are in; optionally post an ADO write-back comment when a PR opens or closes; consider hiding Merge worktree → main once a PR is open; optionally include `get_conversation` and a `render_preview` image in the spec; watch for a Playwright worker crash (0xC0000409) when `output-stream.spec.ts` runs right before `ticket-page.spec.ts` under load. |
 | 2026-10-08 | Integrator batch 5 (b50): merged AL-172, AL-174, AL-177 and AL-178 (done) and AL-234 (partial: matches artboard 08 closely in the e2e screenshot and gallery sheet, but the pixel check is AL-223; Backlog stays disabled until AL-239 and cards are ordered by id, not backlog rank, D590). Nothing rejected. Conflicts with main's team-and-sprint picker (header Team menu, `useBoardSprint`/`useBoardTeam` moved to `shared/model`) and AL-113: `BoardHeader.tsx` (kept main's Team menu, imports `HeaderMenu` from its new `shared/ui/header-menu` home; main's section headings in `HeaderMenu` followed the move), `BoardPage.tsx` (main's `useBoardSprint` + AL-234's `TeamBoard`) and `TicketPanels.tsx` (AL-177's `LeadAgentCard`/tree, keeping AL-113's `leadTokens` prop from `agent:getUsage`, D662). Lockfile unchanged after `pnpm install`. Integration fixes: one `useTeams` hook (AL-234's duplicate in `shared/api/team-board.ts` removed for main's, same key); the team board takes `sprintTeamId` so the agent board's sprint is used only on the header's team (D668, unit test added); `ado.spec.ts`'s Team menu test ignores the team board's team read the fixture org cannot answer (D672); `text.spec.ts` waits for the board header to stop wrapping before its mouse drag (the header now wraps about 0.75 s after load at 1424 px since the Team menu was added; the test failed 2 of 6 runs with or without the team board); `merge-sub-branches.spec.ts` gives `branches:status` 30 s (D659). Decisions D650–D673. `pnpm verify` green (3272 unit tests). E2E: 125/128 in the second full run (`first-run.spec.ts` pick-repo flake, AL-220, and the Merge panel count under load, both 3/3 alone), then 128/128. The b50 agent could not push its branch (Git Credential Manager prompt); it was merged from the local branch. Follow-ups: the board header no longer fits one row at 1440 px with Repo, Team and Sprint menus (artboard 1; AL-223 or a header follow-up); the team board's own Team dropdown and the header's Team menu are two separate team choices, worth unifying (TB§2 vs main's `lastTeam`); AL-084's "Sub-branches appear in the Sub-branches panel" and AL-087's confirm-modal note can be re-checked now AL-178/AL-174 are in; AL-176 puts "Apply model now" in `features/change-model` (`useApplyModelNow` exists); Q1/AL-087 block-until-PR-approved is still open for Merge worktree → main; optionally swap the Sub-agents panel to `PanelErrorBoundary('subAgents')` and tick AL-210's panel item; a main-process "scheduled at stage" field would make "Starts at the … stage" exact; AL-235 adds drag and the keyboard "Send to lane" menu on the team board cards; AL-239 passes `onOpenBacklog` to `<TeamBoard>`; main should expose the signed-in ADO identity's id/uniqueName so "Me" is not matched by name (AL-236 needs it); order team board cards by backlog rank when `ado:teamBoard` provides it; list the `widgets` layer in CLAUDE.md and design §5. |
+| 2026-10-08 | Integrator batch 6 (b51, b52): merged AL-165, AL-236, AL-237, AL-238, AL-240, AL-176 and AL-200 (done) and AL-212 (partial: the entry chunk is 215 kB and input latency is under 5 ms, but GPU-process Present stalls of 250–900 ms pull the average to 29–43 fps on this loaded machine; re-measure on an unloaded one). AL-162 set to done: AL-165's Launch passes the selected skills into the session's first turn. Nothing rejected. b51 merged cleanly; b52 conflicted with AL-172/AL-174 in `pages/gallery/ui/CardStatesSheet.tsx` (Agent and Merge panel samples + AL-176's Composer samples) and with main's team picker in `shared/model/index.ts` (`board-team` + `design-thread-seen` exports), both kept both sides. Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D674–D714. `pnpm verify` green (3348 unit tests), e2e 138/138 on the first run. Neither agent could push its branch (Git Credential Manager waiting for an interactive sign-in); both were merged from the local branches. Follow-ups: AL-235 calls `useLaunchFromAdo()(drop, { alt: event.altKey, action })` for drag and keyboard drops, and AL-237's toast appears only once AL-235/AL-239 drop cards (AL-241 covers Undo end to end); manual check against a real org that `System.AssignedTo` accepts the connectionData Account value and Active lands in the team's In Progress column; tighten AL-109's permission policy for `pr-*-review` tickets so the read-only review is enforced; e2e with the fake `claude` binary sending while paused through Launch and Resume (AL-176); persist design-thread last-seen per ticket in UiPrefs if wanted (AL-200); optionally lazy-load NewTicketModal and ConnectionsModal (AL-212); make `build-queue.kit.test.ts` "runs one build at a time…" deterministic (start order flips under load, AL-220). |
 ---
 
 ## 7. Parallel build rules
