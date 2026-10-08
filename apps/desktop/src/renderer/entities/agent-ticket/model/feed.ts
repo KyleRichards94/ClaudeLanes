@@ -72,6 +72,10 @@ function changesOf(before: AgentTicket, after: AgentTicket): Draft[] {
   if (pr && (pr.id !== before.pullRequest?.id || pr.status !== before.pullRequest.status)) {
     drafts.push({ at: after.lastOutputAt ?? after.stageEnteredAt, text: formatPullRequestActivity({ id: pr.id, status: pr.status }), needsYou: false });
   }
+  const design = after.design;
+  if (design && design !== before.design && (design.version !== before.design?.version || design.used !== before.design?.used)) {
+    drafts.push({ at: design.at, text: design.used ? `Design v${design.version} used by the agent` : `Design v${design.version} shipped to the agent`, needsYou: false });
+  }
   return drafts;
 }
 

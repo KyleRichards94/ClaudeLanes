@@ -63,3 +63,4 @@ export {
   type RecoveryContext,
 } from './error-recovery';
 export { pickBoardTeam, useBoardSprint, useBoardSprints, useBoardTeam } from './board-team';
+export { markDesignThreadSeen, resetDesignThreadSeen, unreadDesignReplies, useDesignThreadSeenAt } from './design-thread-seen';

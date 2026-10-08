@@ -32,6 +32,8 @@ export interface CardView {
   subAgentsLine: string;
   /** The status band along the bottom; null when the card has none. */
   footer: { tone: 'attention' | 'ado' | 'danger'; label: string } | null;
+  /** "Design v2" once a spec was shipped; amber "Design v3 not yet used" until the agent acknowledges it (AL-200). */
+  design: { label: string; tone: 'claude' | 'attention' } | null;
 }
 
 /** What a gate on each stage asks the user to approve ("Needs you · approve plan"). */
@@ -87,11 +89,18 @@ function modelLine(ticket: AgentTicket): string {
   return `${now} · ${EFFORT_LABELS[ticket.effort]} → ${EFFORT_LABELS[switching.effort]}`;
 }
 
+/** The card's design indicator (AL-200): null before any spec was shipped. */
+export function designIndicator(design: AgentTicket['design']): CardView['design'] {
+  if (!design) return null;
+  return design.used ? { label: `Design v${design.version}`, tone: 'claude' } : { label: `Design v${design.version} not yet used`, tone: 'attention' };
+}
+
 export function cardView(ticket: AgentTicket): CardView {
   const total = subAgentTotal(ticket.subAgents);
   const base = {
     modelLine: modelLine(ticket),
     subAgentsLine: total > 0 ? plural(total, 'sub-agent') : '—',
+    design: designIndicator(ticket.design),
   };
   const progress = ticket.progress ?? 0;
   const reason = ticket.needsYou[0];

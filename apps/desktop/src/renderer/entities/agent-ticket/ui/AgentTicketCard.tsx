@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
-import { Card, CardSection, IdChip, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
+import { Card, CardSection, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/shared/config';
 import { useAgentTicket } from '../model/hooks';
 import type { AgentTicketStore } from '../model/store';
@@ -35,6 +35,7 @@ export function AgentTicketCardView({ ticket, adoState, selected = false, onPres
     ticket.title,
     LANE_LABELS[ticket.stage],
     view.activity.text,
+    view.design?.label,
     view.footer?.label,
   ]
     .filter(Boolean)
@@ -70,6 +71,16 @@ export function AgentTicketCardView({ ticket, adoState, selected = false, onPres
           <Text variant="title" size="md" numberOfLines={3} style={styles.title}>
             {ticket.title}
           </Text>
+          {view.design ? (
+            // A shipped design spec (AL-200); amber while the agent has not acknowledged it.
+            <Pill
+              label={view.design.label}
+              tone={view.design.tone}
+              dot={view.design.tone === 'attention'}
+              style={styles.design}
+              testID={testID ? `${testID}-design` : undefined}
+            />
+          ) : null}
         </CardSection>
         <CardSection tone={sectionTone(view.activity.tone)} style={view.activity.tone === 'neutral' ? styles.neutralWash : undefined}>
           <View style={styles.activityRow}>
@@ -150,6 +161,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   title: {
+    marginTop: space.sm,
+  },
+  design: {
+    alignSelf: 'flex-start',
     marginTop: space.sm,
   },
   activityRow: {
