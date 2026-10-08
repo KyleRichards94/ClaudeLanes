@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import type { Lane as LaneName } from '@agent-lanes/contracts';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, glass, radius, space, tone } from '@agent-lanes/tokens';
@@ -9,6 +10,7 @@ import {
   useLaneTicketIds,
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
+import { GateActions } from '@/features/resolve-gate';
 import { LANE_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
@@ -84,7 +86,11 @@ export function Lane({ lane, store = agentTickets }: LaneProps) {
           </View>
         ) : (
           ids.map((id) => (
-            <AgentTicketCard key={id} ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+            <Fragment key={id}>
+              <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+              {/* Approve / Request changes while a gate waits; the drill-in stepper shows the same action (AL-171). */}
+              <GateActions ticketId={id} placement="card" store={store} />
+            </Fragment>
           ))
         )}
       </View>

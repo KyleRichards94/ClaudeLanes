@@ -1,4 +1,4 @@
-import { LANES, type BuildJob, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
+import { LANES, type BuildJob, type StageGates, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   ticketFromRecord,
@@ -6,6 +6,7 @@ import {
   withBuildJob,
   withGateOpened,
   withGateResolved,
+  withGates,
   withLastBuild,
   withModelApplied,
   withModelRequested,
@@ -67,6 +68,8 @@ export interface AgentTicketStore extends Pick<StoreApi<AgentTicketsState>, 'get
   openGate(ticketId: string, stage: Stage, at: number): void;
   /** The waiting gate was approved, sent back or switched off (AL-104, AL-171). */
   resolveGate(ticketId: string): void;
+  /** The ticket's stage gates after a toggle on the drill-in (`agent:setGate`, AL-171). */
+  setGates(ticketId: string, gates: StageGates): void;
   /** A permission request (AL-109) or a QA gap; replaces the ticket's reason of the same kind. */
   setNeedsYou(ticketId: string, reason: OtherNeedsYouReason): void;
   clearNeedsYou(ticketId: string, kind: OtherNeedsYouKind): void;
@@ -196,6 +199,7 @@ export function createAgentTicketStore(): AgentTicketStore {
 
     openGate: (ticketId, stage, at) => update(ticketId, (ticket) => withGateOpened(ticket, stage, at)),
     resolveGate: (ticketId) => update(ticketId, withGateResolved),
+    setGates: (ticketId, gates) => update(ticketId, (ticket) => withGates(ticket, gates)),
     setNeedsYou: (ticketId, reason) => update(ticketId, (ticket) => withNeedsYou(ticket, reason)),
     clearNeedsYou: (ticketId, kind) => update(ticketId, (ticket) => withoutNeedsYou(ticket, kind)),
 
