@@ -1,4 +1,14 @@
-import type { ActivePullRequest, Lane, TeamBoard, TeamBoardColumnKindOrOther, TeamBoardItem, TeamBoardPerson } from '@agent-lanes/contracts';
+import {
+  workItemStateColor,
+  workItemTypeColor,
+  type ActivePullRequest,
+  type Lane,
+  type TeamBoard,
+  type TeamBoardColumnKindOrOther,
+  type TeamBoardItem,
+  type TeamBoardPerson,
+  type WorkItemColors,
+} from '@agent-lanes/contracts';
 import { DROP_REFUSALS, LANE_LABELS, dragLock, type BoardItemCard, type DropMe, type PullRequestCard } from '@/entities/agent-ticket';
 import type { LaneDragData } from '@/features/drag-to-lane';
 
@@ -27,8 +37,14 @@ export interface TeamBoardItemView {
   idLabel: string;
   /** "Bug", "Story". */
   type: string;
+  /** The type's colour on ADO's board (the card's left bar); null when not known, so the token colour is used. */
+  typeColor: string | null;
   title: string;
-  /** "3 pts", "PR !10598", "Resolved", "Failed UAT". */
+  /** `System.State` ("Active", "Failed UAT"), shown in words after a dot in its ADO colour. */
+  state: string;
+  /** The state's colour on ADO's board; null when not known. */
+  stateColor: string | null;
+  /** "3 pts", "PR !10598"; null when neither applies (the state has its own label). */
   detail: string | null;
   /** Null for an unassigned item (shown as an empty avatar). */
   avatar: TeamBoardAvatar | null;
@@ -121,12 +137,17 @@ function avatarOf(person: TeamBoardPerson, me: TeamBoardMe | null): TeamBoardAva
 
 function itemDetail(item: TeamBoardItem): string | null {
   if (item.columnKind === 'code-review' && item.pullRequestId !== null) return `PR !${item.pullRequestId}`;
-  if (item.columnKind === 'testing' || item.columnKind === 'failed') return item.state || null;
   if (item.points !== null) return `${item.points} pts`;
-  return item.state || null;
+  return null;
 }
 
-export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane: Lane | null, board: TeamBoardDropContext | null = null): TeamBoardItemView {
+export function itemView(
+  item: TeamBoardItem,
+  me: TeamBoardMe | null,
+  agentLane: Lane | null,
+  board: TeamBoardDropContext | null = null,
+  colors: WorkItemColors | null = null,
+): TeamBoardItemView {
   const card: BoardItemCard = {
     kind: 'board-item',
     id: item.id,
@@ -157,7 +178,10 @@ export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane:
     id: item.id,
     idLabel: `#${item.id}`,
     type: shortType(item.type),
+    typeColor: workItemTypeColor(colors, item.type),
     title: item.title,
+    state: item.state,
+    stateColor: workItemStateColor(colors, item.type, item.state),
     detail: itemDetail(item),
     avatar: item.assignee ? avatarOf(item.assignee, me) : null,
     lock: lockedByOther ? reason : null,
@@ -234,13 +258,15 @@ export function teamBoardColumns(input: {
   me: TeamBoardMe | null;
   workItemLanes: Readonly<Record<string, Lane>>;
   filter: TeamBoardFilter;
+  /** ADO's type and state colours (`ado:workItemColors`); null or left out while unknown. */
+  colors?: WorkItemColors | null;
 }): readonly TeamBoardColumnView[] {
-  const { board, pullRequests, me, workItemLanes, filter } = input;
+  const { board, pullRequests, me, workItemLanes, filter, colors = null } = input;
   const dropContext: TeamBoardDropContext | null = board ? { teamId: board.team.id, sprintPath: board.sprint.path } : null;
   const columns: TeamBoardColumnView[] = (board?.columns ?? []).map((column) => {
     const cards = board!.items
       .filter((item) => item.columnId === column.id && itemPasses(item, filter, me))
-      .map((item) => itemView(item, me, workItemLanes[String(item.id)] ?? null, dropContext));
+      .map((item) => itemView(item, me, workItemLanes[String(item.id)] ?? null, dropContext, colors));
     return { id: column.id, name: column.name, kind: column.kind, tone: COLUMN_TONES[column.kind], count: cards.length, cards };
   });
   const prCards = (pullRequests ?? []).filter((pr) => pullRequestPasses(pr, filter, me)).map((pr) => pullRequestView(pr, me, dropContext?.teamId ?? null));

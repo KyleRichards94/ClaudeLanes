@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import { color, focusRing, glass, radius, space, tone } from '@agent-lanes/tokens';
 import { Badge, GlassPanel, Text } from '@agent-lanes/ui';
 import {
-  AgentTicketCard,
   agentTickets,
   useLaneNeedsYouCount,
   useLaneNeedsYouTicketIds,
@@ -17,6 +16,7 @@ import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
 import { useIsLaunchedTicket, useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
+import { BoardTicketCard } from './BoardTicketCard';
 import { EMPTY_LANE_COPY, collapsedLaneLabel, laneBadgeLabel, needsYouEmptyCopy } from '../model/lane-copy';
 
 export interface LaneProps {
@@ -100,7 +100,7 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
         ) : (
           ids.map((id) => (
             <LaunchedCardSlot key={id} ticketId={id}>
-              <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+              <BoardTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
               {/* Allow once / Allow for this ticket / Deny under the card while a tool call waits (AL-109). */}
               <PermissionPrompt ticketId={id} />
               {/* Approve / Request changes while a gate waits; the drill-in stepper shows the same action (AL-171). */}

@@ -154,6 +154,7 @@ describe('ado:* IPC handlers', () => {
       'ado:teamBoard': {},
       'ado:activePrs': {},
       'ado:backlog': {},
+      'ado:workItemColors': {},
     };
     for (const channel of ADO_INVOKE_CHANNELS) {
       expect(await call(channel, requests[channel])).toMatchObject({ ok: false, code: 'ADO_UNAUTHORIZED', details: { reason: 'not-connected' } });
