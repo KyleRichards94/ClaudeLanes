@@ -15,6 +15,7 @@ import { BoardHeader } from './BoardHeader';
 import { BoardLanes } from './BoardLanes';
 import { LiveDock } from './LiveDock';
 import { SettingsPanel } from './SettingsPanel';
+import { StickyTop } from './StickyTop';
 
 /**
  * The agent board (artboard 1): the header (AL-142), the sub-header, title and legend, the lanes
@@ -43,7 +44,10 @@ function BoardContent() {
   return (
     <View style={styles.page}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} />
+        {/* Pinned while the page scrolls down to the team board; the content scrolls under its glass. */}
+        <StickyTop testID="board-header-sticky">
+          <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} />
+        </StickyTop>
 
         <View style={styles.titleBlock}>
           <View style={styles.subheaderRow}>
