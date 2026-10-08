@@ -36,6 +36,8 @@ import type { DesignSpecFiles } from './spec-store';
  */
 export interface DesignShipService {
   ship(request: ShipDesignSpecRequest): Promise<Result<ShippedDesignSpec>>;
+  /** Ships an earlier version again as the newest version (AL-199); the agent is told it is that design again. */
+  reship(ticketId: string, version: number): Promise<Result<ShippedDesignSpec>>;
   /** Hands the latest undelivered spec to the ticket's session; called when a session starts. */
   deliverPending(ticketId: string): Promise<boolean>;
   /** Stops listening to sessions. */
@@ -174,6 +176,16 @@ export function createDesignShipService(options: DesignShipServiceOptions): Desi
           supersedes,
           reshipOf: null,
         });
+      }),
+
+    reship: (ticketId, version) =>
+      store(ticketId, async (next, supersedes) => {
+        const record = await tickets.get(ticketId);
+        if (!record) return err('VALIDATION', `There is no ticket ${ticketId}.`);
+        if (!record.design.specs.some((entry) => entry.version === version)) return err('VALIDATION', `There is no Design v${version} to ship again.`);
+        const earlier = await files.read(record.repo, ticketId, version);
+        if (!earlier) return err('INTERNAL', `Design v${version} could not be read from the app data folder.`);
+        return ok({ ...earlier, version: next, shippedAt: now(), approvedBy: userName(), supersedes, reshipOf: version });
       }),
 
     deliverPending,

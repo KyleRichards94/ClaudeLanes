@@ -2,7 +2,14 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
-import { DesignSpecChangeSchema, ShipDesignSpecRequestSchema, ShippedDesignSpecSchema } from './design.specs';
+import {
+  DesignSpecChangeSchema,
+  DesignSpecRequestSchema,
+  DesignSpecSchema,
+  ReshipDesignSpecRequestSchema,
+  ShipDesignSpecRequestSchema,
+  ShippedDesignSpecSchema,
+} from './design.specs';
 import { TicketDesignSchema } from './tickets.schemas';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
@@ -149,6 +156,10 @@ export const designInvokeContracts = {
   'design:listArtboards': { request: DesignViewTicketRequestSchema, response: DesignArtboardListSchema },
   /** Approve & ship the picked artboards to the ticket's agent as DesignSpec vN, at any stage (AL-197, R11). */
   'design:shipSpec': { request: ShipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
+  /** One shipped version (the latest when `version` is left out), for "Attached to this ticket" (AL-199). */
+  'design:getSpec': { request: DesignSpecRequestSchema, response: DesignSpecSchema },
+  /** Ships an earlier version again as the newest version, delivered like a new ship (AL-199). */
+  'design:reshipSpec': { request: ReshipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**
