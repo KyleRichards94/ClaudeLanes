@@ -21,7 +21,8 @@ const BELOW_LANE_HEADER = 56;
  * Arrow keys jump between the lanes that take the card, left to right (lanes that refuse it are
  * disabled drop targets and skipped). From the team board, the first arrow goes to the first such
  * lane (Left: the last). The card is centred on the lane under its header, so it overlaps that lane
- * most and the lane becomes the drop target.
+ * most and the lane becomes the drop target. While the agent board is collapsed, the arrows go through
+ * its strip's cells (targets with a placement, `lane:<lane>:strip`) instead of the lanes scrolled away.
  */
 export const laneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { context }) => {
   const forward = FORWARD.has(event.code);
@@ -30,8 +31,9 @@ export const laneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { conte
   const { collisionRect, droppableContainers, droppableRects, over } = context;
   if (!collisionRect) return undefined;
 
-  const lanes = droppableContainers
-    .getEnabled()
+  const enabled = droppableContainers.getEnabled();
+  const placed = enabled.filter((container) => String(container.id).split(':').length > 2);
+  const lanes = (placed.length > 0 ? placed : enabled)
     .flatMap((container) => {
       const rect = droppableRects.get(container.id);
       return rect ? [{ id: container.id, rect }] : [];
@@ -48,6 +50,7 @@ export const laneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { conte
   const target = lanes[next]!.rect;
   return {
     x: target.left + (target.width - collisionRect.width) / 2,
-    y: target.top + BELOW_LANE_HEADER,
+    // A short target (a cell of the collapsed agent board) is met at its top edge, so the card still overlaps it most.
+    y: target.top + (target.height > 2 * BELOW_LANE_HEADER ? BELOW_LANE_HEADER : 0),
   };
 };

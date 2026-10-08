@@ -1,15 +1,19 @@
-import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
 import { DragStatusPill, DragToLaneProvider, useActiveDrag } from '@/features/drag-to-lane';
 import { useLaunchFromAdo } from '@/features/launch-from-ado';
 import { invoke, useAppInfo } from '@/shared/api';
+import { usePrefersReducedMotion } from '@/shared/lib';
 import { toast, useBoardSprint, useBoardTeam } from '@/shared/model';
 import { BacklogPopout } from '@/widgets/backlog-popout';
 import { TeamBoard, useTeamBoardSession } from '@/widgets/team-board';
+import { isAgentBoardCollapsed, type BoardScrollMetrics } from '../model/agent-strip';
 import { boardSubheader } from '../model/header';
+import { STICKY_TOP_OFFSET } from '../model/sticky';
+import { AgentBoardStrip } from './AgentBoardStrip';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardHeader } from './BoardHeader';
 import { BoardLanes } from './BoardLanes';
@@ -22,31 +26,83 @@ import { StickyTop } from './StickyTop';
  * (AL-143) with every ticket record loaded into the agent ticket store, and the live dock (AL-145).
  * The header's "need you" pill narrows the lanes to the tickets waiting on the user. The team board
  * (AL-234) sits under the lanes; its cards drag onto the lanes (AL-235), which share one drag with it.
+ * The header stays pinned while the page scrolls; once the lanes have scrolled away under it, they fold
+ * into a strip pinned under the header, whose cells take drops too.
  */
 export function BoardPage() {
   // A drop starts the agent through main (AL-236): it rechecks the card, makes the ADO change and launches.
   const launch = useLaunchFromAdo();
+  const [collapsed, setCollapsed] = useState(false);
   return (
-    <DragToLaneProvider onLaunch={launch}>
-      <BoardContent />
+    // While the strip is pinned at the top, a card dragged up to it must not scroll the page under it.
+    <DragToLaneProvider onLaunch={launch} autoScroll={!collapsed}>
+      <BoardContent collapsed={collapsed} onCollapsedChange={setCollapsed} />
     </DragToLaneProvider>
   );
 }
 
-function BoardContent() {
+interface BoardContentProps {
+  /** The lanes have scrolled away under the header and show as the strip. */
+  collapsed: boolean;
+  onCollapsedChange(collapsed: boolean): void;
+}
+
+function BoardContent({ collapsed, onCollapsedChange }: BoardContentProps) {
   useBoardTickets();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needsYouOnly, setNeedsYouOnly] = useState(false);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const backlogTeam = useTeamBoardSession().teamId;
   const needsYou = useAgentTicketCount('needs-you');
+  const reducedMotion = usePrefersReducedMotion();
+
+  // Where the lanes end and how far the page has scrolled, kept out of state so scrolling re-renders
+  // nothing until the board collapses or expands.
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const metrics = useRef<BoardScrollMetrics>({ scrollY: 0, lanesBottom: null, headerBottom: null });
+  const measure = useCallback(() => onCollapsedChange(isAgentBoardCollapsed(metrics.current)), [onCollapsedChange]);
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      metrics.current.scrollY = event.nativeEvent.contentOffset.y;
+      measure();
+    },
+    [measure],
+  );
+  const onHeaderLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      metrics.current.headerBottom = STICKY_TOP_OFFSET + event.nativeEvent.layout.height;
+      measure();
+    },
+    [measure],
+  );
+  const onLanesLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const { y, height } = event.nativeEvent.layout;
+      metrics.current.lanesBottom = y + height;
+      measure();
+    },
+    [measure],
+  );
+  const expand = useCallback(() => {
+    onCollapsedChange(false);
+    scrollRef.current?.scrollTo({ y: 0, animated: !reducedMotion });
+  }, [onCollapsedChange, reducedMotion]);
 
   return (
     <View style={styles.page}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        testID="board-scroll"
+      >
         {/* Pinned while the page scrolls down to the team board; the content scrolls under its glass. */}
-        <StickyTop testID="board-header-sticky">
+        <StickyTop testID="board-header-sticky" onLayout={onHeaderLayout}>
           <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} />
+          {/* The lanes folded into a strip under the header once they have scrolled away. */}
+          <AgentBoardStrip visible={collapsed} onExpand={expand} needsYouOnly={needsYouOnly} />
         </StickyTop>
 
         <View style={styles.titleBlock}>
@@ -71,7 +127,7 @@ function BoardContent() {
           </View>
         ) : null}
 
-        <BoardLanes needsYouOnly={needsYouOnly} />
+        <BoardLanes needsYouOnly={needsYouOnly} onLayout={onLanesLayout} />
 
         {/* The team's Azure DevOps board under the agent lanes (AL-234, artboard 08). */}
         <BoardTeamBoard onOpenBacklog={() => setBacklogOpen(true)} />
