@@ -11,3 +11,4 @@ export {
   type TicketPanel,
 } from './error-boundary';
 export { TicketTabBar, type TicketTabBarProps } from './ticket-tabs';
+export { HeaderMenu, type HeaderMenuItem, type HeaderMenuProps } from './header-menu';

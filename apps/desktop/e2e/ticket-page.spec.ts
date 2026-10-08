@@ -50,6 +50,9 @@ test('lays out the drill-in at 1440 wide with the sub-agent column on the right'
   await expect(page.getByLabel('Planning, done, 12m')).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('ticket-body-wide')).toBeVisible();
+  // No session has run in this app, so the sub-agent tree from `agent:getSubagents` is empty (AL-177).
+  await expect(page.getByTestId('sub-agents-counts')).toHaveText('None yet');
+  await expect(page.getByTestId('lead-agent')).toContainText('Opus · XHigh · working alone');
 
   const output = await page.getByTestId('ticket-tab-panel').boundingBox();
   const side = await page.getByTestId('ticket-side-column').boundingBox();

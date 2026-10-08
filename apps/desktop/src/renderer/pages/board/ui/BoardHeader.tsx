@@ -5,8 +5,8 @@ import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { agentTickets, useAgentTicketCount, type AgentTicketStore } from '@/entities/agent-ticket';
 import { useAddRepo, useRepos, useTeams } from '@/shared/api';
 import { openConnections, openNewTicket, toast, useBoardSprint, useBoardSprints, useBoardTeam, useUiPrefs } from '@/shared/model';
+import { HeaderMenu, type HeaderMenuItem } from '@/shared/ui';
 import { sprintRangeLabel } from '../model/header';
-import { HeaderMenu, type HeaderMenuItem } from './HeaderMenu';
 import { McpStatusPill } from './McpStatusPill';
 
 /** The Repo menu's last item, which opens the folder picker (AL-081). */
