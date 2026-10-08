@@ -1,0 +1,150 @@
+import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
+import { AgentPermissionEventSchema, defaultSettings, type RepoCommands } from '@agent-lanes/contracts';
+import { describe, expect, it } from 'vitest';
+import { createClaudeLauncher } from '../claude-sdk';
+import { createTranscriptService } from '../output/transcript';
+import { combineSessionExtras } from '../session-extras';
+import { createSessionManager } from '../session-manager';
+import { createFakeClaude, fakeInit } from '../testing/fake-claude';
+import { fakeClaudeConnections, memoryTickets, recordingEmit, testPermissions } from '../testing/sessions';
+import { PERMISSION_CANCELLED_MESSAGE, PERMISSION_DENIED_MESSAGE, createPermissionService } from './permission-service';
+
+const dotnet: RepoCommands = {
+  repoPath: 'C:\\repos\\onsite',
+  detected: { toolchain: 'dotnet', manifest: 'OnSite.sln', packageManager: null, build: 'dotnet build OnSite.sln -c Debug', run: null, runTarget: null, runKind: null },
+  build: { command: 'dotnet build OnSite.sln -c Debug', origin: 'detected' },
+  run: null,
+};
+
+function context(signal = new AbortController().signal, extra: Partial<Parameters<CanUseTool>[2]> = {}): Parameters<CanUseTool>[2] {
+  return { signal, toolUseID: 'toolu_1', ...extra } as Parameters<CanUseTool>[2];
+}
+
+async function startSession(options: { commands?: RepoCommands } = {}) {
+  const tickets = await memoryTickets({ id: '71273' });
+  const events = recordingEmit();
+  const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
+  const sessions = createSessionManager({
+    claude: createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query }),
+    connections: fakeClaudeConnections(),
+    tickets,
+    emit: events.emit,
+    extras: (record) => permissionsExtras(record),
+  });
+  const transcripts = createTranscriptService({ sessions, tickets, emit: events.emit });
+  const permissions = createPermissionService({
+    settings: { get: () => defaultSettings() },
+    buildCommands: { forRepo: async () => ({ ok: true, data: options.commands ?? dotnet }) },
+    emit: events.emit,
+    transcripts,
+    userName: () => 'Kyle',
+    newId: (() => {
+      let n = 0;
+      return () => `request-${++n}`;
+    })(),
+  });
+  const permissionsExtras = combineSessionExtras([permissions.sessionExtras]);
+  await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
+  const call = fake.calls[0]!;
+  await call.sentCount(1);
+  return { call, sessions, permissions, transcripts, events };
+}
+
+describe('permission policy for headless sessions (AL-109)', () => {
+  it('starts every session with acceptEdits, the D18 Bash rules and canUseTool, never a prompt it cannot show', async () => {
+    const { call, sessions } = await startSession();
+    expect(call.options.permissionMode).toBe('acceptEdits');
+    expect(call.options.canUseTool).toBeTypeOf('function');
+    expect(call.options).not.toHaveProperty('permissionPromptToolName');
+    expect(call.options.allowedTools).toEqual(
+      expect.arrayContaining(['Bash(git status:*)', 'Bash(git diff:*)', 'Bash(dotnet build OnSite.sln -c Debug:*)', 'Bash(dotnet test:*)']),
+    );
+    expect(call.options.allowedTools).not.toContain('Bash(git branch:*)');
+    await sessions.dispose();
+  });
+
+  it('lets allow-listed Bash commands through canUseTool without asking', async () => {
+    const { call, events, sessions } = await startSession();
+    const canUseTool = call.options.canUseTool!;
+    await expect(canUseTool('Bash', { command: 'git log --oneline -5' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    await expect(canUseTool('Bash', { command: 'dotnet test --no-build' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    expect(events.of('agent:permission')).toEqual([]);
+    await sessions.dispose();
+  });
+
+  it('asks on the card for anything else, and Deny reaches the agent and the output', async () => {
+    const { call, permissions, transcripts, events, sessions } = await startSession();
+    // Chained onto an allowed command, so it must still ask.
+    const answer = call.options.canUseTool!('Bash', { command: 'git status && rm -rf src' }, context(undefined, { title: 'Claude wants to run a command' }));
+
+    const [waiting] = events.of('agent:permission', '71273');
+    expect(AgentPermissionEventSchema.parse({ ...waiting, at: 1 })).toMatchObject({
+      state: 'waiting',
+      request: { requestId: 'request-1', tool: 'Bash', title: 'Claude wants to run a command', detail: 'git status && rm -rf src' },
+    });
+    expect(permissions.pending('71273')?.requestId).toBe('request-1');
+
+    expect(permissions.resolve('71273', 'request-1', 'deny')).toBe(true);
+    await expect(answer).resolves.toEqual({ behavior: 'deny', message: PERMISSION_DENIED_MESSAGE });
+    expect(permissions.pending('71273')).toBeNull();
+    expect(events.of('agent:permission', '71273').at(-1)).toMatchObject({ state: 'denied', waiting: null });
+
+    const output = (await transcripts.get('71273')).events.map((event) => event.item);
+    expect(output).toContainEqual(expect.objectContaining({ kind: 'system', text: 'Kyle denied Bash · git status && rm -rf src' }));
+    expect(permissions.resolve('71273', 'request-1', 'allow-once')).toBe(false);
+    await sessions.dispose();
+  });
+
+  it('Allow once lets one call through; Allow for this ticket remembers it for the session only', async () => {
+    const { call, permissions, transcripts, events, sessions } = await startSession();
+    const canUseTool = call.options.canUseTool!;
+
+    const once = canUseTool('WebFetch', { url: 'https://learn.microsoft.com/' }, context());
+    permissions.resolve('71273', 'request-1', 'allow-once');
+    await expect(once).resolves.toMatchObject({ behavior: 'allow' });
+
+    const again = canUseTool('WebFetch', { url: 'https://example.test/' }, context(undefined, {
+      suggestions: [{ type: 'addRules', rules: [{ toolName: 'WebFetch' }], behavior: 'allow', destination: 'localSettings' }],
+    }));
+    expect(permissions.pending('71273')?.requestId).toBe('request-2');
+    permissions.resolve('71273', 'request-2', 'allow-ticket');
+    // The CLI is told to remember it for this session, never in a settings file inside the worktree.
+    await expect(again).resolves.toEqual({
+      behavior: 'allow',
+      updatedPermissions: [{ type: 'addRules', rules: [{ toolName: 'WebFetch' }], behavior: 'allow', destination: 'session' }],
+    });
+
+    await expect(canUseTool('WebFetch', { url: 'https://third.test/' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    expect(events.of('agent:permission', '71273').filter((event) => event['state'] === 'waiting')).toHaveLength(2);
+
+    const lines = (await transcripts.get('71273')).events.flatMap((event) => (event.item.kind === 'system' ? [event.item.text] : []));
+    expect(lines).toEqual(['Kyle allowed WebFetch · https://learn.microsoft.com/ once', 'Kyle allowed WebFetch · https://example.test/ for this ticket']);
+    await sessions.dispose();
+  });
+
+  it('cancels a waiting request when the turn is interrupted or the session ends', async () => {
+    const permissions = testPermissions();
+    const abort = new AbortController();
+    const interrupted = permissions.canUseTool('71273')('mcp__azure-devops__wit_update_work_item', { id: 71273 }, context(abort.signal));
+    expect(permissions.pending('71273')?.tool).toBe('azure-devops · wit_update_work_item');
+    abort.abort();
+    await expect(interrupted).resolves.toEqual({ behavior: 'deny', message: PERMISSION_CANCELLED_MESSAGE });
+
+    const ended = permissions.canUseTool('71273')('WebSearch', { query: 'bUnit' }, context());
+    permissions.cancelAll('71273');
+    await expect(ended).resolves.toMatchObject({ behavior: 'deny' });
+    expect(permissions.pending('71273')).toBeNull();
+  });
+
+  it('follows the saved policy: ask for edits, no build commands, extra prefixes', async () => {
+    const permissions = createPermissionService({
+      settings: { get: () => ({ ...defaultSettings(), agentPermissions: { edits: 'ask', gitRead: false, buildAndTest: false, bashAllow: ['npm run lint'] } }) },
+      buildCommands: { forRepo: async () => ({ ok: true, data: dotnet }) },
+      emit: recordingEmit().emit,
+    });
+    const tickets = await memoryTickets({ id: '71273' });
+    const extras = await permissions.sessionExtras((await tickets.get('71273'))!);
+    expect(extras.permissionMode).toBe('default');
+    expect(extras.allowedTools).toEqual(['Bash(npm run lint:*)']);
+  });
+});

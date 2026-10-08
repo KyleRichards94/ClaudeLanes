@@ -8,6 +8,7 @@ import { openConnections, openNewTicket, useUiPrefs } from '@/shared/model';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardLanes } from './BoardLanes';
 import { LiveDock } from './LiveDock';
+import { McpStatusPill } from './McpStatusPill';
 
 /**
  * The agent board (artboard 1). The header is still the walking skeleton's until AL-142; the lanes
@@ -45,6 +46,8 @@ export function BoardPage() {
                 ? 'Main process unreachable'
                 : 'Connecting…'}
           </Text>
+          {/* MCP servers of the running sessions (AL-108); AL-142 adds the count pills beside it. */}
+          <McpStatusPill />
           {/* Artboard 1's Connections icon button (AL-046); AL-142 builds the rest of the header. */}
           <Button label="Connections" icon="link" iconOnly onPress={() => openConnections()} testID="open-connections" />
           {/* The header menu's Settings until AL-142 builds the full header (repo dropdown included). */}

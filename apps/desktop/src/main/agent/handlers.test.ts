@@ -3,6 +3,8 @@ import { handleInvoke } from '../ipc/handle-invoke';
 import type { TicketRecordStore } from '../tickets';
 import { createClaudeLauncher } from './claude-sdk';
 import { createAgentHandlers } from './handlers';
+import { createMcpStatusMonitor } from './mcp';
+import { testPermissions } from './testing/sessions';
 import { createTranscriptService } from './output/transcript';
 import { createSessionManager, type SessionManager } from './session-manager';
 import { createStageService } from './stages/stage-service';
@@ -13,7 +15,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
   const emit = recordingEmit();
   const transcripts = createTranscriptService({ sessions, tickets, emit: emit.emit, now });
   const stages = createStageService({ tickets, emit: emit.emit, transcripts, userName: () => 'Kyle', now });
-  return { handlers: createAgentHandlers({ sessions, transcripts, stages }), stages, emit };
+  return { handlers: createAgentHandlers({ sessions, transcripts, stages, mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }), permissions: testPermissions() }), stages, emit };
 }
 
 function idleSessions(tickets: TicketRecordStore): SessionManager {

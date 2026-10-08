@@ -1,7 +1,9 @@
 import type { z } from 'zod';
 import {
   AgentDefaultsSchema,
+  AgentPermissionsSchema,
   RepoSettingsSchema,
+  defaultAgentPermissions,
   SETTINGS_VERSION,
   SettingsSchema,
   UiPrefsSchema,
@@ -58,6 +60,10 @@ function toCurrent(document: unknown, dropped: string[]): Settings {
     ),
     ui: salvageObject(UiPrefsSchema, stored['ui'], fallback.ui, 'ui', dropped),
   };
+  // AL-109: kept only once the user saved a policy; unset means the D18 default.
+  if (stored['agentPermissions'] !== undefined) {
+    settings.agentPermissions = salvageObject(AgentPermissionsSchema, stored['agentPermissions'], defaultAgentPermissions(), 'agentPermissions', dropped);
+  }
   // Valid by construction; parse anyway so a mistake here fails loudly instead of saving bad settings.
   return SettingsSchema.parse(settings);
 }
