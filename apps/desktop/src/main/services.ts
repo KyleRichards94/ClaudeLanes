@@ -26,6 +26,7 @@ import { createElectronConnectionsFile } from './connections/electron-connection
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
 import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas-links';
 import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
+import { createDesignThreadService, designThreadsDir, type DesignThreadService } from './design/thread';
 import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
@@ -83,6 +84,8 @@ export interface Services {
   readonly designCanvases: DesignCanvasLinks;
   /** Reads a linked canvas's artboards through a short read-only design session (AL-195, D118). */
   readonly designArtboards: DesignArtboardReader;
+  /** Each ticket's in-app design thread and its design session, separate from the lead agent (AL-196, D120). */
+  readonly designThreads: DesignThreadService;
   /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
   readonly ado: AdoService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
@@ -232,6 +235,13 @@ export function createServices(options: ServiceOptions): Services {
     warn: (message) => log.child('design').warn(message),
   });
   const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
+  const designThreads = createDesignThreadService({
+    claude,
+    tickets,
+    emit: options.emit,
+    dir: designThreadsDir(options.appDataDir),
+    warn: (message) => log.child('design').warn(message),
+  });
 
   const ado = createAdoService({ connections, settings, log: log.child('ado') });
 
@@ -283,6 +293,7 @@ export function createServices(options: ServiceOptions): Services {
     designView,
     designCanvases,
     designArtboards,
+    designThreads,
     ado,
     tickets,
     repos,
@@ -314,6 +325,8 @@ export async function disposeServices(services: Services): Promise<void> {
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();
+  // Stops the design sessions and finishes writing their threads (AL-196).
+  await services.designThreads.dispose();
   // Closes the canvas views and flushes the claude.ai sign-in cookies to disk (D112).
   await services.designView.dispose();
 }
