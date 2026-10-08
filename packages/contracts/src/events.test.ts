@@ -22,6 +22,7 @@ describe('event contracts', () => {
         'toast',
         'app:window', // AL-066
         'agent:mcpStatus', // AL-108
+        'agent:permission', // AL-109
       ].sort(),
     );
   });

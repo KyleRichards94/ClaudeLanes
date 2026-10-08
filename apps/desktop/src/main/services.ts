@@ -7,6 +7,7 @@ import { createTranscriptService, type TranscriptService } from './agent/output/
 import { createSessionManager, type SessionManager } from './agent/session-manager';
 import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
+import { createPermissionService, type PermissionService } from './agent/permissions';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -100,6 +101,8 @@ export interface Services {
   readonly stages: StageService;
   /** The MCP servers of the running sessions for the header pill; reconnects a failing one (AL-108). */
   readonly mcpStatus: McpStatusMonitor;
+  /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
+  readonly permissions: PermissionService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -246,6 +249,8 @@ export function createServices(options: ServiceOptions): Services {
       stages.cancelGate(ticketId);
       // The ended session's servers leave the header pill (AL-108).
       void mcpStatus.refresh();
+      // Permission requests the session left waiting close (AL-109).
+      permissions.cancelAll(ticketId);
     },
   });
   const transcripts = createTranscriptService({
@@ -258,7 +263,8 @@ export function createServices(options: ServiceOptions): Services {
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
-  const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') })]);
+  const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
+  const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') }), permissions.sessionExtras]);
   const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
 
   return {
@@ -286,6 +292,7 @@ export function createServices(options: ServiceOptions): Services {
     transcripts,
     stages,
     mcpStatus,
+    permissions,
     branches,
     mergeToMain,
     ticketArchive,

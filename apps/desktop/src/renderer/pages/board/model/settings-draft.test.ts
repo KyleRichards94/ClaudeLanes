@@ -93,4 +93,18 @@ describe('settings draft', () => {
     expect(parseSkills(' /a, b  /c,,a ')).toEqual(['a', 'b', 'c']);
     expect(parseSkills('')).toEqual([]);
   });
+
+  it('saves the agent permission policy only when it changed (AL-109)', () => {
+    expect(draftToPatch(apply({ type: 'permission', field: 'gitRead', value: true }), settings())).toEqual({});
+    const draft = apply({ type: 'permission', field: 'acceptEdits', value: false }, { type: 'bashAllow', value: 'npm run lint,  dotnet format, npm run lint' });
+    expect(validateDraft(draft, settings().repos)).toEqual({});
+    expect(draftToPatch(draft, settings())).toEqual({
+      agentPermissions: { edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: ['npm run lint', 'dotnet format'] },
+    });
+  });
+
+  it('refuses a permitted command that chains or redirects (AL-109)', () => {
+    const draft = apply({ type: 'bashAllow', value: 'npm test && rm -rf .' });
+    expect(validateDraft(draft, settings().repos)['bashAllow']).toContain('chains or redirects');
+  });
 });
