@@ -5,9 +5,10 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { _electron as electron, expect, type ElectronApplication, type Page } from '@playwright/test';
 import type { FakeWorkItem } from '@agent-lanes/ado-client/testing';
-import type { RepoSettings, Result } from '@agent-lanes/contracts';
+import type { RepoSettings, Result, TicketRecord } from '@agent-lanes/contracts';
 import { ADO_FIXTURE_PROJECT } from '@agent-lanes/contracts/testing';
 import { FAKE_LOGIN, fakeClaudeEnv, writeFakeClaudeState, type FakeClaudeState } from './fake-claude-code';
+import { seedTicketRecords } from './ticket-records';
 import { startFakeAdoServer, type FakeAdoServer } from './fake-ado-server';
 
 /**
@@ -52,6 +53,8 @@ export interface TeamBoardAppOptions {
   originBranches?: readonly string[];
   /** Extra state for the `claude` stand-in. */
   claude?: Omit<FakeClaudeState, 'login' | 'log'>;
+  /** Ticket records on the board at start-up, given the registered repo's path. */
+  tickets?: (repo: string) => readonly TicketRecord[];
 }
 
 interface Bridge {
@@ -96,6 +99,7 @@ export async function startTeamBoardApp(options: TeamBoardAppOptions): Promise<T
   );
   const stateFile = join(root, 'fake-claude-state.json');
   writeFakeClaudeState(stateFile, { ...options.claude, login: FAKE_LOGIN, log: join(root, 'fake-claude-starts.jsonl') });
+  if (options.tickets) seedTicketRecords(userDataDir, options.tickets(repo));
 
   const app = await electron.launch({
     args: [join(__dirname, '..', '..')],
