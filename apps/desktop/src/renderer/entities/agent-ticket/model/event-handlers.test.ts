@@ -13,8 +13,8 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate and build:queued', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued']);
+  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model and build:queued', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:model', 'agent:output', 'agent:stage', 'build:queued']);
   });
 
   it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
-import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
+import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
@@ -244,6 +244,38 @@ export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 export const SendMessageResponseSchema = z.object({ held: z.boolean() });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
+// ── Live model and effort change (AL-106, R7, design §7, artboard 6 "Model switching") ─────────────
+
+/** A model and effort pair, as the card shows it ("Sonnet · High"). */
+export const ModelEffortSchema = z.object({ model: ModelSchema, effort: EffortSchema });
+export type ModelEffort = z.infer<typeof ModelEffortSchema>;
+
+/**
+ * What a ticket's agent runs with now, and the change waiting for it. A change made while the session
+ * runs applies from its next turn (R7): until the next assistant message reports the new model (or the
+ * next turn starts) `pending` holds it and the card shows "Opus → Sonnet · High" with "Switching ·
+ * applies next turn"; then `model`/`effort` take it and `pending` clears. Without a live session a
+ * change applies at once (the next start uses the ticket record, which is saved on every change).
+ */
+export const AgentModelStateSchema = z.object({
+  ticketId: TicketIdSchema,
+  model: ModelSchema,
+  effort: EffortSchema,
+  pending: ModelEffortSchema.nullable(),
+});
+export type AgentModelState = z.infer<typeof AgentModelStateSchema>;
+
+/** `agent:setModel`: switch the model (Opus / Sonnet / Haiku) from the next turn; saved on the ticket. */
+export const SetModelRequestSchema = z.strictObject({ ticketId: TicketIdSchema, model: ModelSchema });
+export type SetModelRequest = z.infer<typeof SetModelRequestSchema>;
+
+/** `agent:setEffort`: change the effort (Low … Max) from the next turn; saved on the ticket. */
+export const SetEffortRequestSchema = z.strictObject({ ticketId: TicketIdSchema, effort: EffortSchema });
+export type SetEffortRequest = z.infer<typeof SetEffortRequestSchema>;
+
+/** The user turn "Apply model now" sends after interrupting, so the agent carries on with the new model. */
+export const APPLY_MODEL_NOW_MESSAGE = 'Continue where you left off.';
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -251,6 +283,12 @@ export const agentInvokeContracts = {
   'agent:setGate': { request: SetGateRequestSchema, response: SetGateResponseSchema },
   'agent:getGate': { request: AgentTicketRequestSchema, response: GetGateResponseSchema },
   'agent:send': { request: SendMessageRequestSchema, response: SendMessageResponseSchema },
+  'agent:setModel': { request: SetModelRequestSchema, response: AgentModelStateSchema },
+  'agent:setEffort': { request: SetEffortRequestSchema, response: AgentModelStateSchema },
+  /** "Apply model now": interrupts the turn, then a "continue" turn starts with the new model and effort. */
+  'agent:applyModelNow': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
+  /** For a renderer that reloads while a switch is pending. */
+  'agent:getModel': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
@@ -308,10 +346,22 @@ export const AgentStatusEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStatusEvent = z.infer<typeof AgentStatusEventSchema>;
 
+/**
+ * `agent:model` (AL-106): a model or effort change was asked for (`pending` set: the card shows
+ * "Opus → Sonnet · High" and "Switching · applies next turn"), or it now applies (`pending` null).
+ */
+export const AgentModelEventSchema = TicketEventEnvelopeSchema.extend({
+  model: ModelSchema,
+  effort: EffortSchema,
+  pending: ModelEffortSchema.nullable(),
+});
+export type AgentModelEvent = z.infer<typeof AgentModelEventSchema>;
+
 export const agentEventContracts = {
   'agent:output': AgentOutputEventSchema,
   'agent:stage': AgentStageEventSchema,
   'agent:subagent': AgentSubagentEventSchema,
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
+  'agent:model': AgentModelEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

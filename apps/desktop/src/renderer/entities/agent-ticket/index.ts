@@ -47,3 +47,4 @@ export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from '.
 export { ticketBoardQueryKey, useAdoptWorktree, useIgnoreWorktree, useTicketBoard } from './api/board';
 export { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS, modelEffortLabel, stageProgressLabel } from './model/labels';
 export { useHandConflictToLead, useMergeSubBranches, useOpenConflictFiles } from './api/merge-sub-branches';
+export { useApplyModelNow, useSetAgentEffort, useSetAgentModel } from './api/model';
