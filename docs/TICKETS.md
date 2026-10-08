@@ -169,6 +169,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-239 | Backlog popout | E14 | L | AL-233, AL-235, AL-236, AL-029 | partial |
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
+| AL-242 | Board picker for the team board | E14 | M | AL-234 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1198,6 +1199,14 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 
 ---
 
+#### AL-242 · Board picker for the team board
+- **Design:** T1, TB§2 (Kyle, 2026-10-08: "options to select my team, my team board and team sprint") · **Depends on:** AL-234
+- **Scope:** A Board menu next to Team in the board header listing the team's ADO boards (its backlog levels: Stories or Backlog items, Features, Epics). The choice is kept in the UI prefs per team and drives the team board widget's columns and items. Main: `ado:listBoards({ org, project, team })` over the team's Work › Boards API, and a `board` field on `ado:teamBoard`. Must work on Azure DevOps Server through api-version negotiation.
+- **Acceptance criteria:**
+  - [ ] The team board shows the chosen board's columns, and the choice survives a restart.
+  - [ ] Switching team falls back to that team's first board when the saved one is not there.
+
+---
 ## 4. Decisions
 
 | # | Decision | Why | Date |
@@ -1951,6 +1960,10 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D747 | AL-223: The comparison uses seeded and fake data, so live-data content (activity lines, progress, needs-you colours, Done count, canvas artboards) differs by design and isn't reported | Not a design difference | 2026-10-08 |
 | D748 | AL-223 (integration): `visual-qa.spec.ts` holds #71318's first turn on the plan gate (as D742) and presses Undo after capturing artboard 10 | Under full-suite load the turn ended before the toast was checked; leaving it mid-turn would make quit ask first and hang the close | 2026-10-08 |
 | D749 | AL-220 (integration): `build-queue.kit.test.ts` checks that the two builds never overlap and the later one waits as Queued at position 1, whichever joins first, with a 120 s timeout | Each build reads its git fingerprint before joining the queue, so the order flipped under load | 2026-10-08 |
+| D750 | On-prem: sprints, backlog, active PRs and the team board always resolve a team in main (the request's, else the profile default from `ado:listTeams`, else the first team; cached 5 min) and never call the project-level iterations route | Azure DevOps Server answers `/{project}/_apis/work/teamsettings/iterations` with 404; only the team route works (Kyle's server, 2026-10-08) | 2026-10-08 |
+| D751 | A Team menu in the board header sets `lastTeam` in the UI prefs (cleared sprint on change); `useBoardTeam`/`useBoardSprint` in shared/model are the single source for the board team. The Sprint menu groups Current, Upcoming and Past | Kyle asked to pick his team and past sprints; one shared hook keeps the header, New agent ticket modal and team board on the same team | 2026-10-08 |
+| D752 | Plain http organisation URLs are accepted for Azure DevOps Server (refused for cloud hosts), with an unencrypted-token warning in Connections | Kyle's organisation is internal and has no TLS | 2026-10-08 |
+| D753 | The ADO client negotiates `api-version` per organisation from the server's 400 replies (out-of-range ceiling, preview-only flag) | Azure DevOps Server 2020 supports REST 6.x only | 2026-10-08 |
 
 ---
 
@@ -2014,6 +2027,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Integrator batch 7 (b54): merged AL-222 (partial: the golden-path e2e passes locally, about 13 s for the spec and 139/139 for the suite in 3.7 min, but has not yet run in CI because the agent's branch push needed an interactive Git Credential Manager sign-in). Nothing rejected. Merged cleanly; lockfile unchanged after `pnpm install`; no integration fixes. Includes a real fix: branch status is refreshed when a turn ends or the stage changes, so the Merge panel no longer shows a change the agent has since committed. Decisions D715–D719. `pnpm verify` green (293 files, 3353 unit tests); `pnpm e2e` 139/139. Follow-ups: tick AL-222's CI criterion once CI has run on main; CLAUDE.md's command table could note that `pnpm package` builds with `--mode release`, which leaves out the e2e test hooks; AL-224 should keep `--mode release` in any release script it adds. |
 | 2026-10-08 | Integrator batch 8 (b53): merged AL-235 (done). Clean merge; lockfile unchanged after `pnpm install`. Integration fix: BoardPage now passes AL-236's `useLaunchFromAdo()` to `DragToLaneProvider`, so a team board drop starts the agent. Decisions D720–D730. `pnpm verify` green (3382 unit tests), e2e 143/143 (a first run had one failure in `repos.spec.ts` "picking a non-git folder": the folder dialog was not parented because `BrowserWindow.getFocusedWindow()` was null under the parallel run; it passed 3/3 alone and the full rerun was green). |
 | 2026-10-08 | Integrator batch 9 (b55): merged AL-220 (done), AL-239 (partial: artboards 11/12 match closely with deliberate differences D735–D736, sign-off at AL-223; a real mouse drag from the popped-out window to the main window across two monitors needs a manual try), AL-241 (partial: the six flows pass locally and in the full suite, not yet run in CI) and AL-223 (partial: all twelve artboards captured by `e2e/visual-qa.spec.ts` and compared; sign-off is Kyle's). Nothing rejected. Clean merge; lockfile unchanged after `pnpm install`. Integration fixes: `build-queue.kit.test.ts` no longer depends on which build joins the queue first (D749; it failed the first `pnpm verify`); `visual-qa.spec.ts` holds #71318 on the plan gate and undoes the launch after capturing artboard 10 (D748; it failed the first e2e run). Decisions D731–D749. `pnpm verify` green (3437 unit tests), e2e 165/165. The b55 agent could not push its branch (Git Credential Manager sign-in); it was merged from the local branch. Visual QA differences for Kyle to sign off or turn into tickets: 01/08–10 the board header wraps to two rows at 1440 px (Team menu and Settings), moving the lanes down about 70 px, and New agent ticket drops to a second line; 08–10 the lanes and team board don't fit at 960 px tall (artboards are 1360 px), so dragging scrolls the lane tops, drop hints and the "Drop !10571" pill out of view; 08 the team board's Backlog button wraps under the title and shows its count as text (artboard: right-aligned count badge); 08 lock rows say "Assigned to Mia Davies" (artboard and TB§2: initials); 08 PR cards show the first reviewer's avatar while artboard 08 shows the author's (TB§2 says reviewer; design owner to pick); 08 cards ordered by id, not backlog rank (D590); 10 the launch toast sits bottom-right (artboard: top-right under the header) and the dropped card lands below #71322 instead of on top; 04 the "Design system" pill in Attached sits above its row's text (Pill `alignSelf: flex-start` in a row); 02 the Sprint 42 list includes a Closed item (#71250); 06 the card-states sheet has 4 cards per row (artboard 5) and the Status badges block isn't beside the toast; 07 two extra swatches (claude-text, danger); 11/12 see D735–D736. Other follow-ups: in the popped-out backlog the "Agent in …" tag updates only on refetch (agent events go to the main window only); AL-234's "Backlog stays disabled until AL-239" gap is now closed and its artboard 08 criterion can be re-checked at AL-223's sign-off. |
+| 2026-10-08 | Parallel build complete: every buildable ticket merged (97 done, 39 partial; AL-224 and AL-226 wait on Kyle). Final check on `main`: `pnpm verify` green (3,437 tests), e2e 164/165 with the one failure (repos.spec "picking a non-git folder") passing on rerun; load-related e2e flakes stay open under AL-220. Added AL-242 (Board picker) from Kyle's request; recorded the on-prem decisions. |
 ---
 
 ## 7. Parallel build rules
