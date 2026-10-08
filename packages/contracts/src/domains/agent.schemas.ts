@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
-import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
+import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
@@ -245,6 +245,84 @@ export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 export const SendMessageResponseSchema = z.object({ held: z.boolean() });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
+// ── MCP servers of agent sessions (AL-108, design §7 MCP servers, artboard 1 "MCP online") ─────────
+
+/** A server's state as Claude Code reports it (`mcpServerStatus()`). */
+export const MCP_SERVER_STATES = ['connected', 'pending', 'failed', 'needs-auth', 'disabled'] as const;
+export const McpServerStateSchema = z.enum(MCP_SERVER_STATES);
+export type McpServerState = z.infer<typeof McpServerStateSchema>;
+
+/** Longest server error sent to the renderer. */
+export const MCP_ERROR_LIMIT = 500;
+
+/** One MCP server across the running sessions: the worst state any session reports for it. */
+export const McpSessionServerSchema = z.object({
+  /** The name the sessions know the server by (`azure-devops`, `agent_lanes`, a user server's name). */
+  name: z.string().min(1).max(200),
+  state: McpServerStateSchema,
+  /** Why it failed, when a session said; null otherwise. Never holds the server's token. */
+  error: z.string().max(MCP_ERROR_LIMIT).nullable(),
+  /** The tickets whose sessions run the server. */
+  ticketIds: z.array(TicketIdSchema).max(200),
+});
+export type McpSessionServer = z.infer<typeof McpSessionServerSchema>;
+
+/**
+ * The header pill (artboard 1): `online` when no running session has a failing server ("MCP online"),
+ * `failing` when one does ("1 MCP failing", amber, the names on hover), `none` when no session runs.
+ */
+export const McpStatusSummarySchema = z.object({
+  state: z.enum(['none', 'online', 'failing']),
+  /** Every server of the running sessions, failing ones first, then by name. */
+  servers: z.array(McpSessionServerSchema).max(200),
+});
+export type McpStatusSummary = z.infer<typeof McpStatusSummarySchema>;
+
+/** Whether a server counts as failing on the pill: it failed to start or needs a sign-in. */
+export function isFailingMcpState(state: McpServerState): boolean {
+  return state === 'failed' || state === 'needs-auth';
+}
+
+// ── Permission prompts of headless sessions (AL-109, design §4, Q9, Decision D18) ───────────────────
+
+/** Longest prompt line or tool detail sent for a permission request. */
+export const PERMISSION_TEXT_LIMIT = 500;
+
+/**
+ * A tool call outside the ticket's permission policy, waiting for Allow once / Allow for this ticket
+ * / Deny ("Needs you · allow Bash" on the card).
+ */
+export const PermissionRequestSchema = z.object({
+  requestId: z.string().min(1).max(200),
+  /** The tool as the card names it: `Bash`, `WebFetch`, `azure-devops · wit_update_work_item`. */
+  tool: z.string().min(1).max(200),
+  /** What the agent wants to do, one line ("Claude wants to run npm install"). */
+  title: z.string().min(1).max(PERMISSION_TEXT_LIMIT),
+  /** The command, path or URL in mono; null when the tool has none. */
+  detail: z.string().max(PERMISSION_TEXT_LIMIT).nullable(),
+  openedAt: z.int().nonnegative(),
+});
+export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
+
+export const PERMISSION_DECISIONS = ['allow-once', 'allow-ticket', 'deny'] as const;
+export const PermissionDecisionSchema = z.enum(PERMISSION_DECISIONS);
+export type PermissionDecision = z.infer<typeof PermissionDecisionSchema>;
+
+/** `agent:resolvePermission`: the user's answer to one waiting request. */
+export const ResolvePermissionRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  requestId: PermissionRequestSchema.shape.requestId,
+  decision: PermissionDecisionSchema,
+});
+export type ResolvePermissionRequest = z.infer<typeof ResolvePermissionRequestSchema>;
+
+/** `resolved` is false when the request no longer waits (answered elsewhere, or its turn ended). */
+export const ResolvePermissionResponseSchema = z.object({ resolved: z.boolean() });
+
+/** `agent:getPermission`: the ticket's oldest waiting request, for a renderer that reloads while one waits. */
+export const GetPermissionResponseSchema = z.object({ request: PermissionRequestSchema.nullable() });
+export type GetPermissionResponse = z.infer<typeof GetPermissionResponseSchema>;
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -258,6 +336,11 @@ export const agentInvokeContracts = {
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** The session's tokens, cost and context window so far (AL-113). */
   'agent:getUsage': { request: AgentTicketRequestSchema, response: AgentUsageSchema },
+  /** The MCP servers of the running sessions, for the header pill (AL-108). */
+  'agent:getMcpStatus': { request: z.undefined(), response: McpStatusSummarySchema },
+  /** Allow once / Allow for this ticket / Deny on a waiting permission request (AL-109). */
+  'agent:resolvePermission': { request: ResolvePermissionRequestSchema, response: ResolvePermissionResponseSchema },
+  'agent:getPermission': { request: AgentTicketRequestSchema, response: GetPermissionResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -311,6 +394,22 @@ export const AgentStatusEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStatusEvent = z.infer<typeof AgentStatusEventSchema>;
 
+/** `agent:mcpStatus` (AL-108): the header pill's summary changed. Not about one ticket. */
+export const McpStatusEventSchema = EventEnvelopeSchema.extend(McpStatusSummarySchema.shape);
+export type McpStatusEvent = z.infer<typeof McpStatusEventSchema>;
+
+/**
+ * `agent:permission` (AL-109): a request started waiting (the card turns amber with "Needs you ·
+ * allow <tool>"), or it ended: allowed, denied, or cancelled because the turn or session ended.
+ * `waiting` is the ticket's oldest waiting request after this change; null when none waits.
+ */
+export const AgentPermissionEventSchema = TicketEventEnvelopeSchema.extend({
+  state: z.enum(['waiting', 'allowed', 'denied', 'cancelled']),
+  request: PermissionRequestSchema,
+  waiting: PermissionRequestSchema.nullable(),
+});
+export type AgentPermissionEvent = z.infer<typeof AgentPermissionEventSchema>;
+
 export const agentEventContracts = {
   'agent:output': AgentOutputEventSchema,
   'agent:stage': AgentStageEventSchema,
@@ -318,4 +417,6 @@ export const agentEventContracts = {
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
   'agent:usage': AgentUsageEventSchema,
+  'agent:mcpStatus': McpStatusEventSchema,
+  'agent:permission': AgentPermissionEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

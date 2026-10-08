@@ -46,4 +46,5 @@ export {
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
+export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';

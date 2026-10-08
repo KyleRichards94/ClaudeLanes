@@ -1,4 +1,4 @@
-import type { McpServerConfig, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, McpServerConfig, McpServerStatus, Options, PermissionMode, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
   SDK_MODEL_IDS,
   err,
@@ -61,6 +61,12 @@ export interface SessionManager {
   status(ticketId: string): AgentSessionStatus;
   /** The live session's context window (`getContextUsage`, AL-113), from the last response's usage. */
   contextUsage(ticketId: string): Promise<Result<{ totalTokens: number; maxTokens: number; percentage: number }>>;
+  /** The status of every session the app has started since it opened, live or not. */
+  list(): AgentSessionStatus[];
+  /** The MCP servers of the ticket's live session, as Claude Code reports them (AL-108). */
+  mcpServerStatus(ticketId: string): Promise<Result<McpServerStatus[]>>;
+  /** Asks the ticket's live session to restart one of its MCP servers (AL-108). */
+  reconnectMcpServer(ticketId: string, serverName: string): Promise<Result<void>>;
   /** Every message of every session, tagged with its ticket. Returns an unsubscribe function. */
   subscribe(listener: SessionMessageListener): () => void;
   /** Stops every session (app quit, AL-213). */
@@ -95,6 +101,10 @@ export interface SessionExtras {
   systemPromptAppend?: string;
   /** Sections added to a new session's first user turn. */
   firstTurnAppendix?: string[];
+  /** The permission mode (AL-109); `acceptEdits` when absent. */
+  permissionMode?: PermissionMode;
+  /** Asked for every tool call the mode and `allowedTools` don't settle (AL-109). */
+  canUseTool?: CanUseTool;
 }
 
 export interface SessionManagerOptions {
@@ -152,8 +162,9 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
     includePartialMessages: true,
     abortController,
     systemPrompt: { type: 'preset', preset: 'claude_code', ...(extras.systemPromptAppend ? { append: extras.systemPromptAppend } : {}) },
-    // Edits in the ticket's own worktree go ahead (D18); the rest of the policy is AL-109.
-    permissionMode: 'acceptEdits',
+    // Edits in the ticket's own worktree go ahead (D18) unless the policy says otherwise (AL-109).
+    permissionMode: extras.permissionMode ?? 'acceptEdits',
+    ...(extras.canUseTool ? { canUseTool: extras.canUseTool } : {}),
     ...(extras.mcpServers && Object.keys(extras.mcpServers).length > 0 ? { mcpServers: extras.mcpServers } : {}),
     ...(extras.allowedTools && extras.allowedTools.length > 0 ? { allowedTools: extras.allowedTools } : {}),
     ...(record.sessionId ? { resume: record.sessionId } : {}),
@@ -445,6 +456,30 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
         return ok({ totalTokens: usage.totalTokens, maxTokens: usage.maxTokens, percentage: usage.percentage });
       } catch (error) {
         return err('INTERNAL', `The context window could not be read: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    list: () => [...sessions.values()].map((session) => statusOf(session.ticketId, session)),
+
+    async mcpServerStatus(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      if (!found.data.query) return ok([]);
+      try {
+        return ok(await found.data.query.mcpServerStatus());
+      } catch (error) {
+        return err('INTERNAL', `Could not read the MCP servers of ticket ${ticketId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    async reconnectMcpServer(ticketId, serverName) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      try {
+        await found.data.query?.reconnectMcpServer(serverName);
+        return ok(undefined);
+      } catch (error) {
+        return err('INTERNAL', `Could not reconnect ${serverName}: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
 

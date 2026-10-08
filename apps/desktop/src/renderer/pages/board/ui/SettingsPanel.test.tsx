@@ -174,6 +174,7 @@ describe('SettingsPanel', () => {
       'defaults.skills': 'Default skills',
       buildQueueSize: 'Builds at once',
       adoStateTransitions: 'Move work items to the next state in Azure DevOps',
+      agentPermissions: 'Agent permissions', // AL-109
       repos: 'Repo',
       'repo.path': null, // Picked with the native folder dialog: Add repo….
       'repo.name': 'Name',

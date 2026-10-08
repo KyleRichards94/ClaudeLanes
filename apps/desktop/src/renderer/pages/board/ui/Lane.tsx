@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import type { Lane as LaneName } from '@agent-lanes/contracts';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, glass, radius, space, tone } from '@agent-lanes/tokens';
@@ -11,6 +10,7 @@ import {
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
 import { GateActions } from '@/features/resolve-gate';
+import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
@@ -86,11 +86,13 @@ export function Lane({ lane, store = agentTickets }: LaneProps) {
           </View>
         ) : (
           ids.map((id) => (
-            <Fragment key={id}>
+            <View key={id} style={styles.cardSlot}>
               <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+              {/* Allow once / Allow for this ticket / Deny under the card while a tool call waits (AL-109). */}
+              <PermissionPrompt ticketId={id} />
               {/* Approve / Request changes while a gate waits; the drill-in stepper shows the same action (AL-171). */}
               <GateActions ticketId={id} placement="card" store={store} />
-            </Fragment>
+            </View>
           ))
         )}
       </View>
@@ -107,6 +109,9 @@ const verticalLine = 20;
 
 /** Read off artboard 1: 12 px inside the lane, 14 px header, 12 px between cards. */
 const styles = StyleSheet.create({
+  cardSlot: {
+    gap: space.sm,
+  },
   lane: {
     flexGrow: 1,
     flexShrink: 1,
