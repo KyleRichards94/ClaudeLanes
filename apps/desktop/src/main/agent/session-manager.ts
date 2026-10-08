@@ -139,7 +139,23 @@ export interface SessionManagerOptions {
   /** Per-session additions, asked for at each start. */
   extras?: (record: TicketRecord) => SessionExtras | Promise<SessionExtras>;
   /** A session ended (stopped or lost): e.g. a stage gate waiting on it closes (AL-104). */
-  onEnded?: (ticketId: string, state: 'stopped' | 'lost') => void;
+  onEnded?: (ticketId: string, state: 'stopped' | 'lost', info?: SessionEndInfo) => void;
+  /**
+   * Crash detection (AL-110): a session that is running a turn and produces nothing for this long is
+   * treated as lost (its process is closed). 0 turns it off. SESSION_WATCHDOG_MS by default.
+   */
+  watchdogMs?: number;
+  /** True while the ticket waits on the user (a stage gate, a permission request): silence is expected then. */
+  isWaitingOnUser?: (ticketId: string) => boolean;
+  now?: () => number;
+}
+
+/** How a session ended, for crash recovery (AL-110). */
+export interface SessionEndInfo {
+  /** It ended in the middle of a turn, so a resumed session should be told to carry on. */
+  midTurn: boolean;
+  /** The watchdog closed it: it stopped producing output while running. */
+  stalled: boolean;
 }
 
 interface Session {
@@ -167,6 +183,10 @@ interface Session {
   turnBoundary: boolean;
   /** Settles when the session's message loop has finished. */
   done: Promise<void>;
+  /** When the session last produced a message, or last started a turn (AL-110 watchdog). */
+  lastActivityAt: number;
+  /** The watchdog closed it. */
+  stalled: boolean;
 }
 
 /** Shown when `claude` ends on its own; AL-110 offers Reconnect. */
@@ -175,6 +195,13 @@ export const CLAUDE_NOT_CONNECTED_MESSAGE = 'Connect Claude in Connections befor
 export const CLAUDE_KEY_UNREADABLE_MESSAGE = "The saved Claude API key can't be read on this computer. Replace it in Connections.";
 /** The turn Resume sends when nothing was sent while paused (AL-105). */
 export const RESUME_MESSAGE = 'Continue where you left off.';
+/** Silence while running after which a session counts as lost (AL-110). Long builds still print output. */
+export const SESSION_WATCHDOG_MS = 10 * 60_000;
+
+/** The user-facing reason a stalled session was lost (artboard 6 toast body). */
+export function sessionStalledMessage(ticketId: string): string {
+  return `${ticketId} stopped responding. The worktree is intact.`;
+}
 
 const LIVE_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
 /** A turn is under way: closing the app now would cut the agent off (AL-213). */
@@ -218,6 +245,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
   const { claude, connections, tickets, emit, log } = options;
   const sessions = new Map<string, Session>();
   const listeners = new Set<SessionMessageListener>();
+  const now = options.now ?? Date.now;
+  const watchdogMs = options.watchdogMs ?? SESSION_WATCHDOG_MS;
 
   const statusOf = (ticketId: string, session: Session | undefined): AgentSessionStatus =>
     session
@@ -226,6 +255,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
 
   function setState(session: Session, state: AgentSessionState, message: string | null = null): void {
     if (session.state === state && session.message === message) return;
+    // A turn starting counts as activity, so an idle stretch before it never trips the watchdog.
+    if (state === 'running') session.lastActivityAt = now();
     session.state = state;
     session.message = message;
     emit('agent:status', { ticketId: session.ticketId, state, sessionId: session.sessionId, message });
@@ -296,6 +327,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
 
   function handle(session: Session, message: SDKMessage): void {
     notePendingApplied(session, message);
+    session.lastActivityAt = now();
     if (message.type === 'system' && message.subtype === 'init') {
       void rememberSessionId(session, message.session_id);
     } else if (message.type === 'result' && !session.paused) {
@@ -312,20 +344,37 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
 
   async function run(session: Session, query: ClaudeQuery): Promise<void> {
     let failure: string | null = null;
+    const watchdog = watchdogMs > 0 ? setInterval(() => checkWatchdog(session, query), Math.max(1, Math.floor(watchdogMs / 4))) : undefined;
+    watchdog?.unref?.();
     try {
       for await (const message of query) handle(session, message);
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
     }
+    if (watchdog) clearInterval(watchdog);
+    const midTurn = session.state === 'running' || session.state === 'starting';
     session.input.close();
     if (session.stopping) {
       setState(session, 'stopped');
     } else {
       log?.warn(`The session of ticket ${session.ticketId} ended without being stopped${failure ? `: ${failure}` : ''}`);
-      setState(session, 'lost', SESSION_ENDED_MESSAGE);
+      setState(session, 'lost', session.stalled ? sessionStalledMessage(session.ticketId) : SESSION_ENDED_MESSAGE);
     }
-    options.onEnded?.(session.ticketId, session.stopping ? 'stopped' : 'lost');
+    options.onEnded?.(session.ticketId, session.stopping ? 'stopped' : 'lost', { midTurn, stalled: session.stalled });
     // Make sure the process is gone even when the stream ended on its own.
+    query.close();
+  }
+
+  /** AL-110: a running turn that has been silent for `watchdogMs` while nobody is asked anything is lost. */
+  function checkWatchdog(session: Session, query: ClaudeQuery): void {
+    if (session.state !== 'running' || session.stopping || session.stalled) return;
+    if (options.isWaitingOnUser?.(session.ticketId)) {
+      session.lastActivityAt = now();
+      return;
+    }
+    if (now() - session.lastActivityAt < watchdogMs) return;
+    session.stalled = true;
+    log?.warn(`The session of ticket ${session.ticketId} produced nothing for ${Math.round(watchdogMs / 1000)} s while running; closing it`);
     query.close();
   }
 
@@ -367,6 +416,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       pending: null,
       turnBoundary: false,
       done: Promise.resolve(),
+      lastActivityAt: now(),
+      stalled: false,
     };
     // A start for the same ticket may have claimed it while the record was read: that one wins.
     const racing = sessions.get(ticketId);

@@ -285,6 +285,29 @@ describe('ToastHost', () => {
       resetConnectionsModal();
     });
 
+    it('resumes a lost session from Reconnect on "MCP bridge lost the session" (AL-110)', async () => {
+      stopEventHub();
+      bridge = installFakeBridge({ 'agent:reconnect': { ok: true, data: { ticketId: '71288', state: 'idle', sessionId: 'session-a', message: null } } });
+      startEventHub();
+      const { user } = renderHost();
+      act(() => {
+        bridge.emit('toast', {
+          at: 1,
+          id: 'session-lost:71288',
+          tone: 'error',
+          title: 'MCP bridge lost the session',
+          body: '71288 stopped responding. The worktree is intact.',
+          actions: [{ label: 'Reconnect', intent: { type: 'reconnectSession', ticketId: '71288' } }],
+        });
+      });
+
+      const alert = screen.getByRole('alert');
+      expect(within(alert).getByRole('button', { name: 'Dismiss' })).toBeTruthy();
+      await user.click(within(alert).getByRole('button', { name: 'Reconnect' }));
+      expect(bridge.invoke).toHaveBeenCalledWith('agent:reconnect', { ticketId: '71288' });
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
     it('auto-dismisses an info toast event after 5 s', () => {
       renderHost();
       act(() => bridge.emit('toast', { at: 1, tone: 'info', title: 'Saved' }));
