@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
-import { DesignSpecChangeSchema } from './design.specs';
+import { DesignSpecChangeSchema, ShipDesignSpecRequestSchema, ShippedDesignSpecSchema } from './design.specs';
 import { TicketDesignSchema } from './tickets.schemas';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
@@ -147,6 +147,8 @@ export const designInvokeContracts = {
   'design:openCanvas': { request: OpenDesignCanvasRequestSchema, response: DesignViewStateSchema },
   /** Reads the linked canvas's artboards through a short design session (AL-195, D118). */
   'design:listArtboards': { request: DesignViewTicketRequestSchema, response: DesignArtboardListSchema },
+  /** Approve & ship the picked artboards to the ticket's agent as DesignSpec vN, at any stage (AL-197, R11). */
+  'design:shipSpec': { request: ShipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**

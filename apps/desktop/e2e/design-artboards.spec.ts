@@ -86,6 +86,26 @@ test('shows artboards added or renamed on the canvas after Refresh', async () =>
   await expect(page.getByTestId('artboards-status')).toHaveText('3 artboards');
 });
 
+test('ships the picked artboards as Design v1 and shows it in Attached and the Output stream (AL-197)', async () => {
+  await page.getByRole('checkbox', { name: 'JobFilter · side panel, 420×900' }).click();
+  await page.getByTestId('ship-note').fill('Keep the filter panel narrow');
+  await page.getByRole('button', { name: 'Send 2 artboards to agent as spec' }).click();
+
+  // No session runs in this test, so the spec is held for the agent's next start.
+  await expect(page.getByTestId('ship-result')).toHaveText('Design v1 approved. The agent gets it first when its session runs.');
+  const attached = page.getByTestId('design-attached');
+  await expect(attached.getByText('Design v1 · 2 artboards')).toBeVisible();
+  await expect(attached.getByText('Sent', { exact: true })).toBeVisible();
+
+  await page.evaluate(() => {
+    (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273';
+  });
+  await expect(page.getByTestId('output-system').filter({ hasText: /Design v1 approved by .+ · 2 artboards/ })).toBeVisible();
+  await page.evaluate(() => {
+    (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273/design';
+  });
+});
+
 test('says when the Claude login has no Claude Design access', async () => {
   writeFakeClaudeState(stateFile, { login: FAKE_LOGIN });
   await page.getByRole('button', { name: 'Refresh artboards' }).click();

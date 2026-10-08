@@ -101,6 +101,13 @@ describe('OutputStream (AL-175)', () => {
     expect(screen.queryByTestId('output-jump-latest')).toBeNull();
   });
 
+  it('shows a design ship as a timed system line (AL-197)', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    const at = new Date(2026, 9, 8, 14, 1).getTime();
+    act(() => store.receive([fakeOutputEvent('71273', at, { seq: 1, item: { kind: 'system', text: 'Design v2 approved by Kyle · 2 artboards', ...lead } })]));
+    expect(screen.getByTestId('output-system').textContent).toBe('14:01 · Design v2 approved by Kyle · 2 artboards');
+  });
+
   it('lets the user select output text', () => {
     render(<OutputStream ticketId="71273" store={store} />);
     act(() => store.receive([textEvent(1, 'copy me')]));

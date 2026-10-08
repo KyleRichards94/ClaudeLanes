@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TicketIdSchema } from '../events';
-import type { TicketDesignSpec } from './tickets.schemas';
+import { TicketDesignSpecSchema, type TicketDesignSpec } from './tickets.schemas';
 
 // ── Design specs shipped to the ticket's agent (AL-197, AL-198, AL-199, R11, Decisions D8, D16) ─────
 
@@ -78,3 +78,29 @@ export const DesignSpecRequestSchema = z.strictObject({
   version: z.int().min(1).optional(),
 });
 export type DesignSpecRequest = z.infer<typeof DesignSpecRequestSchema>;
+
+/** One picked artboard, as the hand-off list shows it (AL-195). */
+export const ShipArtboardSchema = DesignSpecArtboardSchema.omit({ source: true });
+export type ShipArtboard = z.infer<typeof ShipArtboardSchema>;
+
+/**
+ * `design:shipSpec` (AL-197): Approve & ship the picked artboards to the ticket's agent, in any stage.
+ * Main reads each artboard's source, snapshots DesignSpec vN and delivers it with `priority: 'now'`.
+ */
+export const ShipDesignSpecRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  artboards: z
+    .array(ShipArtboardSchema)
+    .min(1, 'Pick at least one artboard to ship.')
+    .max(DESIGN_SPEC_ARTBOARDS_MAX)
+    .refine((artboards) => new Set(artboards.map((artboard) => artboard.id)).size === artboards.length, 'Each artboard can be shipped once'),
+  note: z.string().max(DESIGN_SPEC_NOTE_MAX).optional(),
+});
+export type ShipDesignSpecRequest = z.infer<typeof ShipDesignSpecRequestSchema>;
+
+/** The new version on the ticket record; `delivered` is false while it is held for a session that isn't running. */
+export const ShippedDesignSpecSchema = z.object({
+  spec: TicketDesignSpecSchema,
+  delivered: z.boolean(),
+});
+export type ShippedDesignSpec = z.infer<typeof ShippedDesignSpecSchema>;
