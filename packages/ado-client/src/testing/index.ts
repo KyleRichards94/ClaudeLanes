@@ -18,6 +18,8 @@ export { agileStates, type FakeAdo, type FakeWorkItem } from './fake-work-items'
 export {
   artboard08Items,
   artboard08PullRequests,
+  artboard11Backlog,
+  BACKLOG_ITERATION,
   branchLink,
   createFakeTeamOrg,
   FAKE_TEAM_ORG_URL,
@@ -25,6 +27,7 @@ export {
   FAKE_TEAM_PROJECT,
   FAKE_TEAM_PROJECT_ID,
   FAKE_TEAM_REPOSITORY,
+  FEATURES,
   MOBILE_REPOSITORY,
   OSC_AREA,
   OSC_DEVELOPERS,

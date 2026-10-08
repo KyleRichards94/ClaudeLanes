@@ -3,8 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AdoGitRemote } from '@agent-lanes/ado-client';
-import { createFakeTeamOrg, FAKE_TEAM_ORG_URL, FAKE_TEAM_PAT, FAKE_TEAM_PROJECT, OSC_DEVELOPERS, PEOPLE, RELEASE_TRAIN } from '@agent-lanes/ado-client/testing';
-import { allowedLanes, dragLock, TeamBoardSchema, type ADO_INVOKE_CHANNELS } from '@agent-lanes/contracts';
+import { artboard11Backlog, createFakeTeamOrg, type FakeTeamOrgOptions, FAKE_TEAM_ORG_URL, FAKE_TEAM_PAT, FAKE_TEAM_PROJECT, OSC_DEVELOPERS, PEOPLE, RELEASE_TRAIN } from '@agent-lanes/ado-client/testing';
+import { allowedLanes, BacklogPageSchema, dragLock, TeamBoardSchema, type ADO_INVOKE_CHANNELS } from '@agent-lanes/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createConnectionsService } from '../connections';
 import { createMemoryConnectionsFile } from '../connections/connections-file';
@@ -33,8 +33,8 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function setupTeamOrg(options: { remotes?: AdoGitRemote[] } = {}) {
-  const org = createFakeTeamOrg();
+async function setupTeamOrg(options: { remotes?: AdoGitRemote[]; items?: FakeTeamOrgOptions['items'] } = {}) {
+  const org = createFakeTeamOrg(options.items ? { items: options.items } : {});
   const secrets = createSecretStore({ filePath: join(dir, SECRETS_FILE_NAME), safeStorage: createFakeSafeStorage({ key: randomBytes(32) }), warn: () => undefined });
   const connections = createConnectionsService({ file: createMemoryConnectionsFile(), secrets, emit: () => undefined, warn: () => undefined });
   const saved = await connections.save({ kind: 'ado', orgUrl: FAKE_TEAM_ORG_URL, pat: FAKE_TEAM_PAT, defaultProject: FAKE_TEAM_PROJECT });
@@ -137,5 +137,42 @@ describe('ado:activePrs (AL-232)', () => {
     const { call } = await setupTeamOrg();
     const listed = await call('ado:activePrs', {});
     expect(listed.ok && listed.data.pullRequests.every((pr) => !pr.repoRegistered)).toBe(true);
+  });
+});
+
+describe('ado:backlog (AL-233)', () => {
+  it("artboard 11's 48-item backlog pages and groups through the channel", async () => {
+    const { call } = await setupTeamOrg({ items: artboard11Backlog() });
+    const first = await call('ado:backlog', { page: { index: 0, size: 7 } });
+    if (!first.ok) throw new Error(first.message);
+    expect(BacklogPageSchema.parse(first.data)).toEqual(first.data);
+    expect(first.data.total).toBe(48);
+    expect(first.data.groups.map((group) => `${group.feature?.title} ${group.items.map((item) => item.id).join(',')}`)).toEqual([
+      'Job management 71360,71362,71371',
+      'Client portal 71335,71377,71380',
+      'Timesheets 71384',
+    ]);
+
+    const pages = await Promise.all([0, 1, 2].map((index) => call('ado:backlog', { team: 'OSC Developers', page: { index, size: 20 } })));
+    const rows = pages.flatMap((page) => (page.ok ? page.data.groups.flatMap((group) => group.items.map((item) => item.id)) : []));
+    expect(rows).toHaveLength(48);
+    expect(new Set(rows).size).toBe(48);
+    // Default page: the first 50.
+    const whole = await call('ado:backlog', {});
+    expect(whole.ok && whole.data.page).toEqual({ index: 0, size: 50, count: 1 });
+  });
+
+  it('filters combine with AND: portal-tagged bugs at priority 1', async () => {
+    const { call } = await setupTeamOrg({ items: artboard11Backlog() });
+    const page = await call('ado:backlog', { filters: { kinds: ['bug'], priorities: [1], tags: ['portal'] } });
+    if (!page.ok) throw new Error(page.message);
+    expect(page.data.groups.flatMap((group) => group.items.map((item) => item.id))).toEqual([71377]);
+  });
+
+  it('refuses a page size over 200 and an unknown filter before anything reaches ADO', async () => {
+    const { call, org } = await setupTeamOrg({ items: artboard11Backlog() });
+    expect(await call('ado:backlog', { page: { index: 0, size: 500 } })).toMatchObject({ ok: false, code: 'VALIDATION' });
+    expect(await call('ado:backlog', { filters: { state: 'New' } })).toMatchObject({ ok: false, code: 'VALIDATION' });
+    expect(org.state.requests).toEqual([]);
   });
 });
