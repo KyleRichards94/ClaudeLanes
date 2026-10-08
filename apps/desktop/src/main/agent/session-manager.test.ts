@@ -259,6 +259,21 @@ describe('session manager: controls', () => {
     await sessions.dispose();
   });
 
+  it('applies a model switch before the next message reaches the session, in order (AL-221 kit log)', async () => {
+    const { fake, sessions } = await setup();
+    await sessions.start({ ticketId: '71273', jobDescription: JOB });
+    const call = fake.calls[0]!;
+    await call.sentCount(1);
+
+    await sessions.setModel('71273', 'sonnet');
+    sessions.send('71273', { text: 'now with the faster model' });
+    await call.sentCount(2);
+    await sessions.stop('71273');
+
+    expect(call.log.map((entry) => entry.kind)).toEqual(['input', 'setModel', 'input', 'close']);
+    expect(call.inputs()[1]).toEqual({ text: 'now with the faster model', priority: 'next', shouldQuery: undefined });
+  });
+
   it('saves model and effort for a ticket without a live session', async () => {
     const { fake, tickets, sessions } = await setup();
     await sessions.setModel('71274', 'haiku');
