@@ -13,6 +13,7 @@ export {
   type SessionManager,
   type SessionManagerOptions,
   type SessionMessageInput,
+  type SessionResumeOptions,
   type SessionMessageListener,
   type SessionStartRequest,
 } from './session-manager';

@@ -41,6 +41,7 @@ import { createDiffService, type DiffService } from './worktrees/diff';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
+import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -108,6 +109,8 @@ export interface Services {
   readonly diffs: DiffService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
+  /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
+  readonly credentialFailures: CredentialFailureService;
 }
 
 export interface ServiceOptions {
@@ -126,6 +129,8 @@ export interface ServiceOptions {
 }
 
 export function createServices(options: ServiceOptions): Services {
+  // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
+  const late: { credentialFailures?: CredentialFailureService } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -208,6 +213,8 @@ export function createServices(options: ServiceOptions): Services {
     // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
     adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
+    // A reconnect resumes the agents a 401 paused (AL-048); created below, after the sessions.
+    onChanged: () => void late.credentialFailures?.connectionsChanged(),
   });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
@@ -226,7 +233,12 @@ export function createServices(options: ServiceOptions): Services {
   });
   const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
 
-  const ado = createAdoService({ connections, settings, log: log.child('ado') });
+  const ado = createAdoService({
+    connections,
+    settings,
+    log: log.child('ado'),
+    onUnauthorized: (connectionId) => void late.credentialFailures?.adoUnauthorized(connectionId),
+  });
 
   const sessions = createSessionManager({
     claude,
@@ -249,6 +261,8 @@ export function createServices(options: ServiceOptions): Services {
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
+  late.credentialFailures = credentialFailureService;
 
   return {
     appDataDir: options.appDataDir,
@@ -280,6 +294,7 @@ export function createServices(options: ServiceOptions): Services {
     archive,
     diffs,
     reconcile,
+    credentialFailures: credentialFailureService,
   };
 }
 
@@ -289,6 +304,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
   services.transcripts.dispose();
+  services.credentialFailures.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

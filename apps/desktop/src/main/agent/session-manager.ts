@@ -49,7 +49,7 @@ export interface SessionManager {
   /** Pause (AL-105): interrupts the current turn; messages sent from now on wait for `resume`. */
   pause(ticketId: string): Promise<Result<AgentSessionStatus>>;
   /** Resume: delivers the held messages in order, or a "continue" turn when none were sent. */
-  resume(ticketId: string): Result<AgentSessionStatus>;
+  resume(ticketId: string, options?: SessionResumeOptions): Result<AgentSessionStatus>;
   /** Stops the current turn; the session stays open for the next message. */
   interrupt(ticketId: string): Promise<Result<void>>;
   /** Saves the model on the ticket and, when its session is live, switches the session to it (D10). */
@@ -71,6 +71,14 @@ export interface SessionStartRequest {
   jobDescription?: string;
   /** The work item the launch picked (AL-161); null or absent for a "No ticket" ticket. */
   workItem?: SessionWorkItem | null;
+}
+
+export interface SessionResumeOptions {
+  /**
+   * A user turn delivered before the held messages, e.g. "Connection restored" after a reconnect
+   * (AL-048). Without it and with nothing held, Resume sends RESUME_MESSAGE.
+   */
+  opening?: string;
 }
 
 export interface SessionMessageInput {
@@ -384,15 +392,17 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       return ok(statusOf(ticketId, session));
     },
 
-    resume(ticketId) {
+    resume(ticketId, resumeOptions = {}) {
       const found = live(ticketId);
       if (!found.ok) return found;
       const session = found.data;
       if (!session.paused) return ok(statusOf(ticketId, session));
       session.paused = false;
       const held = session.held.splice(0);
-      for (const message of held.length > 0 ? held : [userMessage({ text: RESUME_MESSAGE })]) session.input.push(message);
-      setState(session, held.length > 0 && held.every((message) => message.shouldQuery === false) ? 'idle' : 'running');
+      const opening = resumeOptions.opening?.trim() ? [userMessage({ text: resumeOptions.opening })] : [];
+      const turns = opening.length > 0 || held.length > 0 ? [...opening, ...held] : [userMessage({ text: RESUME_MESSAGE })];
+      for (const message of turns) session.input.push(message);
+      setState(session, turns.every((message) => message.shouldQuery === false) ? 'idle' : 'running');
       return ok(statusOf(ticketId, session));
     },
 
