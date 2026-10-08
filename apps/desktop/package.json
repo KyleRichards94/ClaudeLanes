@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json",
     "lint": "eslint src e2e scripts",
     "e2e": "electron-vite build && playwright test",
-    "package": "electron-vite build && electron-builder --win",
+    "package": "electron-vite build --mode release && electron-builder --win",
     "e2e:packaged": "pnpm run package && playwright test -c playwright.packaged.config.ts",
     "icon": "node scripts/app-icon.mts"
   },
