@@ -38,6 +38,8 @@ export interface FakeWorkItem {
   boardColumn?: string;
   /** Links, as `$expand=relations` returns them (branches and pull requests are `ArtifactLink`s). */
   relations?: Array<{ rel: string; url: string; attributes?: { name?: string } }>;
+  /** The item's revision; 3 until a fake PATCH raises it (AL-236). */
+  rev?: number;
 }
 
 /** The board column field the fake team board (AL-231) names in its board settings. */
@@ -260,7 +262,7 @@ function toAdo(found: FakeWorkItem, fields: string[], orgUrl: string) {
       return field && value !== undefined && value !== '' ? [[field.name, value]] : [];
     }),
   );
-  return { id: found.id, rev: 3, fields: values, url: `${orgUrl}/_apis/wit/workItems/${found.id}` };
+  return { id: found.id, rev: found.rev ?? 3, fields: values, url: `${orgUrl}/_apis/wit/workItems/${found.id}` };
 }
 
 // ── A small WIQL interpreter ─────────────────────────────────────────────────────────────────────

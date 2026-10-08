@@ -15,6 +15,8 @@ export * from './domains/ado.active-prs';
 export * from './domains/ado.backlog';
 export * from './domains/agent.schemas';
 export * from './domains/agent.usage';
+export * from './domains/agent.status';
+export * from './domains/agent.launch-from-ado';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';
 export * from './domains/build.display';

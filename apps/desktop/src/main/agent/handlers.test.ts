@@ -1,3 +1,4 @@
+import type { Services } from '../services';
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import type { TicketRecordStore } from '../tickets';
@@ -31,6 +32,8 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
       usage: createUsageService({ sessions, emit: recordingEmit().emit }),
       recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }),
       launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }),
+      // Launch from the team board (AL-236) has its own tests.
+      adoLauncher: {} as Services['adoLauncher'],
     }),
     stages,
     emit,
