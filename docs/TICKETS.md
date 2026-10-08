@@ -1,4 +1,4 @@
-# Agent Lanes — Build Plan and Tickets
+done |done |# Agent Lanes — Build Plan and Tickets
 
 This is the build plan for a feature-complete Agent Lanes, and the place its progress is tracked.
 It is derived from the design brief (`docs/design/DESIGN.md`, cited as `§n` and `Rn`) and the seven
@@ -1803,6 +1803,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 
 | 2026-10-08 | Merged AL-100, AL-102, AL-103, AL-104, AL-105 (batch b11: session manager, output normalisation, stage protocol, gates, messages) as partial; open criteria need a real Claude session. Integration was interrupted by a pause for a Git upgrade (2.56.0) and finished by hand: `pnpm verify` green (2,687 tests), e2e 105/105 on rerun; 3 e2e tests failed once under load and passed on rerun, to be hardened under AL-220. |
 | 2026-10-08 | Added epic E14 (AL-230–AL-241) from the add-on brief "Team Board & Drag-to-Agent" (Kyle, rev 27): team ADO board under the lanes, drag-to-agent with drop rules, Backlog popout, 10 s Undo; only To Do/Failed → Planning/Implementing changes ADO. Copy in `docs/design/DESIGN-team-board.md`, artboards 08–12. |
+| 2026-10-08 | Merged AL-163, AL-164 (batch b16: model and effort pickers, workspace preview and stage gates), both done. The run that merged them stopped on a usage limit before recording them; verified by hand: `pnpm verify` green (2,705 tests), e2e 106/106 on rerun (one load-related flake on the first run, tracked under AL-220). |
 ---
 
 ## 7. Parallel build rules
