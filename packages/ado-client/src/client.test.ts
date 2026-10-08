@@ -120,6 +120,25 @@ describe('request', () => {
     expect(versions).toEqual(['7.1', '7.1-preview', '7.1-preview']);
   });
 
+  it("logs the server's reason for a failure, with the token redacted", async () => {
+    server.use(
+      http.patch(`${ORG_URL}/_apis/wit/workitems/:id`, () =>
+        HttpResponse.json(
+          { message: `TF401320: Rule Error for field State. Token ${FAKE_PAT} was used.`, typeKey: 'RuleValidationException' },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const { client, logs } = createTestClient();
+    const result = await client.request({ method: 'PATCH', path: '/_apis/wit/workitems/1', body: [], schema: z.unknown() });
+
+    expect(result.ok).toBe(false);
+    const line = logs.find((entry) => entry.level === 'error')?.message ?? '';
+    expect(line).toContain('→ 400 · RuleValidationException: TF401320: Rule Error for field State.');
+    expect(line).not.toContain(FAKE_PAT);
+  });
+
   it('does not retry a 400 that is not about the api-version', async () => {
     let calls = 0;
     server.use(

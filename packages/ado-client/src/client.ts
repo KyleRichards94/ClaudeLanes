@@ -310,8 +310,11 @@ export function createAdoClient(options: AdoClientOptions): Result<AdoClient> {
         }
       }
       if (status < 200 || status >= 300) {
-        log({ ...entry, status, level: 'error', message: `${method} ${where} → ${status}` });
-        return httpError({ ...failure, where, ...parseAdoErrorBody(text) });
+        const body = parseAdoErrorBody(text);
+        // The server's own reason (TF… code and message) makes a failure diagnosable from the log; `log` redacts it.
+        const reason = body.adoMessage ? ` · ${body.adoTypeKey ? `${body.adoTypeKey}: ` : ''}${oneLine(body.adoMessage, 400)}` : '';
+        log({ ...entry, status, level: 'error', message: `${method} ${where} → ${status}${reason}` });
+        return httpError({ ...failure, where, ...body });
       }
 
       log({ ...entry, status, level: 'debug', message: `${method} ${where} → ${status} in ${durationMs} ms` });
@@ -450,6 +453,12 @@ export function createApiVersionNegotiator() {
   }
 
   return { effective, learn };
+}
+
+/** Whitespace collapsed to single spaces, cut to `max` characters. */
+function oneLine(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
 function isPositive(value: number): boolean {
