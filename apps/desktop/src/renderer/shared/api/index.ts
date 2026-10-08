@@ -45,6 +45,7 @@ export {
   type AdoQueryOptions,
   type AdoScope,
 } from './ado';
+export { teamBoardKeys, useActivePrs, useBacklogTotal, useTeamBoard } from './team-board';
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';

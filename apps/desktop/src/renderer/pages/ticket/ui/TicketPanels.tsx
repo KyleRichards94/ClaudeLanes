@@ -1,16 +1,20 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { formatTokenCount, type TicketSubBranch } from '@agent-lanes/contracts';
-import { color, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel, Icon, Pill, Text } from '@agent-lanes/ui';
-import { EFFORT_LABELS, MODEL_LABELS, modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { subagentCountsLabel, type TicketSubBranch } from '@agent-lanes/contracts';
+import { color, space } from '@agent-lanes/tokens';
+import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
+import { subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
+import { ModelEffortControls } from '@/features/change-model';
+import { MergeControls } from '@/features/merge-branches';
+import { useBranchStatus } from '@/shared/api';
 import { ErrorBoundary } from '@/shared/ui';
+import { subBranchRows } from '../lib/sub-branch-rows';
 
 /**
- * The drill-in's panels as read-only summaries (artboard 3). The controls inside them are later
- * tickets' features: model and effort switching (AL-172), Build / Run / Stop (AL-173), the merges
- * (AL-174), the sub-agent tree (AL-177) and sub-branch status (AL-178). Each panel has its own error
+ * The drill-in's panels (artboard 3): model and effort switching (AL-172), Build / Run / Stop
+ * (AL-173), the merges (AL-174), the sub-agent tree (AL-177) and sub-branch status (AL-178). Each panel has its own error
  * boundary, so one failing panel leaves the rest of the page working (design §12).
  */
 
@@ -39,22 +43,11 @@ export function Panel({ title, aside, children, testID, style }: PanelProps) {
   );
 }
 
+/** Model on a track and effort as pills; a change shows "Switching · next turn" until it applies (AL-172). */
 export function AgentPanel({ ticket }: { ticket: AgentTicket }) {
   return (
     <Panel title="Agent" testID="agent-panel" style={styles.flexPanel}>
-      <View style={styles.valueRow}>
-        <ValueChip label={MODEL_LABELS[ticket.model]} strong />
-        <ValueChip label={EFFORT_LABELS[ticket.effort]} />
-      </View>
-      {ticket.switching ? (
-        <Pill
-          tone="ado"
-          label={`Switching to ${modelEffortLabel(ticket.switching.model, ticket.switching.effort)} · next turn`}
-          testID="agent-switching"
-        />
-      ) : (
-        <Text variant="meta">Model and effort apply from the next turn when changed.</Text>
-      )}
+      <ModelEffortControls ticket={ticket} />
     </Panel>
   );
 }
@@ -77,66 +70,57 @@ export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
   );
 }
 
-export function MergePanel({ ticket, subBranches }: { ticket: AgentTicket; subBranches: readonly TicketSubBranch[] }) {
-  const unmerged = subBranches.filter((sub) => sub.mergedAt === null).length;
+/** Merge sub-branches and Merge worktree → main, with the confirm and conflict flows (AL-174, features/merge-branches). */
+export function MergePanel({ ticket }: { ticket: AgentTicket }) {
   return (
     <Panel title="Merge" testID="merge-panel" style={styles.flexPanel}>
-      <View style={styles.mergeRow}>
-        <Text variant="title" numberOfLines={1} style={styles.flexText}>
-          {`Merge ${unmerged} sub-branch${unmerged === 1 ? '' : 'es'} → ${ticket.branch}`}
-        </Text>
-        <Icon name="merge" color={color.muted} size={16} />
-      </View>
-      <View style={[styles.mergeRow, styles.mergeMain]}>
-        <Text variant="title" color={color.surface} numberOfLines={1} style={styles.flexText}>
-          {`Merge worktree → ${ticket.baseBranch}`}
-        </Text>
-        <Icon name="arrow-right" color={color.surface} size={16} />
-      </View>
+      <MergeControls ticket={ticket} />
     </Panel>
   );
 }
 
+/**
+ * The lead agent and the sub-agent tree with each one's status, line, model · effort and branch
+ * (AL-177, entities/sub-agent). The tree is read with `agent:getSubagents` and kept current by
+ * `agent:subagent`; until it loads, the counts come from the card's. The lead agent's tokens come from
+ * the live session usage (AL-113) when it has them, else from the tree.
+ */
 export function SubAgentsPanel({ ticket, leadTokens }: { ticket: AgentTicket; leadTokens?: number }) {
-  const { running, done, queued, failed } = ticket.subAgents;
-  const counts = [
-    running ? `${running} running` : null,
-    done ? `${done} done` : null,
-    queued ? `${queued} queued` : null,
-    failed ? `${failed} failed` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const subAgents = useSubAgents(ticket.id);
+  const counts = subAgents.data?.counts ?? ticket.subAgents;
+  const tree = subAgentTree(subAgents.data?.nodes ?? []);
+  const lead = { stage: ticket.stage, model: ticket.model, effort: ticket.effort };
+  const total = subAgents.data ? subAgents.data.nodes.length : subAgentTotal(ticket.subAgents);
+  const countsLabel = subagentCountsLabel(counts);
 
   return (
     <Panel
       title="Sub-agents"
       testID="sub-agents-panel"
-      aside={<Text variant="meta">{counts || 'None yet'}</Text>}
+      aside={
+        <Text variant="meta" testID="sub-agents-counts">
+          {countsLabel === 'none yet' ? 'None yet' : countsLabel}
+        </Text>
+      }
     >
-      <View style={styles.leadCard} testID="lead-agent">
-        <View style={styles.leadText}>
-          <Text variant="title" size="lg" color={color.surface}>
-            Lead agent
-          </Text>
-          <Text variant="body" size="sm" color={color.surface}>
-            {`${modelEffortLabel(ticket.model, ticket.effort)} · ${subAgentTotal(ticket.subAgents) > 0 ? 'orchestrating' : 'working alone'}`}
-          </Text>
-        </View>
-        {leadTokens ? (
-          // "212k tokens" (artboard 3, AL-113): the lead agent's own tokens.
-          <View style={styles.leadTokens} testID="lead-agent-tokens">
-            <Text variant="mono" size="sm" color={color.surface}>
-              {formatTokenCount(leadTokens)}
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={leadTokens && leadTokens > 0 ? leadTokens : (subAgents.data?.leadTokens ?? null)} />
+      {tree.length > 0 ? (
+        <SubAgentList items={tree} lead={lead} />
+      ) : subAgents.isError ? (
+        <Text variant="meta">{"Couldn't load the sub-agents."}</Text>
+      ) : null}
     </Panel>
   );
 }
 
+/**
+ * The ticket's `sub/…` branches with "N ahead" and Ready, and the branch they merge into (AL-178).
+ * `branches:status` is read again after each merge and when a sub-agent starts or finishes (AL-085,
+ * AL-086, AL-107), so the rows follow both.
+ */
 export function SubBranchesPanel({ ticket, subBranches }: { ticket: AgentTicket; subBranches: readonly TicketSubBranch[] }) {
+  const status = useBranchStatus(ticket.id);
+  const rows = subBranchRows(status.data?.subBranches, subBranches);
   return (
     <Panel
       title="Sub-branches"
@@ -147,29 +131,22 @@ export function SubBranchesPanel({ ticket, subBranches }: { ticket: AgentTicket;
         </Text>
       }
     >
-      {subBranches.length === 0 ? (
+      {rows.length === 0 ? (
         <Text variant="meta">Writer sub-agents get their own branches here.</Text>
       ) : (
-        subBranches.map((sub) => (
-          <View key={sub.branch} style={styles.subBranch}>
-            <Text variant="mono" selectable numberOfLines={1} style={styles.flexText}>
-              {sub.branch}
-            </Text>
-            {sub.mergedAt !== null ? <Pill label="Merged" tone="ok" /> : null}
-          </View>
-        ))
+        <View role="list">
+          {rows.map((row) => (
+            <View key={row.branch} role="listitem" style={styles.subBranch} testID={`sub-branch-${row.branch}`}>
+              <Text variant="mono" selectable numberOfLines={1} style={styles.flexText}>
+                {row.branch}
+              </Text>
+              {row.ahead ? <Text variant="meta">{row.ahead}</Text> : null}
+              {row.state ? <Pill label={row.state.label} tone={row.state.tone} /> : null}
+            </View>
+          ))}
+        </View>
       )}
     </Panel>
-  );
-}
-
-function ValueChip({ label, strong = false }: { label: string; strong?: boolean }) {
-  return (
-    <View style={[styles.valueChip, strong && styles.valueChipStrong]}>
-      <Text variant="title" color={strong ? color.claudeText : color.ink}>
-        {label}
-      </Text>
-    </View>
   );
 }
 
@@ -192,58 +169,8 @@ const styles = StyleSheet.create({
   branch: {
     flexShrink: 1,
   },
-  valueRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-    marginBottom: space.sm,
-  },
-  valueChip: {
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    borderRadius: radius.control,
-    backgroundColor: color.surface,
-    borderWidth: 1,
-    borderColor: color.line,
-  },
-  valueChipStrong: {
-    borderColor: color.claudeTint,
-  },
-  mergeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    minHeight: 44,
-    paddingHorizontal: space.lg,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-    marginBottom: space.sm,
-  },
-  mergeMain: {
-    backgroundColor: color.ink,
-    borderColor: color.ink,
-  },
   flexText: {
     flex: 1,
-  },
-  leadCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.card,
-    backgroundColor: color.claude,
-  },
-  leadText: {
-    flex: 1,
-    gap: space.xs,
-  },
-  leadTokens: {
-    paddingHorizontal: space.sm + 2,
-    paddingVertical: space.xs,
-    borderRadius: radius.pill,
-    backgroundColor: color.claudeText,
   },
   subBranch: {
     flexDirection: 'row',

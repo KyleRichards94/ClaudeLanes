@@ -15,6 +15,8 @@ import {
   type ProgressTone,
 } from '@agent-lanes/ui';
 import { BuildRunControlsView, type BuildRunControlsViewProps } from '@/features/build-run';
+import { ModelEffortControlsView, type ModelEffortControlsViewProps } from '@/features/change-model';
+import { MergeControlsView, type MergePanel } from '@/features/merge-branches';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
 
 /** The drill-in's Worktree panel in its build and run states (AL-173), with no actions behind it. */
@@ -36,6 +38,42 @@ const worktreeStates: readonly { state: string; ticket: BuildRunControlsViewProp
   },
 ];
 const ignore = () => undefined;
+
+/** The drill-in's Agent panel steady and while a model change waits for the next turn (AL-172). */
+const agentStates: readonly { state: string; ticket: ModelEffortControlsViewProps['ticket'] }[] = [
+  { state: 'Opus · XHigh', ticket: { id: 'gallery', model: 'opus', effort: 'xhigh', stage: 'implementing', switching: null } },
+  {
+    state: 'Switching',
+    ticket: { id: 'gallery', model: 'opus', effort: 'xhigh', stage: 'implementing', switching: { model: 'sonnet', effort: 'high', requestedAt: 0 } },
+  },
+];
+
+/** The drill-in's Merge panel ready, refused on a dirty worktree, and stopped on a conflict (AL-174). */
+const branch = '71273-cutover-job-control';
+const mergeStates: readonly { state: string; view: MergePanel }[] = [
+  {
+    state: 'Ready',
+    view: { subBranches: { label: `Merge 3 sub-branches → ${branch}`, disabledReason: null }, toMain: { label: 'Merge worktree → main', disabledReason: null }, conflicted: false, readyCount: 3 },
+  },
+  {
+    state: 'Dirty worktree',
+    view: {
+      subBranches: { label: `Merge 3 sub-branches → ${branch}`, disabledReason: 'The worktree has 2 uncommitted changes.' },
+      toMain: { label: 'Merge worktree → main', disabledReason: 'The worktree has 2 uncommitted changes.' },
+      conflicted: false,
+      readyCount: 3,
+    },
+  },
+  {
+    state: 'Conflict',
+    view: {
+      subBranches: { label: `Merge 1 sub-branch → ${branch}`, disabledReason: 'A merge is stopped on conflicts.' },
+      toMain: { label: 'Merge worktree → main', disabledReason: 'A merge is stopped on conflicts.' },
+      conflicted: true,
+      readyCount: 1,
+    },
+  },
+];
 
 /** One card on artboard 6. Built from the primitives; the board's own card is AL-144's AgentTicketCard. */
 interface CardState {
@@ -182,6 +220,20 @@ export function CardStatesSheet() {
             testID="gallery-toast-error"
           />
         </GalleryBlock>
+        {agentStates.map((sample) => (
+          <GalleryBlock key={sample.state} title={`Agent · ${sample.state}`} style={styles.wideBlock}>
+            <View style={styles.badgePanel}>
+              <ModelEffortControlsView ticket={sample.ticket} onModel={ignore} onEffort={ignore} />
+            </View>
+          </GalleryBlock>
+        ))}
+        {mergeStates.map((sample) => (
+          <GalleryBlock key={sample.state} title={`Merge · ${sample.state}`} style={styles.wideBlock}>
+            <View style={styles.badgePanel}>
+              <MergeControlsView view={sample.view} onMergeSubBranches={ignore} onMergeToMain={ignore} onViewConflict={ignore} />
+            </View>
+          </GalleryBlock>
+        ))}
         {worktreeStates.map((sample) => (
           <GalleryBlock key={sample.state} title={`Worktree · ${sample.state}`} style={styles.wideBlock}>
             <View style={styles.badgePanel}>

@@ -116,7 +116,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       <View style={styles.panels}>
         <AgentPanel ticket={ticket} />
         <WorktreePanel ticket={ticket} />
-        <MergePanel ticket={ticket} subBranches={subBranches} />
+        <MergePanel ticket={ticket} />
       </View>
 
       {/* The Create PR stage (AL-181): from entering Create PR, and for as long as the ticket has a PR. */}
