@@ -156,7 +156,8 @@ describe('launch from the team board (AL-236)', () => {
     const input = deps.worktrees.create.mock.calls[0]![0];
     expect(input).toMatchObject({
       repo: REPO,
-      subject: { kind: 'work-item', ado: { orgUrl: FAKE_TEAM_ORG_URL, project: FAKE_TEAM_PROJECT, workItemId: 71318 }, title: 'Quote PDF totals round incorrectly' },
+      // From Failed: the agent may answer the QA failure on the work item (the comment gate).
+      subject: { kind: 'work-item', ado: { orgUrl: FAKE_TEAM_ORG_URL, project: FAKE_TEAM_PROJECT, workItemId: 71318, fromFailed: true }, title: 'Quote PDF totals round incorrectly' },
       model: 'opus',
       effort: 'high',
       skills: [],
@@ -174,6 +175,9 @@ describe('launch from the team board (AL-236)', () => {
     expect(result).toMatchObject({ ok: true, data: { adoChange: { previousState: 'New', state: 'Active' } } });
     expect(item(71335)).toMatchObject({ state: 'Active', assignedTo: PEOPLE.KR });
     expect(deps.worktrees.create.mock.calls[0]![0].gates?.planning).toBe('auto');
+    // Not from Failed: no QA failure to answer.
+    expect(deps.worktrees.create.mock.calls[0]![0].subject).toMatchObject({ kind: 'work-item', ado: { workItemId: 71335 } });
+    expect(deps.worktrees.create.mock.calls[0]![0].subject).not.toHaveProperty('ado.fromFailed');
     expect(launcher.startLane('71335')).toBe('implementing');
   });
 

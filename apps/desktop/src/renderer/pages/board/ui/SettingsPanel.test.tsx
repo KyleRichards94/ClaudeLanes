@@ -126,12 +126,12 @@ describe('SettingsPanel', () => {
     type('settings-repo-worktree-root', 'D:\\worktrees');
     type('settings-repo-run-command', 'dotnet run --project OnSite.Web');
     type('settings-repo-max-agents', '2');
-    fireEvent.click(screen.getByRole('switch', { name: 'Post stage comments to Azure DevOps On' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Post a comment to the work item on each stage change Off' }));
 
     fireEvent.click(save());
     await waitFor(() => expect(fake.updates).toHaveLength(1));
     expect(fake.settings.repos).toEqual([
-      { ...osc, baseBranch: 'develop', worktreeRoot: 'D:\\worktrees', runCommand: 'dotnet run --project OnSite.Web', maxConcurrentAgents: 2, adoWriteBack: false },
+      { ...osc, baseBranch: 'develop', worktreeRoot: 'D:\\worktrees', runCommand: 'dotnet run --project OnSite.Web', maxConcurrentAgents: 2, adoWriteBack: true },
       lanes,
     ]);
   });
@@ -164,6 +164,19 @@ describe('SettingsPanel', () => {
     expect(fake.updates).toEqual([]);
   });
 
+  it('runs agents in Auto permission mode by default, and saves Accept edits or Ask', async () => {
+    renderPanel();
+    const auto = await screen.findByRole('radio', { name: 'Auto' });
+    expect(auto.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('settings-permission-mode-help').textContent).toContain("Claude Code's auto mode");
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Ask' }));
+    expect(screen.getByTestId('settings-permission-mode-help').textContent).toContain('Every edit asks');
+    fireEvent.click(screen.getByTestId('settings-save'));
+    await waitFor(() => expect(fake.updates).toHaveLength(1));
+    expect(fake.updates[0]).toEqual({ agentPermissions: { mode: 'ask', edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: [] } });
+  });
+
   it('has a control for every setting the app uses (tokens are in Connections)', async () => {
     // Each stored setting and the label of its control. A new setting fails here until the panel edits it.
     const controls: Record<string, string | null> = {
@@ -185,7 +198,7 @@ describe('SettingsPanel', () => {
       'repo.buildCommand': 'Build command',
       'repo.runCommand': 'Run command',
       'repo.maxConcurrentAgents': 'Agents at once',
-      'repo.adoWriteBack': 'Post stage comments to Azure DevOps',
+      'repo.adoWriteBack': 'Post a comment to the work item on each stage change',
     };
     const stored = [
       ...Object.keys(SettingsSchema.shape).filter((key) => key !== 'defaults'),

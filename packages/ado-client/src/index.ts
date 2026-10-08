@@ -90,6 +90,7 @@ export {
   type TeamBoardOptions,
   type TeamCallOptions,
 } from './team-board';
+export { adoColor, getWorkItemColors, type WorkItemColorsOptions } from './work-item-colors';
 export {
   ACTIVE_PRS_PAGE_SIZE,
   isUnresolvedThread,

@@ -1,4 +1,4 @@
-import { DROP_KINDS, DROP_KIND_LABELS, EFFORTS, MODELS, STAGES, type RepoSettings, type Settings } from '@agent-lanes/contracts';
+import { DROP_KINDS, DROP_KIND_LABELS, EFFORTS, MODELS, STAGES, type AgentPermissionMode, type RepoSettings, type Settings } from '@agent-lanes/contracts';
 import { useId, useMemo, useReducer, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { color, space } from '@agent-lanes/tokens';
@@ -140,6 +140,17 @@ interface SectionProps {
 
 const MODEL_OPTIONS = MODELS.map((model) => ({ value: model, label: MODEL_LABELS[model] }));
 const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_LABELS[effort] }));
+const PERMISSION_MODE_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'accept-edits', label: 'Accept edits' },
+  { value: 'ask', label: 'Ask' },
+] as const;
+/** What each permission mode means, under the control. */
+const PERMISSION_MODE_HELP: Readonly<Record<AgentPermissionMode, string>> = {
+  auto: "Claude Code's auto mode: lower-risk actions go ahead and risky ones are blocked. Only what it blocks or can't decide asks on the card.",
+  'accept-edits': "Edits in the ticket's worktree go ahead. Other tools ask on the card unless allowed below.",
+  ask: 'Every edit asks on the card too, as do other tools not allowed below.',
+};
 
 /**
  * Settings › Drops (AL-240, TB§3): the skills, model and effort each kind of team board drop starts its
@@ -234,12 +245,21 @@ function DefaultsSection({ draft, errors, dispatch }: SectionProps) {
 
       {/* What headless agents do without asking (AL-109, D18); everything else shows "Needs you · permission". */}
       <Heading>Agent permissions</Heading>
-      <Switch
-        label="Edit files in the ticket's worktree without asking"
-        value={draft.permissions.acceptEdits}
-        stateText={{ on: 'On', off: 'Ask' }}
-        onValueChange={(value) => dispatch({ type: 'permission', field: 'acceptEdits', value })}
-      />
+      <View style={styles.gates} testID="settings-permission-mode">
+        <Text variant="title" size="md" aria-hidden>
+          Permission mode
+        </Text>
+        <SegmentedControl
+          label="Permission mode"
+          options={PERMISSION_MODE_OPTIONS}
+          value={draft.permissions.mode}
+          onChange={(mode) => dispatch({ type: 'permissionMode', mode })}
+          fill
+        />
+        <Text variant="meta" size="sm" testID="settings-permission-mode-help">
+          {PERMISSION_MODE_HELP[draft.permissions.mode]} Applies to new agents and to running ones.
+        </Text>
+      </View>
       <Switch
         label="Run git read commands (status, diff, log, show)"
         value={draft.permissions.gitRead}
@@ -347,7 +367,7 @@ function RepoFields({ repo, draft, errors, dispatch, onForget }: SectionProps & 
         testID="settings-repo-max-agents"
       />
       <Switch
-        label="Post stage comments to Azure DevOps"
+        label="Post a comment to the work item on each stage change"
         value={values.adoWriteBack}
         stateText={{ on: 'On', off: 'Off' }}
         onValueChange={(value) => dispatch({ type: 'repoWriteBack', repo, value })}

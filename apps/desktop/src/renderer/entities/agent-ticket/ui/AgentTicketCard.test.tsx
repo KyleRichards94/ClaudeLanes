@@ -147,6 +147,20 @@ describe('AgentTicketCard', () => {
     expect(screen.getByRole('progressbar').getAttribute('aria-label')).toMatch(/progress$/);
   });
 
+  it("draws ADO's type colour as a bar by the id and the state colour as a dot before the state's name", () => {
+    render(<AgentTicketCard ticketId={ID} store={runningStore()} adoState="Active" typeColor="#009CCC" stateColor="#007ACC" testID="ticket" />);
+    expect(getComputedStyle(screen.getByTestId('ticket-type')).backgroundColor).toBe(rgb('#009CCC'));
+    expect(getComputedStyle(screen.getByTestId('ticket-state-dot')).backgroundColor).toBe(rgb('#007ACC'));
+    // The state is still said in words.
+    expect(screen.getByTestId('ticket-state').textContent).toBe('Active');
+  });
+
+  it('falls back to the token colours when ADO colours are unknown', () => {
+    render(<AgentTicketCard ticketId={ID} store={runningStore()} adoState="Active" testID="ticket" />);
+    expect(getComputedStyle(screen.getByTestId('ticket-type')).backgroundColor).toBe(rgb(tone.ado.dot));
+    expect(getComputedStyle(screen.getByTestId('ticket-state-dot')).backgroundColor).toBe(rgb(tone.neutral.dot));
+  });
+
   it('shows the violet outline when selected', () => {
     render(<AgentTicketCard ticketId={ID} store={runningStore()} selected testID="ticket" />);
     expect(getComputedStyle(screen.getByTestId('ticket-card')).borderTopColor).toBe(rgb(tone.claude.border));

@@ -11,5 +11,6 @@ export const ADO_INVOKE_CHANNELS = [
   'ado:teamBoard',
   'ado:activePrs',
   'ado:backlog',
+  'ado:workItemColors',
 ] as const;
 export const ADO_EVENT_CHANNELS = [] as const;

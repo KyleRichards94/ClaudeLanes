@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS, dropDefaultsOf, dropKindOf } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, agentPermissionPolicy, dropDefaultsOf, dropKindOf } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -10,7 +10,7 @@ import { createSessionManager, type SessionManager } from './agent/session-manag
 import { createUsageService, type UsageService } from './agent/usage/usage-service';
 import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
-import { createPermissionService, type PermissionService } from './agent/permissions';
+import { createPermissionService, sdkPermissionMode, type PermissionService } from './agent/permissions';
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
@@ -208,12 +208,16 @@ export function createServices(options: ServiceOptions): Services {
   const settings: SettingsService = {
     get: () => settingsStore.get(),
     update(patch) {
+      const modeBefore = agentPermissionMode(agentPermissionPolicy(settingsStore.get()));
       const result = settingsStore.update(patch);
       // A larger queue size starts waiting jobs straight away.
       if (result.ok) {
         buildQueue.refresh();
         // A raised agent cap starts queued launches (AL-111).
         void launches.refresh();
+        // A new permission mode reaches running agents too, not only new sessions.
+        const mode = agentPermissionMode(agentPermissionPolicy(result.data));
+        if (mode !== modeBefore) void sessions.setPermissionMode(sdkPermissionMode(mode));
       }
       return result;
     },
@@ -411,7 +415,7 @@ export function createServices(options: ServiceOptions): Services {
   const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
-  const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
+  const permissions = createPermissionService({ settings, tickets, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([
     stageExtras,
     mcpSessionExtras({ connections, log: log.child('agent') }),

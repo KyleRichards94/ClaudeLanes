@@ -17,7 +17,7 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 export type ClaudeQuery = AsyncIterable<SDKMessage> &
   Pick<
     Query,
-    'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings' | 'mcpServerStatus' | 'reconnectMcpServer' | 'getContextUsage' | 'supportedCommands'
+    'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'setPermissionMode' | 'applyFlagSettings' | 'mcpServerStatus' | 'reconnectMcpServer' | 'getContextUsage' | 'supportedCommands'
   >;
 
 export type ClaudeQueryFunction = (params: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => ClaudeQuery;

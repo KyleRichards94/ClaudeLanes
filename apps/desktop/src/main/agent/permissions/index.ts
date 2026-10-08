@@ -2,9 +2,25 @@ export {
   PERMISSION_CANCELLED_MESSAGE,
   PERMISSION_DENIED_MESSAGE,
   createPermissionService,
+  sdkPermissionMode,
   toolDetail,
   toolLabel,
   type PermissionService,
   type PermissionServiceOptions,
 } from './permission-service';
-export { GIT_READ_COMMANDS, allowedBashPrefixes, bashAllowRules, bashCommandAllowed, testCommands } from './policy';
+export {
+  GIT_READ_COMMANDS,
+  QA_FAILED_HEADING,
+  QA_FAIL_ANSWER_HEADING,
+  WORK_ITEM_COMMENT_DENIED,
+  WORK_ITEM_COMMENT_RULE,
+  allowedBashPrefixes,
+  bashAllowRules,
+  bashCommandAllowed,
+  testCommands,
+  workItemCommentBody,
+  workItemCommentKind,
+  workItemCommentVerdict,
+  type WorkItemCommentKind,
+  type WorkItemCommentVerdict,
+} from './policy';

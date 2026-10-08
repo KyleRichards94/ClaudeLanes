@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, IdChip, Text } from '@agent-lanes/ui';
 import { LaneDragCard } from '@/features/drag-to-lane';
+import { FALLBACK_TYPE_COLOR, WorkItemStateLabel } from '@/shared/ui';
 import type { TeamBoardAvatar, TeamBoardItemView, TeamBoardPullRequestView } from '../model/view';
 
 /** A 24 px initials circle: violet for the signed-in user ("KR"), grey for others, dashed "+" when unassigned (artboard 08). */
@@ -42,6 +43,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
   const summary = [
     `${card.idLabel} ${card.type}`,
     card.title,
+    card.state ? `state ${card.state}` : null,
     card.detail,
     card.avatar ? `assigned to ${card.avatar.mine ? 'you' : card.avatar.name}` : 'unassigned',
     card.lock ? `locked: ${card.lock}` : null,
@@ -50,7 +52,12 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
     .filter(Boolean)
     .join(', ');
   return (
-    <LaneDragCard drag={card.drag} label={summary} style={[styles.card, card.agentTag ? styles.cardAgent : null]} testID={`team-card-${card.id}`}>
+    <LaneDragCard
+      drag={card.drag}
+      label={summary}
+      style={[styles.card, styles.typeEdge, { borderLeftColor: card.typeColor ?? FALLBACK_TYPE_COLOR }, card.agentTag ? styles.cardAgent : null]}
+      testID={`team-card-${card.id}`}
+    >
       <View style={styles.cardTop}>
         <Grip enabled={card.draggable} />
         <IdChip id={card.id} />
@@ -62,9 +69,14 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
         {card.title}
       </Text>
       <View style={styles.cardFooter}>
-        <Text variant="meta" numberOfLines={1} style={styles.flexText}>
-          {card.detail ?? ''}
-        </Text>
+        <View style={styles.footerText}>
+          {card.state ? <WorkItemStateLabel state={card.state} stateColor={card.stateColor} testID={`team-card-${card.id}-state`} /> : null}
+          {card.detail ? (
+            <Text variant="meta" numberOfLines={1} style={styles.detail}>
+              {card.state ? `· ${card.detail}` : card.detail}
+            </Text>
+          ) : null}
+        </View>
         <Avatar avatar={card.avatar} />
       </View>
       {card.lock ? (
@@ -133,8 +145,14 @@ const styles = StyleSheet.create({
     borderColor: color.line,
     backgroundColor: color.surface,
   },
+  /** ADO's board marks each card's type with a coloured left edge; so does this one. */
+  typeEdge: {
+    borderLeftWidth: 4,
+  },
   cardAgent: {
-    borderColor: tone.claude.border,
+    borderTopColor: tone.claude.border,
+    borderRightColor: tone.claude.border,
+    borderBottomColor: tone.claude.border,
   },
   cardTop: {
     flexDirection: 'row',
@@ -152,6 +170,16 @@ const styles = StyleSheet.create({
   },
   flexText: {
     flex: 1,
+  },
+  footerText: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    minWidth: 0,
+  },
+  detail: {
+    flexShrink: 0,
   },
   band: {
     flexDirection: 'row',

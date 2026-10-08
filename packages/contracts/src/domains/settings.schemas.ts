@@ -53,16 +53,17 @@ export const RepoSettingsSchema = z.object({
   runCommand: z.string().min(1).nullable(),
   maxConcurrentAgents: z.int().min(1).max(MAX_CONCURRENT_AGENTS_LIMIT),
   /**
-   * Post stage comments to this repo's work items (design §7 "ADO write-back", AL-146, AL-115).
-   * Optional so repos saved before AL-146 stay valid; leaving it out means on (`repoAdoWriteBack`).
+   * Post a comment to this repo's work items on each stage change (design §7 "ADO write-back",
+   * AL-146, AL-115). Opt-in: optional so saved repos stay valid, and leaving it out means off
+   * (`repoAdoWriteBack`).
    */
   adoWriteBack: z.boolean().optional(),
 });
 export type RepoSettings = z.infer<typeof RepoSettingsSchema>;
 
-/** Whether the repo's tickets write stage comments back to ADO; on unless the user turned it off. */
+/** Whether the repo's tickets write stage comments back to ADO; off unless the user turned it on. */
 export function repoAdoWriteBack(repo: RepoSettings): boolean {
-  return repo.adoWriteBack ?? true;
+  return repo.adoWriteBack ?? false;
 }
 
 export const ReposSchema = z
@@ -101,11 +102,33 @@ export const UiPrefsSchema = z.object({
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
 /**
+ * How a ticket's agent session settles what it may do (Settings › Agent defaults › Permission mode):
+ * - `auto`: Claude Code's auto mode; a classifier allows lower-risk actions and blocks risky ones, and
+ *   only what it blocks or can't decide asks on the card.
+ * - `accept-edits`: file edits in the worktree go ahead; other tools ask unless a rule below allows them.
+ * - `ask`: every edit asks too.
+ */
+export const AGENT_PERMISSION_MODES = ['auto', 'accept-edits', 'ask'] as const;
+export const AgentPermissionModeSchema = z.enum(AGENT_PERMISSION_MODES);
+export type AgentPermissionMode = z.infer<typeof AgentPermissionModeSchema>;
+
+/** Kyle: agents kept asking, so auto mode is the default. */
+export const DEFAULT_AGENT_PERMISSION_MODE: AgentPermissionMode = 'auto';
+
+/**
  * What a headless agent session may do without asking (AL-109, Decision D18, Q9). Anything else goes
  * through the app's permission prompt ("Needs you · permission" on the card).
  */
 export const AgentPermissionsSchema = z.object({
-  /** `accept`: file edits in the ticket's worktree go ahead (`acceptEdits`); `ask`: every edit asks too. */
+  /**
+   * The permission mode; read it with `agentPermissionMode`. Optional, so policies saved before it
+   * stay valid: unset follows `edits` (`ask` stays `ask`), else auto.
+   */
+  mode: AgentPermissionModeSchema.optional(),
+  /**
+   * `accept`: file edits in the ticket's worktree go ahead (`acceptEdits`); `ask`: every edit asks too.
+   * Kept in step with `mode` (`ask` for `ask`, else `accept`) for older settings readers.
+   */
   edits: z.enum(['accept', 'ask']),
   /** Read-only git commands (status, diff, log, show, branch, …). */
   gitRead: z.boolean(),
@@ -116,9 +139,14 @@ export const AgentPermissionsSchema = z.object({
 });
 export type AgentPermissions = z.infer<typeof AgentPermissionsSchema>;
 
-/** D18: accept edits, git read commands and the repo's build and test commands; everything else asks. */
+/** Auto mode, plus D18's rules: git read commands and the repo's build and test commands never ask. */
 export function defaultAgentPermissions(): AgentPermissions {
-  return { edits: 'accept', gitRead: true, buildAndTest: true, bashAllow: [] };
+  return { mode: DEFAULT_AGENT_PERMISSION_MODE, edits: 'accept', gitRead: true, buildAndTest: true, bashAllow: [] };
+}
+
+/** The policy's permission mode: its `mode`, else `ask` when it asks for every edit, else auto. */
+export function agentPermissionMode(policy: Pick<AgentPermissions, 'mode' | 'edits'>): AgentPermissionMode {
+  return policy.mode ?? (policy.edits === 'ask' ? 'ask' : DEFAULT_AGENT_PERMISSION_MODE);
 }
 
 export const SettingsSchema = z.object({

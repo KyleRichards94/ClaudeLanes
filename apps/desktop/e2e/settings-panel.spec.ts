@@ -76,7 +76,7 @@ test('edits agent defaults and a repo from the board header and saves them', asy
   await expect(panel.getByText('Leave empty to use the detected command: npm run build')).toBeVisible();
   await panel.getByTestId('settings-repo-base-branch').fill('develop');
   await panel.getByTestId('settings-repo-build-command').fill('npm run build:prod');
-  await panel.getByRole('switch', { name: 'Post stage comments to Azure DevOps On' }).click();
+  await panel.getByRole('switch', { name: 'Post a comment to the work item on each stage change Off' }).click();
   await page.screenshot({ path: test.info().outputPath('settings-repo.png') });
 
   await panel.getByRole('button', { name: 'Save settings' }).click();
@@ -86,7 +86,7 @@ test('edits agent defaults and a repo from the board header and saves them', asy
   expect(savedSettings()).toMatchObject({
     adoStateTransitions: true,
     defaults: { model: 'sonnet', stageGates: { qa: 'approval' } },
-    repos: [{ path: repoPath, baseBranch: 'develop', buildCommand: 'npm run build:prod', adoWriteBack: false }],
+    repos: [{ path: repoPath, baseBranch: 'develop', buildCommand: 'npm run build:prod', adoWriteBack: true }],
   });
 
   // Opened again, the panel shows what was saved.

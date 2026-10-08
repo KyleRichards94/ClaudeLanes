@@ -4,11 +4,11 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  pointerWithin,
   rectIntersection,
   useSensor,
   useSensors,
   type Announcements,
+  type Collision,
   type CollisionDetection,
   type DragEndEvent,
   type DragOverEvent,
@@ -47,8 +47,28 @@ const previewAtPointer: Modifier = ({ activatorEvent, draggingNodeRect, overlayN
   };
 };
 
-/** The pointer has to be inside a lane; a keyboard drag (no pointer) lands on the lane the card overlaps most. */
-const laneCollisions: CollisionDetection = (args) => (args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args));
+/**
+ * The pointer has to be inside a lane; a keyboard drag (no pointer) lands on the lane the card overlaps
+ * most. Pointer hits are tested against each target's rect as it is now: dnd-kit's own rects assume a
+ * target moves with the board when it scrolls, which the collapsed board's pinned strip does not.
+ */
+const laneCollisions: CollisionDetection = (args) => (args.pointerCoordinates ? pointerWithinLive(args) : rectIntersection(args));
+
+const pointerWithinLive: CollisionDetection = ({ droppableContainers, pointerCoordinates }) => {
+  if (!pointerCoordinates) return [];
+  const { x, y } = pointerCoordinates;
+  const hits: Collision[] = [];
+  for (const container of droppableContainers) {
+    const node = container.node.current;
+    if (container.disabled || !node) continue;
+    const rect = node.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      hits.push({ id: container.id, data: { droppableContainer: container, value: rect.width * rect.height } });
+    }
+  }
+  // The smallest target under the pointer first.
+  return hits.sort((a, b) => (a.data?.['value'] as number) - (b.data?.['value'] as number));
+};
 
 /**
  * Web (Electron): drag from the team board to the agent lanes with dnd-kit (T2, TB§6, TB§7). The
@@ -58,7 +78,7 @@ const laneCollisions: CollisionDetection = (args) => (args.pointerCoordinates ? 
  * launch sheet (AL-240). Wraps the whole board, so the lanes, the team board and the Backlog popout
  * share one drag; native drags from the popped-out Backlog window land on the same lanes.
  */
-export function DragToLaneProvider({ onLaunch, children }: DragToLaneProviderProps) {
+export function DragToLaneProvider({ onLaunch, autoScroll = true, children }: DragToLaneProviderProps) {
   const drop = useDropOnLane(onLaunch);
   const value = useMemo(() => ({ drop }), [drop]);
   // Rows dragged in from the popped-out Backlog window (TB§5).
@@ -118,6 +138,7 @@ export function DragToLaneProvider({ onLaunch, children }: DragToLaneProviderPro
     <DragToLaneContext.Provider value={value}>
       <DndContext
         sensors={sensors}
+        autoScroll={autoScroll}
         collisionDetection={laneCollisions}
         accessibility={{
           announcements,

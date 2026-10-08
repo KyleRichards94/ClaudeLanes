@@ -11,8 +11,9 @@ import type { WorkItemWriteBack } from './write-back';
  * item moves to another lane, one short comment goes to the work item's discussion, e.g.
  * "Agent Lanes · Implementing — plan approved by Kyle".
  *
- * - Off switch per repo: Settings › Repos › "Post stage comments to Azure DevOps" (`adoWriteBack`,
- *   on unless turned off), read when the comment is about to be posted.
+ * - Opt-in per repo: Settings › Repos › "Post a comment to the work item on each stage change"
+ *   (`adoWriteBack`, off unless turned on), read when the comment is about to be posted. A ticket
+ *   whose repo is not in Settings posts nothing.
  * - Rate-limited: comments to one work item go one at a time, at least `minIntervalMs` apart, and at
  *   most `maxPending` wait per work item (older waiting ones are dropped, the newest is kept).
  * - Never duplicated: each stage entry (ticket, lane, time it was entered) is posted once, and before
@@ -127,8 +128,8 @@ export function createStageComments(options: StageCommentsOptions): StageComment
     const record = await tickets.get(item.ticketId);
     if (!record?.ado) return;
     const repo = settings.get().repos.find((entry) => repoPathKey(entry.path) === repoPathKey(record.repo));
-    if (repo && !repoAdoWriteBack(repo)) {
-      log?.info(`Stage comments are off for ${repo.name}; not posting to #${record.ado.workItemId}`);
+    if (!repo || !repoAdoWriteBack(repo)) {
+      log?.info(`Stage comments are off for ${repo?.name ?? record.repo}; not posting to #${record.ado.workItemId}`);
       return;
     }
     const org = await options.orgFor(record.ado.orgUrl);

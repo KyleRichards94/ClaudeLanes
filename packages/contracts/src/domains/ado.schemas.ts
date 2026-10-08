@@ -13,6 +13,7 @@ import { WorkItemCommentSchema } from './ado.write-back';
 import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
 import { ActivePullRequestListSchema } from './ado.active-prs';
 import { BACKLOG_PAGE_SIZE_MAX, BacklogKindSchema, BacklogPageSchema } from './ado.backlog';
+import { WorkItemColorsSchema } from './ado.work-item-colors';
 
 // ── Sprints (AL-061) ──────────────────────────────────────────────────────────
 
@@ -278,6 +279,10 @@ export const BacklogRequestSchema = z.strictObject({
 });
 export type BacklogRequest = z.infer<typeof BacklogRequestSchema>;
 
+/** `ado:workItemColors`: the project's work item type and state colours, as its ADO boards show them. */
+export const WorkItemColorsRequestSchema = z.strictObject({ ...AdoScopeShape });
+export type WorkItemColorsRequest = z.infer<typeof WorkItemColorsRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
 export const adoInvokeContracts = {
@@ -299,6 +304,8 @@ export const adoInvokeContracts = {
   'ado:activePrs': { request: ActivePrsRequestSchema, response: ActivePullRequestListSchema },
   /** One page of the team's backlog, grouped by Feature, filters applied in WIQL (AL-233). */
   'ado:backlog': { request: BacklogRequestSchema, response: BacklogPageSchema },
+  /** Each work item type's colour and each type's state colours, read from the project's process. */
+  'ado:workItemColors': { request: WorkItemColorsRequestSchema, response: WorkItemColorsSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;

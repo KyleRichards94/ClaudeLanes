@@ -7,5 +7,5 @@ export { LANE_KEYBOARD_CODES, laneKeyboardCoordinates } from './model/keyboard';
 export { DragToLaneProvider, type DragToLaneProviderProps } from './ui/DragToLaneProvider';
 export { LaneDragCard, type LaneDragCardProps } from './ui/LaneDragCard';
 export { LaneDropHint, laneDropStyle } from './ui/LaneDropHint';
-export { useLaneDropTarget, type LaneDropTarget } from './ui/lane-target';
+export { useLaneDropTarget, type LaneDropTarget, type LaneDropTargetOptions } from './ui/lane-target';
 export { DragStatusPill } from './ui/DragStatusPill';

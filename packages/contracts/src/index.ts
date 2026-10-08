@@ -13,6 +13,7 @@ export * from './domains/ado.write-back';
 export * from './domains/ado.team-board';
 export * from './domains/ado.active-prs';
 export * from './domains/ado.backlog';
+export * from './domains/ado.work-item-colors';
 export * from './domains/agent.schemas';
 export * from './domains/agent.usage';
 export * from './domains/agent.status';
