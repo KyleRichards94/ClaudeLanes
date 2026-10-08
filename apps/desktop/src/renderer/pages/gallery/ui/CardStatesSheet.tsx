@@ -17,6 +17,7 @@ import {
 import { BuildRunControlsView, type BuildRunControlsViewProps } from '@/features/build-run';
 import { ModelEffortControlsView, type ModelEffortControlsViewProps } from '@/features/change-model';
 import { MergeControlsView, type MergePanel } from '@/features/merge-branches';
+import { ComposerView, composerControls, type ComposerInput } from '@/features/send-message';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
 
 /** The drill-in's Worktree panel in its build and run states (AL-173), with no actions behind it. */
@@ -73,6 +74,13 @@ const mergeStates: readonly { state: string; view: MergePanel }[] = [
       readyCount: 1,
     },
   },
+];
+
+/** The Output card's composer (AL-176) in its session states, with no actions behind it. */
+const composerStates: readonly { state: string; input: ComposerInput; text: string }[] = [
+  { state: 'Running', input: { state: 'running', switching: true, held: 0 }, text: '' },
+  { state: 'Paused · 2 queued', input: { state: 'paused', switching: false, held: 2 }, text: 'Keep frmJobNotes as WinForms' },
+  { state: 'No session', input: { state: 'none', switching: false, held: 0 }, text: '' },
 ];
 
 /** One card on artboard 6. Built from the primitives; the board's own card is AL-144's AgentTicketCard. */
@@ -239,6 +247,22 @@ export function CardStatesSheet() {
             <View style={styles.badgePanel}>
               <BuildRunControlsView ticket={sample.ticket} onBuild={ignore} onRun={ignore} onStop={ignore} onOpen={ignore} />
             </View>
+          </GalleryBlock>
+        ))}
+        {composerStates.map((sample) => (
+          <GalleryBlock key={sample.state} title={`Composer · ${sample.state}`} style={styles.wideBlock}>
+            <ComposerView
+              skills={['code-review', 'commit']}
+              controls={composerControls(sample.input)}
+              text={sample.text}
+              onChangeText={ignore}
+              steerNow={false}
+              onSteerNowChange={ignore}
+              onSend={ignore}
+              onPauseResume={ignore}
+              onRunSkill={ignore}
+              onApplyModel={ignore}
+            />
           </GalleryBlock>
         ))}
         <GalleryBlock title="Status badges" style={styles.wideBlock}>

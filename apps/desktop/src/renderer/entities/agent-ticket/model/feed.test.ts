@@ -46,3 +46,14 @@ describe('ticket feed', () => {
     expect(lines()).toEqual(['#71273 Editing']);
   });
 });
+
+describe('ticket feed: design specs (AL-200)', () => {
+  it('reports a shipped spec and its acknowledgement, once each', () => {
+    const { store, lines } = setup();
+    store.setDesignSpec('71273', 2, 'shipped', 1_000);
+    store.setDesignSpec('71273', 2, 'delivered', 1_001);
+    store.setDesignSpec('71273', 2, 'fetched', 1_002);
+    store.setDesignSpec('71273', 2, 'used', 1_100);
+    expect(lines()).toEqual(['#71273 Design v2 used by the agent', '#71273 Design v2 shipped to the agent']);
+  });
+});

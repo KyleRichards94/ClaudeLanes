@@ -224,3 +224,28 @@ describe('cardView', () => {
     ]);
   });
 });
+
+describe('AgentTicketCard design indicator (AL-200)', () => {
+  it('shows nothing before a spec is shipped, amber "not yet used" until the agent acknowledges it, then "Design vN"', () => {
+    const store = runningStore();
+    render(<AgentTicketCard ticketId={ID} store={store} testID="ticket" />);
+    expect(screen.queryByTestId('ticket-design')).toBeNull();
+
+    act(() => store.setDesignSpec(ID, 3, 'shipped', 4_000));
+    expect(screen.getByTestId('ticket-design').textContent).toBe('Design v3 not yet used');
+    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(rgb(tone.attention.band));
+    expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Design v3 not yet used');
+
+    act(() => store.setDesignSpec(ID, 3, 'used', 4_100));
+    expect(screen.getByTestId('ticket-design').textContent).toBe('Design v3');
+    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(rgb(tone.claude.band));
+  });
+
+  it('reads the indicator from the record at start-up', () => {
+    const store = createAgentTicketStore();
+    const spec = { version: 2, shippedAt: 1_500, approvedBy: 'Kyle', artboardCount: 2, usedAt: null, fetchedAt: null, deliveredAt: null };
+    store.load([fakeTicketRecord({ id: ID, design: { canvas: null, lastViewUrl: null, specs: [spec] } })]);
+    render(<AgentTicketCard ticketId={ID} store={store} testID="ticket" />);
+    expect(screen.getByTestId('ticket-design').textContent).toBe('Design v2 not yet used');
+  });
+});

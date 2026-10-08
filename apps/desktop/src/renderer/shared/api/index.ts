@@ -60,3 +60,4 @@ export {
   useDesignThread,
   useSendDesignMessage,
 } from './design-thread';
+export { sessionStatusEventHandlers, sessionStatusQueryKey, useSessionStatus } from './session-status';

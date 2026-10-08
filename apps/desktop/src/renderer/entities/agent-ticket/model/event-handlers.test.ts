@@ -19,7 +19,7 @@ describe('agent ticket event handlers', () => {
     expect(selectTicket(store.getState(), '71273')?.pullRequest).toEqual({ id: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 } });
   });
 
-  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished, pr:status and run:status', () => {
+  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished, design:spec, pr:status and run:status', () => {
     expect(Object.keys(agentTicketEventHandlers).sort()).toEqual([
       'agent:gate',
       'agent:model',
@@ -29,6 +29,7 @@ describe('agent ticket event handlers', () => {
       'agent:subagent',
       'build:finished',
       'build:queued',
+      'design:spec',
       'pr:status',
       'run:status',
     ]);
@@ -164,5 +165,17 @@ describe('agent ticket event handlers', () => {
       at: 1,
     });
     expect(commits).not.toHaveBeenCalled();
+  });
+});
+
+describe('design:spec (AL-200)', () => {
+  it('shows a shipped spec as not yet used until the agent acknowledges it', () => {
+    const { store, handlers } = setup();
+    handlers['design:spec']?.({ ticketId: '71273', at: 1_000, version: 3, change: 'shipped' });
+    expect(selectTicket(store.getState(), '71273')?.design).toEqual({ version: 3, used: false, at: 1_000 });
+    handlers['design:spec']?.({ ticketId: '71273', at: 1_100, version: 3, change: 'fetched' });
+    expect(selectTicket(store.getState(), '71273')?.design).toEqual({ version: 3, used: false, at: 1_000 });
+    handlers['design:spec']?.({ ticketId: '71273', at: 1_200, version: 3, change: 'used' });
+    expect(selectTicket(store.getState(), '71273')?.design).toEqual({ version: 3, used: true, at: 1_200 });
   });
 });

@@ -25,6 +25,29 @@ const webExtensions = ['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.t
 /** A page slice's public API (`src/renderer/pages/<slice>/index.ts`), the module each lazy page chunk starts from. */
 const pageEntry = /[\\/]src[\\/]renderer[\\/]pages[\\/]([^\\/]+)[\\/]index\.tsx?$/;
 
+/**
+ * Third-party code in the renderer, split out of the entry chunk by what changes together (AL-212):
+ * React, the react-native-web layer (with its style helpers and icons), and data libraries. Every
+ * other dependency goes to `vendor`, so no vendor chunk ever imports back from the app's own chunks.
+ */
+const vendorChunks: readonly (readonly [string, RegExp])[] = [
+  ['vendor-react', /^(react|react-dom|scheduler)$/],
+  ['vendor-rnw', /^(react-native-web|react-native-svg|lucide-react-native|inline-style-prefixer|css-in-js-utils|styleq|fbjs|@react-native\/.+|@babel\/runtime)$/],
+  ['vendor-data', /^(zod|@tanstack\/.+|zustand)$/],
+];
+
+/** The package a module id belongs to (`react-dom`, `@tanstack/query-core`), or null for app and workspace code. */
+function packageOf(id: string): string | null {
+  const match = /[\\/]node_modules[\\/](?:\.pnpm[\\/][^\\/]+[\\/]node_modules[\\/])?((?:@[^\\/]+[\\/])?[^\\/]+)/.exec(id);
+  return match?.[1]?.replace('\\', '/') ?? null;
+}
+
+function vendorChunk(id: string): string | undefined {
+  const name = packageOf(id);
+  if (!name) return undefined;
+  return vendorChunks.find(([, pattern]) => pattern.test(name))?.[0] ?? 'vendor';
+}
+
 /** Lazily loaded pages (AL-140) get `page-<slice>` chunk names; Rollup would call them all `index`. */
 function chunkFileName(chunk: { facadeModuleId: string | null }): string {
   const page = chunk.facadeModuleId ? pageEntry.exec(chunk.facadeModuleId)?.[1] : undefined;
@@ -71,8 +94,11 @@ export default defineConfig(({ command, mode }) => ({
         input: resolve(__dirname, 'src/renderer/index.html'),
         output: {
           chunkFileNames: chunkFileName,
+          manualChunks: vendorChunk,
         },
       },
+      // electron-vite leaves the renderer unminified; minified, the entry chunk stays under 500 kB (AL-212).
+      minify: 'esbuild',
       // Bundled fonts (AL-021) stay files: the CSP allows `font-src 'self'` only, so no data: URIs.
       assetsInlineLimit: (filePath: string) => (/\.woff2?$/.test(filePath) ? false : undefined),
     },

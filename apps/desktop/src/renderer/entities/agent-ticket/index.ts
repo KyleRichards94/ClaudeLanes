@@ -3,6 +3,7 @@ export type {
   AgentTicketActivity,
   AgentTicketBuild,
   AgentTicketBuildJob,
+  AgentTicketDesign,
   AgentTicketGate,
   AgentTicketModelSwitch,
   AgentTicketPullRequest,
@@ -45,7 +46,7 @@ export {
   type AgentTicketCardProps,
   type AgentTicketCardViewProps,
 } from './ui/AgentTicketCard';
-export { GATE_ASKS, cardView, clockTime, needsYouLabel, type CardActivityTone, type CardState, type CardView } from './ui/card-view';
+export { GATE_ASKS, cardView, clockTime, designIndicator, needsYouLabel, type CardActivityTone, type CardState, type CardView } from './ui/card-view';
 export { TICKET_FEED_LIMIT, createTicketFeed, ticketFeedOf, type TicketFeed, type TicketFeedEvent, type TicketFeedState } from './model/feed';
 export { useLiveFeed, useLiveTicketCount } from './model/live-hooks';
 export {

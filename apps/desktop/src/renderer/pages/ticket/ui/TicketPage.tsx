@@ -6,6 +6,7 @@ import { Button, TabPanel, Text } from '@agent-lanes/ui';
 import { OutputStream } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
+import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
 import { QueuedNotice } from '@/features/start-queued-agent';
@@ -129,9 +130,13 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             {tab === 'build-log' ? (
               <BuildLog ticketId={ticket.id} style={styles.buildLog} />
             ) : tab === 'output' ? (
-              <PanelErrorBoundary panel="output" ticketId={ticket.id}>
-                <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
-              </PanelErrorBoundary>
+              <View style={styles.outputCard}>
+                <PanelErrorBoundary panel="output" ticketId={ticket.id}>
+                  <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
+                </PanelErrorBoundary>
+                {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}
+                <Composer ticketId={ticket.id} skills={record?.skills ?? []} switching={ticket.switching !== null} style={styles.composer} />
+              </View>
             ) : tab === 'diff' ? (
               <DiffTab ticketId={ticket.id} branch={ticket.branch} subBranches={subBranches} />
             ) : tab === 'ado' ? (
@@ -274,9 +279,16 @@ const styles = StyleSheet.create({
   output: {
     flexGrow: 0,
     flexShrink: 0,
-    flexBasis: 620,
-    height: 620,
+    flexBasis: 560,
+    height: 560,
+  },
+  // Flush with the card's edges; the composer closes the card (artboard 3 footer).
+  outputCard: {
     margin: -space.xl,
+  },
+  composer: {
+    borderBottomLeftRadius: radius.panel,
+    borderBottomRightRadius: radius.panel,
   },
   side: {
     gap: space.lg,
