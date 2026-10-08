@@ -147,3 +147,52 @@ describe('isMine', () => {
     expect(isMine(KR, null)).toBe(false);
   });
 });
+
+describe('drag data (AL-235)', () => {
+  const BOARD = { teamId: 'osc', sprintPath: 'P\\Sprint 42' };
+
+  it('carries the card, the rules and what main needs to read it again', () => {
+    const view = itemView(item(71318, { columnId: 'failed', column: 'Failed', columnKind: 'failed', assignee: KR }), me, null, BOARD);
+    expect(view.drag).toMatchObject({
+      key: 'item:71318',
+      label: '#71318',
+      title: 'Item 71318',
+      meName: 'Kyle Richards',
+      card: { kind: 'board-item', id: 71318, column: 'failed' },
+      source: { kind: 'board-item', id: 71318, team: 'osc', sprint: 'P\\Sprint 42', column: 'Failed' },
+    });
+  });
+
+  it("is null for someone else's item, an item with an agent, or without the board's team and sprint", () => {
+    expect(itemView(item(71341, { assignee: MD }), me, null, BOARD).drag).toBeNull();
+    expect(itemView(item(71273, { assignee: KR, columnKind: 'in-progress' }), me, 'implementing', BOARD).drag).toBeNull();
+    expect(itemView(item(71335), me, null).drag).toBeNull();
+  });
+
+  it('lets a Code Review item with no linked PR be picked up, so Code review can say "No linked PR"', () => {
+    const view = itemView(item(71300, { columnKind: 'code-review', pullRequestId: null }), me, null, BOARD);
+    expect(view).toMatchObject({ draggable: true, lock: null });
+    expect(view.drag?.key).toBe('item:71300');
+  });
+
+  it("gives an open PR the board's team, and none to a PR from a repo Agent Lanes doesn't have", () => {
+    expect(pullRequestView(pr(10571, { author: KR, unresolvedThreads: 6 }), me, 'osc').drag).toMatchObject({
+      key: 'pr:10571',
+      label: '!10571',
+      source: { kind: 'pull-request', id: 10571, team: 'osc' },
+    });
+    expect(pullRequestView(pr(10590, { repoRegistered: false }), me, 'osc').drag).toBeNull();
+  });
+
+  it("teamBoardColumns passes the board's team and sprint to every card", () => {
+    const board: TeamBoard = {
+      team: { id: 'osc', name: 'OSC Developers' },
+      sprint: { id: 's', name: 'Sprint 42', path: 'P\\Sprint 42' },
+      columns: [{ id: 'todo', name: 'To Do', kind: 'to-do' }],
+      items: [item(3)],
+    };
+    const [todo, prs] = teamBoardColumns({ board, pullRequests: [pr(10598)], me, workItemLanes: {}, filter: 'everyone' });
+    expect(todo?.cards[0]?.drag?.source).toEqual({ kind: 'board-item', id: 3, team: 'osc', sprint: 'P\\Sprint 42', column: 'To Do' });
+    expect(prs?.cards[0]?.drag?.source).toEqual({ kind: 'pull-request', id: 10598, team: 'osc' });
+  });
+});
