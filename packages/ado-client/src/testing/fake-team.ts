@@ -104,6 +104,91 @@ export function artboard08Items(): FakeWorkItem[] {
   ];
 }
 
+/** Someone outside OSC Developers. */
+export const OUTSIDER = { id: '6c3a2b1e-0000-4000-8000-000000000009', displayName: 'Sam Outside', uniqueName: 'sam.outside@example.com' } as const;
+/** A repository nobody has registered in Agent Lanes. */
+export const MOBILE_REPOSITORY = { id: '7d1e0c55-9a0b-4c55-8e21-3f6a2b9c0d11', name: 'osc-mobile' } as const;
+
+export interface FakeThread {
+  id: number;
+  status?: string;
+  isDeleted?: boolean;
+  comments: Array<{ commentType: string; isDeleted?: boolean; content?: string }>;
+}
+
+export interface FakeTeamPullRequest {
+  pullRequestId: number;
+  title: string;
+  status: 'active' | 'completed' | 'abandoned';
+  isDraft?: boolean;
+  sourceRefName: string;
+  targetRefName: string;
+  creationDate: string;
+  createdBy: { id: string; displayName: string; uniqueName: string };
+  reviewers: Array<{ id: string; displayName: string; uniqueName: string; vote: number; isRequired?: boolean; isContainer?: boolean }>;
+  repository: { id: string; name: string };
+  threads: FakeThread[];
+}
+
+const text = (content = 'Please rename this.') => ({ commentType: 'text', content });
+const system = () => ({ commentType: 'system', content: 'Tom Young voted 5' });
+const activeThreads = (count: number, from: number): FakeThread[] => Array.from({ length: count }, (_, i) => ({ id: from + i, status: 'active', comments: [text()] }));
+
+/** Open pull requests: the two on artboard 08, one in an unregistered repo, one outside the team, and two closed ones. */
+export function artboard08PullRequests(): FakeTeamPullRequest[] {
+  const pr = (input: Omit<FakeTeamPullRequest, 'status' | 'targetRefName' | 'creationDate' | 'repository'> & Partial<FakeTeamPullRequest>): FakeTeamPullRequest => ({
+    status: 'active',
+    targetRefName: 'refs/heads/main',
+    creationDate: '2026-10-06T09:15:42.1234567Z',
+    repository: FAKE_TEAM_REPOSITORY,
+    ...input,
+  });
+  return [
+    pr({
+      pullRequestId: 10571,
+      title: 'Job notes rich text editor',
+      sourceRefName: 'refs/heads/71240-job-notes-editor',
+      createdBy: PEOPLE.KR,
+      reviewers: [{ ...PEOPLE.TY, vote: -5, isRequired: true }],
+      threads: activeThreads(6, 1),
+    }),
+    pr({
+      pullRequestId: 10598,
+      title: 'Supplier invoice matching rules',
+      sourceRefName: 'refs/heads/users/ty/71298-invoice-matching',
+      createdBy: PEOPLE.TY,
+      reviewers: [
+        { ...PEOPLE.KR, vote: 0 },
+        { id: OSC_DEVELOPERS.id, displayName: '[OnSite Companion]\\OSC Developers', uniqueName: 'vstfs:///Classification/TeamProject/x\\OSC Developers', vote: 0, isContainer: true },
+      ],
+      threads: [
+        ...activeThreads(4, 1),
+        // Not counted: resolved, closed, deleted and system-only threads.
+        { id: 20, status: 'fixed', comments: [text()] },
+        { id: 21, status: 'wontFix', comments: [text()] },
+        { id: 22, status: 'closed', comments: [text()] },
+        { id: 23, status: 'byDesign', comments: [text()] },
+        { id: 24, status: 'active', isDeleted: true, comments: [text()] },
+        { id: 25, status: 'active', comments: [system()] },
+        { id: 26, comments: [system()] },
+        { id: 27, status: 'active', comments: [{ ...text(), isDeleted: true }] },
+      ],
+    }),
+    pr({
+      pullRequestId: 10590,
+      title: 'Offline sync for job photos',
+      sourceRefName: 'refs/heads/71290-offline-photos',
+      createdBy: PEOPLE.RJ,
+      reviewers: [],
+      repository: MOBILE_REPOSITORY,
+      threads: [],
+    }),
+    pr({ pullRequestId: 10580, title: 'Support desk macros', sourceRefName: 'refs/heads/support-macros', createdBy: OUTSIDER, reviewers: [{ ...OUTSIDER, vote: 10 }], threads: activeThreads(2, 1) }),
+    pr({ pullRequestId: 10604, title: 'Defect request accept modal', status: 'completed', sourceRefName: 'refs/heads/71301-defect-request-accept', createdBy: PEOPLE.KR, reviewers: [], threads: [] }),
+    pr({ pullRequestId: 10560, title: 'Defect request accept modal (first try)', status: 'abandoned', sourceRefName: 'refs/heads/71301-old', createdBy: PEOPLE.KR, reviewers: [], threads: [] }),
+  ];
+}
+
 export interface FakeTeamOrgState {
   workItems: FakeAdo;
   /** The board's columns; tests may rename or add one. */
@@ -111,6 +196,8 @@ export interface FakeTeamOrgState {
   /** Every request received, `METHOD path?query`. */
   requests: string[];
   unhandled: string[];
+  /** Pull requests and their threads; tests may edit them. */
+  pullRequests: FakeTeamPullRequest[];
   /** api-versions refused as newer than `serverVersion`. */
   versionRefusals: string[];
 }
@@ -146,7 +233,9 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
     requests: [],
     unhandled: [],
     versionRefusals: [],
+    pullRequests: artboard08PullRequests(),
   };
+  const members = [PEOPLE.KR, PEOPLE.MD, PEOPLE.RJ, PEOPLE.TY];
 
   const teams = [OSC_DEVELOPERS, RELEASE_TRAIN, PROJECT_DEFAULT_TEAM];
   const mine = [OSC_DEVELOPERS, RELEASE_TRAIN];
@@ -172,6 +261,33 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
     http.get(`${orgUrl}/_apis/projects/:project/teams`, ({ request, params }) => {
       if (!isProject(params['project'])) return projectNotFound();
       const value = new URL(request.url).searchParams.get('$mine') === 'true' ? mine : teams;
+      return HttpResponse.json({ count: value.length, value });
+    }),
+    http.get(`${orgUrl}/_apis/projects/:project/teams/:team/members`, ({ request, params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      const found = findTeam(params['team']);
+      if (!found) return teamNotFound(params['team']);
+      const { top, skip } = paging(request);
+      const value = (found.id === OSC_DEVELOPERS.id ? members : [PEOPLE.KR]).slice(skip, skip + top).map((identity) => ({ identity }));
+      return HttpResponse.json({ count: value.length, value });
+    }),
+    http.get(`${orgUrl}/:project/_apis/git/pullrequests`, ({ request, params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      const status = new URL(request.url).searchParams.get('searchCriteria.status') ?? 'active';
+      const { top, skip } = paging(request);
+      const value = state.pullRequests
+        .filter((pr) => status === 'all' || pr.status === status)
+        .slice(skip, skip + top)
+        .map(({ threads: _threads, repository, ...pr }) => ({ ...pr, repository: { ...repository, project: { id: FAKE_TEAM_PROJECT_ID, name: FAKE_TEAM_PROJECT } } }));
+      return HttpResponse.json({ count: value.length, value });
+    }),
+    http.get(`${orgUrl}/:project/_apis/git/repositories/:repository/pullRequests/:id/threads`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      const found = state.pullRequests.find(
+        (pr) => pr.pullRequestId === Number(params['id']) && (sameText(params['repository'], pr.repository.id) || sameText(params['repository'], pr.repository.name)),
+      );
+      if (!found) return adoError(404, 'TF401180: The requested pull request was not found.');
+      const value = found.threads.map((thread) => ({ ...thread, comments: thread.comments.map((comment, index) => ({ id: index + 1, ...comment })) }));
       return HttpResponse.json({ count: value.length, value });
     }),
     http.get(`${orgUrl}/_apis/projects/:project/teams/:team`, ({ params }) => {
@@ -244,6 +360,11 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
   };
 
   return { orgUrl, pat: FAKE_TEAM_PAT, handlers, fetch, state };
+}
+
+function paging(request: Request): { top: number; skip: number } {
+  const query = new URL(request.url).searchParams;
+  return { top: Number(query.get('$top') ?? 100), skip: Number(query.get('$skip') ?? 0) };
 }
 
 function adoError(status: number, message: string) {

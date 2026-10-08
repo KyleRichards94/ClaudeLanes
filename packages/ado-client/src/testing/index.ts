@@ -17,6 +17,7 @@ export {
 export { agileStates, type FakeAdo, type FakeWorkItem } from './fake-work-items';
 export {
   artboard08Items,
+  artboard08PullRequests,
   branchLink,
   createFakeTeamOrg,
   FAKE_TEAM_ORG_URL,
@@ -24,13 +25,17 @@ export {
   FAKE_TEAM_PROJECT,
   FAKE_TEAM_PROJECT_ID,
   FAKE_TEAM_REPOSITORY,
+  MOBILE_REPOSITORY,
   OSC_AREA,
   OSC_DEVELOPERS,
+  OUTSIDER,
   PEOPLE,
   PROJECT_DEFAULT_TEAM,
   pullRequestLink,
   RELEASE_TRAIN,
   type FakeTeamOrg,
+  type FakeTeamPullRequest,
+  type FakeThread,
   type FakeTeamOrgOptions,
   type FakeTeamOrgState,
 } from './fake-team';

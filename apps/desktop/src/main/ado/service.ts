@@ -5,18 +5,22 @@ import {
   getPullRequestSnapshot,
   getTeamBoard,
   getWorkItem,
+  listActivePullRequests,
   listMyTeams,
   listSprints,
   listSprintWorkItems,
   listWorkItemComments,
   searchWorkItems,
   type AdoClient,
+  type AdoGitRemote,
   type AdoLogEntry,
   type FetchLike,
 } from '@agent-lanes/ado-client';
 import {
   err,
   ok,
+  type ActivePrsRequest,
+  type ActivePullRequestList,
   type AdoConnectionSummary,
   type CreatedPullRequest,
   type CreatePullRequestRequest,
@@ -39,6 +43,7 @@ import {
 import type { ConnectionsService } from '../connections';
 import type { Logger } from '../logging';
 import type { SettingsService } from '../settings/service';
+import { isRegisteredRepository } from './registered-repos';
 import { createWorkItemWriteBack, type WorkItemWriteBack } from './write-back';
 
 /**
@@ -69,6 +74,8 @@ export interface AdoService {
   listTeams(request: ListTeamsRequest): Promise<Result<TeamList>>;
   /** A team's ADO board for one sprint (AL-231). */
   teamBoard(request: TeamBoardRequest): Promise<Result<TeamBoard>>;
+  /** The team's open pull requests with unresolved thread counts; unregistered repos flagged (AL-232). */
+  activePrs(request: ActivePrsRequest): Promise<Result<ActivePullRequestList>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -81,6 +88,8 @@ export interface AdoServiceOptions {
   fetch?: FetchLike;
   /** Gets the client's redacted per-request lines (`GET … → 200 in 84 ms`). */
   log?: Pick<Logger, 'log'>;
+  /** The Azure Repos remotes of the repos registered in Agent Lanes (AL-232). Default: none. */
+  registeredRemotes?: () => Promise<AdoGitRemote[]>;
 }
 
 /** Why there is no client for an organisation, in `Err.details.reason`. */
@@ -203,6 +212,16 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
 
     getPullRequest: ({ org, project, repository, pullRequestId }) =>
       withClient({ org, project }, (client) => getPullRequestSnapshot(client, { project, repository, pullRequestId })),
+
+    activePrs: (request) =>
+      withClient(request, async (client, project) => {
+        const remotes = (await options.registeredRemotes?.().catch(() => [])) ?? [];
+        return listActivePullRequests(client, {
+          project,
+          ...(request.team === undefined ? {} : { team: request.team }),
+          isRegistered: (repository) => isRegisteredRepository(remotes, client.orgUrl, repository),
+        });
+      }),
 
     listTeams: (request) => withClient(request, (client, project) => listMyTeams(client, project)),
 

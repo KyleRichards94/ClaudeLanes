@@ -90,3 +90,12 @@ export {
   type TeamBoardOptions,
   type TeamCallOptions,
 } from './team-board';
+export {
+  ACTIVE_PRS_PAGE_SIZE,
+  isUnresolvedThread,
+  listActivePullRequests,
+  TEAM_MEMBERS_PAGE_SIZE,
+  THREAD_READS_IN_PARALLEL,
+  type ActivePullRequestsOptions,
+  type PullRequestThread,
+} from './active-prs';

@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { AdoGitRemote } from '@agent-lanes/ado-client';
 import { createFakeTeamOrg, FAKE_TEAM_ORG_URL, FAKE_TEAM_PAT, FAKE_TEAM_PROJECT, OSC_DEVELOPERS, PEOPLE, RELEASE_TRAIN } from '@agent-lanes/ado-client/testing';
-import { allowedLanes, TeamBoardSchema, type ADO_INVOKE_CHANNELS } from '@agent-lanes/contracts';
+import { allowedLanes, dragLock, TeamBoardSchema, type ADO_INVOKE_CHANNELS } from '@agent-lanes/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createConnectionsService } from '../connections';
 import { createMemoryConnectionsFile } from '../connections/connections-file';
@@ -32,14 +33,14 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function setupTeamOrg() {
+async function setupTeamOrg(options: { remotes?: AdoGitRemote[] } = {}) {
   const org = createFakeTeamOrg();
   const secrets = createSecretStore({ filePath: join(dir, SECRETS_FILE_NAME), safeStorage: createFakeSafeStorage({ key: randomBytes(32) }), warn: () => undefined });
   const connections = createConnectionsService({ file: createMemoryConnectionsFile(), secrets, emit: () => undefined, warn: () => undefined });
   const saved = await connections.save({ kind: 'ado', orgUrl: FAKE_TEAM_ORG_URL, pat: FAKE_TEAM_PAT, defaultProject: FAKE_TEAM_PROJECT });
   if (!saved.ok) throw new Error(saved.message);
   const settings = createSettingsService({ file: createMemorySettingsFile(), warn: () => undefined });
-  const handlers = createAdoHandlers(createAdoService({ connections, settings, fetch: org.fetch }));
+  const handlers = createAdoHandlers(createAdoService({ connections, settings, fetch: org.fetch, registeredRemotes: async () => options.remotes ?? [] }));
   const call = <C extends AdoChannel>(channel: C, request: unknown) => handleInvoke(channel, request, handlers[channel]);
   return { org, call, orgId: saved.data.id };
 }
@@ -100,5 +101,41 @@ describe('ado:listTeams and ado:teamBoard (AL-231)', () => {
     const { call } = await setupTeamOrg();
     expect(await call('ado:teamBoard', { teamName: 'x' })).toMatchObject({ ok: false, code: 'VALIDATION' });
     expect(await call('ado:teamBoard', { team: 'Nobody' })).toMatchObject({ ok: false });
+  });
+});
+
+describe('ado:activePrs (AL-232)', () => {
+  const ONSITE = { orgUrl: FAKE_TEAM_ORG_URL, project: FAKE_TEAM_PROJECT, repository: 'onsite-companion' };
+
+  it("round-trips the team's open PRs with unresolved thread counts and the unregistered repo flagged", async () => {
+    const { call } = await setupTeamOrg({ remotes: [ONSITE] });
+    const listed = await call('ado:activePrs', {});
+    if (!listed.ok) throw new Error(listed.message);
+    expect(listed.data.team).toEqual(OSC_DEVELOPERS);
+    expect(listed.data.pullRequests.map((pr) => `!${pr.id} ${pr.unresolvedThreads} ${pr.repoRegistered ? 'registered' : 'add repo'}`)).toEqual([
+      '!10598 4 registered',
+      '!10590 0 add repo',
+      '!10571 6 registered',
+    ]);
+  });
+
+  it('feeds the drop rules: your PR with comments may be answered, any PR reviewed, an unregistered one refused with "Add repo"', async () => {
+    const { call } = await setupTeamOrg({ remotes: [ONSITE] });
+    const listed = await call('ado:activePrs', { team: 'OSC Developers' });
+    if (!listed.ok) throw new Error(listed.message);
+    const me = { id: PEOPLE.KR.id };
+    const card = (id: number) => {
+      const pr = listed.data.pullRequests.find((candidate) => candidate.id === id)!;
+      return { kind: 'pull-request' as const, id, author: pr.author, unresolvedThreads: pr.unresolvedThreads, sourceBranch: pr.sourceBranch, repoRegistered: pr.repoRegistered };
+    };
+    expect(Object.keys(allowedLanes(card(10571), me))).toEqual(['implementing', 'code-review']);
+    expect(Object.keys(allowedLanes(card(10598), me))).toEqual(['code-review']);
+    expect(dragLock(card(10590), me)).toBe('Add repo');
+  });
+
+  it('with no registered repos, every PR is flagged', async () => {
+    const { call } = await setupTeamOrg();
+    const listed = await call('ado:activePrs', {});
+    expect(listed.ok && listed.data.pullRequests.every((pr) => !pr.repoRegistered)).toBe(true);
   });
 });
