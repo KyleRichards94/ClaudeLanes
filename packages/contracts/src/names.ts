@@ -15,6 +15,7 @@ import { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './domains/design.
 import { GIT_EVENT_CHANNELS, GIT_INVOKE_CHANNELS } from './domains/git.names';
 import { REPOS_EVENT_CHANNELS, REPOS_INVOKE_CHANNELS } from './domains/repos.names';
 import { SETTINGS_EVENT_CHANNELS, SETTINGS_INVOKE_CHANNELS } from './domains/settings.names';
+import { SKILLS_EVENT_CHANNELS, SKILLS_INVOKE_CHANNELS } from './domains/skills.names';
 import { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './domains/tickets.names';
 
 export * from './domains/ado.names';
@@ -26,6 +27,7 @@ export * from './domains/design.names';
 export * from './domains/git.names';
 export * from './domains/repos.names';
 export * from './domains/settings.names';
+export * from './domains/skills.names';
 export * from './domains/tickets.names';
 
 export const INVOKE_CHANNEL_NAMES = [
@@ -39,6 +41,7 @@ export const INVOKE_CHANNEL_NAMES = [
   ...AGENT_INVOKE_CHANNELS,
   ...BUILD_INVOKE_CHANNELS,
   ...DESIGN_INVOKE_CHANNELS,
+  ...SKILLS_INVOKE_CHANNELS,
 ] as const;
 export type InvokeChannel = (typeof INVOKE_CHANNEL_NAMES)[number];
 
@@ -53,6 +56,7 @@ export const EVENT_CHANNEL_NAMES = [
   ...AGENT_EVENT_CHANNELS,
   ...BUILD_EVENT_CHANNELS,
   ...DESIGN_EVENT_CHANNELS,
+  ...SKILLS_EVENT_CHANNELS,
 ] as const;
 export type EventChannel = (typeof EVENT_CHANNEL_NAMES)[number];
 

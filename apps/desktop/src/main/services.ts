@@ -1,10 +1,12 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
+import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { createUsageService, type UsageService } from './agent/usage/usage-service';
 import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
 import { createPermissionService, type PermissionService } from './agent/permissions';
@@ -37,6 +39,7 @@ import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
+import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discovery';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
@@ -102,10 +105,14 @@ export interface Services {
   readonly worktrees: TicketWorktreeService;
   /** One Claude Agent SDK session per ticket, in its worktree (AL-100). Main-only: holds the session processes. */
   readonly sessions: SessionManager;
+  /** Each registered repo's skills from a short Claude Code session, cached per repo (`skills:list`, AL-114). */
+  readonly skills: SkillDiscovery;
   /** Each ticket's normalised output (`agent:output`) and the buffer `agent:getTranscript` backfills from (AL-102). */
   readonly transcripts: TranscriptService;
   /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
   readonly stages: StageService;
+  /** Each session's tokens, cost and context window (`agent:usage`, `agent:getUsage`, AL-113). */
+  readonly usage: UsageService;
   /** The MCP servers of the running sessions for the header pill; reconnects a failing one (AL-108). */
   readonly mcpStatus: McpStatusMonitor;
   /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
@@ -298,7 +305,21 @@ export function createServices(options: ServiceOptions): Services {
     history: async (sessionId, dir) => (await loadClaudeSdk()).getSessionMessages(sessionId, { dir }),
     log: log.child('agent'),
   });
-  const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const stageComments = createStageComments({
+    tickets,
+    settings,
+    writeBack: ado.writeBack,
+    orgFor: (orgUrl) => adoConnectionIdFor(connections, orgUrl),
+    log: log.child('ado'),
+  });
+  const stages = createStageService({
+    tickets,
+    emit: options.emit,
+    transcripts,
+    log: log.child('agent'),
+    // Each lane change posts one comment to the work item (AL-115).
+    onStageChanged: (change) => stageComments.stageChanged(change),
+  });
   const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
   late.subagents = subagents;
   const mergeSubBranches = createMergeSubBranchesService({
@@ -311,6 +332,8 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('merge'),
   });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
+  const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
   const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([
     stageExtras,
@@ -348,6 +371,8 @@ export function createServices(options: ServiceOptions): Services {
     sessions,
     transcripts,
     stages,
+    usage,
+    skills,
     mcpStatus,
     permissions,
     branches,
@@ -373,6 +398,7 @@ export async function disposeServices(services: Services): Promise<void> {
   services.transcripts.dispose();
   services.credentialFailures.dispose();
   services.subagents.dispose();
+  services.usage.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

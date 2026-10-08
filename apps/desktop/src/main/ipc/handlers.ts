@@ -8,6 +8,7 @@ import { createDiagnosticsHandlers } from '../diagnostics/handlers';
 import { createReposHandlers } from '../repos/handlers';
 import type { Services } from '../services';
 import { createSettingsHandlers } from '../settings/handlers';
+import { createSkillsHandlers } from '../skills/handlers';
 import { createTicketsHandlers } from '../tickets/handlers';
 import { createGitHandlers } from '../worktrees/handlers';
 import type { InvokeHandlers } from './handle-invoke';
@@ -31,5 +32,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createAgentHandlers(services),
     ...createGitHandlers(services),
     ...createTicketsHandlers(services),
+    ...createSkillsHandlers(services),
   };
 }

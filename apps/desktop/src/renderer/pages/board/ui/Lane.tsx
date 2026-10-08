@@ -10,6 +10,7 @@ import {
   useLaneTicketIds,
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
+import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
@@ -94,6 +95,8 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
               <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
               {/* Allow once / Allow for this ticket / Deny under the card while a tool call waits (AL-109). */}
               <PermissionPrompt ticketId={id} />
+              {/* Approve / Request changes while a gate waits; the drill-in stepper shows the same action (AL-171). */}
+              <GateActions ticketId={id} placement="card" store={store} />
             </View>
           ))
         )}

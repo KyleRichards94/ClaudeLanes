@@ -30,7 +30,7 @@ let router: Router;
 let settings: FakeSettings;
 
 function renderLanes() {
-  // Each card has its permission prompt (AL-109), which reads through TanStack Query.
+  // Each card has its permission prompt (AL-109) and gate actions (AL-171), which read through TanStack Query.
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>

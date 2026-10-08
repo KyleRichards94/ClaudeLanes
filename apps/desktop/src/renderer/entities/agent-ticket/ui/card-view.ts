@@ -35,7 +35,7 @@ export interface CardView {
 }
 
 /** What a gate on each stage asks the user to approve ("Needs you · approve plan"). */
-const GATE_ASKS: Readonly<Record<Stage, string>> = {
+export const GATE_ASKS: Readonly<Record<Stage, string>> = {
   planning: 'approve plan',
   implementing: 'approve changes',
   'code-review': 'approve fixes',
