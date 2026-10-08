@@ -2,10 +2,11 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { TicketSubBranch } from '@agent-lanes/contracts';
 import { color, radius, space } from '@agent-lanes/tokens';
-import { GlassPanel, Icon, Pill, Text } from '@agent-lanes/ui';
+import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildRunControls } from '@/features/build-run';
 import { ModelEffortControls } from '@/features/change-model';
+import { MergeControls } from '@/features/merge-branches';
 import { ErrorBoundary } from '@/shared/ui';
 
 /**
@@ -67,22 +68,11 @@ export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
   );
 }
 
-export function MergePanel({ ticket, subBranches }: { ticket: AgentTicket; subBranches: readonly TicketSubBranch[] }) {
-  const unmerged = subBranches.filter((sub) => sub.mergedAt === null).length;
+/** Merge sub-branches and Merge worktree → main, with the confirm and conflict flows (AL-174, features/merge-branches). */
+export function MergePanel({ ticket }: { ticket: AgentTicket }) {
   return (
     <Panel title="Merge" testID="merge-panel" style={styles.flexPanel}>
-      <View style={styles.mergeRow}>
-        <Text variant="title" numberOfLines={1} style={styles.flexText}>
-          {`Merge ${unmerged} sub-branch${unmerged === 1 ? '' : 'es'} → ${ticket.branch}`}
-        </Text>
-        <Icon name="merge" color={color.muted} size={16} />
-      </View>
-      <View style={[styles.mergeRow, styles.mergeMain]}>
-        <Text variant="title" color={color.surface} numberOfLines={1} style={styles.flexText}>
-          {`Merge worktree → ${ticket.baseBranch}`}
-        </Text>
-        <Icon name="arrow-right" color={color.surface} size={16} />
-      </View>
+      <MergeControls ticket={ticket} />
     </Panel>
   );
 }
@@ -161,22 +151,6 @@ const styles = StyleSheet.create({
   },
   branch: {
     flexShrink: 1,
-  },
-  mergeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    minHeight: 44,
-    paddingHorizontal: space.lg,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-    marginBottom: space.sm,
-  },
-  mergeMain: {
-    backgroundColor: color.ink,
-    borderColor: color.ink,
   },
   flexText: {
     flex: 1,
