@@ -12,6 +12,7 @@ import {
 import { WorkItemCommentSchema } from './ado.write-back';
 import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
 import { ActivePullRequestListSchema } from './ado.active-prs';
+import { BACKLOG_PAGE_SIZE_MAX, BacklogKindSchema, BacklogPageSchema } from './ado.backlog';
 
 // ── Sprints (AL-061) ──────────────────────────────────────────────────────────
 
@@ -236,6 +237,44 @@ export const ActivePrsRequestSchema = z.strictObject({
 });
 export type ActivePrsRequest = z.infer<typeof ActivePrsRequestSchema>;
 
+/** The Backlog popout's filters (AL-233, TB§5). Every filter given must match (AND). */
+export const BacklogFiltersSchema = z.strictObject({
+  /** Story / Bug / Task; left out or empty, all three. */
+  kinds: z.array(BacklogKindSchema).max(3).optional(),
+  /** Priorities 1–4; any of them. */
+  priorities: z.array(z.int().min(1).max(4)).max(4).optional(),
+  /** Area paths; items under any of them. */
+  areas: z.array(adoText(1_024)).max(20).optional(),
+  /** Tags; items with every one of them. */
+  tags: z.array(adoText(256)).max(20).optional(),
+  /** Free text: an id ("71360", "#71360"), or part of a title or tag. Blank means no text filter. */
+  text: z
+    .string()
+    .trim()
+    .max(256)
+    .regex(/^[^\p{Cc}]*$/u, 'No control characters')
+    .optional(),
+  /** Also show items already in a sprint. Default false. */
+  includeInSprint: z.boolean().optional(),
+});
+export type BacklogFilters = z.infer<typeof BacklogFiltersSchema>;
+
+/** `ado:backlog`: one page of the team's backlog (AL-233). */
+export const BacklogRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** Team name or id. Left out, the team from the user's ADO profile. */
+  team: adoText(256).optional(),
+  filters: BacklogFiltersSchema.optional(),
+  /** Zero-based page and its size. Default the first page of 50 (`BACKLOG_PAGE_SIZE`). */
+  page: z
+    .strictObject({
+      index: z.int().min(0).max(10_000),
+      size: z.int().min(1).max(BACKLOG_PAGE_SIZE_MAX),
+    })
+    .optional(),
+});
+export type BacklogRequest = z.infer<typeof BacklogRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
 export const adoInvokeContracts = {
@@ -255,6 +294,8 @@ export const adoInvokeContracts = {
   'ado:teamBoard': { request: TeamBoardRequestSchema, response: TeamBoardSchema },
   /** The team's open pull requests with unresolved thread counts (AL-232). */
   'ado:activePrs': { request: ActivePrsRequestSchema, response: ActivePullRequestListSchema },
+  /** One page of the team's backlog, grouped by Feature, filters applied in WIQL (AL-233). */
+  'ado:backlog': { request: BacklogRequestSchema, response: BacklogPageSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;

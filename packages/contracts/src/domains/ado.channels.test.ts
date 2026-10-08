@@ -78,6 +78,37 @@ const examples = {
       ],
     },
   },
+  'ado:backlog': {
+    request: { team: 'OSC Developers', filters: { kinds: ['story', 'bug'], priorities: [1], text: 'jobs', includeInSprint: false }, page: { index: 0, size: 20 } },
+    response: {
+      team: TEAM,
+      total: 1,
+      page: { index: 0, size: 20, count: 1 },
+      groups: [
+        {
+          feature: { id: 70101, title: 'Job management' },
+          items: [
+            {
+              id: 71360,
+              type: 'User Story',
+              kind: 'story',
+              title: 'Bulk reassign jobs between technicians',
+              state: 'New',
+              points: 5,
+              priority: 1,
+              tags: ['jobs'],
+              areaPath: 'OnSite Companion\\OSC',
+              iterationPath: 'OnSite Companion',
+              inSprint: false,
+              assignee: null,
+              parentId: 70101,
+              webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_workitems/edit/71360',
+            },
+          ],
+        },
+      ],
+    },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
@@ -93,6 +124,7 @@ describe('ado:* channel contracts', () => {
       'ado:listTeams',
       'ado:teamBoard',
       'ado:activePrs',
+      'ado:backlog',
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

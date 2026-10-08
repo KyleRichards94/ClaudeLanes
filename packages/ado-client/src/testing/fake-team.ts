@@ -189,6 +189,67 @@ export function artboard08PullRequests(): FakeTeamPullRequest[] {
   ];
 }
 
+/** The Features the backlog groups by (artboard 11). */
+export const FEATURES = {
+  jobs: { id: 70101, title: 'Job management' },
+  portal: { id: 70102, title: 'Client portal' },
+  timesheets: { id: 70103, title: 'Timesheets' },
+  assets: { id: 70104, title: 'Asset register' },
+  reporting: { id: 70105, title: 'Reporting' },
+} as const;
+
+/** The team's backlog iteration: items there are not in a sprint yet. */
+export const BACKLOG_ITERATION = FAKE_PROJECT;
+
+/**
+ * Artboard 11's backlog: 48 open items not yet in a sprint, in backlog order (`stackRank`). The seven
+ * rows on the artboard come first; 41 more spread over five Features and none. Also in the store,
+ * and left out of the 48: the Features themselves, two items already in Sprint 42, a closed and a
+ * removed item, and one in another team's area.
+ */
+export function artboard11Backlog(): FakeWorkItem[] {
+  let rank = 0;
+  const row = (input: Omit<FakeWorkItem, 'project' | 'iterationPath' | 'changedDate' | 'areaPath' | 'state'> & Partial<FakeWorkItem>): FakeWorkItem => {
+    rank += 1;
+    return { project: FAKE_PROJECT, iterationPath: BACKLOG_ITERATION, areaPath: OSC_AREA, changedDate: '2026-10-01T09:00:00Z', state: 'New', stackRank: rank * 1000, ...input };
+  };
+  const shown = [
+    row({ id: 71360, type: 'User Story', title: 'Bulk reassign jobs between technicians', tags: 'jobs', storyPoints: 5, priority: 1, parentId: FEATURES.jobs.id }),
+    row({ id: 71362, type: 'Bug', title: 'Job search ignores archived clients filter', tags: 'search', storyPoints: 2, priority: 2, parentId: FEATURES.jobs.id }),
+    row({ id: 71371, type: 'User Story', title: 'Recurring job templates for maintenance contracts', tags: 'jobs', storyPoints: 8, priority: 2, parentId: FEATURES.jobs.id }),
+    row({ id: 71335, type: 'User Story', title: 'Show defect photos inline on requests', tags: 'portal', storyPoints: 5, priority: 1, parentId: FEATURES.portal.id }),
+    row({ id: 71377, type: 'Bug', title: 'Portal session expires during file upload', tags: 'portal', storyPoints: 3, priority: 1, parentId: FEATURES.portal.id, areaPath: `${OSC_AREA}\\Portal` }),
+    row({ id: 71380, type: 'User Story', title: 'Client-side approval of quotes', tags: 'quotes; portal', storyPoints: 8, priority: 3, parentId: FEATURES.portal.id }),
+    row({ id: 71384, type: 'Task', title: 'Export timesheets to payroll CSV format v2', tags: 'payroll', storyPoints: 3, priority: 2, parentId: FEATURES.timesheets.id }),
+  ];
+  const features = [FEATURES.jobs, FEATURES.portal, FEATURES.timesheets, FEATURES.assets, FEATURES.reporting, null];
+  const types = ['User Story', 'Bug', 'Task'];
+  const more = Array.from({ length: 41 }, (_, i) => {
+    const feature = features[i % features.length]!;
+    const type = types[i % types.length]!;
+    return row({
+      id: 71400 + i,
+      type,
+      title: `${feature?.title ?? 'Loose'} item ${i + 1}`,
+      tags: i % 4 === 0 ? 'jobs' : i % 4 === 1 ? 'portal' : 'misc',
+      storyPoints: (i % 5) + 1,
+      priority: (i % 4) + 1,
+      // The first task under Job management hangs off a story, as tasks usually do.
+      ...(i === 2 ? { parentId: 71371 } : feature ? { parentId: feature.id } : {}),
+      ...(i % 7 === 0 ? { assignedTo: PEOPLE.MD } : {}),
+    });
+  });
+  const extra: FakeWorkItem[] = [
+    ...Object.values(FEATURES).map((feature) => row({ id: feature.id, type: 'Feature', title: feature.title, state: 'Active' })),
+    row({ id: 71500, type: 'User Story', title: 'Already planned job costing', iterationPath: SPRINT_42, parentId: FEATURES.jobs.id, tags: 'jobs', priority: 1 }),
+    row({ id: 71501, type: 'Bug', title: 'Already planned portal bug', iterationPath: SPRINT_43, parentId: FEATURES.portal.id, priority: 2 }),
+    row({ id: 71502, type: 'User Story', title: 'Closed long ago', state: 'Closed', parentId: FEATURES.jobs.id, priority: 1 }),
+    row({ id: 71503, type: 'Bug', title: 'Removed duplicate', state: 'Removed', priority: 1 }),
+    row({ id: 71504, type: 'User Story', title: 'Support team item', areaPath: `${FAKE_PROJECT}\\Support`, priority: 1 }),
+  ];
+  return [...shown, ...more, ...extra];
+}
+
 export interface FakeTeamOrgState {
   workItems: FakeAdo;
   /** The board's columns; tests may rename or add one. */
@@ -326,6 +387,31 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
           { id: 'Microsoft.FeatureCategory', name: 'Features', rank: 2, type: 'portfolio' },
           { id: 'Microsoft.RequirementCategory', name: 'Stories', rank: 1, type: 'requirement' },
         ],
+      });
+    }),
+    http.get(`${team}/teamsettings`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      if (!findTeam(params['team'])) return teamNotFound(params['team']);
+      // ADO answers the root iteration with an empty path.
+      return HttpResponse.json({ backlogIteration: { id: 'it-root', name: BACKLOG_ITERATION, path: '' }, bugsBehavior: 'asRequirements', workingDays: ['monday'] });
+    }),
+    http.get(`${team}/backlogconfiguration`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      if (!findTeam(params['team'])) return teamNotFound(params['team']);
+      const states = (type: string, removed = true) => ({
+        workItemTypeName: type,
+        states: { New: 'Proposed', Active: 'InProgress', Resolved: 'Resolved', Closed: 'Completed', ...(removed ? { Removed: 'Removed' } : {}) },
+      });
+      return HttpResponse.json({
+        portfolioBacklogs: [
+          { id: 'Microsoft.EpicCategory', name: 'Epics', rank: 3, workItemTypes: [{ name: 'Epic' }] },
+          { id: 'Microsoft.FeatureCategory', name: 'Features', rank: 2, workItemTypes: [{ name: 'Feature' }] },
+        ],
+        requirementBacklog: { id: 'Microsoft.RequirementCategory', name: 'Stories', rank: 1, workItemTypes: [{ name: 'User Story' }] },
+        taskBacklog: { id: 'Microsoft.TaskCategory', name: 'Tasks', rank: 0, workItemTypes: [{ name: 'Task' }] },
+        bugWorkItems: { id: 'Microsoft.BugCategory', name: 'Bugs', workItemTypes: [{ name: 'Bug' }] },
+        backlogFields: { typeFields: { Order: 'Microsoft.VSTS.Common.StackRank', Effort: 'Microsoft.VSTS.Scheduling.StoryPoints' } },
+        workItemTypeMappedStates: [states('User Story'), states('Bug', false), states('Task'), states('Feature'), states('Epic')],
       });
     }),
     http.get(`${team}/boards/:board`, ({ params }) => {

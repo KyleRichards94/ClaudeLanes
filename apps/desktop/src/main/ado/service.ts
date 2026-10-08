@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import {
   createAdoClient,
   createPullRequest,
+  getBacklog,
   getPullRequestSnapshot,
   getTeamBoard,
   getWorkItem,
@@ -21,6 +22,8 @@ import {
   ok,
   type ActivePrsRequest,
   type ActivePullRequestList,
+  type BacklogPage,
+  type BacklogRequest,
   type AdoConnectionSummary,
   type CreatedPullRequest,
   type CreatePullRequestRequest,
@@ -76,6 +79,8 @@ export interface AdoService {
   teamBoard(request: TeamBoardRequest): Promise<Result<TeamBoard>>;
   /** The team's open pull requests with unresolved thread counts; unregistered repos flagged (AL-232). */
   activePrs(request: ActivePrsRequest): Promise<Result<ActivePullRequestList>>;
+  /** One page of the team's backlog, grouped by Feature, filtered in WIQL (AL-233). */
+  backlog(request: BacklogRequest): Promise<Result<BacklogPage>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -222,6 +227,16 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
           isRegistered: (repository) => isRegisteredRepository(remotes, client.orgUrl, repository),
         });
       }),
+
+    backlog: (request) =>
+      withClient(request, (client, project) =>
+        getBacklog(client, {
+          project,
+          ...(request.team === undefined ? {} : { team: request.team }),
+          ...(request.filters === undefined ? {} : { filters: request.filters }),
+          ...(request.page === undefined ? {} : { page: request.page }),
+        }),
+      ),
 
     listTeams: (request) => withClient(request, (client, project) => listMyTeams(client, project)),
 

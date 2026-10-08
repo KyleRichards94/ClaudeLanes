@@ -99,3 +99,4 @@ export {
   type ActivePullRequestsOptions,
   type PullRequestThread,
 } from './active-prs';
+export { BACKLOG_MAX_ITEMS, backlogQuery, getBacklog, groupByFeature, type BacklogOptions } from './backlog';
