@@ -7,12 +7,21 @@ import {
   autoDismisses,
   dismissToast,
   openConnections,
+  toast,
   useToasts,
   type ToastActionInput,
   type ToastEntry,
 } from '@/shared/model';
+import { reconnectSession } from '@/shared/api';
 import { useRouter } from '@/shared/routing';
 import { runToastIntent, type ToastIntentContext } from './toast-intents';
+
+/** Reconnect on a lost session (AL-110); a failure is shown as a toast of its own. */
+function reconnect(ticketId: string): void {
+  void reconnectSession(ticketId).then((problem) => {
+    if (problem) toast({ id: `reconnect-failed:${ticketId}`, tone: 'error', title: `Couldn't reconnect ${ticketId}`, body: problem });
+  });
+}
 
 /** How many toasts show at once. Later ones wait, in order, and appear as earlier ones close. */
 export const MAX_VISIBLE_TOASTS = 4;
@@ -34,7 +43,7 @@ export function ToastHost() {
   const waiting = toasts.length - visible.length;
 
   function run(entry: ToastEntry, action: ToastActionInput) {
-    const context: ToastIntentContext = { navigate: router.navigate, openConnections };
+    const context: ToastIntentContext = { navigate: router.navigate, openConnections, reconnectSession: reconnect };
     try {
       if ('onPress' in action) action.onPress();
       else runToastIntent(action.intent, context);

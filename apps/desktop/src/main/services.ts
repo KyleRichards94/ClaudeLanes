@@ -8,6 +8,7 @@ import { createSessionManager, type SessionManager } from './agent/session-manag
 import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
 import { createPermissionService, type PermissionService } from './agent/permissions';
+import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -103,6 +104,8 @@ export interface Services {
   readonly mcpStatus: McpStatusMonitor;
   /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
   readonly permissions: PermissionService;
+  /** Resumes a lost session once, then asks with the "MCP bridge lost the session" toast (AL-110). */
+  readonly recovery: SessionRecovery;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -244,14 +247,18 @@ export function createServices(options: ServiceOptions): Services {
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
     // Then the work item's Azure DevOps MCP server and the user's MCP servers (AL-108).
     extras: (record) => sessionExtras(record),
-    onEnded: (ticketId) => {
+    onEnded: (ticketId, state, info) => {
       // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
       stages.cancelGate(ticketId);
       // The ended session's servers leave the header pill (AL-108).
       void mcpStatus.refresh();
       // Permission requests the session left waiting close (AL-109).
       permissions.cancelAll(ticketId);
+      // A lost session is resumed once in the same worktree, then the user is asked (AL-110).
+      recovery.onEnded(ticketId, state, info);
     },
+    // A silent session is lost only while nobody is asked anything (AL-110).
+    isWaitingOnUser: (ticketId) => stages.pendingGate(ticketId) !== null || permissions.pending(ticketId) !== null,
   });
   const transcripts = createTranscriptService({
     sessions,
@@ -262,6 +269,7 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const recovery = createSessionRecovery({ sessions, emit: options.emit, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') }), permissions.sessionExtras]);
@@ -293,6 +301,7 @@ export function createServices(options: ServiceOptions): Services {
     stages,
     mcpStatus,
     permissions,
+    recovery,
     branches,
     mergeToMain,
     ticketArchive,
