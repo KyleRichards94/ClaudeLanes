@@ -4,7 +4,8 @@ import type { TicketRecord, WorkItem } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
 import { WorkItemChip } from '@/entities/ado-work-item';
-import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
+import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
+import { GateActions } from '@/features/resolve-gate';
 import { BuildLog } from '@/entities/build-log';
 import { useAgentUsage, useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
@@ -62,6 +63,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const history = record?.stageHistory ?? [{ stage: ticket.stage, at: ticket.stageEnteredAt }];
   const subBranches = record?.subBranches ?? [];
   const usage = useAgentUsage(ticket.id).data;
+  const setGate = useSetGate();
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.page} testID="ticket-page">
@@ -85,7 +87,19 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       </View>
 
       <ErrorBoundary name="ticket:stepper" label="the stage stepper">
-        <StageStepper steps={stageSteps(ticket.stage, history)} progress={ticket.progress} />
+        <StageStepper
+          steps={stageSteps(ticket.stage, history)}
+          progress={ticket.progress}
+          gates={ticket.gates}
+          onGateChange={(stage, gate) => setGate.mutate({ ticketId: ticket.id, stage, gate })}
+          waitingStage={ticket.gate?.stage ?? null}
+          gateActions={<GateActions ticketId={ticket.id} placement="stepper" />}
+        />
+        {setGate.error ? (
+          <Text variant="body" size="sm" color={color.danger} role="alert">
+            {`The gate couldn't be changed: ${setGate.error.message}`}
+          </Text>
+        ) : null}
       </ErrorBoundary>
 
       <View style={styles.panels}>
