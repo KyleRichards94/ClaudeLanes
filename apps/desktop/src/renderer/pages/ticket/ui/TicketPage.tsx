@@ -6,7 +6,7 @@ import { Button, TabPanel, Text } from '@agent-lanes/ui';
 import { WorkItemChip } from '@/entities/ado-work-item';
 import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
-import { useTicketRecord, useWorkItem } from '@/shared/api';
+import { useAgentUsage, useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
@@ -61,6 +61,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const now = useNow(60_000);
   const history = record?.stageHistory ?? [{ stage: ticket.stage, at: ticket.stageEnteredAt }];
   const subBranches = record?.subBranches ?? [];
+  const usage = useAgentUsage(ticket.id).data;
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.page} testID="ticket-page">
@@ -68,7 +69,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         <TicketTopBar
           ticketId={ticket.id}
           repo={ticket.repo}
-          session={{ id: record?.sessionId ?? null, startedAt: sessionStartedAt(history), now }}
+          session={{ id: record?.sessionId ?? null, startedAt: sessionStartedAt(history), now, usage }}
         />
       </ErrorBoundary>
 
@@ -105,7 +106,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           </ErrorBoundary>
         </TabPanel>
         <View style={[styles.side, wide ? styles.sideWide : null]} testID="ticket-side-column">
-          <SubAgentsPanel ticket={ticket} />
+          <SubAgentsPanel ticket={ticket} leadTokens={usage?.leadTokens} />
           <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
         </View>
       </View>

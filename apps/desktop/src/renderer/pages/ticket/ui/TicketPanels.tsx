@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import type { TicketSubBranch } from '@agent-lanes/contracts';
+import { formatTokenCount, type TicketSubBranch } from '@agent-lanes/contracts';
 import { color, radius, space } from '@agent-lanes/tokens';
 import { GlassPanel, Icon, Pill, Text } from '@agent-lanes/ui';
 import { EFFORT_LABELS, MODEL_LABELS, modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
@@ -114,7 +114,7 @@ export function MergePanel({ ticket, subBranches }: { ticket: AgentTicket; subBr
   );
 }
 
-export function SubAgentsPanel({ ticket }: { ticket: AgentTicket }) {
+export function SubAgentsPanel({ ticket, leadTokens }: { ticket: AgentTicket; leadTokens?: number }) {
   const { running, done, queued, failed } = ticket.subAgents;
   const counts = [
     running ? `${running} running` : null,
@@ -132,12 +132,22 @@ export function SubAgentsPanel({ ticket }: { ticket: AgentTicket }) {
       aside={<Text variant="meta">{counts || 'None yet'}</Text>}
     >
       <View style={styles.leadCard} testID="lead-agent">
-        <Text variant="title" size="lg" color={color.surface}>
-          Lead agent
-        </Text>
-        <Text variant="body" size="sm" color={color.surface}>
-          {`${modelEffortLabel(ticket.model, ticket.effort)} · ${subAgentTotal(ticket.subAgents) > 0 ? 'orchestrating' : 'working alone'}`}
-        </Text>
+        <View style={styles.leadText}>
+          <Text variant="title" size="lg" color={color.surface}>
+            Lead agent
+          </Text>
+          <Text variant="body" size="sm" color={color.surface}>
+            {`${modelEffortLabel(ticket.model, ticket.effort)} · ${subAgentTotal(ticket.subAgents) > 0 ? 'orchestrating' : 'working alone'}`}
+          </Text>
+        </View>
+        {leadTokens ? (
+          // "212k tokens" (artboard 3, AL-113): the lead agent's own tokens.
+          <View style={styles.leadTokens} testID="lead-agent-tokens">
+            <Text variant="mono" size="sm" color={color.surface}>
+              {formatTokenCount(leadTokens)}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Panel>
   );
@@ -240,10 +250,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   leadCard: {
-    gap: space.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
     padding: space.lg,
     borderRadius: radius.card,
     backgroundColor: color.claude,
+  },
+  leadText: {
+    flex: 1,
+    gap: space.xs,
+  },
+  leadTokens: {
+    paddingHorizontal: space.sm + 2,
+    paddingVertical: space.xs,
+    borderRadius: radius.pill,
+    backgroundColor: color.claudeText,
   },
   subBranch: {
     flexDirection: 'row',

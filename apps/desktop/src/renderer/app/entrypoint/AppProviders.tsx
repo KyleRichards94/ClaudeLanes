@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { connectionsEventHandlers, createBranchStatusEventHandlers } from '@/shared/api';
+import { agentUsageEventHandlers, connectionsEventHandlers, createBranchStatusEventHandlers } from '@/shared/api';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
 import { runningEventHub } from './EventHub';
@@ -29,6 +29,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(createBranchStatusEventHandlers(queryClient)), [queryClient]);
   // `connections:changed` refetches the connection list and ADO queries (AL-046, AL-066).
   useEffect(() => runningEventHub()?.register(connectionsEventHandlers(queryClient)), [queryClient]);
+  // `agent:usage` keeps each ticket's session pill and Lead agent tokens current (AL-113).
+  useEffect(() => runningEventHub()?.register(agentUsageEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

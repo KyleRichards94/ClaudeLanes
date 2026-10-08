@@ -3,7 +3,12 @@ import type { HandlersFor } from '../ipc/handle-invoke';
 import type { Services } from '../services';
 
 /** The `agent:*` invoke channels (AL-100 onwards), served by the session manager. */
-export function createAgentHandlers({ sessions, transcripts, stages }: Pick<Services, 'sessions' | 'transcripts' | 'stages'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+export function createAgentHandlers({
+  sessions,
+  transcripts,
+  stages,
+  usage,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'usage'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     'agent:getStatus': ({ ticketId }) => ok(sessions.status(ticketId)),
     'agent:getTranscript': async ({ ticketId }) => ok(await transcripts.get(ticketId)),
@@ -16,5 +21,6 @@ export function createAgentHandlers({ sessions, transcripts, stages }: Pick<Serv
     'agent:send': ({ ticketId, text, priority }) => sessions.send(ticketId, { text, priority: priority ?? 'next' }),
     'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
     'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
+    'agent:getUsage': ({ ticketId }) => ok(usage.get(ticketId)),
   };
 }
