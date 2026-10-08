@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
-import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
+import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
@@ -244,6 +244,44 @@ export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 export const SendMessageResponseSchema = z.object({ held: z.boolean() });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
+// ── MCP servers of agent sessions (AL-108, design §7 MCP servers, artboard 1 "MCP online") ─────────
+
+/** A server's state as Claude Code reports it (`mcpServerStatus()`). */
+export const MCP_SERVER_STATES = ['connected', 'pending', 'failed', 'needs-auth', 'disabled'] as const;
+export const McpServerStateSchema = z.enum(MCP_SERVER_STATES);
+export type McpServerState = z.infer<typeof McpServerStateSchema>;
+
+/** Longest server error sent to the renderer. */
+export const MCP_ERROR_LIMIT = 500;
+
+/** One MCP server across the running sessions: the worst state any session reports for it. */
+export const McpSessionServerSchema = z.object({
+  /** The name the sessions know the server by (`azure-devops`, `agent_lanes`, a user server's name). */
+  name: z.string().min(1).max(200),
+  state: McpServerStateSchema,
+  /** Why it failed, when a session said; null otherwise. Never holds the server's token. */
+  error: z.string().max(MCP_ERROR_LIMIT).nullable(),
+  /** The tickets whose sessions run the server. */
+  ticketIds: z.array(TicketIdSchema).max(200),
+});
+export type McpSessionServer = z.infer<typeof McpSessionServerSchema>;
+
+/**
+ * The header pill (artboard 1): `online` when no running session has a failing server ("MCP online"),
+ * `failing` when one does ("1 MCP failing", amber, the names on hover), `none` when no session runs.
+ */
+export const McpStatusSummarySchema = z.object({
+  state: z.enum(['none', 'online', 'failing']),
+  /** Every server of the running sessions, failing ones first, then by name. */
+  servers: z.array(McpSessionServerSchema).max(200),
+});
+export type McpStatusSummary = z.infer<typeof McpStatusSummarySchema>;
+
+/** Whether a server counts as failing on the pill: it failed to start or needs a sign-in. */
+export function isFailingMcpState(state: McpServerState): boolean {
+  return state === 'failed' || state === 'needs-auth';
+}
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -255,6 +293,8 @@ export const agentInvokeContracts = {
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** The MCP servers of the running sessions, for the header pill (AL-108). */
+  'agent:getMcpStatus': { request: z.undefined(), response: McpStatusSummarySchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -308,10 +348,15 @@ export const AgentStatusEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStatusEvent = z.infer<typeof AgentStatusEventSchema>;
 
+/** `agent:mcpStatus` (AL-108): the header pill's summary changed. Not about one ticket. */
+export const McpStatusEventSchema = EventEnvelopeSchema.extend(McpStatusSummarySchema.shape);
+export type McpStatusEvent = z.infer<typeof McpStatusEventSchema>;
+
 export const agentEventContracts = {
   'agent:output': AgentOutputEventSchema,
   'agent:stage': AgentStageEventSchema,
   'agent:subagent': AgentSubagentEventSchema,
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
+  'agent:mcpStatus': McpStatusEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;
