@@ -1,6 +1,7 @@
 import { createAdoHandlers } from '../ado/handlers';
 import { createAgentHandlers } from '../agent/handlers';
 import { createAppHandlers } from '../app/handlers';
+import { createBacklogWindowHandlers } from '../app/backlog-window';
 import { createBuildHandlers } from '../build/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
 import { createDesignHandlers } from '../design/handlers';
@@ -35,5 +36,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createTicketsHandlers(services),
     ...createSkillsHandlers(services),
     ...createPrHandlers(services),
+    ...createBacklogWindowHandlers(services),
   };
 }

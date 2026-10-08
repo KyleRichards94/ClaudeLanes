@@ -86,11 +86,31 @@ export const DiagnosticsCopiedSchema = z.object({
 });
 export type DiagnosticsCopied = z.infer<typeof DiagnosticsCopiedSchema>;
 
+/**
+ * `app:popOutBacklog` (AL-239, TB§5): opens the Backlog in its own window, or brings that window to the
+ * front, on a team (left out: the team in the user's ADO profile).
+ */
+export const PopOutBacklogRequestSchema = z.strictObject({
+  team: z
+    .string()
+    .trim()
+    .min(1)
+    .max(256)
+    .regex(/^[^\p{Cc}]*$/u, 'No control characters')
+    .optional(),
+});
+export type PopOutBacklogRequest = z.infer<typeof PopOutBacklogRequestSchema>;
+
+/** `opened`: a new window; false when the one already open was brought to the front. */
+export const PopOutBacklogResponseSchema = z.object({ opened: z.boolean() });
+export type PopOutBacklogResponse = z.infer<typeof PopOutBacklogResponseSchema>;
+
 export const appInvokeContracts = {
   'app:getInfo': { request: z.undefined(), response: AppInfoSchema },
   'app:getDiagnostics': { request: z.undefined(), response: DiagnosticsReportSchema },
   'app:copyDiagnostics': { request: z.undefined(), response: DiagnosticsCopiedSchema },
   'app:logError': { request: RendererErrorReportSchema, response: z.null() },
+  'app:popOutBacklog': { request: PopOutBacklogRequestSchema, response: PopOutBacklogResponseSchema },
 } as const satisfies Record<(typeof APP_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /** How a toast looks; error toasts wait for the user, info toasts dismiss themselves (AL-030). */

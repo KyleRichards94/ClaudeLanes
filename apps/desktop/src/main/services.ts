@@ -65,6 +65,7 @@ import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
 import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
+import { createBacklogWindowController, type BacklogWindowController } from './app/backlog-window';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -166,6 +167,8 @@ export interface Services {
   readonly adoLauncher: AdoLauncher;
   /** Undo of a team board launch for 10 s or until the first turn ends; watches each session for a push or a comment (AL-237). */
   readonly launchUndo: LaunchUndo;
+  /** The popped-out Backlog window (AL-239); index.ts supplies the real one. */
+  readonly backlogWindow: BacklogWindowController;
 }
 
 export interface ServiceOptions {
@@ -181,6 +184,8 @@ export interface ServiceOptions {
   designTestOrigin?: string;
   /** A `claude` executable to start instead of the Agent SDK's: the e2e fake, unpackaged builds only (AL-044). */
   claudeExecutable?: string;
+  /** Opens the Backlog in its own window (AL-239); without it, `app:popOutBacklog` reports that it can't. */
+  backlogWindow?: BacklogWindowController;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -435,6 +440,7 @@ export function createServices(options: ServiceOptions): Services {
   const launchUndo = createLaunchUndo({ launcher: adoLauncher, sessions, launches, worktrees, ado, emit: options.emit, log: log.child('launch') });
 
   return {
+    backlogWindow: options.backlogWindow ?? createBacklogWindowController(() => null),
     appDataDir: options.appDataDir,
     secrets,
     emit: options.emit,

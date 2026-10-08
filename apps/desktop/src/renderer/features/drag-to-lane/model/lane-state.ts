@@ -10,10 +10,44 @@ export interface ActiveDrag {
   input: DragInput;
 }
 
+/** The cards a drag carries: the group it was picked up with, or just the card. */
+export function dragMembers(card: LaneDragCard): readonly LaneDragCard[] {
+  return card.group && card.group.length > 0 ? card.group : [card];
+}
+
+/** "Plan this" → "Plan these" for a group (artboard 12). */
+function forSeveral(action: DropAction): DropAction {
+  return { ...action, title: action.title.replace(/\bthis\b/, 'these') };
+}
+
+/**
+ * What each lane does with the card, or with every card of its group: a group goes only to the lanes
+ * that take each of its cards (one agent per card), titled for several ("Plan these").
+ */
+function lanesFor(card: LaneDragCard): Partial<Record<Lane, DropAction>> {
+  const members = dragMembers(card);
+  if (members.length <= 1) return allowedLanes(card.card, card.me);
+  const each = members.map((member) => allowedLanes(member.card, member.me));
+  const allowed: Partial<Record<Lane, DropAction>> = {};
+  for (const lane of LANES) {
+    const first = each[0]?.[lane];
+    if (first && each.every((lanes) => lanes[lane])) allowed[lane] = forSeveral(first);
+  }
+  return allowed;
+}
+
+/** "#71360", or "2 items" for a group. */
+export function dragLabel(card: LaneDragCard): string {
+  const count = dragMembers(card).length;
+  return count > 1 ? `${count} items` : card.label;
+}
+
 export function activeDrag(card: LaneDragCard, input: DragInput): ActiveDrag {
+  const several = dragMembers(card).length > 1;
   return {
-    card,
-    allowed: allowedLanes(card.card, card.me),
+    // A group is announced and previewed as "2 items".
+    card: several ? { ...card, label: dragLabel(card) } : card,
+    allowed: lanesFor(card),
     refused: refusedLanes(card.card, card.me),
     input,
   };
@@ -43,17 +77,17 @@ export function laneDropState(active: ActiveDrag | null, lane: Lane, overLane: L
 
 /** The lanes that take the card, left to right, with what each drop does: the "Send to lane" menu. */
 export function allowedLaneList(card: LaneDragCard): { lane: Lane; action: DropAction }[] {
-  const allowed = allowedLanes(card.card, card.me);
+  const allowed = lanesFor(card);
   return LANES.flatMap((lane) => {
     const action = allowed[lane];
     return action ? [{ lane, action }] : [];
   });
 }
 
-function joinLanes(lanes: readonly Lane[]): string {
+function joinLanes(lanes: readonly Lane[], word = 'and'): string {
   const names = lanes.map((lane) => LANE_LABELS[lane]);
   if (names.length <= 1) return names.join('');
-  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  return `${names.slice(0, -1).join(', ')} ${word} ${names.at(-1)}`;
 }
 
 // ── Announcements (TB§7: "Over Code review: start agentic review") ─────────────────────────────
@@ -88,10 +122,16 @@ export function cancelAnnouncement(active: ActiveDrag): string {
 }
 
 export function sentAnnouncement(card: LaneDragCard, lane: Lane, action: DropAction): string {
-  return `Sent ${card.label} to ${LANE_LABELS[lane]}: ${action.label}`;
+  return `Sent ${dragLabel(card)} to ${LANE_LABELS[lane]}: ${action.label}`;
 }
 
-/** "Drop !10571 on a highlighted lane" (artboard 09's header pill). */
+/**
+ * "Drop !10571 on a highlighted lane" (artboard 09's header pill), or for a group "Dragging 2 items —
+ * drop on Planning or Implementing" (artboard 12).
+ */
 export function dragStatusText(active: ActiveDrag): string {
-  return LANES.some((lane) => active.allowed[lane]) ? `Drop ${active.card.label} on a highlighted lane` : `No lane takes ${active.card.label}`;
+  const lanes = LANES.filter((lane) => active.allowed[lane]);
+  if (lanes.length === 0) return `No lane takes ${active.card.label}`;
+  if (dragMembers(active.card).length > 1) return `Dragging ${active.card.label} — drop on ${joinLanes(lanes, 'or')}`;
+  return `Drop ${active.card.label} on a highlighted lane`;
 }

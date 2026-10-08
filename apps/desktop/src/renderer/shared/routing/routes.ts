@@ -7,7 +7,9 @@ export type Route =
   | { readonly name: 'board' }
   | { readonly name: 'ticket'; readonly ticketId: string }
   | { readonly name: 'ticketDesign'; readonly ticketId: string }
-  | { readonly name: 'gallery' };
+  | { readonly name: 'gallery' }
+  /** The popped-out Backlog window (AL-239): `backlog`, or `backlog/<team id>` for another team. */
+  | { readonly name: 'backlogWindow'; readonly teamId: string | null };
 
 export type RouteName = Route['name'];
 
@@ -17,6 +19,7 @@ export const routes = {
   ticket: (ticketId: string): Route => ({ name: 'ticket', ticketId }),
   ticketDesign: (ticketId: string): Route => ({ name: 'ticketDesign', ticketId }),
   gallery: (): Route => ({ name: 'gallery' }),
+  backlogWindow: (teamId: string | null = null): Route => ({ name: 'backlogWindow', teamId }),
 } as const;
 
 /** `board` · `ticket/71273` · `ticket/71273/design` · `gallery` (the id is URI-encoded). */
@@ -30,6 +33,8 @@ export function routeToPath(route: Route): string {
       return `ticket/${encodeURIComponent(route.ticketId)}/design`;
     case 'gallery':
       return 'gallery';
+    case 'backlogWindow':
+      return route.teamId === null ? 'backlog' : `backlog/${encodeURIComponent(route.teamId)}`;
   }
 }
 
@@ -42,6 +47,11 @@ export function parseRoutePath(path: string): Route | undefined {
 
   if (segments.length === 1 && segments[0] === 'board') return routes.board();
   if (segments.length === 1 && segments[0] === 'gallery') return routes.gallery();
+  if (segments[0] === 'backlog' && segments.length <= 2) {
+    if (segments.length === 1) return routes.backlogWindow();
+    const teamId = decodeSegment(segments[1] ?? '');
+    return teamId ? routes.backlogWindow(teamId) : undefined;
+  }
   if (segments[0] !== 'ticket' || segments.length < 2 || segments.length > 3) return undefined;
 
   const ticketId = decodeSegment(segments[1] ?? '');

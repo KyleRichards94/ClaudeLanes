@@ -7,6 +7,8 @@ describe('routes', () => {
     [routes.ticket('71273'), 'ticket/71273'],
     [routes.ticketDesign('71273'), 'ticket/71273/design'],
     [routes.gallery(), 'gallery'],
+    [routes.backlogWindow(), 'backlog'],
+    [routes.backlogWindow('a1b2-team id'), 'backlog/a1b2-team%20id'],
   ])('writes %o as %s and reads it back', (route, path) => {
     expect(routeToPath(route)).toBe(path);
     expect(parseRoutePath(path)).toEqual(route);
@@ -24,7 +26,7 @@ describe('routes', () => {
     expect(parseRoutePath(routeToPath(route))).toEqual(route);
   });
 
-  it.each(['', '#', '#/', 'boards', 'board/1', 'ticket', 'ticket/', 'ticket/%20', 'ticket/1/diff', 'ticket/1/design/x', 'ticket/%E0%A4%A'])(
+  it.each(['', '#', '#/', 'boards', 'board/1', 'ticket', 'ticket/', 'ticket/%20', 'ticket/1/diff', 'ticket/1/design/x', 'ticket/%E0%A4%A', 'backlog/%20', 'backlog/a/b'])(
     'rejects %j',
     (path) => {
       expect(parseRoutePath(path)).toBeUndefined();
