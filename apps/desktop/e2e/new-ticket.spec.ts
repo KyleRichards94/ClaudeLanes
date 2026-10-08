@@ -1,7 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import type { RepoSettings } from '@agent-lanes/contracts';
 
 /**
  * New agent ticket (AL-160) in the real app, driven with the keyboard only: Tab to "+ New agent
@@ -69,4 +71,72 @@ test('goes from the board to a launched request with the keyboard only', async (
 
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Agent ticket is ready')).toBeVisible();
+});
+
+test('previews the workspace, blocks Launch on an invalid worktree name and keeps the stage gates (AL-164)', async () => {
+  // A real repo with a main branch, registered in the profile (repos are only added through the folder picker).
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-workspace-')));
+  try {
+    const repo = join(root, 'onsite-companion');
+    mkdirSync(repo);
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, stdio: 'pipe' });
+    git('init', '--quiet', '--initial-branch=main');
+    git('-c', 'user.name=Agent Lanes', '-c', 'user.email=e2e@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'Initial');
+    const repoSettings: RepoSettings = {
+      path: repo,
+      name: 'onsite-companion',
+      baseBranch: 'main',
+      worktreeRoot: join(root, '.agent-lanes'),
+      buildCommand: null,
+      runCommand: null,
+      maxConcurrentAgents: 4,
+    };
+    writeFileSync(join(userDataDir, 'settings.json'), JSON.stringify({ version: 2, repos: [repoSettings] }));
+
+    app = await electron.launch({ args: [join(__dirname, '..')], env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir } });
+    const page = await app.firstWindow();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1440, 960));
+    await expect(page.getByText('Agent board')).toBeVisible();
+    await page.getByRole('button', { name: 'New agent ticket' }).click();
+    const dialog = page.getByRole('dialog', { name: 'New agent ticket' });
+    await expect(dialog).toBeVisible();
+
+    // Model cards and gates (AL-163, AL-164).
+    await expect(dialog.getByRole('radio', { name: 'Opus' })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByText('Deepest reasoning')).toBeVisible();
+    await expect(dialog.getByRole('switch', { name: /^Planning/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('switch', { name: /^Create PR/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(dialog.getByRole('switch', { name: /^QA/ })).toHaveAttribute('aria-checked', 'false');
+
+    await dialog.getByRole('radio', { name: 'No ticket' }).click();
+    await dialog.getByRole('textbox', { name: 'What should the agent do?' }).fill('Fix the supplier portal login');
+    await expect(dialog.getByTestId('workspace-repo')).toHaveText('onsite-companion');
+    await expect(dialog.getByTestId('workspace-base')).toHaveText('main');
+    const worktree = dialog.getByRole('textbox', { name: 'Worktree' });
+    await expect(worktree).toHaveValue(/^nt-\d{8}-fix-the-supplier$/);
+    await page.screenshot({ path: test.info().outputPath('workspace.png') });
+
+    // An invalid name blocks Launch with the reason; so does an existing branch.
+    await worktree.fill('fix login');
+    await dialog.getByRole('button', { name: 'Launch agent' }).click();
+    await expect(dialog.getByTestId('workspace-error')).toHaveText("Branch names can't contain spaces.");
+    await expect(worktree).toBeFocused();
+    await worktree.fill('main');
+    await expect(dialog.getByTestId('workspace-error')).toHaveText('A branch named "main" already exists.');
+    const launch = dialog.getByRole('button', { name: 'Launch agent' });
+    await launch.click();
+    // Launch asks main about the name, then stays open.
+    await expect(launch).not.toHaveAttribute('aria-busy', 'true');
+    await expect(dialog).toBeVisible();
+
+    await worktree.fill('fix-supplier-login');
+    await expect(dialog.getByTestId('workspace-error')).toBeHidden();
+    await dialog.getByRole('button', { name: 'Launch agent' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByText('Agent ticket is ready')).toBeVisible();
+  } finally {
+    await app?.close();
+    app = undefined;
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
