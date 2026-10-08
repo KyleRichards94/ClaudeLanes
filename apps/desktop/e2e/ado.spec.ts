@@ -140,7 +140,8 @@ test('the board reads sprints for the user’s team, with a Team menu and a grou
   const paths = ado.org.state.requests.map((request) => decodeURIComponent(request.path.split('?')[0] ?? ''));
   expect(paths.some((path) => path.endsWith(`/${ADO_FIXTURE_PROJECT}/_apis/work/teamsettings/iterations`))).toBe(false);
   expect(paths.some((path) => path.endsWith(`/${ADO_FIXTURE_PROJECT}/${ADO_FIXTURE_TEAM_ID}/_apis/work/teamsettings/iterations`))).toBe(true);
-  expect(ado.org.state.unhandled).toEqual([]);
+  // The team board under the lanes (AL-234) also reads its team, which only team-board.spec's fake serves.
+  expect(ado.org.state.unhandled.filter((request) => !/\/_apis\/projects\/[^/]+\/teams\/[^/?]+\?/.test(request))).toEqual([]);
 });
 
 test('bad requests and ADO failures come back as typed results, never with the token', async () => {
