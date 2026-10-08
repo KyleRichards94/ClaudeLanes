@@ -53,6 +53,8 @@ export interface BuildServiceOptions {
   warn?: (message: string) => void;
   /** Reads a worktree's state, so Run can skip a build that is still fresh (AL-133); without it every Run builds. */
   fingerprint?: WorktreeFingerprint;
+  /** Every finished build, cancelled ones included: the agent gets it as next-turn context (AL-112). */
+  onFinished?: (result: BuildResult) => void;
 }
 
 async function isFolder(path: string): Promise<boolean> {
@@ -165,6 +167,11 @@ export function createBuildService(options: BuildServiceOptions): BuildService {
       if (result.outcome === 'succeeded' && before !== null) fresh.set(ticketId, before);
       await saveLastBuild(record, result);
       options.emit('build:finished', { ...result, at: finishedAt });
+      try {
+        options.onFinished?.(result);
+      } catch (error) {
+        warn(`Could not hand the build of ticket ${ticketId} on: ${String(error)}`);
+      }
 
       return result.outcome === 'failed' ? err('BUILD_FAILED', buildFailedLabel(result.errors), result) : ok(result);
     },
