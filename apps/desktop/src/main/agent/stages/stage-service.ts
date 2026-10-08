@@ -56,11 +56,28 @@ export interface StageChange {
   gate?: { stage: Stage; outcome: GateOutcome; note: string | null; by: string | null };
 }
 
+/** A saved lane change, for listeners such as the ADO write-back (AL-115). */
+export interface StageChangedEvent {
+  ticketId: string;
+  from: Lane;
+  to: Lane;
+  /** When the ticket entered `to` (its stage history entry). */
+  at: number;
+  /** The one-line summary shown as the card's activity; null when none. */
+  summary: string | null;
+  gate?: { stage: Stage; by: string | null };
+}
+
 export interface StageServiceOptions {
   tickets: Pick<TicketRecordStore, 'get' | 'update'>;
   emit: Emit;
   transcripts?: Pick<TranscriptService, 'appendSystem'>;
   log?: Pick<Logger, 'info' | 'warn'>;
+  /**
+   * A ticket entered another lane, after it was saved and shown: the ADO write-back posts its comment
+   * (AL-115). `gate` is the gate the move waited on and who approved it.
+   */
+  onStageChanged?: (change: StageChangedEvent) => void;
   /** Who approves on this computer, for "Plan approved by Kyle". The OS user's first name by default. */
   userName?: () => string;
   now?: () => number;
@@ -101,7 +118,13 @@ export function createStageService(options: StageServiceOptions): StageService {
   const queue = createKeyedQueue();
   const waiting = new Map<string, Waiting>();
 
-  async function move(ticketId: string, to: Lane, summary: string | null, systemLine?: string): Promise<Result<StageChange>> {
+  async function move(
+    ticketId: string,
+    to: Lane,
+    summary: string | null,
+    systemLine?: string,
+    gate?: StageChangedEvent['gate'],
+  ): Promise<Result<StageChange>> {
     const saved = await tickets.update(ticketId, (record) => ({ ...record, stage: to }));
     if (!saved.ok) return saved;
     const from = saved.data.stageHistory.at(-2)?.stage ?? to;
@@ -109,6 +132,12 @@ export function createStageService(options: StageServiceOptions): StageService {
     emit('agent:stage', { ticketId, change: 'stage', stage: to, from, activity, progress: 0 });
     options.transcripts?.appendSystem(ticketId, systemLine ?? `Moved to ${LANE_LABELS[to]}${activity ? ` · ${activity}` : ''}`);
     options.log?.info(`Ticket ${ticketId} moved from ${from} to ${to}`);
+    try {
+      const at = saved.data.stageHistory.at(-1)?.at ?? now();
+      options.onStageChanged?.({ ticketId, from, to, at, summary: activity, ...(gate ? { gate } : {}) });
+    } catch (error) {
+      options.log?.warn(`A stage change listener failed for ticket ${ticketId}: ${error instanceof Error ? error.message : String(error)}`);
+    }
     return ok({ from, to, changed: true });
   }
 
@@ -142,7 +171,10 @@ export function createStageService(options: StageServiceOptions): StageService {
     const result = { stage: gateStage, ...decision };
     if (decision.outcome === 'approved') {
       const by = decision.by ? ` by ${decision.by}` : ' (gate switched off)';
-      const moved = await move(ticketId, to, summary, `${subject} approved${by} · moved to ${LANE_LABELS[to]}`);
+      const moved = await move(ticketId, to, summary, `${subject} approved${by} · moved to ${LANE_LABELS[to]}`, {
+        stage: gateStage,
+        by: decision.by,
+      });
       return moved.ok ? ok({ ...moved.data, gate: result }) : moved;
     }
     if (decision.outcome === 'changes-requested') {

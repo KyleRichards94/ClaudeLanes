@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
 import { createAdoService, type AdoService } from './ado';
+import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
@@ -253,7 +254,21 @@ export function createServices(options: ServiceOptions): Services {
     history: async (sessionId, dir) => (await loadClaudeSdk()).getSessionMessages(sessionId, { dir }),
     log: log.child('agent'),
   });
-  const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const stageComments = createStageComments({
+    tickets,
+    settings,
+    writeBack: ado.writeBack,
+    orgFor: (orgUrl) => adoConnectionIdFor(connections, orgUrl),
+    log: log.child('ado'),
+  });
+  const stages = createStageService({
+    tickets,
+    emit: options.emit,
+    transcripts,
+    log: log.child('agent'),
+    // Each lane change posts one comment to the work item (AL-115).
+    onStageChanged: (change) => stageComments.stageChanged(change),
+  });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
