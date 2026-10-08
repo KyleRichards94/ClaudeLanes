@@ -134,13 +134,13 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-172 | Agent panel (model and effort) | E10 | S | AL-106, AL-170 | todo |
 | AL-173 | Worktree panel (Build, Run, Stop) | E10 | S | AL-134, AL-170 | done |
 | AL-174 | Merge panel, confirm and conflict flows | E10 | M | AL-086, AL-087, AL-170 | todo |
-| AL-175 | Output stream | E10 | L | AL-102, AL-170 | todo |
+| AL-175 | Output stream | E10 | L | AL-102, AL-170 | done |
 | AL-176 | Composer | E10 | S | AL-105, AL-106, AL-175 | todo |
 | AL-177 | Sub-agents panel | E10 | M | AL-107, AL-170 | todo |
 | AL-178 | Sub-branches panel | E10 | S | AL-085, AL-177 | todo |
 | AL-179 | Diff tab | E10 | M | AL-089, AL-170 | done |
 | AL-180 | ADO tab | E10 | M | AL-066, AL-170 | done |
-| AL-181 | Create PR stage | E10 | M | AL-064, AL-104, AL-170 | todo |
+| AL-181 | Create PR stage | E10 | M | AL-064, AL-104, AL-170 | partial |
 | AL-190 | Spike: Claude Design integration surface | E11 | S | — | partial |
 | AL-191 | Design view service (WebContentsView) | E11 | L | AL-190, AL-011 | done |
 | AL-192 | Design tab page | E11 | M | AL-191, AL-140, AL-170 | partial |
@@ -148,9 +148,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-194 | Embed mode switch and MCP-link fallback | E11 | M | AL-190, AL-192 | partial |
 | AL-195 | Artboard list and selection | E11 | M | AL-190, AL-192 | partial |
 | AL-196 | Design thread at any stage (R11) | E11 | L | AL-190, AL-192 | done |
-| AL-197 | Approve & ship design at any time (R11) | E11 | L | AL-195, AL-198, AL-100 | todo |
-| AL-198 | Agent-side design tools | E11 | M | AL-103 | todo |
-| AL-199 | Design specs attached to the ticket | E11 | S | AL-197 | todo |
+| AL-197 | Approve & ship design at any time (R11) | E11 | L | AL-195, AL-198, AL-100 | partial |
+| AL-198 | Agent-side design tools | E11 | M | AL-103 | done |
+| AL-199 | Design specs attached to the ticket | E11 | S | AL-197 | done |
 | AL-200 | Design presence on card and drill-in | E11 | S | AL-197, AL-144 | todo |
 | AL-210 | Error boundaries | E12 | S | AL-140 | partial |
 | AL-211 | Error recovery actions | E12 | M | AL-030, AL-046 | done |
@@ -883,7 +883,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 3 Output, §12 Performance · **Depends on:** AL-102, AL-170
 - **Scope:** Virtualised list (FlashList on react-native-web) of output events: system lines, tool rows (coloured verb chip + mono detail + stats), prose (bold for emphasis), streaming line with caret; auto-follow with "Jump to latest" when scrolled up; text selection (web file if needed, §13).
 - **Acceptance criteria:**
-  - [ ] 10,000 events keep scrolling at 60 fps; store updates at most once per frame.
+  - [x] 10,000 events keep scrolling at 60 fps; store updates at most once per frame.
 
 #### AL-176 · Composer
 - **Design:** artboard 3 footer · **Depends on:** AL-105, AL-106, AL-175
@@ -919,7 +919,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §7 ADO write-back, §9 alternative to step 5, artboard 6 "PR open" · **Depends on:** AL-064, AL-104, AL-170
 - **Scope:** On entering Create PR (after its gate), draft title/description from the agent's summary, let the user edit, create the PR, link the work item, show checks on the card and drill-in; PR completed/abandoned → Done.
 - **Acceptance criteria:**
-  - [ ] The PR is linked to the work item in ADO.
+  - [ ] The PR is linked to the work item in ADO. (open: proven against the MSW fake ADO org, where the created PR carries `workItemIds [71273]`; the push to a real Azure Repos remote, `workItemRefs` and the artifact link with real PAT scopes need a manual check by Kyle against a real org)
 
 ---
 
@@ -999,23 +999,23 @@ implementation agent, mid-run if needed.
   5. If the session is queued, paused or lost, the spec is held and delivered first when it runs.
 - **Scope update (AL-190 spike):** The DesignSpec artboard source is ClaudeDesign `read_file` output (plus a `render_preview` image), captured at ship time and stored per D8. Optionally include the relevant design chat via `get_conversation`.
 - **Acceptance criteria:**
-  - [ ] Shipping during Implementing reaches the running agent without a restart, and its next output references the spec version.
-  - [ ] Shipping during Planning changes the plan the user is asked to approve.
-  - [ ] Shipping twice creates v1 and v2; the agent is told v2 supersedes v1.
-  - [ ] Ship is visible in the Output stream ("14:01 · Design v2 approved by Kyle · 2 artboards").
+  - [ ] Shipping during Implementing reaches the running agent without a restart, and its next output references the spec version. (open: delivery to the same running session with priority `now` and no second launch is proven with the fake SDK; that a real agent's next output names the version needs a manual check against a real Claude session)
+  - [ ] Shipping during Planning changes the plan the user is asked to approve. (open: the hand-off message and stage protocol tell the agent to fold the spec into the plan; whether the plan changes needs a real agent)
+  - [x] Shipping twice creates v1 and v2; the agent is told v2 supersedes v1.
+  - [x] Ship is visible in the Output stream ("14:01 · Design v2 approved by Kyle · 2 artboards").
 
 #### AL-198 · Agent-side design tools
 - **Design:** R11, artboard 4 ("Agent is watching this canvas", "Used · 14:01") · **Depends on:** AL-103
 - **Scope:** Add to the `agent_lanes` MCP server: `get_design_spec({ version? })` → full spec (latest by default); `list_design_specs()`; `ack_design_spec({ version, note })` → marks it "Used" with time and raises `design:spec`. The stage protocol text tells the agent to fetch and acknowledge shipped specs. Sub-agents (e.g. razor-writer) can call `get_design_spec` too.
 - **Acceptance criteria:**
-  - [ ] "Attached to this ticket" shows "Used · 14:01" after the agent acknowledges.
-  - [ ] "Agent is watching this canvas" shows while a spec is fetched but not yet acknowledged.
+  - [x] "Attached to this ticket" shows "Used · 14:01" after the agent acknowledges.
+  - [x] "Agent is watching this canvas" shows while a spec is fetched but not yet acknowledged.
 
 #### AL-199 · Design specs attached to the ticket
 - **Design:** artboard 4 "Attached to this ticket" · **Depends on:** AL-197
 - **Scope:** List of shipped specs and attachments (artboards with status Sent / Used / Superseded, the design-system file chip), view a spec, re-ship a previous version, diff two versions' artboard lists.
 - **Acceptance criteria:**
-  - [ ] List survives restarts and reflects acknowledgements live.
+  - [x] List survives restarts and reflects acknowledgements live.
 
 #### AL-200 · Design presence on card and drill-in
 - **Depends on:** AL-197, AL-144
@@ -1835,6 +1835,22 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D631 | AL-112: Nothing is sent when the ticket has no live session; a paused session holds the message until Resume; a throwing hook never fails the build | The result is already on the ticket record (AL-132) | 2026-10-08 |
 | D632 | AL-112: The message tells the agent no reply is needed now and to rebuild to check the current state before fixing anything | The build may be stale by the next turn | 2026-10-08 |
 | D633 | AL-110: At integration, both the `reconnectSession` toast intent and AL-211's SESSION_LOST recovery go through `createRecoveryEnvironment().reconnectSession`, which calls `agent:reconnect` and shows "Couldn't reconnect <id>" on failure; this replaces D554's Output-tab stand-in and AL-110's own helper in `ToastHost` | One Reconnect path for both toasts | 2026-10-08 |
+| D634 | AL-175: The Output stream is a small custom windowing list (ScrollView with spacer views and measured variable row heights) in `entities/agent-output`, not FlashList | Follows D500 for the Build log, adds no dependency, and keeps rows in normal flow so text can be selected across rows | 2026-10-08 |
+| D635 | AL-175: Sub-agent output (`parentToolUseId` set) is left out of the lead stream; a successful turn end draws no row, only a failed turn shows "Turn ended early" | Sub-agent output belongs under its node in the sub-agents tree (AL-107/AL-177) | 2026-10-08 |
+| D636 | AL-181: The PR channels live in a new `pr` contracts domain (`pr:draft`, `pr:create`, `pr:get`, event `pr:status`; `pr.names.ts`/`pr.schemas.ts` plus one line each in the aggregators and `ipc/handlers.ts`) | tickets.* and ado.* handler factories stay unchanged | 2026-10-08 |
+| D637 | AL-181: `TicketRecord` gains an optional `pullRequest` field (ref, org connection id, id, webUrl, status, openedAt, closedAt) without bumping `TICKET_RECORD_VERSION` | Older records still read | 2026-10-08 |
+| D638 | AL-181: Repository and project come from `git remote get-url origin` parsed with `parseAdoGitRemote`, the ADO connection is matched by org URL; a non-Azure-Repos remote, no work item or a ticket not yet in Create PR gives a `blocked` reason in the draft instead of an error | The panel can explain why it cannot open a PR | 2026-10-08 |
+| D639 | AL-181: The ticket branch is pushed with `git push --set-upstream origin refs/heads/<b>:refs/heads/<b>` before the PR is created; nothing is opened if the push fails | ADO needs the source branch on the remote | 2026-10-08 |
+| D640 | AL-181: The Pull request panel lives in `pages/ticket` (api + ui segments), not `features/create-pull-request` | Steiger's insignificant-slice rule fails a feature only one page uses | 2026-10-08 |
+| D641 | AL-181: An abandoned PR also moves the ticket to Done; its card reads "PR !n · abandoned" instead of "Merged into main". Open PRs are polled every 60 s and re-watched after a restart | The ticket's work is over either way | 2026-10-08 |
+| D642 | AL-198: "Agent is watching this canvas" sits at the top of the design tab's side panel, not on the canvas as in artboard 4 | The canvas is a native WebContentsView drawn over the page and would hide any renderer element on it | 2026-10-08 |
+| D643 | AL-198: `TicketDesignSpecSchema` gains optional `fetchedAt` (and `deliveredAt`, AL-197); `DesignSpecEventSchema` gains `version` and `change` (shipped / delivered / fetched / used); the DesignSpec schema lives in a new `design.specs.ts`. Spec files are app-written JSON at `<userData>/design-specs/<repoKey>/<ticketId>/v<N>.json` (D8) | Keeps `design.schemas.ts` lean, as D124 | 2026-10-08 |
+| D644 | AL-198: The design-spec MCP tools are added only when the session extras get a `DesignSpecService`; their names (`DESIGN_SPEC_TOOLS`) are added to `allowedTools`, `STAGE_SERVER_TOOLS` unchanged | Stage tools stay as they were | 2026-10-08 |
+| D645 | AL-197: The ship button keeps artboard 4's label "Send N artboards to agent as spec" (help text says it approves and ships), not the ticket's "Approve & ship N artboards to agent →" | Matches the artboard and the AL-195 unit and e2e tests | 2026-10-08 |
+| D646 | AL-197: The renderer sends the picked artboards' id, name and size; main reads only their source through a read-only design session, and an unreadable artboard ships with source null | R11: ship works at any time | 2026-10-08 |
+| D647 | AL-197: Ships of one ticket go through a keyed queue, so two clicks at once give v1 and v2; `approvedBy` is the OS user's first name (as AL-104); with no live session the spec is held and delivered first on the next `system/init`, and a paused session holds it until Resume | No duplicate versions; one approver source | 2026-10-08 |
+| D648 | AL-199: The version diff is pure functions in contracts (`diffSpecArtboards` / `describeSpecDiff`) matching artboards by id; each opened version shows its diff against the version just before it, not a free choice of two | Simple and covers the common case | 2026-10-08 |
+| D649 | AL-199: "Ship vN again" (`design:reshipSpec`) copies the stored snapshot (sources included) as the newest version instead of reading the canvas again, and records `reshipOf` so the agent message and Output line say "vN shipped again" | The re-shipped spec is exactly what was approved | 2026-10-08 |
 
 ---
 
@@ -1892,6 +1908,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Integrator batch 1 (b35): merged AL-108 (partial: ADO MCP server injected per work item org and the header MCP pill with auto-reconnect are in; reading and commenting on the work item needs a live session against a real ADO org) and AL-109 (partial: D18 policy, `canUseTool` "Needs you · permission" prompt and settings are in and unit-tested on the fake SDK; both criteria need a real Claude session). AL-110 (uncommitted, kept in the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a"), AL-111 and AL-112 were not on the branch and stay `todo`. No conflicts on main (the branch had already merged main); lockfile unchanged after `pnpm install`. No integration fixes needed. Decision D549. `pnpm verify`: typecheck, lint and build green; 2736/2738 unit tests in the full run, with load-related timeouts in real-git `ticket-worktree.test.ts` and `repos/registry.test.ts` (and `archive`, `merge-to-main`, `service.mcp` in an earlier run), none touched by this merge; each passed when rerun alone. E2E 106/106. The b35 worktree held a conflicted `sub-worktree.ts` and an untracked `subagent-tracker.ts` from another branch's stash; copies were saved before the worktree was removed. |
 | 2026-10-08 | Integrator batch 2 (b24, b23, b39, b34, b38): merged AL-196, AL-211, AL-142, AL-161, AL-173, AL-179, AL-180, AL-221, AL-048, AL-086, AL-106, AL-107, AL-213, AL-230, AL-231, AL-232 and AL-233 (done), AL-225 (partial: the README guide is written, but no teammate has yet followed it end to end on a clean machine with a real org and Claude account) and AL-084 (partial: sub-branches are recorded with ahead counts; the Sub-branches panel is AL-178). Nothing rejected. Conflicts: b24 with AL-108/AL-109 in renderer `AppProviders.tsx` and `shared/api/index.ts` (kept both); b23 in `entities/agent-ticket/model/event-handlers(.test).ts` (kept AL-109 `agent:permission` + AL-173 `run:status`/`build:finished`) and `pages/board/ui/BoardPage.tsx` (took AL-142's header; AL-108's `McpStatusPill` moved into `BoardHeader`, D602); b34 in `agent.names.ts`/`agent.schemas.ts`, `agent/handlers(.test).ts`, `session-messages.test.ts`, renderer `ipc.ts` and `event-handlers(.test).ts` (kept both), `session-manager.ts` (SessionExtras keeps AL-109 `permissionMode`/`canUseTool` and AL-084 `hooks`) and `services.ts` (one `combineSessionExtras` path for stage, MCP, permissions, sub-worktree and sub-agent hooks, D603); b38 in `ado/service.ts`, `services.ts` (`onUnauthorized` + `registeredRemotes`) and `entities/agent-ticket/index.ts` (kept both). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements AL-108's `mcpServerStatus`/`reconnectMcpServer`; `BoardPage.test.tsx` feeds the live MCP status. Decisions D550–D603. `pnpm verify` green (3049 unit tests). E2E: 115/116 in the first full run, the one failure a Playwright worker crash (0xC0000409) in `accessibility.spec.ts`, which passed 2/2 alone; the full rerun was 116/116. Follow-ups: AL-197 sends design-thread messages to the implementation agent on ship; AL-110 replaces `reconnectSession` in `renderer/app/toasts/recovery-environment.ts`; AL-177 renders the sub-agent tree from `agent:getSubagents` + `agent:subagent`; AL-178 renders recorded sub-branches; check ClaudeDesign tool names and `finalize_plan` against a real account; `e2e/first-run.spec.ts` "a fresh profile reaches the board…" is flaky under load (pick-repo dialog close, AL-220). |
 | 2026-10-08 | Integrator batch 3 (b36, b49): merged AL-113, AL-115, AL-171 and AL-111 (done), AL-114 (partial: both skill sources listed through `supportedCommands()` needs a real Claude Code login), AL-162 (partial: the launch request carries the selected skills, but Launch goes to `launchNotReady` until AL-165), AL-110 (partial: tested with the fake SDK only; killing a real `claude` mid-run needs a real account) and AL-112 (partial: whether the model mentions the build errors needs a real session). Nothing rejected. Conflicts: b36 with AL-106/AL-107/AL-161/AL-195/AL-196/AL-213/AL-233 in `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts` (`midTurn` + `contextUsage`), `services.ts` (stage comments + sub-agents + merge sub-branches), `AppProviders.tsx`, `entities/agent-ticket/index.ts`, `NewTicketModal.tsx` (AL-161's `WorkItemPicker` and sprint menu + AL-162's prefill and skill chips; the picker's `workItem` dispatch now fires the prefill), `TicketPage.tsx`, the e2e fake `claude` (design `reply` + `commands`) and `agent.spec.ts` (kept both); b49 in `agent.names.ts`, `app.schemas.ts` (`recover` + `reconnectSession` intents), `agent/handlers(.test).ts`, `session-messages.test.ts`, `session-manager.ts`, `services.ts`, `AppProviders.tsx`, `TicketPage.tsx` (kept both) and `toast-intents.ts`/`ToastHost.tsx` (AL-211's recovery environment kept, D633). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements `getContextUsage`/`supportedCommands`; Reconnect calls `agent:reconnect` from `recovery-environment.ts` and `recovery.test.tsx` checks it (D633). Decisions D604–D633. `pnpm verify` green (3109 unit tests). E2E: 114/118 in the first full run (`git.spec.ts` launch failure and three `logging.spec.ts` tests, all passing alone) and 117/118 in the second (`text.spec.ts` mouse selection, 3/3 alone), under load from other agents (about 46 node processes); the third full run was 118/118. Follow-ups: AL-165 calls `services.launches.launch({ ticketId, jobDescription, workItem })` and passes `NewTicketRequest.skills` into the launch; AL-088 calls `services.launches.cancel(ticketId)` on archive; AL-143/AL-144 drive the queued card from session state `queued` and may show "Session lost · Reconnect" and Start now on the card; AL-222 approves a real gate through the stepper; manual checks with a real account: token totals against `/cost`, skills from `.claude/skills`, crash resume, build errors in the next turn; the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a" is fully merged and can be dropped by Kyle. |
+| 2026-10-08 | Integrator batch 4 (b37): merged AL-175, AL-198 and AL-199 (done), AL-181 (partial: the PR is created linked to the work item against the MSW fake ADO org; the push to a real Azure Repos remote, `workItemRefs` and the artifact link with real PAT scopes need a manual check by Kyle) and AL-197 (partial: delivery to the running session with priority `now` is proven with the fake SDK; that a real agent's next output names the spec version, and that shipping in Planning changes the plan, need a real Claude session). Nothing rejected. Conflicts kept both sides: `contracts/src/names.ts`/`schemas.ts` (AL-114 `skills` + AL-181 `pr` domain), `ipc/handlers.ts` (skills + pr handlers), renderer `AppProviders.tsx` (AL-113 `agent:usage` + AL-198 `design:spec` handlers) and `shared/api/index.ts` (`reconnectSession` + design-spec hooks); `services.ts` keeps AL-115's stage comments on `createStageService` and adds the PR, design-spec and design-ship services, with AL-198's `designSpecs` passed to AL-110's `stageSessionExtras` call; `TicketPage.tsx` imports both AL-171's `useSetGate` and AL-175's `OutputStream`. Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D634–D649. `pnpm verify` green (3186 unit tests). E2E: 120/122 in the first full run, the failure the known `first-run.spec.ts` pick-repo dialog flake under load (AL-220; 2/2 alone), the full rerun 122/122. Follow-ups: AL-064's "PR !n · x / y checks" card text and move to Done are now rendered by AL-181 and can be re-checked; AL-192/AL-194's open notes about shipping and the "Agent is watching" note can be re-checked now AL-197/AL-198 are in; optionally post an ADO write-back comment when a PR opens or closes; consider hiding Merge worktree → main once a PR is open; optionally include `get_conversation` and a `render_preview` image in the spec; watch for a Playwright worker crash (0xC0000409) when `output-stream.spec.ts` runs right before `ticket-page.spec.ts` under load. |
 ---
 
 ## 7. Parallel build rules
