@@ -34,6 +34,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
       launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }),
       // Launch from the team board (AL-236) has its own tests.
       adoLauncher: {} as Services['adoLauncher'],
+      launchUndo: {} as Services['launchUndo'],
     }),
     stages,
     emit,

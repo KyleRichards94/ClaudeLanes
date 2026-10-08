@@ -67,6 +67,13 @@ export interface AdoLauncher {
   undoEntry(undoId: string): LaunchUndoEntry | undefined;
   /** Forgets an undo id (used, expired, or no longer allowed). */
   forgetUndo(undoId: string): void;
+  /** The launch of `ticketId` Undo can still take back, if any (AL-237 watches its session). */
+  undoEntryForTicket(ticketId: string): LaunchUndoEntry | undefined;
+}
+
+/** The id of a launch's success toast, so main can replace it when Undo can no longer run (AL-237). */
+export function launchToastId(ticketId: string): string {
+  return `launch-from-ado:${ticketId}`;
 }
 
 /** Everything Undo needs to take a launch back (AL-237). */
@@ -423,6 +430,7 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
       );
     },
     startLane: (ticketId) => startLanes.get(ticketId),
+    undoEntryForTicket: (ticketId) => [...undo.values()].find((entry) => entry.ticketId === ticketId),
     undoEntry: (undoId) => undo.get(undoId),
     forgetUndo: (undoId) => void undo.delete(undoId),
   };

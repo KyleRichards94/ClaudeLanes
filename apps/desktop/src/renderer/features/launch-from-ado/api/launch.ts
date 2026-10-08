@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { agentTickets, type AgentTicketStore } from '@/entities/agent-ticket';
 import { invoke, ticketsQueryKey, useAddRepo } from '@/shared/api';
 import { markLaunchedTicket, showErrorRecovery, toast } from '@/shared/model';
+import { showLaunchToast } from './undo';
 
 /** A drop as the drag (AL-235), the keyboard "Send to lane" menu and the Backlog popout hand it over. */
 export type AdoDrop = LaunchFromAdoRequest;
@@ -62,7 +63,14 @@ export function useLaunchFromAdo(store: AgentTicketStore = agentTickets): (drop:
       store.upsert(result.data.record);
       markLaunchedTicket(result.data.ticketId);
       void queryClient.invalidateQueries({ queryKey: ticketsQueryKey });
-      toast({ id: `launch-from-ado:${result.data.ticketId}`, tone: 'success', title: 'Agent started', body: result.data.summary });
+      // What changed, with Undo for 10 s or until the first turn ends (AL-237).
+      showLaunchToast(result.data, {
+        store,
+        refresh: () => {
+          refreshTeamBoard(queryClient);
+          void queryClient.invalidateQueries({ queryKey: ticketsQueryKey });
+        },
+      });
       return result.data;
     },
     [addRepo, queryClient, store],

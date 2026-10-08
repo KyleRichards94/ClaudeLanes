@@ -5,7 +5,7 @@ import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Mo
 import { StageGatesSchema } from './settings.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
-import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema } from './agent.launch-from-ado';
+import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema, UndoLaunchRequestSchema, UndoLaunchResponseSchema } from './agent.launch-from-ado';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -451,6 +451,8 @@ export const agentInvokeContracts = {
   'agent:startNow': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Launch from the team board (AL-236): recheck, the one ADO change, worktree, ticket and session; rolls back on failure. */
   'agent:launchFromAdo': { request: LaunchFromAdoRequestSchema, response: LaunchFromAdoResponseSchema },
+  /** Undo (AL-237): within 10 s and before the first turn ends, puts the item back and removes the agent, worktree and ticket. */
+  'agent:undoLaunch': { request: UndoLaunchRequestSchema, response: UndoLaunchResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
