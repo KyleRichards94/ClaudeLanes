@@ -56,6 +56,11 @@ function chunkFileName(chunk: { facadeModuleId: string | null }): string {
 
 export default defineConfig(({ command, mode }) => ({
   main: {
+    define: {
+      // The e2e test hooks (AL-222, src/main/test-hooks.ts) are in every build except `pnpm package`'s
+      // `--mode release`, which leaves them out of the installer.
+      __TEST_HOOKS__: JSON.stringify(mode !== 'release'),
+    },
     build: {
       externalizeDeps: { exclude: [...workspacePackages, ...esmOnlyMainDeps] },
     },

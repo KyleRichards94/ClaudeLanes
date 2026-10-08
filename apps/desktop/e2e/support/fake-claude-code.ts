@@ -16,7 +16,26 @@ export interface FakeClaudeState {
   };
   /** What `supportedCommands()` lists (AL-114); empty by default. */
   commands?: { name: string; description: string; argumentHint: string; builtin?: boolean }[];
+  /**
+   * The ticket agent's script (AL-222): each user turn of a ticket session takes the first unused
+   * turn whose `match` is in the prompt and runs its steps (see fixtures/fake-claude-code.mjs).
+   */
+  lead?: { turns: FakeAgentTurn[] };
 }
+
+export interface FakeAgentTurn {
+  /** Text the prompt must contain; any prompt when left out. */
+  match?: string;
+  steps: FakeAgentStep[];
+}
+
+export type FakeAgentStep =
+  /** Calls a tool of the app's `agent_lanes` server through the SDK and waits for its result. */
+  | { tool: 'set_stage' | 'report_activity' | 'get_design_spec' | 'list_design_specs' | 'ack_design_spec'; input: Record<string, unknown> }
+  /** Writes a file in the worktree and commits it. */
+  | { commit: { file: string; content: string; message: string } }
+  /** What the agent says at the end of the turn. */
+  | { text: string };
 
 export const FAKE_LOGIN = { email: 'kyle@example.com', organization: 'Example', subscriptionType: 'max' } as const;
 
