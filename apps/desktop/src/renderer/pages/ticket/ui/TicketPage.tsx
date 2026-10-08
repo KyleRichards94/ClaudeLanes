@@ -12,6 +12,7 @@ import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
+import { CreatePullRequestPanel } from './CreatePullRequestPanel';
 import { StageStepper } from './StageStepper';
 import { TicketMeta, TicketTopBar } from './TicketHeader';
 import { AgentPanel, MergePanel, SubAgentsPanel, SubBranchesPanel, WorktreePanel } from './TicketPanels';
@@ -93,6 +94,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         <WorktreePanel ticket={ticket} />
         <MergePanel ticket={ticket} subBranches={subBranches} />
       </View>
+
+      {/* The Create PR stage (AL-181): from entering Create PR, and for as long as the ticket has a PR. */}
+      {ticket.stage === 'create-pr' || ticket.pullRequest || record?.pullRequest ? <CreatePullRequestPanel ticket={ticket} saved={record?.pullRequest} /> : null}
 
       <TicketTabBar ticketId={ticket.id} value={tab} idPrefix={TABS_ID} style={styles.tabs} />
       <View style={[styles.body, wide ? styles.bodyWide : styles.bodyStacked]} testID={wide ? 'ticket-body-wide' : 'ticket-body-stacked'}>

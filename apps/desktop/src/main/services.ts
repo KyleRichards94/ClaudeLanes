@@ -28,6 +28,7 @@ import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
 import { LOG_DIRECTORY_NAME, createLogger, type Logger } from './logging';
+import { createPullRequestService, type PullRequestService } from './pull-requests';
 import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from './repos';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
@@ -108,6 +109,8 @@ export interface Services {
   readonly diffs: DiffService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
+  /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
+  readonly pullRequests: PullRequestService;
 }
 
 export interface ServiceOptions {
@@ -248,6 +251,9 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const pullRequests = createPullRequestService({ tickets, ado, connections, git: git.run, emit: options.emit, transcripts, log: log.child('pr') });
+  // Open PRs from before a restart are read again from the start (AL-181).
+  pullRequests.watch();
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
 
   return {
@@ -280,6 +286,7 @@ export function createServices(options: ServiceOptions): Services {
     archive,
     diffs,
     reconcile,
+    pullRequests,
   };
 }
 
@@ -289,6 +296,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
   services.transcripts.dispose();
+  services.pullRequests.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

@@ -19,6 +19,7 @@ export * from './domains/connections.display';
 export * from './domains/design.schemas';
 export * from './domains/design.canvas';
 export * from './domains/git.schemas';
+export * from './domains/pr.schemas';
 export * from './domains/repos.schemas';
 export * from './domains/settings.schemas';
 export * from './domains/tickets.schemas';

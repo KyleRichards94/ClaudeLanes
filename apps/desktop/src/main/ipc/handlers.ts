@@ -5,6 +5,7 @@ import { createBuildHandlers } from '../build/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
 import { createDesignHandlers } from '../design/handlers';
 import { createDiagnosticsHandlers } from '../diagnostics/handlers';
+import { createPrHandlers } from '../pull-requests/handlers';
 import { createReposHandlers } from '../repos/handlers';
 import type { Services } from '../services';
 import { createSettingsHandlers } from '../settings/handlers';
@@ -31,5 +32,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createAgentHandlers(services),
     ...createGitHandlers(services),
     ...createTicketsHandlers(services),
+    ...createPrHandlers(services),
   };
 }
