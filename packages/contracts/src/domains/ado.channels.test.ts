@@ -56,6 +56,28 @@ const examples = {
       ],
     },
   },
+  'ado:activePrs': {
+    request: { team: 'OSC Developers' },
+    response: {
+      team: TEAM,
+      pullRequests: [
+        {
+          id: 10571,
+          title: 'Job notes rich text editor',
+          isDraft: false,
+          author: { id: 'kr', displayName: 'Kyle Richards', uniqueName: null, initials: 'KR' },
+          reviewers: [{ id: 'ty', displayName: 'Tom Young', uniqueName: null, initials: 'TY', vote: 0, isRequired: false, isContainer: false }],
+          sourceBranch: '71240-job-notes-editor',
+          targetBranch: 'main',
+          repository: { id: ADO_FIXTURE_REPOSITORY.id, name: ADO_FIXTURE_REPOSITORY.name, projectId: 'p', projectName: ADO_FIXTURE_PROJECT },
+          createdAt: '2026-10-06T09:00:00.000Z',
+          unresolvedThreads: 6,
+          repoRegistered: true,
+          webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_git/onsite-companion/pullrequest/10571',
+        },
+      ],
+    },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
@@ -70,6 +92,7 @@ describe('ado:* channel contracts', () => {
       'ado:getPullRequest',
       'ado:listTeams',
       'ado:teamBoard',
+      'ado:activePrs',
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

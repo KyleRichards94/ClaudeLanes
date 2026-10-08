@@ -17,5 +17,6 @@ export function createAdoHandlers(ado: AdoService): HandlersFor<(typeof ADO_INVO
     'ado:getPullRequest': (request) => ado.getPullRequest(request),
     'ado:listTeams': (request) => ado.listTeams(request),
     'ado:teamBoard': (request) => ado.teamBoard(request),
+    'ado:activePrs': (request) => ado.activePrs(request),
   };
 }

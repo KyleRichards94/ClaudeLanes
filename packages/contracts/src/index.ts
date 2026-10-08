@@ -11,6 +11,7 @@ export * from './domains/ado.schemas';
 export * from './domains/ado.pull-requests';
 export * from './domains/ado.write-back';
 export * from './domains/ado.team-board';
+export * from './domains/ado.active-prs';
 export * from './domains/agent.schemas';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';

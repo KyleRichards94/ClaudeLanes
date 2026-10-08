@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { createAdoService, type AdoService } from './ado';
+import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
@@ -226,7 +226,13 @@ export function createServices(options: ServiceOptions): Services {
   });
   const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
 
-  const ado = createAdoService({ connections, settings, log: log.child('ado') });
+  const ado = createAdoService({
+    connections,
+    settings,
+    log: log.child('ado'),
+    // AL-232: a PR in a repo that isn't registered here is flagged, so its drop asks to add the repo.
+    registeredRemotes: () => readRegisteredRemotes(settings.get().repos, git.run),
+  });
 
   const sessions = createSessionManager({
     claude,

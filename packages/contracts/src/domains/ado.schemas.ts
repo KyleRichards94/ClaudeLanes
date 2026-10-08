@@ -11,6 +11,7 @@ import {
 } from './ado.pull-requests';
 import { WorkItemCommentSchema } from './ado.write-back';
 import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
+import { ActivePullRequestListSchema } from './ado.active-prs';
 
 // ── Sprints (AL-061) ──────────────────────────────────────────────────────────
 
@@ -227,6 +228,14 @@ export const TeamBoardRequestSchema = z.strictObject({
 });
 export type TeamBoardRequest = z.infer<typeof TeamBoardRequestSchema>;
 
+/** `ado:activePrs`: open pull requests for a team's repositories, with unresolved thread counts (AL-232). */
+export const ActivePrsRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** Team name or id. Left out, the team from the user's ADO profile. */
+  team: adoText(256).optional(),
+});
+export type ActivePrsRequest = z.infer<typeof ActivePrsRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
 export const adoInvokeContracts = {
@@ -244,6 +253,8 @@ export const adoInvokeContracts = {
   'ado:listTeams': { request: ListTeamsRequestSchema, response: TeamListSchema },
   /** A team's board columns and the sprint's items on it (AL-231). */
   'ado:teamBoard': { request: TeamBoardRequestSchema, response: TeamBoardSchema },
+  /** The team's open pull requests with unresolved thread counts (AL-232). */
+  'ado:activePrs': { request: ActivePrsRequestSchema, response: ActivePullRequestListSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;
