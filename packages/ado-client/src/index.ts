@@ -76,3 +76,17 @@ export {
   type ConnectionCallOptions,
   type ProbeAdoScopesOptions,
 } from './connection-test';
+export {
+  BOARD_COLUMN_FIELD,
+  boardColumnKind,
+  getTeamBoard,
+  gitLinksOf,
+  listMyTeams,
+  MY_TEAMS_PAGE_SIZE,
+  resolveTeam,
+  TEAM_BOARD_MAX_ITEMS,
+  teamFieldClause,
+  toPerson,
+  type TeamBoardOptions,
+  type TeamCallOptions,
+} from './team-board';

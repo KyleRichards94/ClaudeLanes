@@ -10,6 +10,7 @@ import {
   PullRequestSnapshotSchema,
 } from './ado.pull-requests';
 import { WorkItemCommentSchema } from './ado.write-back';
+import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
 
 // ── Sprints (AL-061) ──────────────────────────────────────────────────────────
 
@@ -212,6 +213,20 @@ export type CreatePullRequestRequest = z.infer<typeof CreatePullRequestRequestSc
 export const GetPullRequestRequestSchema = PullRequestRefSchema.extend({ org: AdoOrgIdSchema.optional() }).strict();
 export type GetPullRequestRequest = z.infer<typeof GetPullRequestRequestSchema>;
 
+/** `ado:listTeams`: the user's teams in a project, for the team board's dropdown (AL-231). */
+export const ListTeamsRequestSchema = z.strictObject({ ...AdoScopeShape });
+export type ListTeamsRequest = z.infer<typeof ListTeamsRequestSchema>;
+
+/** `ado:teamBoard`: a team's ADO board for one sprint (AL-231, T1). */
+export const TeamBoardRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** Team name or id. Left out, the team from the user's ADO profile (`ado:listTeams`' default). */
+  team: adoText(256).optional(),
+  /** The sprint's `path` or `id` from `ado:listSprints`. Left out, the team's current sprint (`pickSprint`). */
+  sprint: adoText(1_024).optional(),
+});
+export type TeamBoardRequest = z.infer<typeof TeamBoardRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
 export const adoInvokeContracts = {
@@ -225,6 +240,10 @@ export const adoInvokeContracts = {
   'ado:createPullRequest': { request: CreatePullRequestRequestSchema, response: CreatedPullRequestSchema },
   /** The pull request with its checks, for "PR !10612 · 3 / 4 checks" and Done detection. */
   'ado:getPullRequest': { request: GetPullRequestRequestSchema, response: PullRequestSnapshotSchema },
+  /** The user's teams and the default one (AL-231). */
+  'ado:listTeams': { request: ListTeamsRequestSchema, response: TeamListSchema },
+  /** A team's board columns and the sprint's items on it (AL-231). */
+  'ado:teamBoard': { request: TeamBoardRequestSchema, response: TeamBoardSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;
