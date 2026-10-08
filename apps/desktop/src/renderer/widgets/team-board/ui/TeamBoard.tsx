@@ -1,8 +1,10 @@
 import type { TeamRef } from '@agent-lanes/contracts';
+import { useMemo } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Text } from '@agent-lanes/ui';
 import { useWorkItemLanes, type AgentTicketStore } from '@/entities/agent-ticket';
+import { usePendingDropLanes } from '@/features/drag-to-lane';
 import { useActivePrs, useBacklogTotal, useConnections, useTeamBoard, useTeams } from '@/shared/api';
 import { openConnections } from '@/shared/model';
 import { HeaderMenu } from '@/shared/ui';
@@ -44,7 +46,10 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   const board = useTeamBoard(pickedTeam, onSprintTeam ? sprintPath : null);
   const prs = useActivePrs(pickedTeam);
   const backlog = useBacklogTotal(pickedTeam);
-  const workItemLanes = useWorkItemLanes(store);
+  const agentLanes = useWorkItemLanes(store);
+  // A drop main has not confirmed yet already shows "Agent in <lane>" (AL-235's optimistic update).
+  const pendingLanes = usePendingDropLanes();
+  const workItemLanes = useMemo(() => ({ ...agentLanes, ...pendingLanes }), [agentLanes, pendingLanes]);
 
   const me: TeamBoardMe | null = ado?.identity ? { displayName: ado.identity } : null;
   const columns = teamBoardColumns({ board: board.data, pullRequests: prs.data?.pullRequests, me, workItemLanes, filter: session.filter });

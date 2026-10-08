@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, IdChip, Text } from '@agent-lanes/ui';
+import { LaneDragCard } from '@/features/drag-to-lane';
 import type { TeamBoardAvatar, TeamBoardItemView, TeamBoardPullRequestView } from '../model/view';
 
 /** A 24 px initials circle: violet for the signed-in user ("KR"), grey for others, dashed "+" when unassigned (artboard 08). */
@@ -35,7 +36,7 @@ function Grip({ enabled }: { enabled: boolean }) {
  * A work item on the team board (artboard 08): grip, `#id` chip, type, title, points (or PR, or
  * state) and the assignee's avatar. Someone else's item has a lock row with their name; an item an
  * agent works on has an "Agent in Implementing" tag. Both say so in words and an icon, never by
- * colour alone.
+ * colour alone. One that can be dragged goes to an agent lane by pointer, Space or its Enter menu (AL-235).
  */
 export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
   const summary = [
@@ -49,12 +50,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
     .filter(Boolean)
     .join(', ');
   return (
-    <View
-      role="listitem"
-      aria-label={summary}
-      style={[styles.card, card.agentTag ? styles.cardAgent : null]}
-      testID={`team-card-${card.id}`}
-    >
+    <LaneDragCard drag={card.drag} label={summary} style={[styles.card, card.agentTag ? styles.cardAgent : null]} testID={`team-card-${card.id}`}>
       <View style={styles.cardTop}>
         <Grip enabled={card.draggable} />
         <IdChip id={card.id} />
@@ -87,7 +83,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
           </Text>
         </View>
       ) : null}
-    </View>
+    </LaneDragCard>
   );
 }
 
@@ -95,7 +91,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
 export function TeamBoardPullRequestCard({ card }: { card: TeamBoardPullRequestView }) {
   const summary = [`Pull request ${card.idLabel}`, card.draft ? 'draft' : null, card.title, card.comments, card.note].filter(Boolean).join(', ');
   return (
-    <View role="listitem" aria-label={summary} style={styles.card} testID={`team-pr-${card.id}`}>
+    <LaneDragCard drag={card.drag} label={summary} style={styles.card} testID={`team-pr-${card.id}`}>
       <View style={styles.cardTop}>
         <Grip enabled={card.draggable} />
         <View style={styles.prChip}>
@@ -124,7 +120,7 @@ export function TeamBoardPullRequestCard({ card }: { card: TeamBoardPullRequestV
           </Text>
         </View>
       ) : null}
-    </View>
+    </LaneDragCard>
   );
 }
 

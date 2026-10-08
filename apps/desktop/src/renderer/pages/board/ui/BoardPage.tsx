@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
+import { DragStatusPill, DragToLaneProvider, useActiveDrag } from '@/features/drag-to-lane';
 import { useAppInfo } from '@/shared/api';
 import { useBoardSprint, useBoardTeam } from '@/shared/model';
 import { TeamBoard } from '@/widgets/team-board';
@@ -17,9 +18,17 @@ import { SettingsPanel } from './SettingsPanel';
  * The agent board (artboard 1): the header (AL-142), the sub-header, title and legend, the lanes
  * (AL-143) with every ticket record loaded into the agent ticket store, and the live dock (AL-145).
  * The header's "need you" pill narrows the lanes to the tickets waiting on the user. The team board
- * (AL-234) sits under the lanes.
+ * (AL-234) sits under the lanes; its cards drag onto the lanes (AL-235), which share one drag with it.
  */
 export function BoardPage() {
+  return (
+    <DragToLaneProvider>
+      <BoardContent />
+    </DragToLaneProvider>
+  );
+}
+
+function BoardContent() {
   useBoardTickets();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needsYouOnly, setNeedsYouOnly] = useState(false);
@@ -39,7 +48,7 @@ export function BoardPage() {
             <Text variant="display" role="heading" aria-level={1}>
               Agent board
             </Text>
-            <Legend />
+            <LegendOrDragStatus />
           </View>
         </View>
 
@@ -102,6 +111,11 @@ const LEGEND = [
   { label: 'Claude activity', swatch: color.claude },
   { label: 'Needs you', swatch: color.attention },
 ] as const;
+
+/** The colour key, or while a team board card is dragged "Drop !10571 on a highlighted lane" (artboard 09). */
+function LegendOrDragStatus() {
+  return useActiveDrag() ? <DragStatusPill /> : <Legend />;
+}
 
 /** Artboard 1's colour key: what blue, violet and amber mean on the cards. */
 function Legend() {

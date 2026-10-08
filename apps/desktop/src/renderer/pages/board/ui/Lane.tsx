@@ -11,6 +11,7 @@ import {
   useLaneTicketIds,
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
+import { LaneDropHint, laneDropStyle, useLaneDropTarget } from '@/features/drag-to-lane';
 import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
@@ -29,6 +30,8 @@ export interface LaneProps {
  * One board lane (artboard 1): its name and count badge (amber when a card needs the user), its
  * cards oldest first, or the empty-lane copy (artboard 6). Pressing the header collapses the lane to
  * a vertical strip, as Done is by default; the choice is saved with the UI prefs (AL-041).
+ * While a team board card is dragged, a lane that takes it lights up with what the drop does and the
+ * others fade (AL-235, artboard 09).
  */
 export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneProps) {
   const allIds = useLaneTicketIds(lane, store);
@@ -40,15 +43,18 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
   const router = useRouter();
   const name = LANE_LABELS[lane];
   const badgeLabel = laneBadgeLabel(ids.length, needsYou);
+  const { attach, state: dropState } = useLaneDropTarget(lane);
+  const dropStyle = laneDropStyle(dropState);
 
   if (collapsed) {
     return (
       <Pressable
+        ref={attach}
         role="button"
         aria-expanded={false}
         aria-label={`${collapsedLaneLabel(lane, name)}, ${badgeLabel}. Expand lane`}
         onPress={() => toggleLane(lane)}
-        style={styles.strip}
+        style={[styles.strip, dropStyle]}
         testID={`lane-${lane}`}
       >
         <Text variant="display" size="xl" color={lane === 'done' ? tone.ok.dot : needsYou > 0 ? tone.attention.text : color.ink}>
@@ -67,7 +73,7 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
 
   const empty = needsYouOnly ? needsYouEmptyCopy(name) : EMPTY_LANE_COPY[lane];
   return (
-    <GlassPanel level="md" style={styles.lane} testID={`lane-${lane}`}>
+    <GlassPanel level="md" ref={attach} style={[styles.lane, dropStyle]} testID={`lane-${lane}`}>
       <Pressable
         role="button"
         aria-expanded
@@ -81,6 +87,7 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
         <Badge count={ids.length} tone={needsYou > 0 ? 'attention' : 'default'} label={badgeLabel} style={styles.badge} />
       </Pressable>
       <View style={styles.cards}>
+        <LaneDropHint lane={lane} state={dropState} />
         {ids.length === 0 ? (
           <View style={styles.empty} testID={`lane-${lane}-empty`}>
             <Text variant="title" size="md" style={styles.centred}>

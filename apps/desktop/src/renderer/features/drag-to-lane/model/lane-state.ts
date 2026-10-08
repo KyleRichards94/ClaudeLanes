@@ -1,0 +1,97 @@
+import { LANES, type Lane } from '@agent-lanes/contracts';
+import { DROP_REFUSALS, LANE_LABELS, allowedLanes, refusedLanes, type DropAction } from '@/entities/agent-ticket';
+import type { DragInput, LaneDragCard } from './types';
+
+/** A card being dragged, with what each lane does with it (AL-230's rules, worked out once at pick-up). */
+export interface ActiveDrag {
+  card: LaneDragCard;
+  allowed: Partial<Record<Lane, DropAction>>;
+  refused: Partial<Record<Lane, string>>;
+  input: DragInput;
+}
+
+export function activeDrag(card: LaneDragCard, input: DragInput): ActiveDrag {
+  return {
+    card,
+    allowed: allowedLanes(card.card, card.me),
+    refused: refusedLanes(card.card, card.me),
+    input,
+  };
+}
+
+/**
+ * How a lane looks while a card is dragged (T2, TB§7, artboard 09):
+ * - `accept`: it takes the card; it lights up with the action and a dashed border, solid while the card is over it;
+ * - `refuse`: it does not; it dims, and says why when the reason helps ("No linked PR" on Code review);
+ * - `idle`: nothing is being dragged.
+ */
+export type LaneDropState = { kind: 'idle' } | { kind: 'accept'; action: DropAction; over: boolean } | { kind: 'refuse'; reason: string | null };
+
+/** Refusals worth saying on the lane; the rest (Queued, Create PR, "not this lane") just dim it. */
+const SHOWN_REFUSALS: ReadonlySet<string> = new Set([DROP_REFUSALS.noLinkedPr, DROP_REFUSALS.noComments, DROP_REFUSALS.notAuthor, DROP_REFUSALS.addRepo]);
+
+export function laneDropState(active: ActiveDrag | null, lane: Lane, overLane: Lane | null): LaneDropState {
+  if (!active) return { kind: 'idle' };
+  const action = active.allowed[lane];
+  if (action) return { kind: 'accept', action, over: overLane === lane };
+  const reason = active.refused[lane];
+  return {
+    kind: 'refuse',
+    reason: reason !== undefined && SHOWN_REFUSALS.has(reason) ? reason : null,
+  };
+}
+
+/** The lanes that take the card, left to right, with what each drop does: the "Send to lane" menu. */
+export function allowedLaneList(card: LaneDragCard): { lane: Lane; action: DropAction }[] {
+  const allowed = allowedLanes(card.card, card.me);
+  return LANES.flatMap((lane) => {
+    const action = allowed[lane];
+    return action ? [{ lane, action }] : [];
+  });
+}
+
+function joinLanes(lanes: readonly Lane[]): string {
+  const names = lanes.map((lane) => LANE_LABELS[lane]);
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+}
+
+// ── Announcements (TB§7: "Over Code review: start agentic review") ─────────────────────────────
+
+/** Read out on every draggable card (dnd-kit's `aria-describedby`). */
+export const DRAG_INSTRUCTIONS =
+  'To start an agent, press Space to pick the card up, the arrow keys to move between the lanes that take it, Space to drop it and Escape to cancel. Enter opens the Send to lane menu.';
+
+export function pickUpAnnouncement(active: ActiveDrag): string {
+  const lanes = LANES.filter((lane) => active.allowed[lane]);
+  if (lanes.length === 0) return `Picked up ${active.card.label}. No lane takes it.`;
+  const takes = `${joinLanes(lanes)} ${lanes.length === 1 ? 'takes' : 'take'} it.`;
+  return active.input === 'keyboard'
+    ? `Picked up ${active.card.label}. ${takes} Use the arrow keys to move between them, Space to drop, Escape to cancel.`
+    : `Picked up ${active.card.label}. ${takes}`;
+}
+
+export function overAnnouncement(active: ActiveDrag, lane: Lane | null): string {
+  const action = lane ? active.allowed[lane] : undefined;
+  if (!lane || !action) return `${active.card.label} is not over a lane that takes it.`;
+  return `Over ${LANE_LABELS[lane]}: ${action.label}`;
+}
+
+export function dropAnnouncement(active: ActiveDrag, lane: Lane | null): string {
+  const action = lane ? active.allowed[lane] : undefined;
+  if (!lane || !action) return `${active.card.label} was not dropped on a lane. It is back in its column.`;
+  return `Dropped ${active.card.label} on ${LANE_LABELS[lane]}: ${action.label}`;
+}
+
+export function cancelAnnouncement(active: ActiveDrag): string {
+  return `Cancelled. ${active.card.label} is back in its column.`;
+}
+
+export function sentAnnouncement(card: LaneDragCard, lane: Lane, action: DropAction): string {
+  return `Sent ${card.label} to ${LANE_LABELS[lane]}: ${action.label}`;
+}
+
+/** "Drop !10571 on a highlighted lane" (artboard 09's header pill). */
+export function dragStatusText(active: ActiveDrag): string {
+  return LANES.some((lane) => active.allowed[lane]) ? `Drop ${active.card.label} on a highlighted lane` : `No lane takes ${active.card.label}`;
+}
