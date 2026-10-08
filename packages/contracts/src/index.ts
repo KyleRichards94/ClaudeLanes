@@ -4,6 +4,7 @@ export * from './names';
 export * from './result';
 export * from './schemas';
 export * from './vocabulary';
+export * from './drop-rules';
 
 // Domain schemas and types (WorkItem, AgentOutputEvent, …) are exported per domain.
 export * from './domains/ado.schemas';
