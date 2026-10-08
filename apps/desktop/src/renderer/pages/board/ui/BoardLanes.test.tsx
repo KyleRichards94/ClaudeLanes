@@ -30,9 +30,10 @@ let router: Router;
 let settings: FakeSettings;
 
 function renderLanes() {
-  // A waiting gate shows Approve / Request changes under its card (AL-171), which talk to main.
+  // Each card has its permission prompt (AL-109) and gate actions (AL-171), which read through TanStack Query.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router}>
         <BoardLanes store={store} />
       </RouterProvider>

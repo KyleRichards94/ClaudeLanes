@@ -1,6 +1,8 @@
 import {
   BUILD_QUEUE_SIZE_LIMIT,
   MAX_CONCURRENT_AGENTS_LIMIT,
+  agentPermissionPolicy,
+  type AgentPermissions,
   repoAdoWriteBack,
   type Effort,
   type Gate,
@@ -38,7 +40,19 @@ export interface SettingsDraft {
   adoStateTransitions: boolean;
   /** Edited repos by path. */
   repos: Readonly<Record<string, RepoDraft>>;
+  /** The headless permission policy (AL-109); `bashAllow` is the text of its field. */
+  permissions: PermissionsDraft;
 }
+
+export interface PermissionsDraft {
+  acceptEdits: boolean;
+  gitRead: boolean;
+  buildAndTest: boolean;
+  /** Command prefixes separated by commas. */
+  bashAllow: string;
+}
+
+export type PermissionSwitch = Exclude<keyof PermissionsDraft, 'bashAllow'>;
 
 export type GlobalTextField = 'skills' | 'buildQueueSize';
 export type RepoTextField = Exclude<keyof RepoDraft, 'adoWriteBack'>;
@@ -51,7 +65,9 @@ export type DraftAction =
   | { type: 'text'; field: GlobalTextField; value: string }
   | { type: 'adoStateTransitions'; value: boolean }
   | { type: 'repoText'; repo: RepoSettings; field: RepoTextField; value: string }
-  | { type: 'repoWriteBack'; repo: RepoSettings; value: boolean };
+  | { type: 'repoWriteBack'; repo: RepoSettings; value: boolean }
+  | { type: 'permission'; field: PermissionSwitch; value: boolean }
+  | { type: 'bashAllow'; value: string };
 
 export function repoDraft(repo: RepoSettings): RepoDraft {
   return {
@@ -74,7 +90,17 @@ export function draftFromSettings(settings: Settings): SettingsDraft {
     buildQueueSize: String(settings.buildQueueSize),
     adoStateTransitions: settings.adoStateTransitions,
     repos: {},
+    permissions: permissionsDraft(agentPermissionPolicy(settings)),
   };
+}
+
+function permissionsDraft(policy: AgentPermissions): PermissionsDraft {
+  return { acceptEdits: policy.edits === 'accept', gitRead: policy.gitRead, buildAndTest: policy.buildAndTest, bashAllow: policy.bashAllow.join(', ') };
+}
+
+/** "npm run lint, dotnet format" → ["npm run lint", "dotnet format"], each once. */
+export function parseCommandPrefixes(text: string): string[] {
+  return [...new Set(text.split(',').map((command) => command.trim()).filter((command) => command.length > 0))];
 }
 
 /** The repo as the form shows it: the user's edits, else what is saved. */
@@ -100,6 +126,10 @@ export function draftReducer(draft: SettingsDraft, action: DraftAction): Setting
       return { ...draft, repos: { ...draft.repos, [action.repo.path]: { ...repoValues(draft, action.repo), [action.field]: action.value } } };
     case 'repoWriteBack':
       return { ...draft, repos: { ...draft.repos, [action.repo.path]: { ...repoValues(draft, action.repo), adoWriteBack: action.value } } };
+    case 'permission':
+      return { ...draft, permissions: { ...draft.permissions, [action.field]: action.value } };
+    case 'bashAllow':
+      return { ...draft, permissions: { ...draft.permissions, bashAllow: action.value } };
   }
 }
 
@@ -136,6 +166,10 @@ export function validateDraft(draft: SettingsDraft, repos: readonly RepoSettings
   }
   const badSkill = parseSkills(draft.skills).find((name) => !SKILL_NAME.test(name));
   if (badSkill) errors['skills'] = `"${badSkill}" is not a skill name. Use names like /code-review.`;
+  const commands = parseCommandPrefixes(draft.permissions.bashAllow);
+  const chained = commands.find((command) => /[;&|`$<>]/.test(command));
+  if (chained) errors['bashAllow'] = `"${chained}" chains or redirects commands. Enter plain commands such as npm run lint.`;
+  else if (commands.some((command) => command.length > 200) || commands.length > 50) errors['bashAllow'] = 'Enter at most 50 commands of up to 200 characters.';
 
   for (const repo of repos) {
     const values = draft.repos[repo.path];
@@ -202,6 +236,16 @@ export function draftToPatch(draft: SettingsDraft, settings: Settings): Settings
   const buildQueueSize = Number(draft.buildQueueSize.trim());
   if (buildQueueSize !== settings.buildQueueSize) patch.buildQueueSize = buildQueueSize;
   if (draft.adoStateTransitions !== settings.adoStateTransitions) patch.adoStateTransitions = draft.adoStateTransitions;
+  const policy: AgentPermissions = {
+    edits: draft.permissions.acceptEdits ? 'accept' : 'ask',
+    gitRead: draft.permissions.gitRead,
+    buildAndTest: draft.permissions.buildAndTest,
+    bashAllow: parseCommandPrefixes(draft.permissions.bashAllow),
+  };
+  const saved = agentPermissionPolicy(settings);
+  if (policy.edits !== saved.edits || policy.gitRead !== saved.gitRead || policy.buildAndTest !== saved.buildAndTest || !sameList(policy.bashAllow, saved.bashAllow)) {
+    patch.agentPermissions = policy;
+  }
 
   const repos = settings.repos.map((repo) => {
     const values = draft.repos[repo.path];

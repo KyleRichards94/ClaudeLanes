@@ -5,8 +5,9 @@ import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
 import { WorkItemChip } from '@/entities/ado-work-item';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
-import { GateActions } from '@/features/resolve-gate';
 import { BuildLog } from '@/entities/build-log';
+import { GateActions } from '@/features/resolve-gate';
+import { PermissionPrompt } from '@/features/resolve-permission';
 import { useAgentUsage, useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
@@ -101,6 +102,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           </Text>
         ) : null}
       </ErrorBoundary>
+
+      {/* A tool call outside the permission policy waits for the user (AL-109). */}
+      <PermissionPrompt ticketId={ticket.id} />
 
       <View style={styles.panels}>
         <AgentPanel ticket={ticket} />

@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ConnectionSummary } from '@agent-lanes/contracts';
+import { defaultSettings, ok, type ConnectionSummary, type RepoCommands, type Settings } from '@agent-lanes/contracts';
+import { createPermissionService, type PermissionService } from '../permissions';
 import type { ConnectionsService } from '../../connections';
 import type { Emit } from '../../ipc/emit';
 import { createTicketRecordStore, type TicketRecordStore } from '../../tickets';
@@ -65,4 +66,14 @@ export async function eventually(check: () => boolean, timeoutMs = 2_000): Promi
     if (Date.now() - started > timeoutMs) throw new Error('Timed out waiting for a condition');
     await new Promise((resolve) => setTimeout(resolve, 2));
   }
+}
+
+/** A permission service (AL-109) with the D18 default policy and no build commands. */
+export function testPermissions(options: { emit?: Emit; settings?: Settings; commands?: RepoCommands } = {}): PermissionService {
+  return createPermissionService({
+    settings: { get: () => options.settings ?? defaultSettings() },
+    buildCommands: { forRepo: async (repoPath) => ok(options.commands ?? { repoPath, detected: null, build: null, run: null }) },
+    emit: options.emit ?? recordingEmit().emit,
+    userName: () => 'Kyle',
+  });
 }

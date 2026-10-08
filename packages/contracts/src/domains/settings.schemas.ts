@@ -94,6 +94,27 @@ export const UiPrefsSchema = z.object({
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
+/**
+ * What a headless agent session may do without asking (AL-109, Decision D18, Q9). Anything else goes
+ * through the app's permission prompt ("Needs you · permission" on the card).
+ */
+export const AgentPermissionsSchema = z.object({
+  /** `accept`: file edits in the ticket's worktree go ahead (`acceptEdits`); `ask`: every edit asks too. */
+  edits: z.enum(['accept', 'ask']),
+  /** Read-only git commands (status, diff, log, show, branch, …). */
+  gitRead: z.boolean(),
+  /** The repo's build command and its test command (`dotnet test`, `pnpm test`). */
+  buildAndTest: z.boolean(),
+  /** More Bash command prefixes the agent may run, e.g. `npm run lint`. */
+  bashAllow: z.array(z.string().trim().min(1).max(200)).max(50),
+});
+export type AgentPermissions = z.infer<typeof AgentPermissionsSchema>;
+
+/** D18: accept edits, git read commands and the repo's build and test commands; everything else asks. */
+export function defaultAgentPermissions(): AgentPermissions {
+  return { edits: 'accept', gitRead: true, buildAndTest: true, bashAllow: [] };
+}
+
 export const SettingsSchema = z.object({
   version: z.literal(SETTINGS_VERSION),
   repos: ReposSchema,
@@ -105,8 +126,15 @@ export const SettingsSchema = z.object({
    */
   adoStateTransitions: z.boolean(),
   ui: UiPrefsSchema,
+  /** Headless permission policy (AL-109). Optional so settings saved before it stay valid; unset is the D18 default. */
+  agentPermissions: AgentPermissionsSchema.optional(),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
+
+/** The permission policy in force: the saved one, or the D18 default when none was saved. */
+export function agentPermissionPolicy(settings: Pick<Settings, 'agentPermissions'>): AgentPermissions {
+  return settings.agentPermissions ?? defaultAgentPermissions();
+}
 
 /**
  * `settings:update` request: any top-level section, and any field inside `defaults` and `ui`.
@@ -117,6 +145,7 @@ export const SettingsPatchSchema = z.strictObject({
   defaults: z.strictObject(AgentDefaultsSchema.shape).partial().optional(),
   buildQueueSize: SettingsSchema.shape.buildQueueSize.optional(),
   adoStateTransitions: SettingsSchema.shape.adoStateTransitions.optional(),
+  agentPermissions: AgentPermissionsSchema.optional(),
   ui: z.strictObject(UiPrefsSchema.shape).partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
