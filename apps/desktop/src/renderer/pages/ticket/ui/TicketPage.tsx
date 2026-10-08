@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import type { TicketRecord, WorkItem } from '@agent-lanes/contracts';
+import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
-import { WorkItemChip } from '@/entities/ado-work-item';
 import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { useTicketRecord, useWorkItem } from '@/shared/api';
@@ -11,6 +10,7 @@ import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
+import { AdoTab } from './AdoTab';
 import { DiffTab } from './DiffTab';
 import { StageStepper } from './StageStepper';
 import { TicketMeta, TicketTopBar } from './TicketHeader';
@@ -102,8 +102,10 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
               <BuildLog ticketId={ticket.id} style={styles.buildLog} />
             ) : tab === 'diff' ? (
               <DiffTab ticketId={ticket.id} branch={ticket.branch} subBranches={subBranches} />
+            ) : tab === 'ado' ? (
+              <AdoTab ticket={ticket} />
             ) : (
-              <TabPlaceholder tab={tab} ticket={ticket} workItem={workItem.data} />
+              <TabPlaceholder tab={tab} ticket={ticket} />
             )}
           </ErrorBoundary>
         </TabPanel>
@@ -125,16 +127,14 @@ const TAB_EMPTY: Record<TicketPageTab, string> = {
   ado: 'The work item, its acceptance criteria, comments and linked pull request.',
 };
 
-/** What each tab shows until its feature lands (AL-175, AL-180). Build log is AL-135's BuildLog, Diff is AL-179's DiffTab. */
-function TabPlaceholder({ tab, ticket, workItem }: { tab: TicketPageTab; ticket: AgentTicket; workItem: WorkItem | undefined }) {
+/** What the Output tab shows until AL-175 lands. Build log is AL-135's BuildLog, Diff AL-179's DiffTab, ADO AL-180's AdoTab. */
+function TabPlaceholder({ tab, ticket }: { tab: TicketPageTab; ticket: AgentTicket }) {
   const activity = tab === 'output' ? ticket.activity?.text : undefined;
   return (
     <View style={styles.placeholder} testID={`ticket-tab-${tab}`}>
       <Text variant="title" size="lg">
         {TAB_TITLES[tab]}
       </Text>
-      {/* The work item from Azure DevOps (AL-066) until AL-180 builds the ADO tab. */}
-      {tab === 'ado' && workItem ? <WorkItemChip item={workItem} testID="ticket-work-item" /> : null}
       {activity ? (
         <Text variant="body" color={color.claudeText}>
           {activity}
