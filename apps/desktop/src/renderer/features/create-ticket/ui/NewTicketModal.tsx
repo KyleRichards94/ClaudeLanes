@@ -4,9 +4,9 @@ import { useReducer, useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
 import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, SegmentedControl, Text, TextField, type TextFieldHandle } from '@agent-lanes/ui';
-import { fetchWorktreePreview, useRefreshSkills, useSettings, useSkills, useSprints, useWorkItem, useWorktreePreview } from '@/shared/api';
+import { fetchWorktreePreview, useRefreshSkills, useSettings, useSkills, useWorkItem, useWorktreePreview } from '@/shared/api';
 import { EFFORT_LABELS } from '@/shared/config';
-import { useUiPrefs } from '@/shared/model';
+import { useBoardSprints, useUiPrefs } from '@/shared/model';
 import { workItemQuote } from '../lib/quote';
 import { useDebouncedValue } from '../lib/use-debounced-value';
 import {
@@ -73,8 +73,8 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const description = useRef<TextFieldHandle>(null);
-  // The board's sprint: the one picked in its Sprint menu, else the current one (AL-142).
-  const sprints = useSprints();
+  // The board's sprint: the board team's, the one picked in its Sprint menu, else the current one (AL-142).
+  const sprints = useBoardSprints();
   const lastSprint = useUiPrefs((state) => state.lastSprint);
   const sprint = sprints.data ? pickSprint(sprints.data, lastSprint) : null;
   const worktreeInput = useRef<TextInputInstance>(null);

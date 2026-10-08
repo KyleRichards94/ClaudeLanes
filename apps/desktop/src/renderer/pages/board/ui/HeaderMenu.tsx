@@ -6,10 +6,31 @@ import { Icon, Text } from '@agent-lanes/ui';
 export interface HeaderMenuItem {
   key: string;
   label: string;
-  /** A muted word after the label ("current"). */
+  /** Muted text after the label ("7 – 20 Oct"). */
   detail?: string;
   /** The ticked choice. Items without it (e.g. "Add repo…") are plain actions. */
   selected?: boolean;
+  /**
+   * The heading this item sits under ("Current", "Upcoming", "Past"). Consecutive items with the same
+   * section share one heading; items without one have none.
+   */
+  section?: string;
+}
+
+interface MenuGroup {
+  section: string | undefined;
+  items: HeaderMenuItem[];
+}
+
+/** Runs of consecutive items in the same section, in order. */
+function groupBySection(items: readonly HeaderMenuItem[]): MenuGroup[] {
+  const groups: MenuGroup[] = [];
+  for (const item of items) {
+    const last = groups.at(-1);
+    if (last && last.section === item.section) last.items.push(item);
+    else groups.push({ section: item.section, items: [item] });
+  }
+  return groups;
 }
 
 export interface HeaderMenuProps {
@@ -88,9 +109,26 @@ export function HeaderMenu({ label, value, items, onSelect, disabled = false, te
             testID={testID ? `${testID}-menu` : undefined}
           >
             <ScrollView style={styles.scroll}>
-              {items.map((item) => (
-                <MenuItem key={item.key} item={item} onPress={() => choose(item.key)} testID={testID ? `${testID}-item-${item.key}` : undefined} />
-              ))}
+              {groupBySection(items).map((group, index) => {
+                const rows = group.items.map((item) => (
+                  <MenuItem key={item.key} item={item} onPress={() => choose(item.key)} testID={testID ? `${testID}-item-${item.key}` : undefined} />
+                ));
+                if (group.section === undefined) return rows;
+                return (
+                  <View
+                    key={`section-${index}-${group.section}`}
+                    role="group"
+                    aria-label={group.section}
+                    style={index > 0 ? styles.sectionDivided : undefined}
+                    testID={testID ? `${testID}-section-${group.section}` : undefined}
+                  >
+                    <Text variant="meta" color={color.muted} style={styles.sectionHeading}>
+                      {group.section}
+                    </Text>
+                    {rows}
+                  </View>
+                );
+              })}
             </ScrollView>
           </View>
         ) : null}
@@ -161,6 +199,17 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 0,
+  },
+  sectionDivided: {
+    marginTop: space.xs,
+    paddingTop: space.xs,
+    borderTopWidth: 1,
+    borderTopColor: color.line,
+  },
+  sectionHeading: {
+    paddingHorizontal: space.md,
+    paddingTop: space.xs,
+    paddingBottom: space.xs,
   },
   item: {
     flexDirection: 'row',

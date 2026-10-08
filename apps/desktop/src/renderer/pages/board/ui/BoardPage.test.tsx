@@ -7,8 +7,12 @@ import { getConnectionsModal, resetConnectionsModal, useUiPrefs } from '@/shared
 import { RouterProvider, createRouter } from '@/shared/routing';
 import { fakeTicketRecord, installFakeBridge } from '@/shared/testing';
 import { BoardPage } from './BoardPage';
+import { sprintMenuItems } from './BoardHeader';
 
 const fixture = adoFixture();
+const OSC_DEVELOPERS = { id: 'team-osc', name: 'OSC Developers' };
+const RELEASE_TRAIN = { id: 'team-release', name: 'Release Train' };
+const teamList = { teams: [RELEASE_TRAIN, OSC_DEVELOPERS], defaultTeamId: OSC_DEVELOPERS.id };
 
 const appInfo = {
   ok: true,
@@ -85,7 +89,7 @@ describe('BoardPage header (AL-142)', () => {
   const repos = [repo('onsite-companion'), repo('liink')];
 
   afterEach(() => {
-    useUiPrefs.setState({ lastRepo: null, lastSprint: null });
+    useUiPrefs.setState({ lastRepo: null, lastSprint: null, lastTeam: null });
   });
 
   function boardBridge(extra: Parameters<typeof installFakeBridge>[0] = {}) {
@@ -99,6 +103,7 @@ describe('BoardPage header (AL-142)', () => {
           fakeTicketRecord({ id: '71330', stage: 'queued', title: 'Asset register paging slow above 5k rows' }),
         ],
       },
+      'ado:listTeams': { ok: true, data: teamList },
       'ado:listSprints': { ok: true, data: fixture.sprints },
       'repos:list': { ok: true, data: repos },
       // The running sessions' MCP servers (AL-108's live pill).
@@ -175,5 +180,92 @@ describe('BoardPage header (AL-142)', () => {
     fireEvent.click(within(await screen.findByRole('menu', { name: 'Repo' })).getByRole('menuitem', { name: 'Add repo…' }));
     await waitFor(() => expect(screen.getByTestId('board-repo').textContent).toBe('new-repo'));
     expect(bridge.invoke).toHaveBeenCalledWith('repos:add', undefined);
+  });
+});
+
+describe('BoardPage header: Team menu and grouped Sprint menu', () => {
+  afterEach(() => {
+    useUiPrefs.setState({ lastRepo: null, lastSprint: null, lastTeam: null });
+  });
+
+  function teamBridge(extra: Parameters<typeof installFakeBridge>[0] = {}) {
+    return installFakeBridge({
+      'app:getInfo': appInfo,
+      'tickets:list': { ok: true, data: [] },
+      'ado:listTeams': { ok: true, data: teamList },
+      'ado:listSprints': { ok: true, data: fixture.sprints },
+      ...extra,
+    });
+  }
+
+  it('opens on the default team from ADO and reads its sprints, never the project-level ones', async () => {
+    const bridge = teamBridge();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId('board-team').textContent).toBe('OSC Developers'));
+    await waitFor(() => expect(screen.getByTestId('board-sprint').textContent).toBe('42'));
+    expect(bridge.invoke).toHaveBeenCalledWith('ado:listSprints', { team: OSC_DEVELOPERS.id });
+    expect(bridge.invoke).not.toHaveBeenCalledWith('ado:listSprints', {});
+  });
+
+  it('shows the saved team while it is still one of the user’s teams, else the default', async () => {
+    useUiPrefs.setState({ lastTeam: RELEASE_TRAIN.id });
+    teamBridge();
+    const first = renderPage();
+    await waitFor(() => expect(screen.getByTestId('board-team').textContent).toBe('Release Train'));
+    first.unmount();
+
+    useUiPrefs.setState({ lastTeam: 'team-gone' });
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('board-team').textContent).toBe('OSC Developers'));
+  });
+
+  it('picking a team saves it, goes back to its current sprint and reads that team’s sprints', async () => {
+    useUiPrefs.setState({ lastSprint: fixture.sprints.sprints[3]?.id ?? null });
+    const bridge = teamBridge();
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('board-sprint').textContent).toBe('43'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Team: OSC Developers' }));
+    const menu = await screen.findByRole('menu', { name: 'Team' });
+    expect(within(menu).getByRole('menuitem', { name: 'OSC Developers, selected' })).toBeTruthy();
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Release Train' }));
+
+    expect(useUiPrefs.getState()).toMatchObject({ lastTeam: RELEASE_TRAIN.id, lastSprint: null });
+    expect(screen.getByTestId('board-team').textContent).toBe('Release Train');
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('ado:listSprints', { team: RELEASE_TRAIN.id }));
+    await waitFor(() => expect(screen.getByTestId('board-sprint').textContent).toBe('42'));
+  });
+
+  it('groups the Sprint menu under Current, Upcoming and Past, newest past first, each with its dates', async () => {
+    teamBridge();
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId('board-sprint').textContent).toBe('42'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sprint: 42' }));
+    const menu = await screen.findByRole('menu', { name: 'Sprint' });
+    const sections = within(menu).getAllByRole('group');
+    expect(sections.map((section) => section.getAttribute('aria-label'))).toEqual(['Current', 'Upcoming', 'Past']);
+    const names = (section: HTMLElement) => within(section).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'));
+    expect(sections.map(names)).toEqual([['Sprint 42, selected'], ['Sprint 43', 'Sprint 44'], ['Sprint 41', 'Sprint 40']]);
+    expect(within(sections[0]!).getByText('Current')).toBeTruthy();
+    expect(within(sections[0]!).getByText(/^7 (– 20 Oct|Oct 2026 – 20 Oct 2026)$/)).toBeTruthy();
+
+    // Past sprints can be picked too.
+    fireEvent.click(within(sections[2]!).getByRole('menuitem', { name: 'Sprint 40' }));
+    expect(useUiPrefs.getState().lastSprint).toBe(fixture.sprints.sprints[0]?.id);
+    expect(screen.getByTestId('board-sprint').textContent).toBe('40');
+  });
+
+  it('sprintMenuItems: dates per sprint, sections in order', () => {
+    const items = sprintMenuItems(fixture.sprints.sprints, fixture.sprints.currentId, 2026);
+    expect(items.map((item) => `${item.section ?? ''}|${item.label}|${item.detail ?? ''}`)).toEqual([
+      'Current|Sprint 42|7 – 20 Oct',
+      'Upcoming|Sprint 43|21 Oct – 3 Nov',
+      'Upcoming|Sprint 44|4 – 17 Nov',
+      'Past|Sprint 41|23 Sep – 6 Oct',
+      'Past|Sprint 40|9 – 22 Sep',
+    ]);
+    expect(items.filter((item) => item.selected).map((item) => item.label)).toEqual(['Sprint 42']);
   });
 });

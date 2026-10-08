@@ -4,13 +4,15 @@ import { defaultUiPrefs, type EmbedMode, type Lane, type UiPrefs } from '@agent-
 import { createUiPrefsStorage } from '@/shared/api';
 
 /**
- * Persisted UI prefs (design §6): last repo and sprint, collapsed lanes, and the Claude Design embed
+ * Persisted UI prefs (design §6): last repo, team and sprint, collapsed lanes, and the Claude Design embed
  * mode per ticket. Saved in the main-process settings store on every change and loaded by
  * `hydrateUiPrefs()`, which the app runs before the first page renders.
  */
 export interface UiPrefsState extends UiPrefs {
   setLastRepo(path: string | null): void;
   setLastSprint(sprintId: string | null): void;
+  /** Picks the board team; its sprints differ, so the picked sprint goes back to the current one. */
+  setLastTeam(teamId: string | null): void;
   setLaneCollapsed(lane: Lane, collapsed: boolean): void;
   toggleLane(lane: Lane): void;
   setEmbedMode(ticketId: string, mode: EmbedMode): void;
@@ -19,8 +21,8 @@ export interface UiPrefsState extends UiPrefs {
 /** The embed mode of a ticket that has never been switched (AL-194). */
 export const DEFAULT_EMBED_MODE: EmbedMode = 'webview';
 
-function pickPrefs({ lastRepo, lastSprint, collapsedLanes, embedModeByTicket }: UiPrefsState): UiPrefs {
-  return { lastRepo, lastSprint, collapsedLanes, embedModeByTicket };
+function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket }: UiPrefsState): UiPrefs {
+  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket };
 }
 
 /** Builds a UI prefs store over the given storage; the app uses `useUiPrefs`, tests make their own. */
@@ -31,6 +33,7 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
         ...defaultUiPrefs(),
         setLastRepo: (lastRepo) => set({ lastRepo }),
         setLastSprint: (lastSprint) => set({ lastSprint }),
+        setLastTeam: (lastTeam) => set({ lastTeam, lastSprint: null }),
         setLaneCollapsed: (lane, collapsed) =>
           set(({ collapsedLanes }) => ({
             collapsedLanes: collapsed

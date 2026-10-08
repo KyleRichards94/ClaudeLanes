@@ -10,6 +10,7 @@ import {
   adoKeys,
   usePullRequest,
   useSprints,
+  useTeams,
   useWorkItem,
   useWorkItemSearch,
   useWorkItems,
@@ -20,6 +21,7 @@ import { connectionsEventHandlers } from './connections';
 const fixture = adoFixture();
 const sprint42 = fixture.sprints.sprints.find((sprint) => sprint.path === ADO_FIXTURE_SPRINT_42_PATH);
 const [snapshot] = fixture.pullRequests;
+const teamList = { teams: [{ id: 'team-osc', name: 'OSC Developers' }], defaultTeamId: 'team-osc' };
 
 let bridge: FakeBridge;
 let client: QueryClient;
@@ -39,6 +41,7 @@ function windowVisible(visible: boolean) {
 
 beforeEach(() => {
   bridge = installFakeBridge({
+    'ado:listTeams': { ok: true, data: teamList },
     'ado:listSprints': { ok: true, data: fixture.sprints },
     'ado:listWorkItems': { ok: true, data: fixture.workItems.slice(0, 4) },
     'ado:searchWorkItems': { ok: true, data: fixture.workItems.slice(0, 1) },
@@ -59,6 +62,8 @@ describe('ADO query keys (AL-066)', () => {
     expect(adoKeys.workItem(71273)).toEqual(['ado', 'workItem', 71273]);
     expect(adoKeys.workItem(71273, 'ado:contoso')).toEqual(['ado', 'workItem', 71273, 'ado:contoso']);
     expect(adoKeys.sprints()).toEqual(['ado', 'sprints', {}]);
+    expect(adoKeys.sprints({ team: 'team-osc' })).toEqual(['ado', 'sprints', { team: 'team-osc' }]);
+    expect(adoKeys.teams()).toEqual(['ado', 'teams', {}]);
     expect(adoKeys.workItems('P\\Sprint 42')).toEqual(['ado', 'workItems', 'P\\Sprint 42', {}]);
     expect(adoKeys.search('71273')).toEqual(['ado', 'search', '71273', {}]);
     expect(adoKeys.pullRequest({ project: 'p', repository: 'r', pullRequestId: 10612 })).toEqual(['ado', 'pullRequest', 'p', 'r', 10612]);
@@ -86,6 +91,21 @@ describe('ADO query hooks (AL-066)', () => {
     const ref = snapshot ? pullRequestRef(snapshot.pullRequest) : null;
     const pr = renderHook(() => usePullRequest(ref), { wrapper });
     await waitFor(() => expect(pr.result.current.data?.pullRequest.id).toBe(10612));
+  });
+
+  it('reads the user’s teams, and a team’s sprints for that team', async () => {
+    const teams = renderHook(() => useTeams(), { wrapper });
+    await waitFor(() => expect(teams.result.current.data).toEqual(teamList));
+    expect(bridge.invoke).toHaveBeenCalledWith('ado:listTeams', {});
+
+    const sprints = renderHook(() => useSprints({ team: 'team-osc' }), { wrapper });
+    await waitFor(() => expect(sprints.result.current.data).toEqual(fixture.sprints));
+    expect(bridge.invoke).toHaveBeenCalledWith('ado:listSprints', { team: 'team-osc' });
+  });
+
+  it('holds the sprints while told to (the board team is still loading)', () => {
+    renderHook(() => useSprints({}, { enabled: false }), { wrapper });
+    expect(bridge.invoke).not.toHaveBeenCalled();
   });
 
   it('stays idle without a sprint, a query, an id or a pull request', () => {
@@ -132,7 +152,7 @@ describe('ADO refetch policy (AL-066, design §6)', () => {
   });
 
   it('does not poll while the window is minimised or hidden, and refetches when it comes back', async () => {
-    renderHook(() => useSprints({}, { live: true }), { wrapper });
+    renderHook(() => useSprints({ team: 'team-osc' }, { live: true }), { wrapper });
     await settle();
     expect(calls('ado:listSprints')).toBe(1);
 
