@@ -1,6 +1,6 @@
 import { defaultAgentDefaults } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
-import { initialForm, launchRequest, launchSummary, newTicketReducer, validateForm, type NewTicketAction } from './form';
+import { initialForm, launchRequest, launchSummary, newTicketReducer, validateForm, worktreeSubject, type NewTicketAction } from './form';
 
 const defaults = { ...defaultAgentDefaults(), skills: ['code-review'] };
 const run = (...actions: NewTicketAction[]) => actions.reduce(newTicketReducer, initialForm(defaults));
@@ -64,6 +64,7 @@ describe('new ticket form', () => {
         effort: 'xhigh',
         gates: defaults.stageGates,
         worktreeName: null,
+        repo: null,
       },
     });
   });
@@ -75,5 +76,23 @@ describe('new ticket form', () => {
     expect(launchSummary(run({ type: 'source', source: 'none' }, { type: 'model', model: 'haiku' }, { type: 'effort', effort: 'low' }))).toBe(
       'Launch starts a headless Claude Code session in its own worktree via the MCP bridge. No work item linked. Haiku · Low.',
     );
+  });
+
+  it('passes the edited worktree name exactly as validated, and the workspace repo', () => {
+    const result = launchRequest(run({ type: 'workItem', workItem: item }, { type: 'worktreeName', name: '71273-grid' }), 'C:/src/onsite');
+    expect(result).toMatchObject({ ok: true, request: { worktreeName: '71273-grid', repo: 'C:/src/onsite' } });
+  });
+
+  it('names the worktree after the work item, the description for No ticket, or nothing yet', () => {
+    expect(worktreeSubject(run())).toBeNull();
+    expect(worktreeSubject(run({ type: 'workItem', workItem: item }))).toEqual({
+      kind: 'work-item',
+      workItemId: 71273,
+      title: 'Cutover frmJobControl to Blazor',
+    });
+    expect(worktreeSubject(run({ type: 'workItem', workItem: item }, { type: 'source', source: 'none' }, { type: 'description', description: 'Fix it' }))).toEqual({
+      kind: 'no-ticket',
+      description: 'Fix it',
+    });
   });
 });
