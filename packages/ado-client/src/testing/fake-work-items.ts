@@ -106,6 +106,27 @@ export function agileStates(): Record<string, Array<{ name: string; category: st
   };
 }
 
+/** The Agile process's type colours, as `GET {project}/_apis/wit/workitemtypes` sends them. */
+export const AGILE_TYPE_COLORS: Readonly<Record<string, string>> = {
+  'User Story': '009CCC',
+  Bug: 'CC293D',
+  Task: 'F2CB1D',
+  Epic: 'FF7B00',
+  Feature: '773B93',
+};
+
+/** ADO's default state colours, by category. */
+export const STATE_CATEGORY_COLORS: Readonly<Record<string, string>> = {
+  Proposed: 'b2b2b2',
+  InProgress: '007acc',
+  Resolved: 'ff9d00',
+  Completed: '339933',
+  Removed: 'ffffff',
+};
+
+/** Types the fake's type list sends without their states, as some servers do, so their colours come from the states route. */
+export const TYPES_LISTED_WITHOUT_STATES: ReadonlySet<string> = new Set(['Task']);
+
 /** `IN GROUP` category → type names, as in the Agile process. */
 const CATEGORY_TYPES: Record<string, string[]> = {
   'microsoft.requirementcategory': ['User Story'],
@@ -153,6 +174,8 @@ export interface FakeAdo {
   gets: Array<{ id: number; fields: string[] }>;
   /** `project/type` of each states read. */
   stateReads: string[];
+  /** Project of each work item type list read. */
+  typeReads: string[];
   /** Every request the fake answered. */
   requests: number;
 }
@@ -166,7 +189,7 @@ export function installFakeWorkItems(server: Pick<SetupServer, 'use'>, items: Fa
 
 /** The fake's state for `items`, before any request (AL-065 builds the shared fake organisation on it). */
 export function createFakeWorkItems(items: FakeWorkItem[]): FakeAdo {
-  return { items, states: agileStates(), unreadable: new Set(), wiql: [], batches: [], gets: [], stateReads: [], requests: 0 };
+  return { items, states: agileStates(), unreadable: new Set(), wiql: [], batches: [], gets: [], stateReads: [], typeReads: [], requests: 0 };
 }
 
 /** The fake's MSW handlers for the organisation at `orgUrl` (default the unit tests' `contoso`). */
@@ -248,7 +271,20 @@ export function fakeWorkItemHandlers(fake: FakeAdo, orgUrl: string = ORG_URL) {
       fake.stateReads.push(`${project}/${type}`);
       const states = Object.entries(fake.states).find(([name]) => name.toLowerCase() === type.toLowerCase())?.[1];
       if (!states) return HttpResponse.json({ message: `VS402323: Work item type ${type} does not exist.` }, { status: 404 });
-      return HttpResponse.json({ count: states.length, value: states.map((state) => ({ ...state, color: '007acc' })) });
+      return HttpResponse.json({ count: states.length, value: states.map((state) => ({ ...state, color: STATE_CATEGORY_COLORS[state.category] ?? '007acc' })) });
+    }),
+
+    http.get(`${orgUrl}/:project/_apis/wit/workitemtypes`, ({ params }) => {
+      fake.requests += 1;
+      fake.typeReads.push(String(params['project']));
+      const value = Object.entries(fake.states).map(([name, states]) => ({
+        name,
+        referenceName: `Microsoft.VSTS.WorkItemTypes.${name.replace(/\s/g, '')}`,
+        color: `FF${AGILE_TYPE_COLORS[name] ?? '666666'}`,
+        isDisabled: false,
+        ...(TYPES_LISTED_WITHOUT_STATES.has(name) ? {} : { states: states.map((state) => ({ ...state, color: STATE_CATEGORY_COLORS[state.category] ?? '007acc' })) }),
+      }));
+      return HttpResponse.json({ count: value.length, value });
     }),
   ];
 }

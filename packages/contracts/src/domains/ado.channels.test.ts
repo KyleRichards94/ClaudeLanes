@@ -109,6 +109,10 @@ const examples = {
       ],
     },
   },
+  'ado:workItemColors': {
+    request: { org: ADO_FIXTURE_ORG_ID, project: ADO_FIXTURE_PROJECT },
+    response: { types: { Bug: '#CC293D', 'User Story': '#009CCC' }, states: { Bug: { Active: '#007ACC', Closed: '#339933' } } },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
@@ -125,6 +129,7 @@ describe('ado:* channel contracts', () => {
       'ado:teamBoard',
       'ado:activePrs',
       'ado:backlog',
+      'ado:workItemColors',
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

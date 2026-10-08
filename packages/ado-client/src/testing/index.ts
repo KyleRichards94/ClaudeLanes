@@ -14,7 +14,7 @@ export {
   type FakeAdoOrgState,
   type FakeAdoRequest,
 } from './fake-org';
-export { agileStates, type FakeAdo, type FakeWorkItem } from './fake-work-items';
+export { AGILE_TYPE_COLORS, agileStates, STATE_CATEGORY_COLORS, TYPES_LISTED_WITHOUT_STATES, type FakeAdo, type FakeWorkItem } from './fake-work-items';
 export {
   artboard08Items,
   artboard08PullRequests,

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/shared/config';
+import { WorkItemStateLabel, WorkItemTypeBar } from '@/shared/ui';
 import { useAgentTicket } from '../model/hooks';
 import type { AgentTicketStore } from '../model/store';
 import type { AgentTicket } from '../model/types';
@@ -14,6 +15,13 @@ export interface AgentTicketCardViewProps {
    * It is server data (TanStack Query, AL-066), so the board passes it in; omitted, the corner is empty.
    */
   adoState?: string | null;
+  /**
+   * ADO's colour for the work item's type (the bar beside the id) and for its state (the dot before
+   * it), from `ado:workItemColors`. Null or omitted uses the token colours. Words carry the meaning;
+   * the colours only echo ADO's board.
+   */
+  typeColor?: string | null;
+  stateColor?: string | null;
   /** The ticket open in the drill-in or picked with the keyboard: violet outline (artboard 6 "Selected"). */
   selected?: boolean;
   /** Opens the ticket's drill-in. */
@@ -26,7 +34,7 @@ export interface AgentTicketCardViewProps {
  * progress bar, "Model · Effort" and sub-agents, and a status band when the ticket needs something.
  * Presentational: give it a ticket; `AgentTicketCard` reads one from the store.
  */
-export function AgentTicketCardView({ ticket, adoState, selected = false, onPress, testID }: AgentTicketCardViewProps) {
+export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, testID }: AgentTicketCardViewProps) {
   const view = cardView(ticket);
   const cardTone = selected ? 'selected' : view.border;
   const activityTone = activityTones[view.activity.tone];
@@ -54,7 +62,10 @@ export function AgentTicketCardView({ ticket, adoState, selected = false, onPres
         <CardSection>
           <View style={styles.idRow}>
             {ticket.ado ? (
-              <IdChip id={ticket.ado.workItemId} />
+              <View style={styles.adoId}>
+                <WorkItemTypeBar typeColor={typeColor} testID={testID ? `${testID}-type` : undefined} />
+                <IdChip id={ticket.ado.workItemId} />
+              </View>
             ) : (
               <View style={styles.localId}>
                 <Text variant="mono" size="xs" color={tone.neutral.text} numberOfLines={1}>
@@ -62,11 +73,7 @@ export function AgentTicketCardView({ ticket, adoState, selected = false, onPres
                 </Text>
               </View>
             )}
-            {adoState ? (
-              <Text variant="meta" size="xs" numberOfLines={1} style={styles.adoState}>
-                {adoState}
-              </Text>
-            ) : null}
+            {adoState ? <WorkItemStateLabel state={adoState} stateColor={stateColor} testID={testID ? `${testID}-state` : undefined} /> : null}
           </View>
           <Text variant="title" size="md" numberOfLines={3} style={styles.title}>
             {ticket.title}
@@ -157,8 +164,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
     backgroundColor: tone.neutral.band,
   },
-  adoState: {
-    flexShrink: 1,
+  adoId: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
   },
   title: {
     marginTop: space.sm,

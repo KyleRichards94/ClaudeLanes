@@ -30,6 +30,8 @@ export const adoKeys = {
   all: ['ado'] as const,
   /** The user's teams in a project (`ado:listTeams`), for the board's Team menu. */
   teams: (scope: AdoScope = {}) => ['ado', 'teams', scope] as const,
+  /** The project's work item type and state colours (`ado:workItemColors`). */
+  workItemColors: (scope: AdoScope = {}) => ['ado', 'workItemColors', scope] as const,
   sprints: (scope: AdoScope & { team?: string } = {}) => ['ado', 'sprints', scope] as const,
   workItems: (iterationPath: string, scope: AdoScope = {}) => ['ado', 'workItems', iterationPath, scope] as const,
   search: (query: string, scope: AdoScope = {}) => ['ado', 'search', query, scope] as const,
@@ -65,6 +67,25 @@ export function useTeams(scope: AdoScope = {}, options: AdoQueryOptions = {}) {
     queryKey: adoKeys.teams(scope),
     queryFn: async () => unwrap(await invoke('ado:listTeams', scope)),
     ...refetchPolicy(options),
+  });
+}
+
+/** How long the work item colours stay fresh in the renderer: they change only when someone edits the process. */
+export const WORK_ITEM_COLORS_STALE_MS = 30 * 60_000;
+
+/**
+ * The project's work item type and state colours, as ADO's boards show them, for the cards' type bar
+ * and state dot. Long-lived: no polling and no refetch on focus; while it loads or fails, cards use
+ * the token colours.
+ */
+export function useWorkItemColors(scope: AdoScope = {}, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: adoKeys.workItemColors(scope),
+    queryFn: async () => unwrap(await invoke('ado:workItemColors', scope)),
+    enabled: options.enabled ?? true,
+    staleTime: WORK_ITEM_COLORS_STALE_MS,
+    gcTime: WORK_ITEM_COLORS_STALE_MS,
+    refetchOnWindowFocus: false,
   });
 }
 
