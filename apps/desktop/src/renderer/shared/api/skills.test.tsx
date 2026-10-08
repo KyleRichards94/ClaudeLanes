@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { installFakeBridge } from '@/shared/testing';
 import { useRefreshSkills, useSkills } from './skills';
 
-const REPO = 'C:\src\onsite-companion';
+const REPO = 'C:\\src\\onsite-companion';
 
 describe('skills queries (AL-114)', () => {
   it('reads a repo once, waits for a repo, and refreshes on demand', async () => {
