@@ -79,6 +79,7 @@ test.afterEach(async () => {
 });
 
 test('merges ready sub-branches in order and stops at the first conflict (AL-086)', async () => {
+  test.slow(); // a dozen real git calls in a temporary repo, slow on a busy Windows machine
   const result = await invoke<MergeSubBranchesResult>('git:mergeSubBranches', { ticketId: '71273' });
   expect(result).toMatchObject({
     ok: false,
