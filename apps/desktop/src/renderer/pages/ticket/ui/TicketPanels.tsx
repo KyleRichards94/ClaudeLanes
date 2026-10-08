@@ -8,12 +8,13 @@ import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents } from '@/entit
 import { BuildRunControls } from '@/features/build-run';
 import { ModelEffortControls } from '@/features/change-model';
 import { MergeControls } from '@/features/merge-branches';
+import { useBranchStatus } from '@/shared/api';
 import { ErrorBoundary } from '@/shared/ui';
+import { subBranchRows } from '../lib/sub-branch-rows';
 
 /**
- * The drill-in's panels as read-only summaries (artboard 3). The controls inside them are later
- * tickets' features: model and effort switching (AL-172), Build / Run / Stop (AL-173), the merges
- * (AL-174), the sub-agent tree (AL-177) and sub-branch status (AL-178). Each panel has its own error
+ * The drill-in's panels (artboard 3): model and effort switching (AL-172), Build / Run / Stop
+ * (AL-173), the merges (AL-174), the sub-agent tree (AL-177) and sub-branch status (AL-178). Each panel has its own error
  * boundary, so one failing panel leaves the rest of the page working (design §12).
  */
 
@@ -111,7 +112,14 @@ export function SubAgentsPanel({ ticket }: { ticket: AgentTicket }) {
   );
 }
 
+/**
+ * The ticket's `sub/…` branches with "N ahead" and Ready, and the branch they merge into (AL-178).
+ * `branches:status` is read again after each merge and when a sub-agent starts or finishes (AL-085,
+ * AL-086, AL-107), so the rows follow both.
+ */
 export function SubBranchesPanel({ ticket, subBranches }: { ticket: AgentTicket; subBranches: readonly TicketSubBranch[] }) {
+  const status = useBranchStatus(ticket.id);
+  const rows = subBranchRows(status.data?.subBranches, subBranches);
   return (
     <Panel
       title="Sub-branches"
@@ -122,17 +130,20 @@ export function SubBranchesPanel({ ticket, subBranches }: { ticket: AgentTicket;
         </Text>
       }
     >
-      {subBranches.length === 0 ? (
+      {rows.length === 0 ? (
         <Text variant="meta">Writer sub-agents get their own branches here.</Text>
       ) : (
-        subBranches.map((sub) => (
-          <View key={sub.branch} style={styles.subBranch}>
-            <Text variant="mono" selectable numberOfLines={1} style={styles.flexText}>
-              {sub.branch}
-            </Text>
-            {sub.mergedAt !== null ? <Pill label="Merged" tone="ok" /> : null}
-          </View>
-        ))
+        <View role="list">
+          {rows.map((row) => (
+            <View key={row.branch} role="listitem" style={styles.subBranch} testID={`sub-branch-${row.branch}`}>
+              <Text variant="mono" selectable numberOfLines={1} style={styles.flexText}>
+                {row.branch}
+              </Text>
+              {row.ahead ? <Text variant="meta">{row.ahead}</Text> : null}
+              {row.state ? <Pill label={row.state.label} tone={row.state.tone} /> : null}
+            </View>
+          ))}
+        </View>
       )}
     </Panel>
   );
