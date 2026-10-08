@@ -8,6 +8,7 @@ describe('event contracts', () => {
     expect([...EVENT_CHANNEL_NAMES].sort()).toEqual(
       [
         'agent:gate',
+        'agent:model', // AL-106
         'agent:output',
         'agent:stage',
         'agent:status',
