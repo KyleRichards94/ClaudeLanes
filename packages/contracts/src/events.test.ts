@@ -8,6 +8,7 @@ describe('event contracts', () => {
     expect([...EVENT_CHANNEL_NAMES].sort()).toEqual(
       [
         'agent:gate',
+        'agent:model', // AL-106
         'agent:output',
         'agent:stage',
         'agent:status',
@@ -18,10 +19,13 @@ describe('event contracts', () => {
         'connections:changed',
         'design:spec',
         'design:view', // AL-191
+        'design:thread', // AL-196
         'run:status',
         'toast',
         'app:window', // AL-066
         'pr:status', // AL-181
+        'agent:mcpStatus', // AL-108
+        'agent:permission', // AL-109
       ].sort(),
     );
   });

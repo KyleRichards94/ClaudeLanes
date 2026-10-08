@@ -7,5 +7,9 @@ export const ADO_INVOKE_CHANNELS = [
   'ado:getComments',
   'ado:createPullRequest',
   'ado:getPullRequest',
+  'ado:listTeams',
+  'ado:teamBoard',
+  'ado:activePrs',
+  'ado:backlog',
 ] as const;
 export const ADO_EVENT_CHANNELS = [] as const;

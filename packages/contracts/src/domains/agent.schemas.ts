@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { InvokeContract } from '../contract';
-import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
-import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
+import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
+import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
@@ -244,6 +244,200 @@ export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 export const SendMessageResponseSchema = z.object({ held: z.boolean() });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
 
+// ── MCP servers of agent sessions (AL-108, design §7 MCP servers, artboard 1 "MCP online") ─────────
+
+/** A server's state as Claude Code reports it (`mcpServerStatus()`). */
+export const MCP_SERVER_STATES = ['connected', 'pending', 'failed', 'needs-auth', 'disabled'] as const;
+export const McpServerStateSchema = z.enum(MCP_SERVER_STATES);
+export type McpServerState = z.infer<typeof McpServerStateSchema>;
+
+/** Longest server error sent to the renderer. */
+export const MCP_ERROR_LIMIT = 500;
+
+/** One MCP server across the running sessions: the worst state any session reports for it. */
+export const McpSessionServerSchema = z.object({
+  /** The name the sessions know the server by (`azure-devops`, `agent_lanes`, a user server's name). */
+  name: z.string().min(1).max(200),
+  state: McpServerStateSchema,
+  /** Why it failed, when a session said; null otherwise. Never holds the server's token. */
+  error: z.string().max(MCP_ERROR_LIMIT).nullable(),
+  /** The tickets whose sessions run the server. */
+  ticketIds: z.array(TicketIdSchema).max(200),
+});
+export type McpSessionServer = z.infer<typeof McpSessionServerSchema>;
+
+/**
+ * The header pill (artboard 1): `online` when no running session has a failing server ("MCP online"),
+ * `failing` when one does ("1 MCP failing", amber, the names on hover), `none` when no session runs.
+ */
+export const McpStatusSummarySchema = z.object({
+  state: z.enum(['none', 'online', 'failing']),
+  /** Every server of the running sessions, failing ones first, then by name. */
+  servers: z.array(McpSessionServerSchema).max(200),
+});
+export type McpStatusSummary = z.infer<typeof McpStatusSummarySchema>;
+
+/** Whether a server counts as failing on the pill: it failed to start or needs a sign-in. */
+export function isFailingMcpState(state: McpServerState): boolean {
+  return state === 'failed' || state === 'needs-auth';
+}
+
+// ── Permission prompts of headless sessions (AL-109, design §4, Q9, Decision D18) ───────────────────
+
+/** Longest prompt line or tool detail sent for a permission request. */
+export const PERMISSION_TEXT_LIMIT = 500;
+
+/**
+ * A tool call outside the ticket's permission policy, waiting for Allow once / Allow for this ticket
+ * / Deny ("Needs you · allow Bash" on the card).
+ */
+export const PermissionRequestSchema = z.object({
+  requestId: z.string().min(1).max(200),
+  /** The tool as the card names it: `Bash`, `WebFetch`, `azure-devops · wit_update_work_item`. */
+  tool: z.string().min(1).max(200),
+  /** What the agent wants to do, one line ("Claude wants to run npm install"). */
+  title: z.string().min(1).max(PERMISSION_TEXT_LIMIT),
+  /** The command, path or URL in mono; null when the tool has none. */
+  detail: z.string().max(PERMISSION_TEXT_LIMIT).nullable(),
+  openedAt: z.int().nonnegative(),
+});
+export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
+
+export const PERMISSION_DECISIONS = ['allow-once', 'allow-ticket', 'deny'] as const;
+export const PermissionDecisionSchema = z.enum(PERMISSION_DECISIONS);
+export type PermissionDecision = z.infer<typeof PermissionDecisionSchema>;
+
+/** `agent:resolvePermission`: the user's answer to one waiting request. */
+export const ResolvePermissionRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  requestId: PermissionRequestSchema.shape.requestId,
+  decision: PermissionDecisionSchema,
+});
+export type ResolvePermissionRequest = z.infer<typeof ResolvePermissionRequestSchema>;
+
+/** `resolved` is false when the request no longer waits (answered elsewhere, or its turn ended). */
+export const ResolvePermissionResponseSchema = z.object({ resolved: z.boolean() });
+
+/** `agent:getPermission`: the ticket's oldest waiting request, for a renderer that reloads while one waits. */
+export const GetPermissionResponseSchema = z.object({ request: PermissionRequestSchema.nullable() });
+export type GetPermissionResponse = z.infer<typeof GetPermissionResponseSchema>;
+
+// ── Live model and effort change (AL-106, R7, design §7, artboard 6 "Model switching") ─────────────
+
+/** A model and effort pair, as the card shows it ("Sonnet · High"). */
+export const ModelEffortSchema = z.object({ model: ModelSchema, effort: EffortSchema });
+export type ModelEffort = z.infer<typeof ModelEffortSchema>;
+
+/**
+ * What a ticket's agent runs with now, and the change waiting for it. A change made while the session
+ * runs applies from its next turn (R7): until the next assistant message reports the new model (or the
+ * next turn starts) `pending` holds it and the card shows "Opus → Sonnet · High" with "Switching ·
+ * applies next turn"; then `model`/`effort` take it and `pending` clears. Without a live session a
+ * change applies at once (the next start uses the ticket record, which is saved on every change).
+ */
+export const AgentModelStateSchema = z.object({
+  ticketId: TicketIdSchema,
+  model: ModelSchema,
+  effort: EffortSchema,
+  pending: ModelEffortSchema.nullable(),
+});
+export type AgentModelState = z.infer<typeof AgentModelStateSchema>;
+
+/** `agent:setModel`: switch the model (Opus / Sonnet / Haiku) from the next turn; saved on the ticket. */
+export const SetModelRequestSchema = z.strictObject({ ticketId: TicketIdSchema, model: ModelSchema });
+export type SetModelRequest = z.infer<typeof SetModelRequestSchema>;
+
+/** `agent:setEffort`: change the effort (Low … Max) from the next turn; saved on the ticket. */
+export const SetEffortRequestSchema = z.strictObject({ ticketId: TicketIdSchema, effort: EffortSchema });
+export type SetEffortRequest = z.infer<typeof SetEffortRequestSchema>;
+
+/** The user turn "Apply model now" sends after interrupting, so the agent carries on with the new model. */
+export const APPLY_MODEL_NOW_MESSAGE = 'Continue where you left off.';
+
+// ── Sub-agent tracking (AL-107, artboard 3 Sub-agents, design §6 `agent:subagent`) ────────────────
+
+/** Longest description or activity line sent for a sub-agent (the panel shows one line). */
+export const SUBAGENT_TEXT_LIMIT = 300;
+
+/** Sub-agent states on the panel's pills (artboard 3): Queued / Running / Done / Failed. */
+export const SUBAGENT_STATUSES = ['queued', 'running', 'done', 'failed'] as const;
+export const SubagentStatusSchema = z.enum(SUBAGENT_STATUSES);
+export type SubagentStatus = z.infer<typeof SubagentStatusSchema>;
+
+/** How many sub-agents are in each state ("2 running · 1 done · 1 queued"). */
+export const SubagentCountsSchema = z.object({
+  queued: z.int().nonnegative(),
+  running: z.int().nonnegative(),
+  done: z.int().nonnegative(),
+  failed: z.int().nonnegative(),
+});
+export type SubagentCounts = z.infer<typeof SubagentCountsSchema>;
+
+/**
+ * One sub-agent in the ticket's tree, built from the lead agent's Agent/Task tool uses
+ * (`parent_tool_use_id` nests them), the SDK's task_started / task_updated / task_progress /
+ * task_notification messages and the SubagentStart / SubagentStop hooks.
+ */
+export const SubagentNodeSchema = z.object({
+  /** The Agent/Task tool use that spawned it (or the SDK task id for a task with no tool use seen). */
+  id: z.string().min(1).max(200),
+  /** The SDK task id once the task started; null while queued. */
+  taskId: z.string().max(200).nullable(),
+  /** The sub-agent that spawned this one; null for one the lead agent spawned. */
+  parentId: z.string().max(200).nullable(),
+  /** "explore", "razor-writer": the agent type, else the tool use's name. */
+  name: z.string().min(1).max(200),
+  agentType: z.string().max(200).nullable(),
+  /** What it was asked to do ("Mapped 4 child modals…" while running comes in `activity`). */
+  description: z.string().max(SUBAGENT_TEXT_LIMIT),
+  /** The model it runs on when known; null when it inherits the lead agent's. */
+  model: ModelSchema.nullable(),
+  effort: EffortSchema.nullable(),
+  status: SubagentStatusSchema,
+  /** The one-line activity: the latest progress summary, or its result when finished. */
+  activity: z.string().max(SUBAGENT_TEXT_LIMIT).nullable(),
+  /** Tokens it has used, when the SDK reported them. */
+  tokens: z.int().nonnegative().nullable(),
+  /** Its sub-branch (AL-084) for a writer; null for one that has none (read-only, or not created yet). */
+  branch: z.string().max(255).nullable(),
+  /** A read-only agent type (explore, reviewer) that shares the ticket worktree. */
+  readOnly: z.boolean(),
+  startedAt: z.int().nonnegative(),
+  endedAt: z.int().nonnegative().nullable(),
+});
+export type SubagentNode = z.infer<typeof SubagentNodeSchema>;
+
+/** Most sub-agents kept per ticket; the oldest finished ones are dropped first. */
+export const SUBAGENT_TREE_LIMIT = 200;
+
+/** `agent:getSubagents`: the ticket's tree, for a drill-in opened mid-run. */
+export const AgentSubagentsSchema = z.object({
+  ticketId: TicketIdSchema,
+  /** The lead agent's tokens this app run ("212k tokens"). */
+  leadTokens: z.int().nonnegative(),
+  /** Oldest first. */
+  nodes: z.array(SubagentNodeSchema).max(SUBAGENT_TREE_LIMIT),
+  counts: SubagentCountsSchema,
+});
+export type AgentSubagents = z.infer<typeof AgentSubagentsSchema>;
+
+/** The Sub-agents panel heading's counts: "2 running · 1 done · 1 queued" (zeros left out). */
+export function subagentCountsLabel(counts: SubagentCounts): string {
+  const parts = (['running', 'done', 'queued', 'failed'] as const).filter((status) => counts[status] > 0).map((status) => `${counts[status]} ${status}`);
+  return parts.length > 0 ? parts.join(' · ') : 'none yet';
+}
+
+/**
+ * `agent:subagent` (AL-107): a sub-agent was spawned or started (`started`), progressed (`updated`) or
+ * finished (`finished`); carries the node as it is now and the ticket's counts.
+ */
+export const AgentSubagentEventSchema = TicketEventEnvelopeSchema.extend({
+  change: z.enum(['started', 'updated', 'finished']),
+  node: SubagentNodeSchema,
+  counts: SubagentCountsSchema,
+});
+export type AgentSubagentEvent = z.infer<typeof AgentSubagentEventSchema>;
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -251,10 +445,23 @@ export const agentInvokeContracts = {
   'agent:setGate': { request: SetGateRequestSchema, response: SetGateResponseSchema },
   'agent:getGate': { request: AgentTicketRequestSchema, response: GetGateResponseSchema },
   'agent:send': { request: SendMessageRequestSchema, response: SendMessageResponseSchema },
+  'agent:setModel': { request: SetModelRequestSchema, response: AgentModelStateSchema },
+  'agent:setEffort': { request: SetEffortRequestSchema, response: AgentModelStateSchema },
+  /** "Apply model now": interrupts the turn, then a "continue" turn starts with the new model and effort. */
+  'agent:applyModelNow': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
+  /** For a renderer that reloads while a switch is pending. */
+  'agent:getModel': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
+  /** The ticket's sub-agent tree and counts, for a drill-in opened mid-run (AL-107). */
+  'agent:getSubagents': { request: AgentTicketRequestSchema, response: AgentSubagentsSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** The MCP servers of the running sessions, for the header pill (AL-108). */
+  'agent:getMcpStatus': { request: z.undefined(), response: McpStatusSummarySchema },
+  /** Allow once / Allow for this ticket / Deny on a waiting permission request (AL-109). */
+  'agent:resolvePermission': { request: ResolvePermissionRequestSchema, response: ResolvePermissionResponseSchema },
+  'agent:getPermission': { request: AgentTicketRequestSchema, response: GetPermissionResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -281,9 +488,6 @@ export const AgentStageEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStageEvent = z.infer<typeof AgentStageEventSchema>;
 
-/** `agent:subagent`: a sub-agent started, progressed or finished (AL-107). */
-export const AgentSubagentEventSchema = TicketEventEnvelopeSchema.extend({});
-export type AgentSubagentEvent = z.infer<typeof AgentSubagentEventSchema>;
 
 /**
  * `agent:gate` (AL-104): a stage gate started waiting for the user (the card turns amber with
@@ -308,10 +512,40 @@ export const AgentStatusEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStatusEvent = z.infer<typeof AgentStatusEventSchema>;
 
+/** `agent:mcpStatus` (AL-108): the header pill's summary changed. Not about one ticket. */
+export const McpStatusEventSchema = EventEnvelopeSchema.extend(McpStatusSummarySchema.shape);
+export type McpStatusEvent = z.infer<typeof McpStatusEventSchema>;
+
+/**
+ * `agent:permission` (AL-109): a request started waiting (the card turns amber with "Needs you ·
+ * allow <tool>"), or it ended: allowed, denied, or cancelled because the turn or session ended.
+ * `waiting` is the ticket's oldest waiting request after this change; null when none waits.
+ */
+export const AgentPermissionEventSchema = TicketEventEnvelopeSchema.extend({
+  state: z.enum(['waiting', 'allowed', 'denied', 'cancelled']),
+  request: PermissionRequestSchema,
+  waiting: PermissionRequestSchema.nullable(),
+});
+export type AgentPermissionEvent = z.infer<typeof AgentPermissionEventSchema>;
+
+/**
+ * `agent:model` (AL-106): a model or effort change was asked for (`pending` set: the card shows
+ * "Opus → Sonnet · High" and "Switching · applies next turn"), or it now applies (`pending` null).
+ */
+export const AgentModelEventSchema = TicketEventEnvelopeSchema.extend({
+  model: ModelSchema,
+  effort: EffortSchema,
+  pending: ModelEffortSchema.nullable(),
+});
+export type AgentModelEvent = z.infer<typeof AgentModelEventSchema>;
+
 export const agentEventContracts = {
   'agent:output': AgentOutputEventSchema,
   'agent:stage': AgentStageEventSchema,
   'agent:subagent': AgentSubagentEventSchema,
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
+  'agent:mcpStatus': McpStatusEventSchema,
+  'agent:permission': AgentPermissionEventSchema,
+  'agent:model': AgentModelEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

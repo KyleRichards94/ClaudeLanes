@@ -1,7 +1,15 @@
 import { LANES, type TicketRecord } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { fakeTicketRecord } from '@/shared/testing';
-import { selectLaneNeedsYouCount, selectLaneTicketIds, selectTicket, selectTicketCount } from './selectors';
+import {
+  selectLaneNeedsYouCount,
+  selectLaneNeedsYouTicketIds,
+  selectLaneTicketIds,
+  selectTicket,
+  selectTicketCount,
+  selectTicketTotal,
+  selectWorkItemLanes,
+} from './selectors';
 import { createAgentTicketStore, type AgentTicketStore } from './store';
 
 /** The artboard 1 board: one card in Queued, Planning, Code review, QA and Create PR; two in Implementing. */
@@ -155,6 +163,12 @@ describe('agent ticket store', () => {
     expect(selectLaneNeedsYouCount(state, 'code-review')).toBe(1);
     expect(selectLaneNeedsYouCount(state, 'qa')).toBe(1);
     expect(selectLaneNeedsYouCount(state, 'implementing')).toBe(0);
+    // The header's "need you" filter and the sub-header's total (AL-142).
+    expect(selectLaneNeedsYouTicketIds(state, 'code-review')).toEqual(['71301']);
+    expect(selectLaneNeedsYouTicketIds(state, 'implementing')).toEqual([]);
+    expect(selectTicketTotal(state)).toBe(7);
+    // The New agent ticket picker's running work items (AL-161): every ticket but the Done one.
+    expect(selectWorkItemLanes(state)).toEqual({ 71330: 'queued', 71322: 'planning', 71288: 'implementing', 71273: 'implementing', 71301: 'code-review', 71310: 'qa' });
   });
 
   it('routes every action to its ticket', () => {

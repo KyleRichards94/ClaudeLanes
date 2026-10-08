@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, fakeTicketRecord } from '@/shared/testing';
+import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, fakeSubagentEvent, fakeTicketRecord } from '@/shared/testing';
 import { agentTicketEventHandlers, createAgentTicketEventHandlers } from './event-handlers';
 import { selectLaneNeedsYouCount, selectTicket, ticketNeedsYou } from './selectors';
 import { createAgentTicketStore } from './store';
@@ -13,14 +13,34 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate, build:queued and pr:status', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued', 'pr:status']);
-  });
-
   it("shows the Create PR stage's pull request and its checks from pr:status (AL-181)", () => {
     const { store, handlers } = setup();
     handlers['pr:status']?.({ ticketId: '71273', at: 5, pullRequestId: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 }, webUrl: 'https://dev.azure.com/contoso/p/_git/r/pullrequest/10612' });
     expect(selectTicket(store.getState(), '71273')?.pullRequest).toEqual({ id: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 } });
+  });
+
+  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished, pr:status and run:status', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual([
+      'agent:gate',
+      'agent:model',
+      'agent:output',
+      'agent:permission',
+      'agent:stage',
+      'agent:subagent',
+      'build:finished',
+      'build:queued',
+      'pr:status',
+      'run:status',
+    ]);
+  });
+
+  it("agent:subagent sets that ticket's sub-agent counts from the SDK's task states (AL-107)", () => {
+    const { store, handlers } = setup();
+
+    handlers['agent:subagent']?.(fakeSubagentEvent('71273', 2_000, { counts: { queued: 1, running: 2, done: 1, failed: 0 } }));
+
+    expect(selectTicket(store.getState(), '71273')?.subAgents).toEqual({ queued: 1, running: 2, done: 1, failed: 0 });
+    expect(selectTicket(store.getState(), '71288')?.subAgents).toEqual({ queued: 0, running: 0, done: 0, failed: 0 });
   });
 
   it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {
@@ -69,6 +89,40 @@ describe('agent ticket event handlers', () => {
     store.setActivity('71273', { text: 'old', progress: 0.5 }, 2_500);
     handlers['agent:stage']?.(fakeStageEvent('71273', 3_000, { stage: 'code-review', from: 'implementing', activity: null, progress: 0 }));
     expect(selectTicket(store.getState(), '71273')).toMatchObject({ stage: 'code-review', activity: null, progress: 0 });
+  });
+
+  it('follows a run through run:status and keeps the last build from build:finished (AL-173)', () => {
+    const { store, handlers } = setup();
+    const run = { ticketId: '71273', runId: 'run-1', runKind: 'web', port: 5080, startedAt: 10, stoppedAt: null, exitCode: null, message: null, at: 10 } as const;
+
+    handlers['run:status']?.({ ...run, state: 'starting', url: null });
+    expect(selectTicket(store.getState(), '71273')?.run).toEqual({ state: 'starting', url: null, startedAt: 10 });
+    handlers['run:status']?.({ ...run, state: 'running', url: 'http://localhost:5080/', at: 11 });
+    expect(selectTicket(store.getState(), '71273')?.run).toEqual({ state: 'running', url: 'http://localhost:5080/', startedAt: 10 });
+
+    const error = { severity: 'error', code: 'CS0246', message: 'JobFilterState not found', file: 'a.cs', line: 1, column: 1 } as const;
+    handlers['build:finished']?.({
+      jobId: 'job-1',
+      ticketId: '71273',
+      kind: 'build',
+      outcome: 'failed',
+      command: 'dotnet build',
+      exitCode: 1,
+      errors: 3,
+      warnings: 0,
+      diagnostics: [{ ...error, severity: 'warning', code: 'CS0168' }, error],
+      startedAt: 20,
+      finishedAt: 30,
+      at: 30,
+    });
+    expect(selectTicket(store.getState(), '71273')?.build.last).toEqual({
+      outcome: 'failed',
+      startedAt: 20,
+      finishedAt: 30,
+      errors: 3,
+      warnings: 0,
+      firstError: error,
+    });
   });
 
   it('commits a frame of agent:output as one store update', () => {

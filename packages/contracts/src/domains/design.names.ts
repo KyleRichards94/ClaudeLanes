@@ -13,8 +13,12 @@ export const DESIGN_INVOKE_CHANNELS = [
   'design:shipSpec', // AL-197
   'design:getSpec', // AL-199
   'design:reshipSpec', // AL-199
+  'design:getThread', // AL-196
+  'design:sendThreadMessage', // AL-196
+  'design:answerThreadApproval', // AL-196
 ] as const;
 export const DESIGN_EVENT_CHANNELS = [
   'design:spec',
   'design:view', // AL-191
+  'design:thread', // AL-196
 ] as const;

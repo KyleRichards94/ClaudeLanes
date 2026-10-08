@@ -102,8 +102,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-105 | Messages, skills and pause | E6 | S | AL-100 | partial |
 | AL-106 | Live model and effort change | E6 | M | AL-100 | todo |
 | AL-107 | Sub-agent tracking | E6 | M | AL-102 | todo |
-| AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | todo |
-| AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | todo |
+| AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | partial |
+| AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | partial |
 | AL-110 | Crash recovery | E6 | M | AL-100, AL-101 | todo |
 | AL-111 | Concurrency cap and Queued lane | E6 | S | AL-100 | todo |
 | AL-112 | Build result as next-turn context | E6 | S | AL-100, AL-132 | todo |
@@ -672,15 +672,15 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** §7 MCP servers, artboard 1 "MCP online" · **Depends on:** AL-100, AL-045
 - **Scope:** Each session gets `agent_lanes` (AL-103), the ADO MCP server for the work item's org (official Azure DevOps MCP server, PAT as env), and the user's MCP servers. `mcpServerStatus()` aggregated into the header pill (all online / N failing); `reconnectMcpServer` on failure.
 - **Acceptance criteria:**
-  - [ ] The agent can read and comment on its own work item through the ADO MCP server.
-  - [ ] A failing server turns the pill amber with the server name on hover.
+  - [ ] The agent can read and comment on its own work item through the ADO MCP server. (open: `session-mcp.test.ts` proves the session gets the work item's org ADO server with the PAT; reading and commenting needs a live session against a real ADO org)
+  - [x] A failing server turns the pill amber with the server name on hover.
 
 #### AL-109 · Permission policy for headless sessions
 - **Design:** §4 (headless sessions), Q9 · **Depends on:** AL-100 · **Policy:** the proposed default (Decision D18), configurable in settings
 - **Scope:** Choose `permissionMode` and an allow-list (proposal: `acceptEdits`, plus Bash allow-list for git read commands, build and test commands of the repo); everything else goes through `canUseTool`, which raises "Needs you · permission" on the card with Allow once / Allow for this ticket / Deny.
 - **Acceptance criteria:**
-  - [ ] No session ever blocks on an invisible prompt.
-  - [ ] Decisions are logged in the ticket's output.
+  - [ ] No session ever blocks on an invisible prompt. (open: `permission-service.test.ts` proves every session gets `canUseTool` and each request is shown on the card through `agent:permission`, on the fake SDK only; needs a check with a real Claude session)
+  - [ ] Decisions are logged in the ticket's output. (open: unit tests write the Allow/Deny lines to the transcript; not yet seen in a real session's output)
 
 #### AL-110 · Crash recovery
 - **Design:** §12 ("restarted from its saved session id in the same worktree"), artboard 6 toast · **Depends on:** AL-100, AL-101
@@ -1750,6 +1750,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D546 | AL-104: Added `agent:setGate` and `agent:getGate` channels | Gates are editable per ticket from the drill-in, and a reloaded renderer can recover a gate that is still waiting | 2026-10-08 |
 | D547 | AL-104: System lines such as "Plan approved by Kyle · moved to Implementing" use the OS user's first name | There is no user profile to take a name from | 2026-10-08 |
 | D548 | AL-105: `agent:send` returns `held: true` when the session is paused | The composer can show that the message is queued until Resume | 2026-10-08 |
+| D549 | AL-108: The branch merged `main` (AL-163/AL-164) before integration; its one conflict, two adjacent export lines in the renderer's `shared/api/index.ts`, kept both | Brought the branch up to date while the agent's worktree was blocked | 2026-10-08 |
 
 ---
 
@@ -1804,6 +1805,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Merged AL-100, AL-102, AL-103, AL-104, AL-105 (batch b11: session manager, output normalisation, stage protocol, gates, messages) as partial; open criteria need a real Claude session. Integration was interrupted by a pause for a Git upgrade (2.56.0) and finished by hand: `pnpm verify` green (2,687 tests), e2e 105/105 on rerun; 3 e2e tests failed once under load and passed on rerun, to be hardened under AL-220. |
 | 2026-10-08 | Added epic E14 (AL-230–AL-241) from the add-on brief "Team Board & Drag-to-Agent" (Kyle, rev 27): team ADO board under the lanes, drag-to-agent with drop rules, Backlog popout, 10 s Undo; only To Do/Failed → Planning/Implementing changes ADO. Copy in `docs/design/DESIGN-team-board.md`, artboards 08–12. |
 | 2026-10-08 | Merged AL-163, AL-164 (batch b16: model and effort pickers, workspace preview and stage gates), both done. The run that merged them stopped on a usage limit before recording them; verified by hand: `pnpm verify` green (2,705 tests), e2e 106/106 on rerun (one load-related flake on the first run, tracked under AL-220). |
+| 2026-10-08 | Integrator batch 1 (b35): merged AL-108 (partial: ADO MCP server injected per work item org and the header MCP pill with auto-reconnect are in; reading and commenting on the work item needs a live session against a real ADO org) and AL-109 (partial: D18 policy, `canUseTool` "Needs you · permission" prompt and settings are in and unit-tested on the fake SDK; both criteria need a real Claude session). AL-110 (uncommitted, kept in the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a"), AL-111 and AL-112 were not on the branch and stay `todo`. No conflicts on main (the branch had already merged main); lockfile unchanged after `pnpm install`. No integration fixes needed. Decision D549. `pnpm verify`: typecheck, lint and build green; 2736/2738 unit tests in the full run, with load-related timeouts in real-git `ticket-worktree.test.ts` and `repos/registry.test.ts` (and `archive`, `merge-to-main`, `service.mcp` in an earlier run), none touched by this merge; each passed when rerun alone. E2E 106/106. The b35 worktree held a conflicted `sub-worktree.ts` and an untracked `subagent-tracker.ts` from another branch's stash; copies were saved before the worktree was removed. |
 ---
 
 ## 7. Parallel build rules

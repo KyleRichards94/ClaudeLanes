@@ -4,11 +4,15 @@ export * from './names';
 export * from './result';
 export * from './schemas';
 export * from './vocabulary';
+export * from './drop-rules';
 
 // Domain schemas and types (WorkItem, AgentOutputEvent, …) are exported per domain.
 export * from './domains/ado.schemas';
 export * from './domains/ado.pull-requests';
 export * from './domains/ado.write-back';
+export * from './domains/ado.team-board';
+export * from './domains/ado.active-prs';
+export * from './domains/ado.backlog';
 export * from './domains/agent.schemas';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';
@@ -19,6 +23,7 @@ export * from './domains/connections.display';
 export * from './domains/design.schemas';
 export * from './domains/design.canvas';
 export * from './domains/design.specs';
+export * from './domains/design.thread';
 export * from './domains/git.schemas';
 export * from './domains/pr.schemas';
 export * from './domains/repos.schemas';

@@ -1,10 +1,14 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { createAdoService, type AdoService } from './ado';
+import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { combineSessionExtras } from './agent/session-extras';
+import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
+import { createPermissionService, type PermissionService } from './agent/permissions';
+import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -23,6 +27,7 @@ import { createElectronConnectionsFile } from './connections/electron-connection
 import { createDesignNavigationPolicy, createDesignViewService, type DesignViewService } from './design';
 import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas-links';
 import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
+import { createDesignThreadService, designThreadsDir, type DesignThreadService } from './design/thread';
 import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDesignSpecFiles, designSpecsRootDir } from './design/spec-store';
 import { createDesignSpecService, type DesignSpecService } from './design/specs';
@@ -43,9 +48,12 @@ import { createBranchStatusService, type BranchStatusService } from './worktrees
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
 import { createArchiveService, type ArchiveService } from './worktrees/archive';
 import { createDiffService, type DiffService } from './worktrees/diff';
+import { createMergeSubBranchesService, type MergeSubBranchesService } from './worktrees/merge-sub-branches';
+import { createSubWorktreeService, subWorktreeHooks, type SubWorktreeService } from './worktrees/sub-worktree';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
+import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -85,6 +93,8 @@ export interface Services {
   readonly designCanvases: DesignCanvasLinks;
   /** Reads a linked canvas's artboards through a short read-only design session (AL-195, D118). */
   readonly designArtboards: DesignArtboardReader;
+  /** Each ticket's in-app design thread and its design session, separate from the lead agent (AL-196, D120). */
+  readonly designThreads: DesignThreadService;
   /** Azure DevOps per organisation from `connections` (AL-065): the `ado:*` channels and work item write-back (AL-063). */
   readonly ado: AdoService;
   /** Ticket records in `<userData>/tickets/<repoKey>/<ticketId>.json` (AL-101, D8); never inside a worktree. */
@@ -101,6 +111,10 @@ export interface Services {
   readonly transcripts: TranscriptService;
   /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
   readonly stages: StageService;
+  /** The MCP servers of the running sessions for the header pill; reconnects a failing one (AL-108). */
+  readonly mcpStatus: McpStatusMonitor;
+  /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
+  readonly permissions: PermissionService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -119,6 +133,14 @@ export interface Services {
   readonly designSpecs: DesignSpecService;
   /** Approve & ship design at any time: snapshots DesignSpec vN and hands it to the ticket's agent with `priority: 'now'` (AL-197). */
   readonly designShip: DesignShipService;
+  /** Writer sub-agents' worktrees on `sub/<ticket>-<name>`, created through each session's WorktreeCreate hook (AL-084, D9). */
+  readonly subWorktrees: SubWorktreeService;
+  /** Each ticket's sub-agent tree and counts from its session (`agent:subagent`, AL-107). */
+  readonly subagents: SubagentTracker;
+  /** Merge sub-branches → ticket branch, stopping at the first conflict; Hand to lead agent / I'll resolve it (AL-086). */
+  readonly mergeSubBranches: MergeSubBranchesService;
+  /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
+  readonly credentialFailures: CredentialFailureService;
 }
 
 export interface ServiceOptions {
@@ -137,6 +159,8 @@ export interface ServiceOptions {
 }
 
 export function createServices(options: ServiceOptions): Services {
+  // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -187,13 +211,15 @@ export function createServices(options: ServiceOptions): Services {
   });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
-  const branches = createBranchStatusService({ git, tickets });
+  // A sub-branch is Ready only once its sub-agent finished (AL-107); the tracker is created after the sessions.
+  const branches = createBranchStatusService({ git, tickets, subagents: { isRunning: (ticketId, name) => late.subagents?.isRunning(ticketId, name) ?? false } });
   // Merges and archives in one repo run one at a time.
   const repoQueue = createKeyedQueue();
   const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
   const diffs = createDiffService({ git, tickets });
+  const subWorktrees = createSubWorktreeService({ git, tickets, queue: repoQueue, log: log.child('worktrees') });
   const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
   const diagnostics = createDiagnostics({
@@ -219,6 +245,8 @@ export function createServices(options: ServiceOptions): Services {
     // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
     adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
+    // A reconnect resumes the agents a 401 paused (AL-048); created below, after the sessions.
+    onChanged: () => void late.credentialFailures?.connectionsChanged(),
   });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
@@ -236,8 +264,22 @@ export function createServices(options: ServiceOptions): Services {
     warn: (message) => log.child('design').warn(message),
   });
   const designArtboards = createDesignArtboardReader({ claude, tickets, warn: (message) => log.child('design').warn(message) });
+  const designThreads = createDesignThreadService({
+    claude,
+    tickets,
+    emit: options.emit,
+    dir: designThreadsDir(options.appDataDir),
+    warn: (message) => log.child('design').warn(message),
+  });
 
-  const ado = createAdoService({ connections, settings, log: log.child('ado') });
+  const ado = createAdoService({
+    connections,
+    settings,
+    log: log.child('ado'),
+    onUnauthorized: (connectionId) => void late.credentialFailures?.adoUnauthorized(connectionId),
+    // AL-232: a PR in a repo that isn't registered here is flagged, so its drop asks to add the repo.
+    registeredRemotes: () => readRegisteredRemotes(settings.get().repos, git.run),
+  });
 
   const sessions = createSessionManager({
     claude,
@@ -246,9 +288,18 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     log: log.child('agent'),
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
-    extras: (record) => stageExtras(record),
-    // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
-    onEnded: (ticketId) => stages.cancelGate(ticketId),
+    // Then the work item's Azure DevOps MCP server and the user's MCP servers (AL-108), the permission
+    // policy (AL-109), the WorktreeCreate / WorktreeRemove hooks that give writer sub-agents their own
+    // worktrees (AL-084) and the SubagentStart / SubagentStop hooks of sub-agent tracking (AL-107).
+    extras: (record) => sessionExtras(record),
+    onEnded: (ticketId) => {
+      // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
+      stages.cancelGate(ticketId);
+      // The ended session's servers leave the header pill (AL-108).
+      void mcpStatus.refresh();
+      // Permission requests the session left waiting close (AL-109).
+      permissions.cancelAll(ticketId);
+    },
   });
   const transcripts = createTranscriptService({
     sessions,
@@ -279,7 +330,29 @@ export function createServices(options: ServiceOptions): Services {
     transcripts,
     log: log.child('design'),
   });
+  const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
+  late.subagents = subagents;
+  const mergeSubBranches = createMergeSubBranchesService({
+    git,
+    tickets,
+    branches,
+    sessions,
+    openPath: (path) => shell.openPath(path),
+    queue: repoQueue,
+    log: log.child('merge'),
+  });
   const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
+  const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
+  const sessionExtras = combineSessionExtras([
+    stageExtras,
+    mcpSessionExtras({ connections, log: log.child('agent') }),
+    permissions.sessionExtras,
+    (record) => ({ hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees'), (sub) => subagents.noteSubBranch(record.id, sub)) }),
+    (record) => ({ hooks: subagents.hooks(record.id) }),
+  ]);
+  const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
+  const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
+  late.credentialFailures = credentialFailureService;
 
   return {
     appDataDir: options.appDataDir,
@@ -297,6 +370,7 @@ export function createServices(options: ServiceOptions): Services {
     designView,
     designCanvases,
     designArtboards,
+    designThreads,
     ado,
     tickets,
     repos,
@@ -305,6 +379,8 @@ export function createServices(options: ServiceOptions): Services {
     sessions,
     transcripts,
     stages,
+    mcpStatus,
+    permissions,
     branches,
     mergeToMain,
     ticketArchive,
@@ -314,22 +390,32 @@ export function createServices(options: ServiceOptions): Services {
     pullRequests,
     designSpecs,
     designShip,
+    subWorktrees,
+    subagents,
+    mergeSubBranches,
+    credentialFailures: credentialFailureService,
   };
 }
 
-/** Stops child processes and flushes state on quit (AL-213 fills this in). */
+/** Stops every child process the app started and flushes state on quit (AL-213, design §10). */
 export async function disposeServices(services: Services): Promise<void> {
-  void services;
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
+  services.claude.closeAll();
+  services.mcpStatus.dispose();
   services.transcripts.dispose();
   services.pullRequests.dispose();
   services.designShip.dispose();
+  services.credentialFailures.dispose();
+  services.subagents.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();
   // After the queue, so a build that finished while stopping is still saved to its ticket.
   await services.tickets.dispose();
+  // Stops the design sessions and finishes writing their threads (AL-196).
+  await services.designThreads.dispose();
   // Closes the canvas views and flushes the claude.ai sign-in cookies to disk (D112).
   await services.designView.dispose();
 }

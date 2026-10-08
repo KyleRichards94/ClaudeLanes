@@ -114,7 +114,7 @@ describe('emit', () => {
 
       for (const frame of [undefined, gone.frame, loading.frame]) {
         const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log });
-        emit('agent:subagent', { ticketId: '71273', at: 5 });
+        emit('design:spec', { ticketId: '71273', at: 5, version: 1, change: 'shipped' });
       }
 
       expect(gone.send).not.toHaveBeenCalled();
@@ -125,12 +125,12 @@ describe('emit', () => {
     it('reads the frame on every emit, so a recreated window keeps receiving', () => {
       const mainWindow: { frame?: EventFrame } = {};
       const emit = createEmitter({ frame: () => mainWindow.frame, renderer: packaged, strict: true });
-      emit('agent:subagent', { ticketId: '71273', at: 1 });
+      emit('design:spec', { ticketId: '71273', at: 1, version: 1, change: 'shipped' });
 
       const { frame, send } = fakeFrame(pathToFileURL(rendererFile).href);
       mainWindow.frame = frame;
-      emit('agent:subagent', { ticketId: '71273', at: 2 });
-      expect(send).toHaveBeenCalledExactlyOnceWith('agent:subagent', { ticketId: '71273', at: 2 });
+      emit('design:spec', { ticketId: '71273', at: 2, version: 1, change: 'shipped' });
+      expect(send).toHaveBeenCalledExactlyOnceWith('design:spec', { ticketId: '71273', at: 2, version: 1, change: 'shipped' });
     });
   });
 });

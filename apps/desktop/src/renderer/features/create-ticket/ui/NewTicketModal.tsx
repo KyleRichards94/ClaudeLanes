@@ -1,10 +1,10 @@
-import { EFFORTS, defaultAgentDefaults } from '@agent-lanes/contracts';
+import { EFFORTS, defaultAgentDefaults, pickSprint, type Sprint } from '@agent-lanes/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useReducer, useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, SegmentedControl, Text, TextField, type TextFieldHandle } from '@agent-lanes/ui';
-import { fetchWorktreePreview, useSettings, useWorktreePreview } from '@/shared/api';
+import { fetchWorktreePreview, useSettings, useSprints, useWorktreePreview } from '@/shared/api';
 import { EFFORT_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
 import { useDebouncedValue } from '../lib/use-debounced-value';
@@ -21,6 +21,7 @@ import {
 } from '../model/form';
 import { ModelPicker } from './ModelPicker';
 import { StageGates } from './StageGates';
+import { WorkItemPicker } from './WorkItemPicker';
 import { WorkspacePreview } from './WorkspacePreview';
 
 export interface NewTicketModalProps {
@@ -43,12 +44,14 @@ export function NewTicketModal({ visible, ...props }: NewTicketModalProps) {
   return visible ? <OpenNewTicketModal {...props} /> : null;
 }
 
-const SOURCE_OPTIONS: readonly { value: WorkItemSource; label: string }[] = [
-  // "Sprint 42" once the sprint list loads (AL-161).
-  { value: 'sprint', label: 'Sprint' },
-  { value: 'search', label: 'Search' },
-  { value: 'none', label: 'No ticket' },
-];
+/** Sprint / Search / No ticket; the first reads "Sprint 42" once the board's sprint is known (AL-161). */
+function sourceOptions(sprint: Sprint | null): readonly { value: WorkItemSource; label: string }[] {
+  return [
+    { value: 'sprint', label: sprint?.name ?? 'Sprint' },
+    { value: 'search', label: 'Search' },
+    { value: 'none', label: 'No ticket' },
+  ];
+}
 const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_LABELS[effort] }));
 /** How long typing in the description or the worktree name settles before the preview asks main. */
 const PREVIEW_DEBOUNCE_MS = 250;
@@ -68,6 +71,10 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
   const [launching, setLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
   const description = useRef<TextFieldHandle>(null);
+  // The board's sprint: the one picked in its Sprint menu, else the current one (AL-142).
+  const sprints = useSprints();
+  const lastSprint = useUiPrefs((state) => state.lastSprint);
+  const sprint = sprints.data ? pickSprint(sprints.data, lastSprint) : null;
   const worktreeInput = useRef<TextInputInstance>(null);
   const queryClient = useQueryClient();
 
@@ -160,22 +167,23 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
             <SegmentedControl
               label="Azure DevOps work item"
               tone="ink"
-              options={SOURCE_OPTIONS}
+              options={sourceOptions(sprint)}
               value={form.source}
               onChange={(source) => dispatch({ type: 'source', source })}
               testID="work-item-source"
             />
             {form.source === 'none' ? (
-              <Text variant="meta" size="sm">
+              <Text variant="meta" size="sm" testID="no-ticket-note">
                 The agent works from your description. The worktree is named nt-… after it.
               </Text>
             ) : (
-              // The sprint list and search results (AL-161) render here.
-              <View style={styles.pickerSlot} testID="work-item-picker">
-                <Text variant="meta" size="sm">
-                  {form.workItem ? `#${form.workItem.id} ${form.workItem.title}` : 'Sprint work items appear here.'}
-                </Text>
-              </View>
+              <WorkItemPicker
+                source={form.source}
+                sprint={sprint}
+                sprintState={sprints.isPending ? 'loading' : sprints.isError ? 'error' : 'ready'}
+                picked={form.workItem}
+                onPick={(workItem) => dispatch({ type: 'workItem', workItem })}
+              />
             )}
             {shown.workItem ? (
               <View style={styles.error} role="alert">
@@ -257,16 +265,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  pickerSlot: {
-    minHeight: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: space.lg,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: color.line,
   },
   error: {
     flexDirection: 'row',

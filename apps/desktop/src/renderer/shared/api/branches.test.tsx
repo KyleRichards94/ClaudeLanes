@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import type { BranchStatus } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
-import { installFakeBridge } from '@/shared/testing';
+import { fakeSubagentEvent, installFakeBridge } from '@/shared/testing';
 import { branchesQueryKey, createBranchStatusEventHandlers, useBranchStatus } from './branches';
 
 const status: BranchStatus = {
@@ -56,13 +56,17 @@ describe('branch status query', () => {
     expect(client.getQueryData(['branches', '71273'])).toEqual(status);
   });
 
-  it("an agent:subagent event invalidates that ticket's branch status only", async () => {
+  it("a sub-agent starting or finishing (agent:subagent) invalidates that ticket's branch status only", async () => {
     const { client } = setup();
     client.setQueryData(branchesQueryKey('71273'), status);
     client.setQueryData(branchesQueryKey('71330'), { ...status, ticketId: '71330' });
     const handlers = createBranchStatusEventHandlers(client);
 
-    handlers['agent:subagent']?.({ ticketId: '71273', at: 5 });
+    // Progress in between changes neither its branch nor whether it is ready.
+    handlers['agent:subagent']?.(fakeSubagentEvent('71273', 4, { change: 'updated' }));
+    expect(client.getQueryState(branchesQueryKey('71273'))?.isInvalidated).toBe(false);
+
+    handlers['agent:subagent']?.(fakeSubagentEvent('71273', 5, { change: 'finished' }));
 
     expect(client.getQueryState(branchesQueryKey('71273'))?.isInvalidated).toBe(true);
     expect(client.getQueryState(branchesQueryKey('71330'))?.isInvalidated).toBe(false);

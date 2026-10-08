@@ -193,6 +193,36 @@ function DefaultsSection({ draft, errors, dispatch }: SectionProps) {
         stateText={{ on: 'On', off: 'Off' }}
         onValueChange={(value) => dispatch({ type: 'adoStateTransitions', value })}
       />
+
+      {/* What headless agents do without asking (AL-109, D18); everything else shows "Needs you · permission". */}
+      <Heading>Agent permissions</Heading>
+      <Switch
+        label="Edit files in the ticket's worktree without asking"
+        value={draft.permissions.acceptEdits}
+        stateText={{ on: 'On', off: 'Ask' }}
+        onValueChange={(value) => dispatch({ type: 'permission', field: 'acceptEdits', value })}
+      />
+      <Switch
+        label="Run git read commands (status, diff, log, show)"
+        value={draft.permissions.gitRead}
+        stateText={{ on: 'On', off: 'Ask' }}
+        onValueChange={(value) => dispatch({ type: 'permission', field: 'gitRead', value })}
+      />
+      <Switch
+        label="Run the repo's build and test commands"
+        value={draft.permissions.buildAndTest}
+        stateText={{ on: 'On', off: 'Ask' }}
+        onValueChange={(value) => dispatch({ type: 'permission', field: 'buildAndTest', value })}
+      />
+      <TextField
+        label="Other commands agents may run"
+        value={draft.permissions.bashAllow}
+        onChangeText={(value) => dispatch({ type: 'bashAllow', value })}
+        placeholder="npm run lint, dotnet format"
+        help="Commands starting with these run without asking. Separate them with commas. Anything else asks on the card."
+        error={errors['bashAllow']}
+        testID="settings-bash-allow"
+      />
     </View>
   );
 }
