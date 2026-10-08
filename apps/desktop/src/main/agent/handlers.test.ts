@@ -4,6 +4,7 @@ import type { TicketRecordStore } from '../tickets';
 import { createClaudeLauncher } from './claude-sdk';
 import { createAgentHandlers } from './handlers';
 import { createMcpStatusMonitor } from './mcp';
+import { createLaunchQueue } from './launch-queue';
 import { createSessionRecovery } from './recovery';
 import { testPermissions } from './testing/sessions';
 import { createTranscriptService } from './output/transcript';
@@ -16,7 +17,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
   const emit = recordingEmit();
   const transcripts = createTranscriptService({ sessions, tickets, emit: emit.emit, now });
   const stages = createStageService({ tickets, emit: emit.emit, transcripts, userName: () => 'Kyle', now });
-  return { handlers: createAgentHandlers({ sessions, transcripts, stages, mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }), permissions: testPermissions(), recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }) }), stages, emit };
+  return { handlers: createAgentHandlers({ sessions, transcripts, stages, mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }), permissions: testPermissions(), recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }), launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }) }), stages, emit };
 }
 
 function idleSessions(tickets: TicketRecordStore): SessionManager {

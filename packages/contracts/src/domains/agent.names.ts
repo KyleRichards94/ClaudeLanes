@@ -12,6 +12,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:resolvePermission', // AL-109
   'agent:getPermission', // AL-109
   'agent:reconnect', // AL-110
+  'agent:startNow', // AL-111
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

@@ -10,9 +10,11 @@ export function createAgentHandlers({
   mcpStatus,
   permissions,
   recovery,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'recovery'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  launches,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'recovery' | 'launches'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
-    'agent:getStatus': ({ ticketId }) => ok(sessions.status(ticketId)),
+    // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
+    'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
     'agent:getTranscript': async ({ ticketId }) => ok(await transcripts.get(ticketId)),
     'agent:resolveGate': ({ ticketId, decision, note }) => {
       if (decision === 'request-changes' && !note?.trim()) return err('VALIDATION', 'Say what the agent should change.');
@@ -27,5 +29,6 @@ export function createAgentHandlers({
     'agent:resolvePermission': ({ ticketId, requestId, decision }) => ok({ resolved: permissions.resolve(ticketId, requestId, decision) }),
     'agent:getPermission': ({ ticketId }) => ok({ request: permissions.pending(ticketId) }),
     'agent:reconnect': ({ ticketId }) => recovery.reconnect(ticketId),
+    'agent:startNow': ({ ticketId }) => launches.startNow(ticketId),
   };
 }

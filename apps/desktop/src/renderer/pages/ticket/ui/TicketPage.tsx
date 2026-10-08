@@ -7,6 +7,7 @@ import { WorkItemChip } from '@/entities/ado-work-item';
 import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { PermissionPrompt } from '@/features/resolve-permission';
+import { QueuedNotice } from '@/features/start-queued-agent';
 import { useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
@@ -90,6 +91,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
 
       {/* A tool call outside the permission policy waits for the user (AL-109). */}
       <PermissionPrompt ticketId={ticket.id} />
+
+      {/* Waiting for a free slot in its repo, with Start now (AL-111). */}
+      <QueuedNotice ticketId={ticket.id} />
 
       <View style={styles.panels}>
         <AgentPanel ticket={ticket} />
