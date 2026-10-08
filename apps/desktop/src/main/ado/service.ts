@@ -71,6 +71,8 @@ export interface AdoServiceOptions {
   fetch?: FetchLike;
   /** Gets the client's redacted per-request lines (`GET … → 200 in 84 ms`). */
   log?: Pick<Logger, 'log'>;
+  /** Azure DevOps answered 401 for this connection's token (AL-048: the org turns red and its agents pause). */
+  onUnauthorized?: (connectionId: string) => void;
 }
 
 /** Why there is no client for an organisation, in `Err.details.reason`. */
@@ -95,6 +97,7 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
     return (entry) => {
       logEntry(entry);
       connections.noteAdoResponse?.(connectionId, entry).catch(() => undefined);
+      if (entry.status === 401) options.onUnauthorized?.(connectionId);
     };
   }
 

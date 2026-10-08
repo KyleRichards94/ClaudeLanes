@@ -125,3 +125,23 @@ test('messages, skill chips and pause are refused with a reason when no session 
   expect(await invoke(page, 'agent:pause', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
   expect(await invoke(page, 'agent:resume', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
+
+test('model and effort changes answer over IPC and are saved on the ticket record (AL-106)', async () => {
+  expect(await invoke(page, 'agent:getModel', { ticketId: '71273' })).toEqual({ ok: true, data: { ticketId: '71273', model: 'opus', effort: 'xhigh', pending: null } });
+  // No session runs, so a change applies at once.
+  expect(await invoke(page, 'agent:setModel', { ticketId: '71273', model: 'sonnet' })).toEqual({
+    ok: true,
+    data: { ticketId: '71273', model: 'sonnet', effort: 'xhigh', pending: null },
+  });
+  expect(await invoke(page, 'agent:setEffort', { ticketId: '71273', effort: 'high' })).toEqual({
+    ok: true,
+    data: { ticketId: '71273', model: 'sonnet', effort: 'high', pending: null },
+  });
+  expect(await invoke(page, 'agent:setEffort', { ticketId: '71273', effort: 'extreme' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await invoke(page, 'agent:applyModelNow', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+
+  await app?.close();
+  app = undefined;
+  const records = savedRecords(ticketsDir);
+  expect(records.some((record) => record.model === 'sonnet' && record.effort === 'high')).toBe(true);
+});

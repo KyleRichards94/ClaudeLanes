@@ -8,6 +8,10 @@ export const GIT_INVOKE_CHANNELS = [
   // Files changed against the base or a sub-branch, and one file's unified diff on demand (AL-089).
   'git:diff',
   'git:diffFile',
+  // Merge sub-branches → ticket branch, and the two ways out of a conflict (AL-086).
+  'git:mergeSubBranches',
+  'git:handConflictToLead',
+  'git:openConflictFiles',
   // Workspace preview in the New agent ticket modal (AL-164).
   'git:previewWorktree',
 ] as const;

@@ -1,13 +1,16 @@
 import type { CanUseTool, McpServerConfig, McpServerStatus, Options, PermissionMode, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
+  APPLY_MODEL_NOW_MESSAGE,
   SDK_MODEL_IDS,
   err,
   ok,
+  type AgentModelState,
   type AgentSessionState,
   type AgentSessionStatus,
   type Effort,
   type Err,
   type Model,
+  type ModelEffort,
   type Result,
   type TicketRecord,
 } from '@agent-lanes/contracts';
@@ -49,13 +52,21 @@ export interface SessionManager {
   /** Pause (AL-105): interrupts the current turn; messages sent from now on wait for `resume`. */
   pause(ticketId: string): Promise<Result<AgentSessionStatus>>;
   /** Resume: delivers the held messages in order, or a "continue" turn when none were sent. */
-  resume(ticketId: string): Result<AgentSessionStatus>;
+  resume(ticketId: string, options?: SessionResumeOptions): Result<AgentSessionStatus>;
   /** Stops the current turn; the session stays open for the next message. */
   interrupt(ticketId: string): Promise<Result<void>>;
-  /** Saves the model on the ticket and, when its session is live, switches the session to it (D10). */
-  setModel(ticketId: string, model: Model): Promise<Result<void>>;
-  /** Saves the effort on the ticket and, when its session is live, applies it from the next request (D10). */
-  setEffort(ticketId: string, effort: Effort): Promise<Result<void>>;
+  /**
+   * Saves the model on the ticket and, when its session is live, switches the session to it (D10).
+   * The change is pending (`agent:model`) until the next assistant message reports the new model or
+   * the next turn starts (AL-106).
+   */
+  setModel(ticketId: string, model: Model): Promise<Result<AgentModelState>>;
+  /** Saves the effort on the ticket and, when its session is live, applies it from the next turn (D10, AL-106). */
+  setEffort(ticketId: string, effort: Effort): Promise<Result<AgentModelState>>;
+  /** "Apply model now" (AL-106): interrupts the turn and starts a "continue" turn with the pending model and effort. */
+  applyModelNow(ticketId: string): Promise<Result<AgentModelState>>;
+  /** What the ticket's agent runs with now, and the change waiting for it (AL-106). */
+  modelState(ticketId: string): Promise<Result<AgentModelState>>;
   /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. */
   stop(ticketId: string): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
@@ -77,6 +88,14 @@ export interface SessionStartRequest {
   jobDescription?: string;
   /** The work item the launch picked (AL-161); null or absent for a "No ticket" ticket. */
   workItem?: SessionWorkItem | null;
+}
+
+export interface SessionResumeOptions {
+  /**
+   * A user turn delivered before the held messages, e.g. "Connection restored" after a reconnect
+   * (AL-048). Without it and with nothing held, Resume sends RESUME_MESSAGE.
+   */
+  opening?: string;
 }
 
 export interface SessionMessageInput {
@@ -103,6 +122,8 @@ export interface SessionExtras {
   permissionMode?: PermissionMode;
   /** Asked for every tool call the mode and `allowedTools` don't settle (AL-109). */
   canUseTool?: CanUseTool;
+  /** SDK hooks, e.g. AL-084's WorktreeCreate / WorktreeRemove for sub-agent worktrees (D9). */
+  hooks?: Options['hooks'];
 }
 
 export interface SessionManagerOptions {
@@ -134,6 +155,12 @@ interface Session {
   /** Paused by the user (AL-105): turns ending do not make it idle, and messages wait in `held`. */
   paused: boolean;
   held: SDKUserMessage[];
+  /** The model and effort the session runs with (AL-106). */
+  applied: ModelEffort;
+  /** A change asked for that applies from the next turn; null when none waits. */
+  pending: ModelEffort | null;
+  /** A turn ended (or none was running) since the change was asked for: the next assistant message is a new turn. */
+  turnBoundary: boolean;
   /** Settles when the session's message loop has finished. */
   done: Promise<void>;
 }
@@ -165,6 +192,7 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
     ...(extras.canUseTool ? { canUseTool: extras.canUseTool } : {}),
     ...(extras.mcpServers && Object.keys(extras.mcpServers).length > 0 ? { mcpServers: extras.mcpServers } : {}),
     ...(extras.allowedTools && extras.allowedTools.length > 0 ? { allowedTools: extras.allowedTools } : {}),
+    ...(extras.hooks && Object.keys(extras.hooks).length > 0 ? { hooks: extras.hooks } : {}),
     ...(record.sessionId ? { resume: record.sessionId } : {}),
   };
 }
@@ -220,7 +248,48 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     if (!flushed.ok) log?.warn(`Could not write the session id of ticket ${session.ticketId}: ${flushed.message}`);
   }
 
+  function modelStateOf(session: Session): AgentModelState {
+    return { ticketId: session.ticketId, ...session.applied, pending: session.pending };
+  }
+
+  function emitModel(session: Session): void {
+    emit('agent:model', { ticketId: session.ticketId, ...session.applied, pending: session.pending });
+  }
+
+  /**
+   * Clears a pending change once it is in use (AL-106): the next lead-agent message reports the new
+   * model, or the next turn starts (a turn ended since the change, or none was running).
+   */
+  function notePendingApplied(session: Session, message: SDKMessage): void {
+    const pending = session.pending;
+    if (!pending) return;
+    if (message.type === 'result') {
+      session.turnBoundary = true;
+      return;
+    }
+    if (message.type !== 'assistant' || message.parent_tool_use_id !== null) return;
+    const reported = (message.message as { model?: unknown }).model;
+    const modelArrived =
+      pending.model !== session.applied.model && typeof reported === 'string' && reported.startsWith(SDK_MODEL_IDS[pending.model]);
+    if (!modelArrived && !session.turnBoundary) return;
+    session.applied = pending;
+    session.pending = null;
+    session.turnBoundary = false;
+    emitModel(session);
+  }
+
+  /** A change on a live session: pending until it applies, or none when it goes back to what runs now. */
+  function requestChange(session: Session, change: Partial<ModelEffort>): void {
+    const target = { ...(session.pending ?? session.applied), ...change };
+    const next = target.model === session.applied.model && target.effort === session.applied.effort ? null : target;
+    if (next?.model === session.pending?.model && next?.effort === session.pending?.effort) return;
+    if (!session.pending) session.turnBoundary = session.state === 'idle' || session.state === 'paused';
+    session.pending = next;
+    emitModel(session);
+  }
+
   function handle(session: Session, message: SDKMessage): void {
+    notePendingApplied(session, message);
     if (message.type === 'system' && message.subtype === 'init') {
       void rememberSessionId(session, message.session_id);
     } else if (message.type === 'result' && !session.paused) {
@@ -288,6 +357,9 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       stopping: false,
       paused: false,
       held: [],
+      applied: { model: record.model, effort: record.effort },
+      pending: null,
+      turnBoundary: false,
       done: Promise.resolve(),
     };
     // A start for the same ticket may have claimed it while the record was read: that one wins.
@@ -354,6 +426,13 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     return ok(statusOf(ticketId, session));
   }
 
+  /** Without a live session a change applies at once: the next start reads it from the record. */
+  function appliedAtOnce(ticketId: string, record: TicketRecord): AgentModelState {
+    const state = { ticketId, model: record.model, effort: record.effort, pending: null };
+    emit('agent:model', state);
+    return state;
+  }
+
   async function stopSession(session: Session): Promise<void> {
     session.stopping = true;
     session.input.close();
@@ -395,15 +474,17 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       return ok(statusOf(ticketId, session));
     },
 
-    resume(ticketId) {
+    resume(ticketId, resumeOptions = {}) {
       const found = live(ticketId);
       if (!found.ok) return found;
       const session = found.data;
       if (!session.paused) return ok(statusOf(ticketId, session));
       session.paused = false;
       const held = session.held.splice(0);
-      for (const message of held.length > 0 ? held : [userMessage({ text: RESUME_MESSAGE })]) session.input.push(message);
-      setState(session, held.length > 0 && held.every((message) => message.shouldQuery === false) ? 'idle' : 'running');
+      const opening = resumeOptions.opening?.trim() ? [userMessage({ text: resumeOptions.opening })] : [];
+      const turns = opening.length > 0 || held.length > 0 ? [...opening, ...held] : [userMessage({ text: RESUME_MESSAGE })];
+      for (const message of turns) session.input.push(message);
+      setState(session, turns.every((message) => message.shouldQuery === false) ? 'idle' : 'running');
       return ok(statusOf(ticketId, session));
     },
 
@@ -422,16 +503,54 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       const saved = await tickets.update(ticketId, (record) => ({ ...record, model }));
       if (!saved.ok) return saved;
       const session = sessions.get(ticketId);
-      if (session && LIVE_STATES.has(session.state)) await session.query?.setModel(SDK_MODEL_IDS[model]);
-      return ok(undefined);
+      if (!session || !LIVE_STATES.has(session.state)) return ok(appliedAtOnce(ticketId, saved.data));
+      try {
+        await session.query?.setModel(SDK_MODEL_IDS[model]);
+      } catch (error) {
+        return err('INTERNAL', `The model could not be switched: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      requestChange(session, { model });
+      return ok(modelStateOf(session));
     },
 
     async setEffort(ticketId, effort) {
       const saved = await tickets.update(ticketId, (record) => ({ ...record, effort }));
       if (!saved.ok) return saved;
       const session = sessions.get(ticketId);
-      if (session && LIVE_STATES.has(session.state)) await session.query?.applyFlagSettings({ effortLevel: effort });
-      return ok(undefined);
+      if (!session || !LIVE_STATES.has(session.state)) return ok(appliedAtOnce(ticketId, saved.data));
+      try {
+        await session.query?.applyFlagSettings({ effortLevel: effort });
+      } catch (error) {
+        return err('INTERNAL', `The effort could not be changed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      requestChange(session, { effort });
+      return ok(modelStateOf(session));
+    },
+
+    async applyModelNow(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      const session = found.data;
+      if (!session.pending) return ok(modelStateOf(session));
+      if (session.paused) return err('VALIDATION', 'Resume the agent to apply the new model.', { reason: 'paused' });
+      try {
+        await session.query?.interrupt();
+      } catch (error) {
+        return err('INTERNAL', `The agent could not be interrupted: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      // The interrupted turn is over: the continue turn is the next one, with the new model and effort.
+      session.turnBoundary = true;
+      session.input.push(userMessage({ text: APPLY_MODEL_NOW_MESSAGE }));
+      setState(session, 'running');
+      return ok(modelStateOf(session));
+    },
+
+    async modelState(ticketId) {
+      const session = sessions.get(ticketId);
+      if (session && LIVE_STATES.has(session.state)) return ok(modelStateOf(session));
+      const record = await tickets.get(ticketId);
+      if (!record) return err('VALIDATION', `There is no ticket ${ticketId}.`);
+      return ok({ ticketId, model: record.model, effort: record.effort, pending: null });
     },
 
     async stop(ticketId) {
