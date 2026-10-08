@@ -1,4 +1,4 @@
-import type { AccountInfo, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { AccountInfo, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage, SlashCommand } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
 
 /**
@@ -15,6 +15,8 @@ export interface FakeClaudeScript {
   account?: AccountInfo | Error | 'hang';
   /** What `getContextUsage()` reports (AL-113): tokens used of the window; rejects when an Error. */
   contextUsage?: { totalTokens: number; maxTokens: number; percentage: number } | Error;
+  /** What `supportedCommands()` lists (AL-114); rejects when an Error, never settles when `'hang'`. */
+  commands?: SlashCommand[] | Error | 'hang';
   /** Messages the stream yields, in order, after the prompt is read. */
   messages?: SDKMessage[];
   /** Thrown by the stream after `messages`, like a process that died. */
@@ -166,6 +168,11 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       },
       applyFlagSettings: async (settings: Record<string, unknown>) => {
         call.flagSettings.push(settings);
+      },
+      supportedCommands: () => {
+        const commands = plan.commands ?? [];
+        if (commands === 'hang') return new Promise<SlashCommand[]>(() => undefined);
+        return commands instanceof Error ? Promise.reject(commands) : Promise.resolve(commands);
       },
       getContextUsage: async () => {
         const usage = plan.contextUsage ?? { totalTokens: 0, maxTokens: 200_000, percentage: 0 };

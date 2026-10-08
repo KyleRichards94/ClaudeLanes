@@ -22,4 +22,5 @@ export * from './domains/design.canvas';
 export * from './domains/git.schemas';
 export * from './domains/repos.schemas';
 export * from './domains/settings.schemas';
+export * from './domains/skills.schemas';
 export * from './domains/tickets.schemas';

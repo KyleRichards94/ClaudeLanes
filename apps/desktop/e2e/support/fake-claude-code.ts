@@ -10,6 +10,8 @@ export interface FakeClaudeState {
   log?: string;
   /** Claude Design access, and the artboards a design session answers with (AL-195). */
   design?: { artboards: { id: string; name: string; width: number | null; height: number | null }[] };
+  /** What `supportedCommands()` lists (AL-114); empty by default. */
+  commands?: { name: string; description: string; argumentHint: string; builtin?: boolean }[];
 }
 
 export const FAKE_LOGIN = { email: 'kyle@example.com', organization: 'Example', subscriptionType: 'max' } as const;
