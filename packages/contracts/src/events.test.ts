@@ -18,6 +18,7 @@ describe('event contracts', () => {
         'connections:changed',
         'design:spec',
         'design:view', // AL-191
+        'design:thread', // AL-196
         'run:status',
         'toast',
         'app:window', // AL-066

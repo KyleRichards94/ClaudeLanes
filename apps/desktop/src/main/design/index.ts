@@ -12,3 +12,4 @@ export {
 } from './view-service';
 export { createDesignCanvasLinks, isCanvasPage, type DesignCanvasLinks, type DesignCanvasLinksOptions } from './canvas-links';
 export { createDesignArtboardReader, type DesignArtboardReader, type DesignArtboardReaderOptions } from './artboards';
+export { createDesignThreadService, designThreadsDir, type DesignThreadService, type DesignThreadServiceOptions } from './thread';

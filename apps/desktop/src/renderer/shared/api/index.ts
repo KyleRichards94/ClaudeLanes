@@ -46,3 +46,10 @@ export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
 export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';
+export {
+  designThreadEventHandlers,
+  designThreadQueryKey,
+  useAnswerDesignApproval,
+  useDesignThread,
+  useSendDesignMessage,
+} from './design-thread';

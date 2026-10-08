@@ -1,6 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import { connectionsEventHandlers, createBranchStatusEventHandlers, mcpStatusEventHandlers } from '@/shared/api';
+import {
+  connectionsEventHandlers,
+  createBranchStatusEventHandlers,
+  designThreadEventHandlers,
+  mcpStatusEventHandlers,
+} from '@/shared/api';
 import { permissionEventHandlers } from '@/features/resolve-permission';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
@@ -34,6 +39,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(mcpStatusEventHandlers(queryClient)), [queryClient]);
   // `agent:permission` keeps each ticket's waiting permission request current (AL-109).
   useEffect(() => runningEventHub()?.register(permissionEventHandlers(queryClient)), [queryClient]);
+  // `design:thread` → the ticket's cached design thread (AL-196).
+  useEffect(() => runningEventHub()?.register(designThreadEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
