@@ -16,5 +16,9 @@ export function createAgentHandlers({ sessions, transcripts, stages }: Pick<Serv
     'agent:send': ({ ticketId, text, priority }) => sessions.send(ticketId, { text, priority: priority ?? 'next' }),
     'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
     'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
+    'agent:setModel': ({ ticketId, model }) => sessions.setModel(ticketId, model),
+    'agent:setEffort': ({ ticketId, effort }) => sessions.setEffort(ticketId, effort),
+    'agent:applyModelNow': ({ ticketId }) => sessions.applyModelNow(ticketId),
+    'agent:getModel': ({ ticketId }) => sessions.modelState(ticketId),
   };
 }

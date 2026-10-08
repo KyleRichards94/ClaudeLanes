@@ -249,8 +249,8 @@ describe('session manager: controls', () => {
     await sessions.start({ ticketId: '71273', jobDescription: JOB });
 
     await expect(sessions.interrupt('71273')).resolves.toEqual({ ok: true, data: undefined });
-    await expect(sessions.setModel('71273', 'sonnet')).resolves.toEqual({ ok: true, data: undefined });
-    await expect(sessions.setEffort('71273', 'high')).resolves.toEqual({ ok: true, data: undefined });
+    await expect(sessions.setModel('71273', 'sonnet')).resolves.toMatchObject({ ok: true, data: { pending: { model: 'sonnet' } } });
+    await expect(sessions.setEffort('71273', 'high')).resolves.toMatchObject({ ok: true, data: { pending: { model: 'sonnet', effort: 'high' } } });
 
     expect(fake.calls[0]!.interrupts).toBe(1);
     expect(fake.calls[0]!.models).toEqual(['claude-sonnet-5-5']);
