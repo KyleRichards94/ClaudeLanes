@@ -111,3 +111,4 @@ export {
   type AssignmentRef,
   type WorkItemAssignment,
 } from './assignment';
+export { listOpenThreads, type OpenThread } from './pr-threads';

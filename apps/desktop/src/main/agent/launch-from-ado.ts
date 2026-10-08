@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import {
+  listOpenThreads,
   getSignedInUser,
   getWorkItemAssignment,
   inProgressStateOf,
@@ -40,6 +41,7 @@ import type { CreateTicketWorktreeInput, TicketWorktreeService } from '../worktr
 import { createKeyedQueue } from '../worktrees/keyed-queue';
 import type { SessionWorkItem } from './first-turn';
 import type { LaunchQueue } from './launch-queue';
+import { answerCommentsJob, reviewJob } from './pr-launch';
 import { LANE_LABELS as LANE_NAMES } from './stages/stage-rules';
 
 /**
@@ -295,17 +297,22 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     };
   }
 
-  /** What the agent is asked to do first, per lane (TB§3); AL-238 adds the PR review and comment payloads. */
-  function jobFor(action: DropAction, fresh: FreshCard): string {
-    const id = fresh.workItem ? `#${fresh.workItem.id}` : `!${fresh.card.id}`;
-    switch (action.worktree) {
-      case 'pr-branch-read-only':
-        return `Review pull request ${id} (${fresh.title}) on its source branch. This worktree is read-only: change no files and push nothing.`;
-      case 'pr-source-branch':
-        return `Work through the open comment threads on your pull request ${id} (${fresh.title}) on its source branch.`;
-      default:
-        break;
+  /**
+   * What the agent is asked to do first, per lane (TB§3). A review runs /code-review and posts with
+   * /pr-comment-actioner; answering your PR lists every unresolved thread with its file and line (AL-238).
+   */
+  async function jobFor(client: AdoClient, action: DropAction, fresh: FreshCard): Promise<Result<string>> {
+    const pr = fresh.pullRequest;
+    if (pr && action.worktree === 'pr-branch-read-only') return ok(reviewJob(pr));
+    if (pr && action.worktree === 'pr-source-branch') {
+      const threads = await listOpenThreads(client, { project: pr.repository.projectId, repositoryId: pr.repository.id, pullRequestId: pr.id });
+      return threads.ok ? ok(answerCommentsJob(pr, threads.data)) : threads;
     }
+    return ok(workItemJob(action, fresh));
+  }
+
+  function workItemJob(action: DropAction, fresh: FreshCard): string {
+    const id = fresh.workItem ? `#${fresh.workItem.id}` : `!${fresh.card.id}`;
     if (action.lane === 'qa') return `QA work item ${id} on its branch: build it and check each acceptance criterion.`;
     if (action.lane === 'implementing') return `Plan and implement work item ${id}. No plan approval is needed: go straight on to building it.`;
     return `Read work item ${id}, explore the code, and write a plan. Ask for plan approval before implementing.`;
@@ -361,6 +368,10 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
       sessionItem = { id: item.data.id, title: item.data.title, type: item.data.type, state: item.data.state, description: text || null };
     }
 
+    // The first turn, read before anything changes (a PR's open threads).
+    const job = await jobFor(client.data, action, fresh.data);
+    if (!job.ok) return job;
+
     // 2. The only ADO change a drop makes (T5).
     let restoreInfo: AdoRestore | null = null;
     let adoChange: LaunchAdoChange | null = null;
@@ -393,7 +404,7 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     // 4. The session, entering the dropped lane as it starts (or Queued at the cap).
     startLanes.set(ticketId, request.lane);
     const started = await launches
-      .launch({ ticketId, jobDescription: jobFor(action, fresh.data), workItem: sessionItem })
+      .launch({ ticketId, jobDescription: job.data, workItem: sessionItem })
       .catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
     if (!started.ok) {
       startLanes.delete(ticketId);

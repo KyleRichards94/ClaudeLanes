@@ -111,7 +111,7 @@ async function setUp(options: SetUpOptions = {}) {
       }),
     },
     launches: {
-      launch: vi.fn(async ({ ticketId }: { ticketId: string }) => options.start?.(ticketId) ?? ok<AgentSessionStatus>({ ticketId, state: 'running', sessionId: null, message: null })),
+      launch: vi.fn(async ({ ticketId }: { ticketId: string; jobDescription?: string }) => options.start?.(ticketId) ?? ok<AgentSessionStatus>({ ticketId, state: 'running', sessionId: null, message: null })),
     },
     tickets: { get: async (id: string) => saveds.get(id), list: async () => [...saveds.values()] },
   };
@@ -259,5 +259,70 @@ describe('launch from the team board (AL-236)', () => {
     const { launcher, writes } = await setUp({ records: [{ ...existing, stage: 'implementing', stageHistory: [{ stage: 'implementing', at: 1 }] }] });
     await expect(launcher.launch({ source: board(71335), lane: 'planning', repo: REPO })).resolves.toMatchObject({ ok: false, message: 'Agent in Implementing' });
     expect(writes()).toEqual([]);
+  });
+});
+
+describe('pull request launches (AL-238)', () => {
+  it('Code review: a read-only review that runs /code-review and posts its findings with /pr-comment-actioner', async () => {
+    const { launcher, deps, writes } = await setUp();
+    const result = await launcher.launch({ source: { kind: 'pull-request', id: 10598 }, lane: 'code-review' });
+
+    expect(result).toMatchObject({ ok: true, data: { ticketId: 'pr-10598-review', adoChange: null, summary: '!10598 · agent started in Code review' } });
+    expect(deps.worktrees.create.mock.calls[0]![0]).toMatchObject({
+      repo: REPO,
+      subject: { kind: 'pull-request', pullRequestId: 10598, title: '!10598 Supplier invoice matching rules', purpose: 'review' },
+      checkout: { branch: 'users/ty/71298-invoice-matching', detached: true },
+      baseBranch: 'main',
+      skills: ['code-review', 'pr-comment-actioner'],
+      model: 'opus',
+      effort: 'high',
+    });
+    const job = deps.launches.launch.mock.calls[0]![0].jobDescription;
+    expect(job).toContain('Run /code-review on its changes (git diff origin/main...HEAD in this worktree)');
+    expect(job).toContain('with /pr-comment-actioner');
+    expect(job).toContain('change no files, commit nothing and push nothing');
+    expect(launcher.startLane('pr-10598-review')).toBe('code-review');
+    // The app itself changes nothing in ADO: the agent posts through its skill.
+    expect(writes()).toEqual([]);
+  });
+
+  it("Implementing by the PR's author: the first turn lists every unresolved thread with its file and line", async () => {
+    const { launcher, deps, writes } = await setUp();
+    const result = await launcher.launch({ source: { kind: 'pull-request', id: 10571 }, lane: 'implementing' });
+
+    expect(result).toMatchObject({ ok: true, data: { ticketId: 'pr-10571', adoChange: null } });
+    expect(deps.worktrees.create.mock.calls[0]![0]).toMatchObject({
+      subject: { kind: 'pull-request', pullRequestId: 10571, purpose: 'answer' },
+      checkout: { branch: '71240-job-notes-editor', detached: false },
+      skills: ['pr-comment-actioner'],
+      model: 'sonnet',
+      effort: 'high',
+    });
+    const job = deps.launches.launch.mock.calls[0]![0].jobDescription ?? '';
+    expect(job).toContain('Your pull request !10571 "Job notes rich text editor" has 6 open comment threads.');
+    expect(job).toContain('Work through each one with /pr-comment-actioner: fix the code and reply, or reply why not; resolve the thread; then commit and push to 71240-job-notes-editor.');
+    expect(job.split('\n').filter((line) => /^\d+\. Thread /.test(line))).toEqual([
+      '1. Thread 1 · /src/Jobs/JobNotes.razor, line 10 · Tom Young: "Please rename this (1)."',
+      '2. Thread 2 · /src/Jobs/JobNotesEditor.cs, line 17 · Tom Young: "Please rename this (2)."',
+      '3. Thread 3 · /src/Jobs/JobNotes.razor, line 24 · Tom Young: "Please rename this (3)."',
+      '4. Thread 4 · /src/Jobs/JobNotesEditor.cs, line 31 · Tom Young: "Please rename this (4)."',
+      '5. Thread 5 · /src/Jobs/JobNotes.razor, line 38 · Tom Young: "Please rename this (5)."',
+      '6. Thread 6 · the whole pull request · Tom Young: "Please rename this (6)."',
+    ]);
+    expect(writes()).toEqual([]);
+  });
+
+  it('several people can start reviews of the same PR at once', async () => {
+    const { launcher, deps } = await setUp();
+    const [first, second] = await Promise.all([
+      launcher.launch({ source: { kind: 'pull-request', id: 10598 }, lane: 'code-review' }),
+      launcher.launch({ source: { kind: 'pull-request', id: 10598 }, lane: 'code-review' }),
+    ]);
+    expect(first.ok && second.ok).toBe(true);
+    // Each gets its own read-only worktree: the worktree service names them pr-10598-review and pr-10598-review-2.
+    expect(deps.worktrees.create.mock.calls.map(([input]) => input.checkout)).toEqual([
+      { branch: 'users/ty/71298-invoice-matching', detached: true },
+      { branch: 'users/ty/71298-invoice-matching', detached: true },
+    ]);
   });
 });
