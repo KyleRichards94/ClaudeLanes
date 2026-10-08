@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import type { TicketSubBranch } from '@agent-lanes/contracts';
-import { color, radius, space } from '@agent-lanes/tokens';
+import { subagentCountsLabel, type TicketSubBranch } from '@agent-lanes/contracts';
+import { color, space } from '@agent-lanes/tokens';
 import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
-import { modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
 import { ModelEffortControls } from '@/features/change-model';
 import { MergeControls } from '@/features/merge-branches';
@@ -77,31 +78,35 @@ export function MergePanel({ ticket }: { ticket: AgentTicket }) {
   );
 }
 
+/**
+ * The lead agent and the sub-agent tree with each one's status, line, model · effort and branch
+ * (AL-177, entities/sub-agent). The tree is read with `agent:getSubagents` and kept current by
+ * `agent:subagent`; until it loads, the counts come from the card's.
+ */
 export function SubAgentsPanel({ ticket }: { ticket: AgentTicket }) {
-  const { running, done, queued, failed } = ticket.subAgents;
-  const counts = [
-    running ? `${running} running` : null,
-    done ? `${done} done` : null,
-    queued ? `${queued} queued` : null,
-    failed ? `${failed} failed` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const subAgents = useSubAgents(ticket.id);
+  const counts = subAgents.data?.counts ?? ticket.subAgents;
+  const tree = subAgentTree(subAgents.data?.nodes ?? []);
+  const lead = { stage: ticket.stage, model: ticket.model, effort: ticket.effort };
+  const total = subAgents.data ? subAgents.data.nodes.length : subAgentTotal(ticket.subAgents);
+  const countsLabel = subagentCountsLabel(counts);
 
   return (
     <Panel
       title="Sub-agents"
       testID="sub-agents-panel"
-      aside={<Text variant="meta">{counts || 'None yet'}</Text>}
+      aside={
+        <Text variant="meta" testID="sub-agents-counts">
+          {countsLabel === 'none yet' ? 'None yet' : countsLabel}
+        </Text>
+      }
     >
-      <View style={styles.leadCard} testID="lead-agent">
-        <Text variant="title" size="lg" color={color.surface}>
-          Lead agent
-        </Text>
-        <Text variant="body" size="sm" color={color.surface}>
-          {`${modelEffortLabel(ticket.model, ticket.effort)} · ${subAgentTotal(ticket.subAgents) > 0 ? 'orchestrating' : 'working alone'}`}
-        </Text>
-      </View>
+      <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={subAgents.data?.leadTokens ?? null} />
+      {tree.length > 0 ? (
+        <SubAgentList items={tree} lead={lead} />
+      ) : subAgents.isError ? (
+        <Text variant="meta">{"Couldn't load the sub-agents."}</Text>
+      ) : null}
     </Panel>
   );
 }
@@ -154,12 +159,6 @@ const styles = StyleSheet.create({
   },
   flexText: {
     flex: 1,
-  },
-  leadCard: {
-    gap: space.xs,
-    padding: space.lg,
-    borderRadius: radius.card,
-    backgroundColor: color.claude,
   },
   subBranch: {
     flexDirection: 'row',

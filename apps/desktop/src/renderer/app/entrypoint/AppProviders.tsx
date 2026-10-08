@@ -6,6 +6,7 @@ import {
   designThreadEventHandlers,
   mcpStatusEventHandlers,
 } from '@/shared/api';
+import { subAgentEventHandlers } from '@/entities/sub-agent';
 import { permissionEventHandlers } from '@/features/resolve-permission';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
@@ -39,6 +40,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(mcpStatusEventHandlers(queryClient)), [queryClient]);
   // `agent:permission` keeps each ticket's waiting permission request current (AL-109).
   useEffect(() => runningEventHub()?.register(permissionEventHandlers(queryClient)), [queryClient]);
+  // `agent:subagent` → the ticket's cached sub-agent tree (AL-177).
+  useEffect(() => runningEventHub()?.register(subAgentEventHandlers(queryClient)), [queryClient]);
   // `design:thread` → the ticket's cached design thread (AL-196).
   useEffect(() => runningEventHub()?.register(designThreadEventHandlers(queryClient)), [queryClient]);
 
