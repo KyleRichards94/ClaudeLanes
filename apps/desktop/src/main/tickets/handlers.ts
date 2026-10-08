@@ -8,7 +8,8 @@ export function createTicketsHandlers({
   archive,
   ticketArchive,
   reconcile,
-}: Pick<Services, 'tickets' | 'archive' | 'ticketArchive' | 'reconcile'>): HandlersFor<(typeof TICKETS_INVOKE_CHANNELS)[number]> {
+  ticketLauncher,
+}: Pick<Services, 'tickets' | 'archive' | 'ticketArchive' | 'reconcile' | 'ticketLauncher'>): HandlersFor<(typeof TICKETS_INVOKE_CHANNELS)[number]> {
   return {
     'tickets:list': async () => ok(await tickets.list()),
     'tickets:archive': ({ ticketId, discardUnmerged, deleteMergedBranches }) => archive.archive(ticketId, { discardUnmerged, deleteMergedBranches }),
@@ -17,5 +18,6 @@ export function createTicketsHandlers({
     'tickets:adoptWorktree': ({ worktreePath }) => reconcile.adopt(worktreePath),
     'tickets:ignoreWorktree': ({ worktreePath }) => reconcile.ignore(worktreePath),
     'tickets:get': async ({ ticketId }) => ok({ record: (await tickets.get(ticketId)) ?? null }),
+    'tickets:launch': (request) => ticketLauncher.launch(request),
   };
 }

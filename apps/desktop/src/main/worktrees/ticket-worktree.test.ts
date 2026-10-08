@@ -342,6 +342,7 @@ describe('failure leaves no half-created worktree or branch', () => {
       get: (id) => tickets.get(id),
       list: (filter) => tickets.list(filter),
       create: async () => err('INTERNAL', 'Could not write 71273.json (ENOSPC)'),
+      delete: (id) => tickets.delete(id),
     };
 
     const result = await service({ tickets: failingTickets }).worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
@@ -449,6 +450,37 @@ describe('failure leaves no half-created worktree or branch', () => {
     fail = false;
     const retry = await worktrees.create(workItem(71273, 'Cutover'));
     expect(retry.ok && retry.data.record.branch).toBe('71273-cutover');
+  });
+});
+
+describe('discarding a ticket this run created (AL-165, AL-237)', () => {
+  it('removes its worktree, branch and record, leaving the repo as before the launch', async () => {
+    const before = await snapshot();
+    const { worktrees } = service();
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
+    expect(created.ok).toBe(true);
+    // The agent may already have written files in it.
+    await writeFile(join(root, '71273', 'notes.md'), 'plan\n');
+
+    await expect(worktrees.discard('71273')).resolves.toEqual({ ok: true, data: { complete: true, leftovers: [] } });
+    expect(await snapshot()).toEqual(before);
+    expect(await tickets.get('71273')).toBeUndefined();
+    // Only once.
+    await expect(worktrees.discard('71273')).resolves.toMatchObject({ ok: false, details: { reason: 'not-created-here' } });
+  });
+
+  it('keeps a branch the agent already committed to and says so', async () => {
+    const { worktrees } = service();
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
+    expect(created.ok).toBe(true);
+    const path = join(root, '71273');
+    await writeFile(join(path, 'grid.cs'), 'class Grid {}\n');
+    await repo.exec(['add', 'grid.cs'], path);
+    await repo.exec(['-c', 'user.name=Agent', '-c', 'user.email=agent@example.invalid', 'commit', '--quiet', '-m', 'Grid'], path);
+
+    const result = await worktrees.discard('71273');
+    expect(result).toEqual({ ok: true, data: { complete: false, leftovers: ['branch 71273-cutover-frmjobcontrol-to'] } });
+    expect(await worktreeOf(path)).toBeUndefined();
   });
 });
 
