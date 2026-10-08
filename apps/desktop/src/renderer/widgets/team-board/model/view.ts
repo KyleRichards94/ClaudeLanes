@@ -1,5 +1,6 @@
 import type { ActivePullRequest, Lane, TeamBoard, TeamBoardColumnKindOrOther, TeamBoardItem, TeamBoardPerson } from '@agent-lanes/contracts';
-import { LANE_LABELS, dragLock, type BoardItemCard, type DropMe, type PullRequestCard } from '@/entities/agent-ticket';
+import { DROP_REFUSALS, LANE_LABELS, dragLock, type BoardItemCard, type DropMe, type PullRequestCard } from '@/entities/agent-ticket';
+import type { LaneDragData } from '@/features/drag-to-lane';
 
 /** Everyone / Me / Unassigned (T1). */
 export type TeamBoardFilter = 'everyone' | 'me' | 'unassigned';
@@ -36,6 +37,8 @@ export interface TeamBoardItemView {
   /** "Agent in Implementing" on an item an agent already works on. */
   agentTag: string | null;
   draggable: boolean;
+  /** What dragging it onto a lane carries (AL-235); null when it can't be dragged or the board's team and sprint aren't known. */
+  drag: LaneDragData | null;
   webUrl: string;
 }
 
@@ -55,7 +58,15 @@ export interface TeamBoardPullRequestView {
   /** "Repo not in Agent Lanes" when the drop would be refused with Add repo (TB§7). */
   note: string | null;
   draggable: boolean;
+  /** What dragging it onto a lane carries (AL-235); null when it can't be dragged. */
+  drag: LaneDragData | null;
   webUrl: string;
+}
+
+/** The board a card is on: a drop tells main which team and sprint to read it from again (AL-236). */
+export interface TeamBoardDropContext {
+  teamId: string;
+  sprintPath: string;
 }
 
 export type ColumnTone = 'neutral' | 'ado' | 'claude' | 'attention' | 'danger' | 'ink';
@@ -115,7 +126,7 @@ function itemDetail(item: TeamBoardItem): string | null {
   return item.state || null;
 }
 
-export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane: Lane | null): TeamBoardItemView {
+export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane: Lane | null, board: TeamBoardDropContext | null = null): TeamBoardItemView {
   const card: BoardItemCard = {
     kind: 'board-item',
     id: item.id,
@@ -127,6 +138,20 @@ export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane:
   };
   const reason = dragLock(card, DROP_ME);
   const lockedByOther = reason !== null && item.assignee !== null && !isMine(item.assignee, me) && reason.startsWith('Assigned to');
+  // A Code Review item with no linked PR can still be picked up, so the Code review lane can say "No linked PR" (TB§3).
+  const pickable = reason === null || reason === DROP_REFUSALS.noLinkedPr;
+  const drag: LaneDragData | null =
+    pickable && board
+      ? {
+          key: `item:${item.id}`,
+          label: `#${item.id}`,
+          title: item.title,
+          card,
+          me: DROP_ME,
+          meName: me?.displayName ?? null,
+          source: { kind: 'board-item', id: item.id, team: board.teamId, sprint: board.sprintPath, column: item.column },
+        }
+      : null;
   return {
     kind: 'item',
     id: item.id,
@@ -137,7 +162,8 @@ export function itemView(item: TeamBoardItem, me: TeamBoardMe | null, agentLane:
     avatar: item.assignee ? avatarOf(item.assignee, me) : null,
     lock: lockedByOther ? reason : null,
     agentTag: agentLane ? `Agent in ${LANE_LABELS[agentLane]}` : null,
-    draggable: reason === null,
+    draggable: pickable,
+    drag,
     webUrl: item.webUrl,
   };
 }
@@ -146,7 +172,7 @@ function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-export function pullRequestView(pr: ActivePullRequest, me: TeamBoardMe | null): TeamBoardPullRequestView {
+export function pullRequestView(pr: ActivePullRequest, me: TeamBoardMe | null, teamId: string | null = null): TeamBoardPullRequestView {
   const reviewer = pr.reviewers.find((person) => !person.isContainer);
   const card: PullRequestCard = {
     kind: 'pull-request',
@@ -156,6 +182,7 @@ export function pullRequestView(pr: ActivePullRequest, me: TeamBoardMe | null): 
     sourceBranch: pr.sourceBranch,
     repoRegistered: pr.repoRegistered,
   };
+  const draggable = dragLock(card, DROP_ME) === null;
   return {
     kind: 'pull-request',
     id: pr.id,
@@ -166,7 +193,18 @@ export function pullRequestView(pr: ActivePullRequest, me: TeamBoardMe | null): 
     avatar: avatarOf(reviewer ?? pr.author, me),
     draft: pr.isDraft,
     note: pr.repoRegistered ? null : 'Repo not in Agent Lanes',
-    draggable: dragLock(card, DROP_ME) === null,
+    draggable,
+    drag: draggable
+      ? {
+          key: `pr:${pr.id}`,
+          label: `!${pr.id}`,
+          title: pr.title,
+          card,
+          me: DROP_ME,
+          meName: me?.displayName ?? null,
+          source: { kind: 'pull-request', id: pr.id, ...(teamId ? { team: teamId } : {}) },
+        }
+      : null,
     webUrl: pr.webUrl,
   };
 }
@@ -198,13 +236,14 @@ export function teamBoardColumns(input: {
   filter: TeamBoardFilter;
 }): readonly TeamBoardColumnView[] {
   const { board, pullRequests, me, workItemLanes, filter } = input;
+  const dropContext: TeamBoardDropContext | null = board ? { teamId: board.team.id, sprintPath: board.sprint.path } : null;
   const columns: TeamBoardColumnView[] = (board?.columns ?? []).map((column) => {
     const cards = board!.items
       .filter((item) => item.columnId === column.id && itemPasses(item, filter, me))
-      .map((item) => itemView(item, me, workItemLanes[String(item.id)] ?? null));
+      .map((item) => itemView(item, me, workItemLanes[String(item.id)] ?? null, dropContext));
     return { id: column.id, name: column.name, kind: column.kind, tone: COLUMN_TONES[column.kind], count: cards.length, cards };
   });
-  const prCards = (pullRequests ?? []).filter((pr) => pullRequestPasses(pr, filter, me)).map((pr) => pullRequestView(pr, me));
+  const prCards = (pullRequests ?? []).filter((pr) => pullRequestPasses(pr, filter, me)).map((pr) => pullRequestView(pr, me, dropContext?.teamId ?? null));
   columns.push({ id: 'active-prs', name: 'Active PRs', kind: 'active-prs', tone: 'ink', count: prCards.length, cards: prCards });
   return columns;
 }
