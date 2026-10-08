@@ -126,8 +126,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | done |
 | AL-161 | Work item picker | E9 | M | AL-160, AL-066 | todo |
 | AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | todo |
-| AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | todo |
-| AL-164 | Workspace preview and stage gates | E9 | S | AL-160, AL-082 | todo |
+| AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | done |
+| AL-164 | Workspace preview and stage gates | E9 | S | AL-160, AL-082 | done |
 | AL-165 | Launch | E9 | M | AL-161–AL-164, AL-083, AL-100, AL-111 | todo |
 | AL-170 | Ticket page frame | E10 | M | AL-140, AL-141 | done |
 | AL-171 | Stage stepper and gate actions | E10 | M | AL-104, AL-170 | todo |
