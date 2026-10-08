@@ -9,6 +9,7 @@ import {
   useLaneTicketIds,
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
+import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
@@ -84,7 +85,11 @@ export function Lane({ lane, store = agentTickets }: LaneProps) {
           </View>
         ) : (
           ids.map((id) => (
-            <AgentTicketCard key={id} ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+            <View key={id} style={styles.cardSlot}>
+              <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
+              {/* Allow once / Allow for this ticket / Deny under the card while a tool call waits (AL-109). */}
+              <PermissionPrompt ticketId={id} />
+            </View>
           ))
         )}
       </View>
@@ -101,6 +106,9 @@ const verticalLine = 20;
 
 /** Read off artboard 1: 12 px inside the lane, 14 px header, 12 px between cards. */
 const styles = StyleSheet.create({
+  cardSlot: {
+    gap: space.sm,
+  },
   lane: {
     flexGrow: 1,
     flexShrink: 1,

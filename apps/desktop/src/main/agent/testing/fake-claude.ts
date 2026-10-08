@@ -1,4 +1,4 @@
-import type { AccountInfo, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { AccountInfo, McpServerStatus, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
 
 /**
@@ -29,6 +29,8 @@ export interface FakeClaudeScript {
   live?: boolean;
   /** What a live session answers each sent user message with (e.g. an assistant reply and a result). */
   onSend?: (message: SDKUserMessage, call: FakeClaudeCall) => SDKMessage[];
+  /** What `mcpServerStatus()` answers (AL-108); change `call.mcpStatus` to change later answers. */
+  mcpStatus?: McpServerStatus[];
 }
 
 export interface FakeClaudeCall {
@@ -52,6 +54,10 @@ export interface FakeClaudeCall {
   models: Array<string | undefined>;
   /** Arguments of each `applyFlagSettings()` call. */
   flagSettings: Array<Record<string, unknown>>;
+  /** What `mcpServerStatus()` answers now (AL-108). */
+  mcpStatus: McpServerStatus[];
+  /** Server names passed to `reconnectMcpServer()`. */
+  reconnects: string[];
 }
 
 export interface FakeClaude {
@@ -97,9 +103,12 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       interrupts: 0,
       models: [],
       flagSettings: [],
+      mcpStatus: [],
+      reconnects: [],
     };
     calls.push(call);
     const plan = typeof script === 'function' ? script(call) : script;
+    if (plan.mcpStatus) call.mcpStatus = plan.mcpStatus;
     let wakeClosed: (() => void) | undefined;
     const closed = new Promise<void>((resolve) => {
       wakeClosed = resolve;
@@ -164,6 +173,10 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       },
       applyFlagSettings: async (settings: Record<string, unknown>) => {
         call.flagSettings.push(settings);
+      },
+      mcpServerStatus: async () => call.mcpStatus.map((server) => ({ ...server })),
+      reconnectMcpServer: async (serverName: string) => {
+        call.reconnects.push(serverName);
       },
     });
     options.abortController?.signal.addEventListener('abort', () => fake.close(), { once: true });

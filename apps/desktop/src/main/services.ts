@@ -5,6 +5,9 @@ import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { combineSessionExtras } from './agent/session-extras';
+import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
+import { createPermissionService, type PermissionService } from './agent/permissions';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -96,6 +99,10 @@ export interface Services {
   readonly transcripts: TranscriptService;
   /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
   readonly stages: StageService;
+  /** The MCP servers of the running sessions for the header pill; reconnects a failing one (AL-108). */
+  readonly mcpStatus: McpStatusMonitor;
+  /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
+  readonly permissions: PermissionService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -235,9 +242,16 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     log: log.child('agent'),
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
-    extras: (record) => stageExtras(record),
-    // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
-    onEnded: (ticketId) => stages.cancelGate(ticketId),
+    // Then the work item's Azure DevOps MCP server and the user's MCP servers (AL-108).
+    extras: (record) => sessionExtras(record),
+    onEnded: (ticketId) => {
+      // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
+      stages.cancelGate(ticketId);
+      // The ended session's servers leave the header pill (AL-108).
+      void mcpStatus.refresh();
+      // Permission requests the session left waiting close (AL-109).
+      permissions.cancelAll(ticketId);
+    },
   });
   const transcripts = createTranscriptService({
     sessions,
@@ -249,6 +263,9 @@ export function createServices(options: ServiceOptions): Services {
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
+  const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') }), permissions.sessionExtras]);
+  const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
 
   return {
     appDataDir: options.appDataDir,
@@ -274,6 +291,8 @@ export function createServices(options: ServiceOptions): Services {
     sessions,
     transcripts,
     stages,
+    mcpStatus,
+    permissions,
     branches,
     mergeToMain,
     ticketArchive,
@@ -288,6 +307,7 @@ export async function disposeServices(services: Services): Promise<void> {
   void services;
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  services.mcpStatus.dispose();
   services.transcripts.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
