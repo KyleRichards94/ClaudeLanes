@@ -9,6 +9,8 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:pause', // AL-105
   'agent:resume', // AL-105
   'agent:getMcpStatus', // AL-108
+  'agent:resolvePermission', // AL-109
+  'agent:getPermission', // AL-109
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',
@@ -17,4 +19,5 @@ export const AGENT_EVENT_CHANNELS = [
   'agent:gate',
   'agent:status',
   'agent:mcpStatus', // AL-108
+  'agent:permission', // AL-109
 ] as const;

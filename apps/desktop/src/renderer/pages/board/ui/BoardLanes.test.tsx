@@ -1,4 +1,5 @@
 import type { TicketRecord } from '@agent-lanes/contracts';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { color, tone } from '@agent-lanes/tokens';
@@ -29,10 +30,14 @@ let router: Router;
 let settings: FakeSettings;
 
 function renderLanes() {
+  // Each card has its permission prompt (AL-109), which reads through TanStack Query.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <RouterProvider router={router}>
-      <BoardLanes store={store} />
-    </RouterProvider>,
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router}>
+        <BoardLanes store={store} />
+      </RouterProvider>
+    </QueryClientProvider>,
   );
 }
 

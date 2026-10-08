@@ -282,6 +282,46 @@ export function isFailingMcpState(state: McpServerState): boolean {
   return state === 'failed' || state === 'needs-auth';
 }
 
+// ── Permission prompts of headless sessions (AL-109, design §4, Q9, Decision D18) ───────────────────
+
+/** Longest prompt line or tool detail sent for a permission request. */
+export const PERMISSION_TEXT_LIMIT = 500;
+
+/**
+ * A tool call outside the ticket's permission policy, waiting for Allow once / Allow for this ticket
+ * / Deny ("Needs you · allow Bash" on the card).
+ */
+export const PermissionRequestSchema = z.object({
+  requestId: z.string().min(1).max(200),
+  /** The tool as the card names it: `Bash`, `WebFetch`, `azure-devops · wit_update_work_item`. */
+  tool: z.string().min(1).max(200),
+  /** What the agent wants to do, one line ("Claude wants to run npm install"). */
+  title: z.string().min(1).max(PERMISSION_TEXT_LIMIT),
+  /** The command, path or URL in mono; null when the tool has none. */
+  detail: z.string().max(PERMISSION_TEXT_LIMIT).nullable(),
+  openedAt: z.int().nonnegative(),
+});
+export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
+
+export const PERMISSION_DECISIONS = ['allow-once', 'allow-ticket', 'deny'] as const;
+export const PermissionDecisionSchema = z.enum(PERMISSION_DECISIONS);
+export type PermissionDecision = z.infer<typeof PermissionDecisionSchema>;
+
+/** `agent:resolvePermission`: the user's answer to one waiting request. */
+export const ResolvePermissionRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  requestId: PermissionRequestSchema.shape.requestId,
+  decision: PermissionDecisionSchema,
+});
+export type ResolvePermissionRequest = z.infer<typeof ResolvePermissionRequestSchema>;
+
+/** `resolved` is false when the request no longer waits (answered elsewhere, or its turn ended). */
+export const ResolvePermissionResponseSchema = z.object({ resolved: z.boolean() });
+
+/** `agent:getPermission`: the ticket's oldest waiting request, for a renderer that reloads while one waits. */
+export const GetPermissionResponseSchema = z.object({ request: PermissionRequestSchema.nullable() });
+export type GetPermissionResponse = z.infer<typeof GetPermissionResponseSchema>;
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -295,6 +335,9 @@ export const agentInvokeContracts = {
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** The MCP servers of the running sessions, for the header pill (AL-108). */
   'agent:getMcpStatus': { request: z.undefined(), response: McpStatusSummarySchema },
+  /** Allow once / Allow for this ticket / Deny on a waiting permission request (AL-109). */
+  'agent:resolvePermission': { request: ResolvePermissionRequestSchema, response: ResolvePermissionResponseSchema },
+  'agent:getPermission': { request: AgentTicketRequestSchema, response: GetPermissionResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -352,6 +395,18 @@ export type AgentStatusEvent = z.infer<typeof AgentStatusEventSchema>;
 export const McpStatusEventSchema = EventEnvelopeSchema.extend(McpStatusSummarySchema.shape);
 export type McpStatusEvent = z.infer<typeof McpStatusEventSchema>;
 
+/**
+ * `agent:permission` (AL-109): a request started waiting (the card turns amber with "Needs you ·
+ * allow <tool>"), or it ended: allowed, denied, or cancelled because the turn or session ended.
+ * `waiting` is the ticket's oldest waiting request after this change; null when none waits.
+ */
+export const AgentPermissionEventSchema = TicketEventEnvelopeSchema.extend({
+  state: z.enum(['waiting', 'allowed', 'denied', 'cancelled']),
+  request: PermissionRequestSchema,
+  waiting: PermissionRequestSchema.nullable(),
+});
+export type AgentPermissionEvent = z.infer<typeof AgentPermissionEventSchema>;
+
 export const agentEventContracts = {
   'agent:output': AgentOutputEventSchema,
   'agent:stage': AgentStageEventSchema,
@@ -359,4 +414,5 @@ export const agentEventContracts = {
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
   'agent:mcpStatus': McpStatusEventSchema,
+  'agent:permission': AgentPermissionEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;
