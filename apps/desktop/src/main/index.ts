@@ -10,6 +10,7 @@ import { createInvokeHandlers } from './ipc/handlers';
 import { registerInvokeHandlers, type RendererLocation } from './ipc/router';
 import { LOG_DIRECTORY_NAME, captureConsole, captureProcessErrors, createLogger } from './logging';
 import { createServices, disposeServices, type Services } from './services';
+import { NO_TEST_HOOKS, testHooksFor } from './test-hooks';
 
 const APP_ID = 'au.com.companionsystems.agentlanes';
 
@@ -22,6 +23,10 @@ const renderer: RendererLocation = {
 // copy over the single-instance lock. Must be set before the lock is requested.
 const userDataOverride = process.env['AGENT_LANES_USER_DATA_DIR'];
 if (userDataOverride) app.setPath('userData', userDataOverride);
+
+// The switches e2e swaps fakes in with (AL-222). A release build (`pnpm package`) has none: `__TEST_HOOKS__`
+// is false there, so the code that reads them is left out; the installed app never reads them either.
+const testHooks = __TEST_HOOKS__ ? testHooksFor({ isPackaged: app.isPackaged, env: process.env }) : NO_TEST_HOOKS;
 
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
@@ -81,8 +86,7 @@ function createMainWindow(): BrowserWindow {
   window.webContents.on('will-navigate', (event) => event.preventDefault());
 
   // e2e opens most specs straight on the board instead of first run (AL-047); never honoured in the installed app.
-  const query: Record<string, string> =
-    !app.isPackaged && process.env['AGENT_LANES_SKIP_FIRST_RUN'] === '1' ? { firstRun: 'skip' } : {};
+  const query: Record<string, string> = testHooks.skipFirstRun ? { firstRun: 'skip' } : {};
 
   if (renderer.url) {
     const url = new URL(renderer.url);
@@ -141,9 +145,9 @@ if (!app.requestSingleInstanceLock()) {
       log,
       mainWindow: () => mainWindow,
       // e2e points the design view at a local fake claude.ai (AL-191); never honoured in the installed app.
-      designTestOrigin: app.isPackaged ? undefined : process.env['AGENT_LANES_DESIGN_TEST_ORIGIN'],
+      designTestOrigin: testHooks.designTestOrigin,
       // e2e starts a fake `claude` instead of the real one (AL-044); never honoured in the installed app.
-      claudeExecutable: app.isPackaged ? undefined : process.env['AGENT_LANES_CLAUDE_EXECUTABLE'],
+      claudeExecutable: testHooks.claudeExecutable,
     });
     registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
     const sessions = services.sessions;
