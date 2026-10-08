@@ -12,6 +12,7 @@ import {
   type Stage,
 } from '../vocabulary';
 import type { SETTINGS_EVENT_CHANNELS, SETTINGS_INVOKE_CHANNELS } from './settings.names';
+import { DropDefaultsSchema } from './settings.drops';
 
 /**
  * App settings (AL-041, design §6, §8, R5): one app-written JSON document in the app data folder,
@@ -128,6 +129,8 @@ export const SettingsSchema = z.object({
   ui: UiPrefsSchema,
   /** Headless permission policy (AL-109). Optional so settings saved before it stay valid; unset is the D18 default. */
   agentPermissions: AgentPermissionsSchema.optional(),
+  /** Settings › Drops (AL-240): each kind of team board drop's skills, model and effort. Unset is TB§3's (`dropDefaultsOf`). */
+  dropDefaults: DropDefaultsSchema.optional(),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
 
@@ -146,6 +149,8 @@ export const SettingsPatchSchema = z.strictObject({
   buildQueueSize: SettingsSchema.shape.buildQueueSize.optional(),
   adoStateTransitions: SettingsSchema.shape.adoStateTransitions.optional(),
   agentPermissions: AgentPermissionsSchema.optional(),
+  /** Every row at once, as the Drops tab saves them. */
+  dropDefaults: DropDefaultsSchema.optional(),
   ui: z.strictObject(UiPrefsSchema.shape).partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;

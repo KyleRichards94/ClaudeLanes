@@ -200,3 +200,19 @@ describe('SettingsService', () => {
     });
   });
 });
+
+describe('Settings › Drops (AL-240)', () => {
+  it('saves the drop defaults whole, keeps them across a restart, and salvages a bad row back to TB§3', async () => {
+    const { defaultDropDefaults, dropDefaultsOf } = await import('@agent-lanes/contracts');
+    const { service, file } = start();
+    expect(dropDefaultsOf(service.get())).toEqual(defaultDropDefaults());
+
+    const drops = { ...defaultDropDefaults(), qa: { skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku' as const, effort: 'low' as const } };
+    expect(service.update({ dropDefaults: drops }).ok).toBe(true);
+    expect(createSettingsService({ file, warn: vi.fn() }).get().dropDefaults).toEqual(drops);
+
+    const warn = vi.fn();
+    const salvaged = createSettingsService({ file: createMemorySettingsFile({ ...defaultSettings(), dropDefaults: { ...drops, planning: { skills: 'oops', model: 'gpt', effort: 'high' } } }), warn });
+    expect(salvaged.get().dropDefaults).toEqual({ ...drops, planning: defaultDropDefaults().planning });
+  });
+});

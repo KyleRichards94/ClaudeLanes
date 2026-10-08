@@ -78,6 +78,7 @@ interface SetUpOptions {
   create?: (input: CreateTicketWorktreeInput) => Result<{ record: TicketRecord }>;
   start?: (ticketId: string) => Result<AgentSessionStatus>;
   records?: TicketRecord[];
+  laneDefaults?: AdoLauncherOptions['laneDefaults'];
 }
 
 async function setUp(options: SetUpOptions = {}) {
@@ -121,6 +122,7 @@ async function setUp(options: SetUpOptions = {}) {
     settings,
     ...deps,
     repoForPullRequest: async (_orgUrl: string, pr: ActivePullRequest) => (pr.repository.name === 'onsite-companion' ? REPO : null),
+    ...(options.laneDefaults ? { laneDefaults: options.laneDefaults } : {}),
   } as unknown as AdoLauncherOptions);
   const item = (id: number) => org.state.workItems.items.find((candidate) => candidate.id === id)!;
   /** ADO calls that change something: anything but GETs and the read-only POSTs (WIQL, workitemsbatch). */
@@ -324,5 +326,26 @@ describe('pull request launches (AL-238)', () => {
       { branch: 'users/ty/71298-invoice-matching', detached: true },
       { branch: 'users/ty/71298-invoice-matching', detached: true },
     ]);
+  });
+});
+
+describe('per-lane drop defaults (AL-240)', () => {
+  it("starts the agent with the lane's defaults from Settings, and the Alt sheet's choices over them", async () => {
+    const { launcher, deps } = await setUp({ laneDefaults: () => ({ skills: ['brainstorm'], model: 'sonnet', effort: 'xhigh' }) });
+    await launcher.launch({ source: board(71335), lane: 'planning', repo: REPO });
+    expect(deps.worktrees.create.mock.calls[0]![0]).toMatchObject({ skills: ['brainstorm'], model: 'sonnet', effort: 'xhigh' });
+
+    await launcher.launch({
+      source: board(71273),
+      lane: 'implementing',
+      repo: REPO,
+      overrides: { skills: ['/cs-plan'], model: 'haiku', effort: 'low', gates: { planning: 'approval', implementing: 'approval', 'code-review': 'auto', qa: 'auto', 'create-pr': 'approval' } },
+    });
+    expect(deps.worktrees.create.mock.calls[1]![0]).toMatchObject({
+      skills: ['cs-plan'],
+      model: 'haiku',
+      effort: 'low',
+      gates: { planning: 'approval', implementing: 'approval', 'code-review': 'auto', qa: 'auto', 'create-pr': 'approval' },
+    });
   });
 });
