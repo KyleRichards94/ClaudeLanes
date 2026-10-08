@@ -34,6 +34,8 @@ export class IpcError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    /** The Result's `details`, e.g. MERGE_CONFLICT's conflicted files (AL-086). */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'IpcError';
@@ -42,5 +44,5 @@ export class IpcError extends Error {
 
 export function unwrap<T>(result: Result<T>): T {
   if (result.ok) return result.data;
-  throw new IpcError(result.code, result.message);
+  throw new IpcError(result.code, result.message, result.details);
 }
