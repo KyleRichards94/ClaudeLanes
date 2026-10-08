@@ -4,6 +4,7 @@ import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
 import { DragStatusPill, DragToLaneProvider, useActiveDrag } from '@/features/drag-to-lane';
+import { useLaunchFromAdo } from '@/features/launch-from-ado';
 import { useAppInfo } from '@/shared/api';
 import { useBoardSprint, useBoardTeam } from '@/shared/model';
 import { TeamBoard } from '@/widgets/team-board';
@@ -21,8 +22,10 @@ import { SettingsPanel } from './SettingsPanel';
  * (AL-234) sits under the lanes; its cards drag onto the lanes (AL-235), which share one drag with it.
  */
 export function BoardPage() {
+  // A drop starts the agent through main (AL-236): it rechecks the card, makes the ADO change and launches.
+  const launch = useLaunchFromAdo();
   return (
-    <DragToLaneProvider>
+    <DragToLaneProvider onLaunch={launch}>
       <BoardContent />
     </DragToLaneProvider>
   );
