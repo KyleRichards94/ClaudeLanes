@@ -233,7 +233,7 @@ function savedRepo(repo: RepoSettings, values: RepoDraft): RepoSettings {
     runCommand: values.runCommand.trim() || null,
     maxConcurrentAgents: Number(values.maxConcurrentAgents.trim()),
   };
-  // Written only when switched, so a repo that never had the field keeps it unset (on).
+  // Written only when switched, so a repo that never had the field keeps it unset (off).
   if (values.adoWriteBack !== repoAdoWriteBack(repo)) next.adoWriteBack = values.adoWriteBack;
   return next;
 }
