@@ -13,6 +13,8 @@ import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
 export interface FakeClaudeScript {
   /** What `accountInfo()` resolves to (or rejects with); never settles when `'hang'`. */
   account?: AccountInfo | Error | 'hang';
+  /** What `getContextUsage()` reports (AL-113): tokens used of the window; rejects when an Error. */
+  contextUsage?: { totalTokens: number; maxTokens: number; percentage: number } | Error;
   /** Messages the stream yields, in order, after the prompt is read. */
   messages?: SDKMessage[];
   /** Thrown by the stream after `messages`, like a process that died. */
@@ -164,6 +166,13 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       },
       applyFlagSettings: async (settings: Record<string, unknown>) => {
         call.flagSettings.push(settings);
+      },
+      getContextUsage: async () => {
+        const usage = plan.contextUsage ?? { totalTokens: 0, maxTokens: 200_000, percentage: 0 };
+        if (usage instanceof Error) throw usage;
+        return { categories: [], gridRows: [], model: 'fake', memoryFiles: [], rawMaxTokens: usage.maxTokens, ...usage } as unknown as Awaited<
+          ReturnType<ClaudeQuery['getContextUsage']>
+        >;
       },
     });
     options.abortController?.signal.addEventListener('abort', () => fake.close(), { once: true });

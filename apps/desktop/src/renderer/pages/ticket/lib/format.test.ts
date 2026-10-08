@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { folderName, formatClock, formatDuration, sprintName } from './format';
+import { emptyAgentUsage, formatTokenCount } from '@agent-lanes/contracts';
+import { folderName, formatClock, formatDuration, sessionPillLabel, sessionUsageDetails, sprintName } from './format';
 import { sessionStartedAt, stageSteps } from './stage-steps';
 
 describe('drill-in formatting', () => {
@@ -43,5 +44,21 @@ describe('stageSteps', () => {
   it('dates the session from its first stage', () => {
     expect(sessionStartedAt(history)).toBe(1_000);
     expect(sessionStartedAt([{ stage: 'queued', at: 0 }])).toBeNull();
+  });
+});
+
+describe('session usage formatting (AL-113)', () => {
+  const usage = { ...emptyAgentUsage('71273'), totalTokens: 412_000, costUsd: 0.004, turns: 1 };
+
+  it('adds the tokens to the session pill once there are any', () => {
+    expect(sessionPillLabel('cc-71273', 0, 72 * 60_000, usage)).toBe('Session cc-71273 · 1h 12m · 412k tokens');
+    expect(sessionPillLabel('cc-71273', null, 0, { totalTokens: 0 })).toBe('Session cc-71273');
+    expect(formatTokenCount(1_250_000)).toBe('1.3M tokens');
+    expect(formatTokenCount(999_700)).toBe('1M tokens');
+  });
+
+  it('puts the cost and context in the tooltip text', () => {
+    expect(sessionUsageDetails(usage)).toBe('Cost about <$0.01 · 1 turn');
+    expect(sessionUsageDetails(emptyAgentUsage('x'))).toBeNull();
   });
 });

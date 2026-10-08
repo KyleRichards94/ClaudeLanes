@@ -3,6 +3,7 @@ import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { GateSchema, LaneSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
+import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -255,6 +256,8 @@ export const agentInvokeContracts = {
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** The session's tokens, cost and context window so far (AL-113). */
+  'agent:getUsage': { request: AgentTicketRequestSchema, response: AgentUsageSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -314,4 +317,5 @@ export const agentEventContracts = {
   'agent:subagent': AgentSubagentEventSchema,
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
+  'agent:usage': AgentUsageEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

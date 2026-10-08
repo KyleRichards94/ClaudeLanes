@@ -1,15 +1,16 @@
+import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
-import type { WorkItem } from '@agent-lanes/contracts';
+import type { AgentUsage, WorkItem } from '@agent-lanes/contracts';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Icon, IdChip, Pill, Text } from '@agent-lanes/ui';
 import { routes, useNavigation } from '@/shared/routing';
-import { folderName, formatDuration, sprintName } from '../lib/format';
+import { folderName, sessionPillLabel, sessionUsageDetails, sprintName } from '../lib/format';
 
 export interface TicketTopBarProps {
   ticketId: string;
   /** The repo's main checkout; its folder name starts the breadcrumb. Undefined while unknown. */
   repo?: string;
-  session?: { id: string | null; startedAt: number | null; now: number };
+  session?: { id: string | null; startedAt: number | null; now: number; usage?: AgentUsage };
 }
 
 /** "← Board", the repo / #id breadcrumb and the session pill (artboard 3 top bar). */
@@ -30,10 +31,35 @@ export function TicketTopBar({ ticketId, repo, session }: TicketTopBarProps) {
   );
 }
 
-function SessionPill({ id, startedAt, now }: { id: string | null; startedAt: number | null; now: number }) {
+function SessionPill({ id, startedAt, now, usage }: NonNullable<TicketTopBarProps['session']>) {
+  const [open, setOpen] = useState(false);
   if (!id) return <Pill label="No session yet" tone="neutral" dot size="md" testID="session-pill" />;
-  const label = startedAt === null ? `Session ${id}` : `Session ${id} · ${formatDuration(now - startedAt)}`;
-  return <Pill label={label} tone="ok" dot size="md" testID="session-pill" />;
+  const label = sessionPillLabel(id, startedAt, now, usage);
+  const details = usage ? sessionUsageDetails(usage) : null;
+  if (!details) return <Pill label={label} tone="ok" dot size="md" testID="session-pill" />;
+
+  // Cost shows in a tooltip only (AL-113): on hover, or on focus for the keyboard.
+  return (
+    <Pressable
+      aria-label={`${label}. ${details}`}
+      aria-describedby="session-usage-tooltip"
+      onHoverIn={() => setOpen(true)}
+      onHoverOut={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      style={styles.sessionAnchor}
+      testID="session-pill-anchor"
+    >
+      <Pill label={label} tone="ok" dot size="md" testID="session-pill" />
+      {open ? (
+        <View role="tooltip" id="session-usage-tooltip" style={styles.tooltip} testID="session-usage-tooltip">
+          <Text variant="body" size="sm" color={color.surface}>
+            {details}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
 }
 
 export interface TicketMetaProps {
@@ -97,6 +123,21 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flex: 1,
+  },
+  sessionAnchor: {
+    position: 'relative',
+  },
+  tooltip: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: space.xs,
+    paddingHorizontal: space.sm + 2,
+    paddingVertical: space.xs + 2,
+    borderRadius: radius.chip,
+    backgroundColor: color.ink,
+    zIndex: 10,
+    minWidth: 220,
   },
   meta: {
     flexDirection: 'row',

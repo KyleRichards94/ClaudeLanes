@@ -5,6 +5,7 @@ import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { createUsageService, type UsageService } from './agent/usage/usage-service';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -96,6 +97,8 @@ export interface Services {
   readonly transcripts: TranscriptService;
   /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
   readonly stages: StageService;
+  /** Each session's tokens, cost and context window (`agent:usage`, `agent:getUsage`, AL-113). */
+  readonly usage: UsageService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -249,6 +252,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
 
   return {
     appDataDir: options.appDataDir,
@@ -274,6 +278,7 @@ export function createServices(options: ServiceOptions): Services {
     sessions,
     transcripts,
     stages,
+    usage,
     branches,
     mergeToMain,
     ticketArchive,
@@ -289,6 +294,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
   services.transcripts.dispose();
+  services.usage.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();
