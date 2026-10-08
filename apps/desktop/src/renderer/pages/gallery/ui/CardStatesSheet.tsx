@@ -15,6 +15,7 @@ import {
   type ProgressTone,
 } from '@agent-lanes/ui';
 import { BuildRunControlsView, type BuildRunControlsViewProps } from '@/features/build-run';
+import { ModelEffortControlsView, type ModelEffortControlsViewProps } from '@/features/change-model';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
 
 /** The drill-in's Worktree panel in its build and run states (AL-173), with no actions behind it. */
@@ -36,6 +37,15 @@ const worktreeStates: readonly { state: string; ticket: BuildRunControlsViewProp
   },
 ];
 const ignore = () => undefined;
+
+/** The drill-in's Agent panel steady and while a model change waits for the next turn (AL-172). */
+const agentStates: readonly { state: string; ticket: ModelEffortControlsViewProps['ticket'] }[] = [
+  { state: 'Opus · XHigh', ticket: { id: 'gallery', model: 'opus', effort: 'xhigh', stage: 'implementing', switching: null } },
+  {
+    state: 'Switching',
+    ticket: { id: 'gallery', model: 'opus', effort: 'xhigh', stage: 'implementing', switching: { model: 'sonnet', effort: 'high', requestedAt: 0 } },
+  },
+];
 
 /** One card on artboard 6. Built from the primitives; the board's own card is AL-144's AgentTicketCard. */
 interface CardState {
@@ -182,6 +192,13 @@ export function CardStatesSheet() {
             testID="gallery-toast-error"
           />
         </GalleryBlock>
+        {agentStates.map((sample) => (
+          <GalleryBlock key={sample.state} title={`Agent · ${sample.state}`} style={styles.wideBlock}>
+            <View style={styles.badgePanel}>
+              <ModelEffortControlsView ticket={sample.ticket} onModel={ignore} onEffort={ignore} />
+            </View>
+          </GalleryBlock>
+        ))}
         {worktreeStates.map((sample) => (
           <GalleryBlock key={sample.state} title={`Worktree · ${sample.state}`} style={styles.wideBlock}>
             <View style={styles.badgePanel}>
