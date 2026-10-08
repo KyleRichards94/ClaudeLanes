@@ -11,6 +11,7 @@ import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
+import { DiffTab } from './DiffTab';
 import { StageStepper } from './StageStepper';
 import { TicketMeta, TicketTopBar } from './TicketHeader';
 import { AgentPanel, MergePanel, SubAgentsPanel, SubBranchesPanel, WorktreePanel } from './TicketPanels';
@@ -99,6 +100,8 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           <ErrorBoundary key={tab} name={`ticket:tab:${tab}`} label={`the ${TAB_TITLES[tab]} tab`}>
             {tab === 'build-log' ? (
               <BuildLog ticketId={ticket.id} style={styles.buildLog} />
+            ) : tab === 'diff' ? (
+              <DiffTab ticketId={ticket.id} branch={ticket.branch} subBranches={subBranches} />
             ) : (
               <TabPlaceholder tab={tab} ticket={ticket} workItem={workItem.data} />
             )}
@@ -122,7 +125,7 @@ const TAB_EMPTY: Record<TicketPageTab, string> = {
   ado: 'The work item, its acceptance criteria, comments and linked pull request.',
 };
 
-/** What each tab shows until its feature lands (AL-175, AL-179, AL-180). The Build log tab is AL-135's BuildLog. */
+/** What each tab shows until its feature lands (AL-175, AL-180). Build log is AL-135's BuildLog, Diff is AL-179's DiffTab. */
 function TabPlaceholder({ tab, ticket, workItem }: { tab: TicketPageTab; ticket: AgentTicket; workItem: WorkItem | undefined }) {
   const activity = tab === 'output' ? ticket.activity?.text : undefined;
   return (
