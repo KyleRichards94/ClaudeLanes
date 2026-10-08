@@ -39,9 +39,8 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   // A team picked earlier that the user is no longer in falls back to the profile's.
   const pickedTeam = session.teamId !== null && teamList.some((team) => team.id === session.teamId) ? session.teamId : null;
   const onProfileTeam = pickedTeam === null || pickedTeam === defaultTeamId;
-  // Until the teams are known (or without a sprint team), the sprint is the profile team's, as main resolves it.
-  const shownTeamId = pickedTeam ?? defaultTeamId;
-  const onSprintTeam = sprintTeamId == null || shownTeamId === null ? onProfileTeam : shownTeamId === sprintTeamId;
+  // Without a sprint team (the board's teams could not be read), the sprint is the profile team's, as main resolves it.
+  const onSprintTeam = sprintTeamId == null ? onProfileTeam : (pickedTeam ?? defaultTeamId) === sprintTeamId;
   const board = useTeamBoard(pickedTeam, onSprintTeam ? sprintPath : null);
   const prs = useActivePrs(pickedTeam);
   const backlog = useBacklogTotal(pickedTeam);

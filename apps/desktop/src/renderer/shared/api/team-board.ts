@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ADO_REFETCH_INTERVAL_MS, type AdoScope } from './ado';
+import { ADO_REFETCH_INTERVAL_MS } from './ado';
 import { invoke, unwrap } from './ipc';
 
 /**

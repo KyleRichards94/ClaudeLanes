@@ -169,6 +169,28 @@ describe('TeamBoard (AL-234)', () => {
     expect(bridge.invoke).not.toHaveBeenCalledWith('ado:teamBoard', { sprint: 'OnSite\\Sprint 42' });
   });
 
+  it("uses the agent board's sprint only on the team that sprint belongs to (the header's Team menu)", async () => {
+    const bridge = installFakeBridge({
+      'connections:list': { ok: true, data: [fakeAdoRow()] },
+      'ado:listTeams': { ok: true, data: { teams: [board.team, { id: 'qa', name: 'QA Team' }], defaultTeamId: 'osc' } },
+      'ado:teamBoard': { ok: true, data: board },
+      'ado:activePrs': { ok: true, data: prs },
+      'ado:backlog': { ok: true, data: { team: board.team, total: 48, page: { index: 0, size: 1, count: 48 }, groups: [] } },
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <TeamBoard sprintPath="OnSite\QA Sprint 7" sprintTeamId="qa" />
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId('team-board-columns');
+    expect(bridge.invoke).not.toHaveBeenCalledWith('ado:teamBoard', { sprint: 'OnSite\\QA Sprint 7' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Team: OSC Developers · from your ADO profile' }));
+    fireEvent.click(await screen.findByTestId('team-board-team-item-qa'));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('ado:teamBoard', { team: 'qa', sprint: 'OnSite\\QA Sprint 7' }));
+  });
+
   it('asks for a connection when no organisation is connected', async () => {
     setup({ 'connections:list': { ok: true, data: [] } });
     expect(await screen.findByTestId('team-board-not-connected')).toBeTruthy();
