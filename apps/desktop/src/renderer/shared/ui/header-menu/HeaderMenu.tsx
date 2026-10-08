@@ -17,6 +17,8 @@ export interface HeaderMenuProps {
   label: string;
   /** The chosen value in bold ("onsite-companion", "42"). */
   value: string;
+  /** Muted words after the value ("· from your ADO profile", artboard 08). */
+  valueNote?: string;
   items: readonly HeaderMenuItem[];
   onSelect(key: string): void;
   disabled?: boolean;
@@ -35,11 +37,11 @@ const MENU_MIN_WIDTH = 220;
 const MENU_MAX_HEIGHT = 360;
 
 /**
- * The board header's Repo and Sprint dropdowns (artboard 1): a white capsule with the muted label,
+ * The board header's Repo and Sprint dropdowns (artboard 1) and the team board's Team dropdown (artboard 08): a white capsule with the muted label,
  * the bold value and a chevron. Pressing it opens a menu under it in a transparent modal, so a press
  * outside or Escape closes it and keyboard focus stays in the menu while it is open.
  */
-export function HeaderMenu({ label, value, items, onSelect, disabled = false, testID, valueTestID }: HeaderMenuProps) {
+export function HeaderMenu({ label, value, valueNote, items, onSelect, disabled = false, testID, valueTestID }: HeaderMenuProps) {
   const trigger = useRef<PressableInstance>(null);
   const [hovered, setHovered] = useState(false);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
@@ -62,12 +64,12 @@ export function HeaderMenu({ label, value, items, onSelect, disabled = false, te
         role="button"
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
-        aria-label={`${label}: ${value}`}
+        aria-label={`${label}: ${value}${valueNote ? ` ${valueNote}` : ''}`}
         disabled={disabled}
         onPress={open}
         onHoverIn={() => setHovered(true)}
         onHoverOut={() => setHovered(false)}
-        style={[styles.trigger, hovered && !disabled && styles.triggerHovered, disabled && styles.disabled]}
+        style={[styles.trigger, valueNote ? styles.triggerWide : null, hovered && !disabled && styles.triggerHovered, disabled && styles.disabled]}
         testID={testID}
       >
         <Text variant="body" color={color.muted}>
@@ -76,6 +78,11 @@ export function HeaderMenu({ label, value, items, onSelect, disabled = false, te
         <Text variant="title" numberOfLines={1} style={styles.value} testID={valueTestID}>
           {value}
         </Text>
+        {valueNote ? (
+          <Text variant="body" color={color.muted} numberOfLines={1}>
+            {valueNote}
+          </Text>
+        ) : null}
         <Icon name="chevron-down" size={14} color={color.ink} />
       </Pressable>
       <Modal transparent visible={anchor !== null} onRequestClose={close} animationType="none">
@@ -148,6 +155,10 @@ const styles = StyleSheet.create({
   },
   value: {
     flexShrink: 1,
+  },
+  // Room for the note: "Team OSC Developers · from your ADO profile" (artboard 08).
+  triggerWide: {
+    maxWidth: 480,
   },
   menu: {
     position: 'absolute',

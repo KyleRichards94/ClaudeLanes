@@ -4,6 +4,7 @@ import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
 import { useAppInfo } from '@/shared/api';
+import { TeamBoard } from '@/widgets/team-board';
 import { boardSubheader } from '../model/header';
 import { useBoardSprint } from '../model/use-board-sprint';
 import { useBoardTickets } from '../model/use-board-tickets';
@@ -15,7 +16,8 @@ import { SettingsPanel } from './SettingsPanel';
 /**
  * The agent board (artboard 1): the header (AL-142), the sub-header, title and legend, the lanes
  * (AL-143) with every ticket record loaded into the agent ticket store, and the live dock (AL-145).
- * The header's "need you" pill narrows the lanes to the tickets waiting on the user.
+ * The header's "need you" pill narrows the lanes to the tickets waiting on the user. The team board
+ * (AL-234) sits under the lanes.
  */
 export function BoardPage() {
   useBoardTickets();
@@ -51,6 +53,9 @@ export function BoardPage() {
         ) : null}
 
         <BoardLanes needsYouOnly={needsYouOnly} />
+
+        {/* The team's Azure DevOps board under the agent lanes (AL-234, artboard 08). */}
+        <BoardTeamBoard />
       </ScrollView>
       <View style={styles.dock}>
         <LiveDock />
@@ -58,6 +63,12 @@ export function BoardPage() {
       <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </View>
   );
+}
+
+/** The team board on the board's sprint. */
+function BoardTeamBoard() {
+  const sprint = useBoardSprint();
+  return <TeamBoard sprintPath={sprint?.path ?? null} />;
 }
 
 /** "Sprint 42 · 7 – 20 Oct · 8 agent tickets". */

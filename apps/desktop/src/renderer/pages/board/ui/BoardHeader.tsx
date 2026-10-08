@@ -6,7 +6,7 @@ import { agentTickets, useAgentTicketCount, type AgentTicketStore } from '@/enti
 import { useAddRepo, useRepos, useSprints } from '@/shared/api';
 import { openConnections, openNewTicket, toast, useUiPrefs } from '@/shared/model';
 import { useBoardSprint } from '../model/use-board-sprint';
-import { HeaderMenu, type HeaderMenuItem } from './HeaderMenu';
+import { HeaderMenu, type HeaderMenuItem } from '@/shared/ui';
 import { McpStatusPill } from './McpStatusPill';
 
 /** The Repo menu's last item, which opens the folder picker (AL-081). */

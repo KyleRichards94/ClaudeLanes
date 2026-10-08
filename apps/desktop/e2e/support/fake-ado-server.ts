@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createFakeAdoOrg, type FakeAdoOrg, type FakeAdoOrgOptions } from '@agent-lanes/ado-client/testing';
+import { createFakeAdoOrg, createFakeTeamOrg, FAKE_TEAM_PAT, type FakeAdoOrg, type FakeAdoOrgOptions, type FakeTeamOrg } from '@agent-lanes/ado-client/testing';
 
 /**
  * The shared fake Azure DevOps organisation (AL-065, `@agent-lanes/ado-client/testing`) served on
@@ -12,13 +12,19 @@ export interface FakeAdoServer {
   readonly orgUrl: string;
   /** The fake's state: requests received, work items, pull requests, … */
   readonly org: FakeAdoOrg;
+  /** With `teamBoard`: the team board's fake (artboard 08's board, PRs and backlog), answered first. */
+  readonly teamOrg: FakeTeamOrg | null;
+  /** The PAT both fakes accept. */
+  readonly pat: string;
   close(): Promise<void>;
 }
 
-export async function startFakeAdoServer(options: Omit<FakeAdoOrgOptions, 'orgUrl'> & { orgName?: string } = {}): Promise<FakeAdoServer> {
-  const { orgName = 'contoso', ...orgOptions } = options;
+export async function startFakeAdoServer(
+  options: Omit<FakeAdoOrgOptions, 'orgUrl'> & { orgName?: string; teamBoard?: boolean } = {},
+): Promise<FakeAdoServer> {
+  const { orgName = 'contoso', teamBoard = false, ...orgOptions } = options;
   // Created once the port is known; requests before that get a 500.
-  const ready: { org?: FakeAdoOrg } = {};
+  const ready: { org?: FakeAdoOrg; teamOrg?: FakeTeamOrg } = {};
 
   const server: Server = createServer((request, response) => {
     void answer(request, response);
@@ -37,11 +43,11 @@ export async function startFakeAdoServer(options: Omit<FakeAdoOrgOptions, 'orgUr
       }
       const method = request.method ?? 'GET';
       const { port } = server.address() as AddressInfo;
-      const reply = await org.fetch(`http://127.0.0.1:${port}${request.url ?? '/'}`, {
-        method,
-        headers,
-        ...(body.length > 0 && method !== 'GET' && method !== 'HEAD' ? { body } : {}),
-      });
+      const url = `http://127.0.0.1:${port}${request.url ?? '/'}`;
+      const init = { method, headers, ...(body.length > 0 && method !== 'GET' && method !== 'HEAD' ? { body } : {}) };
+      // The team board fake answers what it knows (teams, boards, PRs, backlog); 501 means "not mine".
+      const teamReply = ready.teamOrg ? await ready.teamOrg.fetch(url, init) : null;
+      const reply = teamReply && teamReply.status !== 501 ? teamReply : await org.fetch(url, init);
       const replyHeaders: Record<string, string> = {};
       reply.headers.forEach((value, name) => {
         replyHeaders[name] = value;
@@ -57,12 +63,16 @@ export async function startFakeAdoServer(options: Omit<FakeAdoOrgOptions, 'orgUr
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
-  const org = createFakeAdoOrg({ ...orgOptions, orgUrl: `http://127.0.0.1:${port}/${orgName}` });
+  const orgUrl = `http://127.0.0.1:${port}/${orgName}`;
+  const org = createFakeAdoOrg({ ...orgOptions, ...(teamBoard ? { pat: FAKE_TEAM_PAT } : {}), orgUrl });
   ready.org = org;
+  ready.teamOrg = teamBoard ? createFakeTeamOrg({ orgUrl }) : undefined;
 
   return {
     orgUrl: org.orgUrl,
     org,
+    teamOrg: ready.teamOrg ?? null,
+    pat: org.pat,
     close: () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();
