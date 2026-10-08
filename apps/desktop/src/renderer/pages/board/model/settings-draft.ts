@@ -5,7 +5,9 @@ import {
   type DropKind,
   BUILD_QUEUE_SIZE_LIMIT,
   MAX_CONCURRENT_AGENTS_LIMIT,
+  agentPermissionMode,
   agentPermissionPolicy,
+  type AgentPermissionMode,
   type AgentPermissions,
   repoAdoWriteBack,
   type Effort,
@@ -58,14 +60,15 @@ export interface DropDraft {
 }
 
 export interface PermissionsDraft {
-  acceptEdits: boolean;
+  /** Auto (Claude Code's classifier), Accept edits, or Ask. */
+  mode: AgentPermissionMode;
   gitRead: boolean;
   buildAndTest: boolean;
   /** Command prefixes separated by commas. */
   bashAllow: string;
 }
 
-export type PermissionSwitch = Exclude<keyof PermissionsDraft, 'bashAllow'>;
+export type PermissionSwitch = Exclude<keyof PermissionsDraft, 'bashAllow' | 'mode'>;
 
 export type GlobalTextField = 'skills' | 'buildQueueSize';
 export type RepoTextField = Exclude<keyof RepoDraft, 'adoWriteBack'>;
@@ -80,6 +83,7 @@ export type DraftAction =
   | { type: 'repoText'; repo: RepoSettings; field: RepoTextField; value: string }
   | { type: 'repoWriteBack'; repo: RepoSettings; value: boolean }
   | { type: 'permission'; field: PermissionSwitch; value: boolean }
+  | { type: 'permissionMode'; mode: AgentPermissionMode }
   | { type: 'bashAllow'; value: string }
   | { type: 'drop'; kind: DropKind; change: Partial<DropDraft> };
 
@@ -116,7 +120,7 @@ function dropsDraft(defaults: DropDefaults): Record<DropKind, DropDraft> {
 }
 
 function permissionsDraft(policy: AgentPermissions): PermissionsDraft {
-  return { acceptEdits: policy.edits === 'accept', gitRead: policy.gitRead, buildAndTest: policy.buildAndTest, bashAllow: policy.bashAllow.join(', ') };
+  return { mode: agentPermissionMode(policy), gitRead: policy.gitRead, buildAndTest: policy.buildAndTest, bashAllow: policy.bashAllow.join(', ') };
 }
 
 /** "npm run lint, dotnet format" → ["npm run lint", "dotnet format"], each once. */
@@ -149,6 +153,8 @@ export function draftReducer(draft: SettingsDraft, action: DraftAction): Setting
       return { ...draft, repos: { ...draft.repos, [action.repo.path]: { ...repoValues(draft, action.repo), adoWriteBack: action.value } } };
     case 'permission':
       return { ...draft, permissions: { ...draft.permissions, [action.field]: action.value } };
+    case 'permissionMode':
+      return { ...draft, permissions: { ...draft.permissions, mode: action.mode } };
     case 'bashAllow':
       return { ...draft, permissions: { ...draft.permissions, bashAllow: action.value } };
     case 'drop':
@@ -271,13 +277,15 @@ export function draftToPatch(draft: SettingsDraft, settings: Settings): Settings
   if (buildQueueSize !== settings.buildQueueSize) patch.buildQueueSize = buildQueueSize;
   if (draft.adoStateTransitions !== settings.adoStateTransitions) patch.adoStateTransitions = draft.adoStateTransitions;
   const policy: AgentPermissions = {
-    edits: draft.permissions.acceptEdits ? 'accept' : 'ask',
+    mode: draft.permissions.mode,
+    // Kept in step with the mode for older readers of the settings file.
+    edits: draft.permissions.mode === 'ask' ? 'ask' : 'accept',
     gitRead: draft.permissions.gitRead,
     buildAndTest: draft.permissions.buildAndTest,
     bashAllow: parseCommandPrefixes(draft.permissions.bashAllow),
   };
   const saved = agentPermissionPolicy(settings);
-  if (policy.edits !== saved.edits || policy.gitRead !== saved.gitRead || policy.buildAndTest !== saved.buildAndTest || !sameList(policy.bashAllow, saved.bashAllow)) {
+  if (draft.permissions.mode !== agentPermissionMode(saved) || policy.gitRead !== saved.gitRead || policy.buildAndTest !== saved.buildAndTest || !sameList(policy.bashAllow, saved.bashAllow)) {
     patch.agentPermissions = policy;
   }
 

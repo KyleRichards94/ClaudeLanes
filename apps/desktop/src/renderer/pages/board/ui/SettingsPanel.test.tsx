@@ -164,6 +164,19 @@ describe('SettingsPanel', () => {
     expect(fake.updates).toEqual([]);
   });
 
+  it('runs agents in Auto permission mode by default, and saves Accept edits or Ask', async () => {
+    renderPanel();
+    const auto = await screen.findByRole('radio', { name: 'Auto' });
+    expect(auto.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('settings-permission-mode-help').textContent).toContain("Claude Code's auto mode");
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Ask' }));
+    expect(screen.getByTestId('settings-permission-mode-help').textContent).toContain('Every edit asks');
+    fireEvent.click(screen.getByTestId('settings-save'));
+    await waitFor(() => expect(fake.updates).toHaveLength(1));
+    expect(fake.updates[0]).toEqual({ agentPermissions: { mode: 'ask', edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: [] } });
+  });
+
   it('has a control for every setting the app uses (tokens are in Connections)', async () => {
     // Each stored setting and the label of its control. A new setting fails here until the panel edits it.
     const controls: Record<string, string | null> = {

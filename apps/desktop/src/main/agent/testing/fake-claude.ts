@@ -56,6 +56,8 @@ export interface FakeClaudeCall {
   interrupts: number;
   /** Arguments of each `setModel()` call. */
   models: Array<string | undefined>;
+  /** Arguments of each `setPermissionMode()` call. */
+  permissionModes: string[];
   /** Arguments of each `applyFlagSettings()` call. */
   flagSettings: Array<Record<string, unknown>>;
   /** What `mcpServerStatus()` answers now (AL-108). */
@@ -85,6 +87,7 @@ export type FakeClaudeEntry =
   | ({ kind: 'input' } & FakeClaudeInput)
   | { kind: 'interrupt' }
   | { kind: 'setModel'; model: string | undefined }
+  | { kind: 'setPermissionMode'; mode: string }
   | { kind: 'applyFlagSettings'; settings: Record<string, unknown> }
   | { kind: 'close' };
 
@@ -142,6 +145,7 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       },
       interrupts: 0,
       models: [],
+      permissionModes: [],
       flagSettings: [],
       mcpStatus: [],
       reconnects: [],
@@ -216,6 +220,10 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       setModel: async (model?: string) => {
         call.models.push(model);
         call.log.push({ kind: 'setModel', model });
+      },
+      setPermissionMode: async (mode: string) => {
+        call.permissionModes.push(mode);
+        call.log.push({ kind: 'setPermissionMode', mode });
       },
       applyFlagSettings: async (settings: Record<string, unknown>) => {
         call.flagSettings.push(settings);

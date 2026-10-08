@@ -1,5 +1,5 @@
 import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
-import { AgentPermissionEventSchema, defaultSettings, type RepoCommands } from '@agent-lanes/contracts';
+import { AgentPermissionEventSchema, defaultAgentPermissions, defaultSettings, type RepoCommands } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { createClaudeLauncher } from '../claude-sdk';
 import { createTranscriptService } from '../output/transcript';
@@ -7,7 +7,7 @@ import { combineSessionExtras } from '../session-extras';
 import { createSessionManager } from '../session-manager';
 import { createFakeClaude, fakeInit } from '../testing/fake-claude';
 import { fakeClaudeConnections, memoryTickets, recordingEmit, testPermissions } from '../testing/sessions';
-import { PERMISSION_CANCELLED_MESSAGE, PERMISSION_DENIED_MESSAGE, createPermissionService } from './permission-service';
+import { PERMISSION_CANCELLED_MESSAGE, PERMISSION_DENIED_MESSAGE, createPermissionService, sdkPermissionMode } from './permission-service';
 
 const dotnet: RepoCommands = {
   repoPath: 'C:\\repos\\onsite',
@@ -51,9 +51,10 @@ async function startSession(options: { commands?: RepoCommands } = {}) {
 }
 
 describe('permission policy for headless sessions (AL-109)', () => {
-  it('starts every session with acceptEdits, the D18 Bash rules and canUseTool, never a prompt it cannot show', async () => {
+  it('starts every session in auto mode with the D18 Bash rules and canUseTool, never a prompt it cannot show', async () => {
     const { call, sessions } = await startSession();
-    expect(call.options.permissionMode).toBe('acceptEdits');
+    // Auto mode: the classifier allows lower-risk actions; only what it blocks or cannot decide reaches canUseTool.
+    expect(call.options.permissionMode).toBe('auto');
     expect(call.options.canUseTool).toBeTypeOf('function');
     expect(call.options).not.toHaveProperty('permissionPromptToolName');
     expect(call.options.allowedTools).toEqual(
@@ -146,6 +147,29 @@ describe('permission policy for headless sessions (AL-109)', () => {
     const extras = await permissions.sessionExtras((await tickets.get('71273'))!);
     expect(extras.permissionMode).toBe('default');
     expect(extras.allowedTools).toEqual(['Bash(npm run lint:*)']);
+  });
+
+  it.each([
+    ['auto', 'auto'],
+    ['accept-edits', 'acceptEdits'],
+    ['ask', 'default'],
+  ] as const)('runs a session in Settings mode %s as the SDK mode %s', async (mode, sdkMode) => {
+    expect(sdkPermissionMode(mode)).toBe(sdkMode);
+    const permissions = createPermissionService({
+      settings: { get: () => ({ ...defaultSettings(), agentPermissions: { ...defaultAgentPermissions(), mode } }) },
+      buildCommands: { forRepo: async () => ({ ok: true, data: dotnet }) },
+      emit: recordingEmit().emit,
+    });
+    const tickets = await memoryTickets({ id: '71273' });
+    expect((await permissions.sessionExtras((await tickets.get('71273'))!)).permissionMode).toBe(sdkMode);
+  });
+
+  it('switches running sessions to a new mode', async () => {
+    const { call, sessions } = await startSession();
+    expect(await sessions.setPermissionMode('acceptEdits')).toEqual([]);
+    expect(call.permissionModes).toEqual(['acceptEdits']);
+    expect(call.log).toContainEqual({ kind: 'setPermissionMode', mode: 'acceptEdits' });
+    await sessions.dispose();
   });
 });
 

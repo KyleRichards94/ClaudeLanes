@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { CanUseTool, HookCallback, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, HookCallback, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import {
   PERMISSION_TEXT_LIMIT,
+  agentPermissionMode,
   agentPermissionPolicy,
+  type AgentPermissionMode,
   type PermissionDecision,
   type PermissionRequest,
   type TicketRecord,
@@ -19,9 +21,10 @@ import { firstName } from '../stages/stage-service';
 import { allowedBashPrefixes, bashAllowRules, bashCommandAllowed, workItemCommentBody, workItemCommentVerdict, type WorkItemCommentVerdict } from './policy';
 
 /**
- * Permissions of headless sessions (AL-109, design §4, Q9, Decision D18). A ticket's session runs
- * with `acceptEdits` (unless the policy asks for every edit), Bash rules for git read commands and the
- * repo's build and test commands, and `canUseTool` for everything else. `canUseTool` never answers on
+ * Permissions of headless sessions (AL-109, design §4, Q9, Decision D18). A ticket's session runs in
+ * the Settings permission mode (`sdkPermissionMode`: auto by default, where Claude Code's classifier
+ * allows lower-risk actions and only what it blocks or can't decide reaches `canUseTool`), with Bash
+ * rules for git read commands and the repo's build and test commands, and `canUseTool` for the rest. `canUseTool` never answers on
  * its own: the request is shown on the card ("Needs you · allow Bash", `agent:permission`), stays
  * readable through `agent:getPermission`, and waits for Allow once / Allow for this ticket / Deny. So
  * no session ever waits on a prompt nobody can see. Each answer is written to the ticket's output.
@@ -73,6 +76,11 @@ interface Waiting {
 function clip(text: string): string {
   const line = text.replace(/\s+/g, ' ').trim();
   return line.length > PERMISSION_TEXT_LIMIT ? `${line.slice(0, PERMISSION_TEXT_LIMIT - 1)}…` : line;
+}
+
+/** The SDK's permission mode for a Settings mode: auto, `acceptEdits`, or `default` (every edit asks). */
+export function sdkPermissionMode(mode: AgentPermissionMode): PermissionMode {
+  return mode === 'auto' ? 'auto' : mode === 'accept-edits' ? 'acceptEdits' : 'default';
 }
 
 /** `mcp__azure-devops__wit_update_work_item` → `azure-devops · wit_update_work_item`. */
@@ -207,7 +215,7 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       const prefixes = allowedBashPrefixes(policy, commands?.ok ? commands.data : null);
       bashPrefixes.set(record.id, prefixes);
       return {
-        permissionMode: policy.edits === 'accept' ? 'acceptEdits' : 'default',
+        permissionMode: sdkPermissionMode(agentPermissionMode(policy)),
         allowedTools: bashAllowRules(prefixes),
         canUseTool: canUseTool(record.id),
         hooks: { PreToolUse: [{ matcher: '^mcp__', hooks: [commentHook(record.id)] }] },
