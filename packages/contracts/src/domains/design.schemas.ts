@@ -2,6 +2,14 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
+import {
+  DesignSpecChangeSchema,
+  DesignSpecRequestSchema,
+  DesignSpecSchema,
+  ReshipDesignSpecRequestSchema,
+  ShipDesignSpecRequestSchema,
+  ShippedDesignSpecSchema,
+} from './design.specs';
 import { TicketDesignSchema } from './tickets.schemas';
 import {
   AnswerDesignThreadApprovalRequestSchema,
@@ -153,6 +161,12 @@ export const designInvokeContracts = {
   'design:openCanvas': { request: OpenDesignCanvasRequestSchema, response: DesignViewStateSchema },
   /** Reads the linked canvas's artboards through a short design session (AL-195, D118). */
   'design:listArtboards': { request: DesignViewTicketRequestSchema, response: DesignArtboardListSchema },
+  /** Approve & ship the picked artboards to the ticket's agent as DesignSpec vN, at any stage (AL-197, R11). */
+  'design:shipSpec': { request: ShipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
+  /** One shipped version (the latest when `version` is left out), for "Attached to this ticket" (AL-199). */
+  'design:getSpec': { request: DesignSpecRequestSchema, response: DesignSpecSchema },
+  /** Ships an earlier version again as the newest version, delivered like a new ship (AL-199). */
+  'design:reshipSpec': { request: ReshipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
   /** The ticket's design thread (AL-196). */
   'design:getThread': { request: DesignThreadRequestSchema, response: DesignThreadSchema },
   /** Sends a message to the ticket's design session; replies arrive as `design:thread` events (AL-196). */
@@ -165,7 +179,12 @@ export const designInvokeContracts = {
  * `design:spec`: a design spec was shipped to the ticket's agent or acknowledged by it (AL-197, AL-198).
  * Starts as the ticket envelope `{ ticketId, at }` (AL-012); those tickets add their fields.
  */
-export const DesignSpecEventSchema = TicketEventEnvelopeSchema.extend({});
+export const DesignSpecEventSchema = TicketEventEnvelopeSchema.extend({
+  /** The spec version that changed (AL-198). */
+  version: z.int().min(1),
+  /** `shipped` (AL-197), `delivered` to the agent's session, `fetched` by `get_design_spec`, `used` once acknowledged (AL-198). */
+  change: DesignSpecChangeSchema,
+});
 export type DesignSpecEvent = z.infer<typeof DesignSpecEventSchema>;
 
 /**

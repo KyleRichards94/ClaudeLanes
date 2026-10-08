@@ -55,6 +55,22 @@ describe('ticketFromRecord', () => {
     });
   });
 
+  it('shows the PR its record keeps, checks unknown until pr:status (AL-181)', () => {
+    const record = fakeTicketRecord({
+      stage: 'create-pr',
+      pullRequest: {
+        ref: { project: 'p', repository: 'r', pullRequestId: 10612 },
+        org: 'ado:contoso',
+        id: 10612,
+        webUrl: 'https://dev.azure.com/contoso/p/_git/r/pullrequest/10612',
+        status: 'active',
+        openedAt: 5,
+        closedAt: null,
+      },
+    });
+    expect(ticketFromRecord(record).pullRequest).toEqual({ id: 10612, status: 'active', checks: null });
+  });
+
   it('shows a run as running only while its record has no stop time', () => {
     const running = fakeTicketRecord({ lastRun: { startedAt: 5, stoppedAt: null, exitCode: null, url: 'http://localhost:5080' } });
     const stopped = fakeTicketRecord({ lastRun: { startedAt: 5, stoppedAt: 9, exitCode: 0, url: null } });

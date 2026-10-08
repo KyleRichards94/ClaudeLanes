@@ -10,3 +10,5 @@ export {
 export { openTicketOutput } from './model/backfill';
 export { useAgentOutput } from './model/hooks';
 export { agentOutputEventHandlers, createAgentOutputEventHandlers } from './model/event-handlers';
+export { OutputStream, type OutputStreamProps } from './ui/OutputStream';
+export { outputRows, proseSpans, statSpans, type OutputRow, type ProseSpan, type StatSpan } from './model/rows';

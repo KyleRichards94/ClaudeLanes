@@ -10,6 +10,9 @@ export const DESIGN_INVOKE_CHANNELS = [
   'design:unlinkCanvas', // AL-193
   'design:openCanvas', // AL-193
   'design:listArtboards', // AL-195
+  'design:shipSpec', // AL-197
+  'design:getSpec', // AL-199
+  'design:reshipSpec', // AL-199
   'design:getThread', // AL-196
   'design:sendThreadMessage', // AL-196
   'design:answerThreadApproval', // AL-196

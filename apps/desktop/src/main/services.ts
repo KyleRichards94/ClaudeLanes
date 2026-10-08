@@ -35,10 +35,15 @@ import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas
 import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
 import { createDesignThreadService, designThreadsDir, type DesignThreadService } from './design/thread';
 import { createElectronDesignPlatform } from './design/electron-platform';
+import { createDesignSpecFiles, designSpecsRootDir } from './design/spec-store';
+import { createDesignSpecService, type DesignSpecService } from './design/specs';
+import { createArtboardSourceReader } from './design/artboard-sources';
+import { createDesignShipService, type DesignShipService } from './design/ship';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
 import { LOG_DIRECTORY_NAME, createLogger, type Logger } from './logging';
+import { createPullRequestService, type PullRequestService } from './pull-requests';
 import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from './repos';
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
@@ -137,6 +142,12 @@ export interface Services {
   readonly diffs: DiffService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
+  /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
+  readonly pullRequests: PullRequestService;
+  /** Shipped design specs in `<userData>/design-specs` (D8): the agent's get / list / ack tools and the design tab (AL-198). */
+  readonly designSpecs: DesignSpecService;
+  /** Approve & ship design at any time: snapshots DesignSpec vN and hands it to the ticket's agent with `priority: 'now'` (AL-197). */
+  readonly designShip: DesignShipService;
   /** Writer sub-agents' worktrees on `sub/<ticket>-<name>`, created through each session's WorktreeCreate hook (AL-084, D9). */
   readonly subWorktrees: SubWorktreeService;
   /** Each ticket's sub-agent tree and counts from its session (`agent:subagent`, AL-107). */
@@ -340,6 +351,26 @@ export function createServices(options: ServiceOptions): Services {
     // Each lane change posts one comment to the work item (AL-115).
     onStageChanged: (change) => stageComments.stageChanged(change),
   });
+  const pullRequests = createPullRequestService({ tickets, ado, connections, git: git.run, emit: options.emit, transcripts, log: log.child('pr') });
+  // Open PRs from before a restart are read again from the start (AL-181).
+  pullRequests.watch();
+  const designSpecFiles = createDesignSpecFiles({ rootDir: designSpecsRootDir(options.appDataDir), warn: (message) => log.child('design').warn(message) });
+  const designSpecs = createDesignSpecService({
+    tickets,
+    files: designSpecFiles,
+    emit: options.emit,
+    transcripts,
+    log: log.child('design'),
+  });
+  const designShip = createDesignShipService({
+    tickets,
+    files: designSpecFiles,
+    sources: createArtboardSourceReader({ claude, warn: (message) => log.child('design').warn(message) }),
+    sessions,
+    emit: options.emit,
+    transcripts,
+    log: log.child('design'),
+  });
   const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
   late.subagents = subagents;
   const mergeSubBranches = createMergeSubBranchesService({
@@ -360,7 +391,7 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     log: log.child('agent'),
   });
-  const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
   const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
@@ -413,6 +444,9 @@ export function createServices(options: ServiceOptions): Services {
     archive,
     diffs,
     reconcile,
+    pullRequests,
+    designSpecs,
+    designShip,
     subWorktrees,
     subagents,
     mergeSubBranches,
@@ -428,6 +462,8 @@ export async function disposeServices(services: Services): Promise<void> {
   services.claude.closeAll();
   services.mcpStatus.dispose();
   services.transcripts.dispose();
+  services.pullRequests.dispose();
+  services.designShip.dispose();
   services.credentialFailures.dispose();
   services.subagents.dispose();
   services.usage.dispose();

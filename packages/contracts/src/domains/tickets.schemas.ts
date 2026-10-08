@@ -4,6 +4,7 @@ import { TicketIdSchema } from '../events';
 import { EffortSchema, LaneSchema, ModelSchema } from '../vocabulary';
 import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
+import { TicketPullRequestSchema } from './pr.schemas';
 import { StageGatesSchema } from './settings.schemas';
 import type { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './tickets.names';
 
@@ -109,6 +110,10 @@ export const TicketDesignSpecSchema = z.object({
   artboardCount: z.int().nonnegative(),
   /** When the agent acknowledged it with `ack_design_spec` ("Used · 14:01", AL-198); null until then. */
   usedAt: EpochMsSchema.nullable(),
+  /** When the agent first fetched it with `get_design_spec` ("Agent is watching this canvas", AL-198); null or absent until then. */
+  fetchedAt: EpochMsSchema.nullable().optional(),
+  /** When it was handed to the agent's session (AL-197); null or absent while held for a session that isn't running. */
+  deliveredAt: EpochMsSchema.nullable().optional(),
 });
 export type TicketDesignSpec = z.infer<typeof TicketDesignSpecSchema>;
 
@@ -164,6 +169,8 @@ export const TicketRecordSchema = z
     lastBuild: TicketLastBuildSchema.nullable(),
     lastRun: TicketLastRunSchema.nullable(),
     design: TicketDesignSchema,
+    /** The PR the Create PR stage opened (AL-181); absent or null before one. Optional, so older records still read. */
+    pullRequest: TicketPullRequestSchema.nullable().optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

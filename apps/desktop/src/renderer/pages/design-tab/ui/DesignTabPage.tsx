@@ -7,13 +7,14 @@ import { agentTickets, ticketFromRecord, useAgentTicket } from '@/entities/agent
 import { invoke, useDesignCanvasSlot, useTicketRecord } from '@/shared/api';
 import { setDesignViewState, useDesignViewState, useEmbedMode, useUiPrefs } from '@/shared/model';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
+import { AgentWatchingNote } from './AgentWatchingNote';
+import { AttachedSection } from './AttachedSection';
 import { BrowserBar } from './BrowserBar';
 import { DesignHeader } from './DesignHeader';
 import { DesignThreadSection } from './DesignThreadSection';
 import { EmbedModeSection, webviewSignInFailed } from './EmbedModeSection';
 import { HandOffSection } from './HandOffSection';
 import { LinkCanvasForm } from './LinkCanvasForm';
-import { AttachedSection } from './SideSection';
 
 export interface DesignTabPageProps {
   ticketId: string;
@@ -84,10 +85,11 @@ export function DesignTabPage({ ticketId }: DesignTabPageProps) {
         </View>
 
         <ScrollView style={styles.side} contentContainerStyle={styles.sideContent} testID="design-side-panel">
+          <AgentWatchingNote specs={record?.design.specs ?? []} />
           <EmbedModeSection mode={mode} onChange={(next) => setEmbedMode(ticketId, next)} status={view?.status} />
           <HandOffSection ticketId={ticketId} canvasUrl={canvas?.url} />
           <DesignThreadSection ticketId={ticketId} canvasLinked={canvas !== null} inApp={mode === 'mcp-link' || webviewSignInFailed(view?.status)} />
-          <AttachedSection specs={record?.design.specs ?? []} />
+          <AttachedSection ticketId={ticketId} specs={record?.design.specs ?? []} />
         </ScrollView>
       </View>
     </View>
