@@ -3,8 +3,9 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { TicketSubBranch } from '@agent-lanes/contracts';
 import { color, radius, space } from '@agent-lanes/tokens';
 import { GlassPanel, Icon, Pill, Text } from '@agent-lanes/ui';
-import { EFFORT_LABELS, MODEL_LABELS, modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildRunControls } from '@/features/build-run';
+import { ModelEffortControls } from '@/features/change-model';
 import { ErrorBoundary } from '@/shared/ui';
 
 /**
@@ -39,22 +40,11 @@ export function Panel({ title, aside, children, testID, style }: PanelProps) {
   );
 }
 
+/** Model on a track and effort as pills; a change shows "Switching · next turn" until it applies (AL-172). */
 export function AgentPanel({ ticket }: { ticket: AgentTicket }) {
   return (
     <Panel title="Agent" testID="agent-panel" style={styles.flexPanel}>
-      <View style={styles.valueRow}>
-        <ValueChip label={MODEL_LABELS[ticket.model]} strong />
-        <ValueChip label={EFFORT_LABELS[ticket.effort]} />
-      </View>
-      {ticket.switching ? (
-        <Pill
-          tone="ado"
-          label={`Switching to ${modelEffortLabel(ticket.switching.model, ticket.switching.effort)} · next turn`}
-          testID="agent-switching"
-        />
-      ) : (
-        <Text variant="meta">Model and effort apply from the next turn when changed.</Text>
-      )}
+      <ModelEffortControls ticket={ticket} />
     </Panel>
   );
 }
@@ -153,16 +143,6 @@ export function SubBranchesPanel({ ticket, subBranches }: { ticket: AgentTicket;
   );
 }
 
-function ValueChip({ label, strong = false }: { label: string; strong?: boolean }) {
-  return (
-    <View style={[styles.valueChip, strong && styles.valueChipStrong]}>
-      <Text variant="title" color={strong ? color.claudeText : color.ink}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   panel: {
     gap: space.md,
@@ -181,22 +161,6 @@ const styles = StyleSheet.create({
   },
   branch: {
     flexShrink: 1,
-  },
-  valueRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-    marginBottom: space.sm,
-  },
-  valueChip: {
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-    borderRadius: radius.control,
-    backgroundColor: color.surface,
-    borderWidth: 1,
-    borderColor: color.line,
-  },
-  valueChipStrong: {
-    borderColor: color.claudeTint,
   },
   mergeRow: {
     flexDirection: 'row',
