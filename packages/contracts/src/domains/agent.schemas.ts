@@ -4,6 +4,8 @@ import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '
 import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
+import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
+import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema, UndoLaunchRequestSchema, UndoLaunchResponseSchema } from './agent.launch-from-ado';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -18,31 +20,8 @@ export const SDK_MODEL_IDS = {
   haiku: 'claude-haiku-4-5',
 } as const satisfies Record<Model, string>;
 
-/**
- * Where a ticket's agent session is:
- * - `none`: no session has run for the ticket since the app started;
- * - `starting`: `claude` is being started;
- * - `running`: a turn is in progress;
- * - `idle`: the turn ended and the session waits for the next user turn;
- * - `paused`: the user paused it (AL-105): the turn was interrupted and new messages wait for Resume;
- * - `stopped`: the app closed the session (its process is gone);
- * - `lost`: the session ended without being asked to (crash, process exit); AL-110 recovers it;
- * - `queued`: its repo is at the concurrency cap; it starts when a slot frees, or on "Start now" (AL-111).
- */
-export const AGENT_SESSION_STATES = ['none', 'starting', 'running', 'idle', 'paused', 'stopped', 'lost', 'queued'] as const;
-export const AgentSessionStateSchema = z.enum(AGENT_SESSION_STATES);
-export type AgentSessionState = z.infer<typeof AgentSessionStateSchema>;
-
-/** A ticket's session as the card and drill-in see it. Never holds the credential it runs with. */
-export const AgentSessionStatusSchema = z.object({
-  ticketId: TicketIdSchema,
-  state: AgentSessionStateSchema,
-  /** The Agent SDK session id once `claude` reported it; what `resume` takes (AL-110). */
-  sessionId: z.string().min(1).max(200).nullable(),
-  /** Why the session stopped or was lost, for the user; null otherwise. */
-  message: z.string().max(2000).nullable(),
-});
-export type AgentSessionStatus = z.infer<typeof AgentSessionStatusSchema>;
+// The session status (`AGENT_SESSION_STATES`, `AgentSessionStatusSchema`) lives in `agent.status.ts`, so the
+// tickets domain's launch (AL-165) and launch from the team board (AL-236) can use it without an import cycle.
 
 /** Request of `agent:getStatus` and `agent:getTranscript`: one ticket. */
 export const AgentTicketRequestSchema = z.strictObject({ ticketId: TicketIdSchema });
@@ -470,6 +449,10 @@ export const agentInvokeContracts = {
   'agent:reconnect': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** "Start now" (AL-111): starts a queued ticket at once, over its repo's concurrency cap. */
   'agent:startNow': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** Launch from the team board (AL-236): recheck, the one ADO change, worktree, ticket and session; rolls back on failure. */
+  'agent:launchFromAdo': { request: LaunchFromAdoRequestSchema, response: LaunchFromAdoResponseSchema },
+  /** Undo (AL-237): within 10 s and before the first turn ends, puts the item back and removes the agent, worktree and ticket. */
+  'agent:undoLaunch': { request: UndoLaunchRequestSchema, response: UndoLaunchResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

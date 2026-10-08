@@ -8,7 +8,8 @@ import type { RepoSettings } from '@agent-lanes/contracts';
 /**
  * New agent ticket (AL-160) in the real app, driven with the keyboard only: Tab to "+ New agent
  * ticket", open it, choose "No ticket", describe the job, Tab to "Launch agent" and press Enter.
- * Launch itself is AL-165; until then the app acknowledges the request with a toast.
+ * Launch itself (AL-165) is in `launch.spec.ts`; here no repo or Claude connection is set up, so
+ * Launch says what is missing and the modal stays open.
  */
 
 let userDataDir: string;
@@ -69,8 +70,9 @@ test('goes from the board to a launched request with the keyboard only', async (
   await tabTo(page, 'Launch agent');
   await page.keyboard.press('Enter');
 
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText('Agent ticket is ready')).toBeVisible();
+  // No repo is registered in this profile: Launch says so and keeps the form.
+  await expect(dialog.getByText(/^Add a repo in Settings before launching an agent/)).toBeVisible();
+  await expect(dialog).toBeVisible();
 });
 
 test('previews the workspace, blocks Launch on an invalid worktree name and keeps the stage gates (AL-164)', async () => {
@@ -132,8 +134,9 @@ test('previews the workspace, blocks Launch on an invalid worktree name and keep
     await worktree.fill('fix-supplier-login');
     await expect(dialog.getByTestId('workspace-error')).toBeHidden();
     await dialog.getByRole('button', { name: 'Launch agent' }).click();
-    await expect(dialog).toBeHidden();
-    await expect(page.getByText('Agent ticket is ready')).toBeVisible();
+    // Claude is not connected in this profile, so the launch is refused and rolled back (AL-165).
+    await expect(dialog.getByText('Connect Claude in Connections before starting an agent.')).toBeVisible({ timeout: 30_000 });
+    await expect(dialog).toBeVisible();
   } finally {
     await app?.close();
     app = undefined;

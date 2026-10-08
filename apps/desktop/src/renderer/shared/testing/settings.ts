@@ -42,6 +42,7 @@ export function installFakeSettings(
       adoStateTransitions = settings.adoStateTransitions,
       defaults,
       ui,
+      dropDefaults = settings.dropDefaults,
     } = patch.data;
     settings = {
       ...settings,
@@ -50,6 +51,7 @@ export function installFakeSettings(
       adoStateTransitions,
       defaults: { ...settings.defaults, ...defaults },
       ui: { ...settings.ui, ...ui },
+      ...(dropDefaults ? { dropDefaults } : {}),
     };
     return { ok: true, data: structuredClone(settings) };
   });

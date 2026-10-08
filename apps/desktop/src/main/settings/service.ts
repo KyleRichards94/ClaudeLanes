@@ -82,7 +82,7 @@ function applyPatch(settings: Settings, patch: SettingsPatch): Settings {
   return {
     ...settings,
     ...definedEntries({ repos: patch.repos, buildQueueSize: patch.buildQueueSize, adoStateTransitions: patch.adoStateTransitions }),
-    ...definedEntries({ agentPermissions: patch.agentPermissions }),
+    ...definedEntries({ agentPermissions: patch.agentPermissions, dropDefaults: patch.dropDefaults }),
     defaults: { ...settings.defaults, ...definedEntries(patch.defaults) },
     ui: { ...settings.ui, ...definedEntries(patch.ui) },
   };

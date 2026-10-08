@@ -32,7 +32,7 @@ export interface StageService {
   setStage(ticketId: string, stage: Stage, summary: string, options?: { signal?: AbortSignal }): Promise<Result<StageChange>>;
   /** The agent's `report_activity`; `progress` is 0 to 1. */
   reportActivity(ticketId: string, text: string, progress: number | null): Promise<Result<void>>;
-  /** A session is starting: a Queued ticket moves to Planning (design §9 step 1). */
+  /** A session is starting: a Queued ticket moves to Planning (design §9 step 1), or the lane a team board drop chose (AL-236). */
   sessionStarting(ticketId: string): Promise<void>;
 
   /** The user's decision on the ticket's waiting gate (`agent:resolveGate`). False when none waits. */
@@ -81,6 +81,11 @@ export interface StageServiceOptions {
   /** Who approves on this computer, for "Plan approved by Kyle". The OS user's first name by default. */
   userName?: () => string;
   now?: () => number;
+  /**
+   * The lane a starting ticket enters from Queued: Planning unless a team board drop launched it on
+   * another lane (AL-236: Implementing, Code review, QA).
+   */
+  startLane?: (ticketId: string) => Lane | undefined;
 }
 
 interface Waiting {
@@ -210,8 +215,9 @@ export function createStageService(options: StageServiceOptions): StageService {
       queue(ticketId, async () => {
         const record = await tickets.get(ticketId);
         if (record?.stage !== 'queued') return;
-        const moved = await move(ticketId, 'planning', null);
-        if (!moved.ok) options.log?.warn(`Could not move ticket ${ticketId} to Planning: ${moved.message}`);
+        const lane = options.startLane?.(ticketId) ?? 'planning';
+        const moved = await move(ticketId, lane, null);
+        if (!moved.ok) options.log?.warn(`Could not move ticket ${ticketId} to ${LANE_LABELS[lane]}: ${moved.message}`);
       }),
 
     resolveGate(ticketId, decision) {

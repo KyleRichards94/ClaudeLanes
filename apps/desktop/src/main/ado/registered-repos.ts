@@ -42,3 +42,20 @@ function normalized(url: string): string {
 function same(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
+
+/**
+ * The registered repo (settings `repos[].path`) whose origin is the pull request's repository, for a
+ * team board PR launch's worktree (AL-236); null when none is, so the drop asks to add it (TB§7).
+ */
+export async function findRegisteredRepo(
+  repos: readonly RepoSettings[],
+  git: GitRunner,
+  orgUrl: string,
+  repository: PullRequestRepository,
+): Promise<string | null> {
+  for (const repo of repos) {
+    const [remote] = await readRegisteredRemotes([repo], git);
+    if (remote && isRegisteredRepository([remote], orgUrl, repository)) return repo.path;
+  }
+  return null;
+}

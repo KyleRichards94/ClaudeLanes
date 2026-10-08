@@ -113,7 +113,9 @@ export interface FakeThread {
   id: number;
   status?: string;
   isDeleted?: boolean;
-  comments: Array<{ commentType: string; isDeleted?: boolean; content?: string }>;
+  /** Where a code comment points (AL-238); absent on a thread about the whole PR. */
+  threadContext?: { filePath: string; rightFileStart?: { line: number; offset: number } };
+  comments: Array<{ commentType: string; isDeleted?: boolean; content?: string; author?: { displayName: string } }>;
 }
 
 export interface FakeTeamPullRequest {
@@ -132,7 +134,14 @@ export interface FakeTeamPullRequest {
 
 const text = (content = 'Please rename this.') => ({ commentType: 'text', content });
 const system = () => ({ commentType: 'system', content: 'Tom Young voted 5' });
-const activeThreads = (count: number, from: number): FakeThread[] => Array.from({ length: count }, (_, i) => ({ id: from + i, status: 'active', comments: [text()] }));
+/** Open threads on a file and line, as reviewers leave them (AL-238 lists each); the sixth is on the whole PR. */
+const activeThreads = (count: number, from: number): FakeThread[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: from + i,
+    status: 'active',
+    ...(i === 5 ? {} : { threadContext: { filePath: i % 2 === 0 ? '/src/Jobs/JobNotes.razor' : '/src/Jobs/JobNotesEditor.cs', rightFileStart: { line: 10 + i * 7, offset: 1 } } }),
+    comments: [{ ...text(`Please rename this (${from + i}).`), author: { displayName: 'Tom Young' } }],
+  }));
 
 /** Open pull requests: the two on artboard 08, one in an unregistered repo, one outside the team, and two closed ones. */
 export function artboard08PullRequests(): FakeTeamPullRequest[] {
@@ -297,6 +306,8 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
     pullRequests: artboard08PullRequests(),
   };
   const members = [PEOPLE.KR, PEOPLE.MD, PEOPLE.RJ, PEOPLE.TY];
+  /** The column each item was in at a state, so a state change back puts it where it was. */
+  const columnBefore = new Map<string, string>();
 
   const teams = [OSC_DEVELOPERS, RELEASE_TRAIN, PROJECT_DEFAULT_TEAM];
   const mine = [OSC_DEVELOPERS, RELEASE_TRAIN];
@@ -430,6 +441,52 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
       });
     }),
 
+    // ── Assign to me and move to In Progress (AL-236): who the token is, and the guarded JSON Patch ──
+    http.get(`${orgUrl}/_apis/connectionData`, () =>
+      HttpResponse.json({
+        authenticatedUser: {
+          id: PEOPLE.KR.id,
+          providerDisplayName: PEOPLE.KR.displayName,
+          properties: { Account: { $type: 'System.String', $value: PEOPLE.KR.uniqueName } },
+        },
+      }),
+    ),
+    http.get(`${orgUrl}/:project/_apis/wit/workitems/:id`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      const item = state.workItems.items.find((candidate) => candidate.id === Number(params['id']));
+      if (!item) return workItemNotFound(Number(params['id']));
+      return HttpResponse.json(assignmentFields(item));
+    }),
+    http.patch(`${orgUrl}/:project/_apis/wit/workitems/:id`, async ({ request, params }) => {
+      if (!isProject(params['project'])) return projectNotFound();
+      const item = state.workItems.items.find((candidate) => candidate.id === Number(params['id']));
+      if (!item) return workItemNotFound(Number(params['id']));
+      const operations = (await request.json()) as Array<{ op: string; path: string; value?: unknown }>;
+      if (operations.some((operation) => operation.op === 'test' && operation.path === '/rev' && operation.value !== (item.rev ?? 3))) {
+        return adoError(412, 'TF26071: This work item has been changed by someone else since you opened it.');
+      }
+      for (const operation of operations) {
+        if (operation.path === '/fields/System.AssignedTo') {
+          if (operation.op === 'remove') delete item.assignedTo;
+          else {
+            const person = Object.values(PEOPLE).find((candidate) => sameText(candidate.uniqueName, operation.value));
+            item.assignedTo = person ?? String(operation.value);
+          }
+        } else if (operation.path === '/fields/System.State' && operation.op === 'add') {
+          const next = String(operation.value);
+          // ADO moves the card to the first column mapped to the new state; a state no column maps goes back where it was.
+          if (item.boardColumn) columnBefore.set(`${item.id}\n${item.state}`, item.boardColumn);
+          const mapped = state.boardColumns.find((column) => sameText((column.stateMappings as Record<string, string>)[item.type], next));
+          const remembered = columnBefore.get(`${item.id}\n${next}`);
+          if (mapped && !remembered) item.boardColumn = mapped.name;
+          else if (remembered) item.boardColumn = remembered;
+          item.state = next;
+        }
+      }
+      item.rev = (item.rev ?? 3) + 1;
+      return HttpResponse.json(assignmentFields(item));
+    }),
+
     ...fakeWorkItemHandlers(state.workItems, orgUrl),
   ];
 
@@ -455,6 +512,23 @@ function paging(request: Request): { top: number; skip: number } {
 
 function adoError(status: number, message: string) {
   return HttpResponse.json({ message, typeKey: 'FakeAdoException' }, { status });
+}
+
+function workItemNotFound(id: number) {
+  return adoError(404, `TF401232: Work item ${id} does not exist, or you do not have permissions to read it.`);
+}
+
+/** A work item read or patched with the fields an assignment change uses (AL-236). */
+function assignmentFields(item: FakeWorkItem) {
+  return {
+    id: item.id,
+    rev: item.rev ?? 3,
+    fields: {
+      'System.State': item.state,
+      'System.WorkItemType': item.type,
+      ...(item.assignedTo === undefined ? {} : { 'System.AssignedTo': item.assignedTo }),
+    },
+  };
 }
 
 function projectNotFound() {

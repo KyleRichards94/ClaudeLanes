@@ -16,7 +16,7 @@ describe('tickets IPC handlers', () => {
       expect(first.ok && second.ok).toBe(true);
 
       // Archive (AL-088) and reconciliation (AL-090) have their own tests; tickets:list doesn't touch them.
-      const unused = {} as Pick<Services, 'archive' | 'ticketArchive' | 'reconcile'>;
+      const unused = {} as Pick<Services, 'archive' | 'ticketArchive' | 'reconcile' | 'ticketLauncher'>;
       const handlers = createTicketsHandlers({ tickets, ...unused });
       const listed = await handleInvoke('tickets:list', undefined, handlers['tickets:list']);
       expect(listed.ok).toBe(true);
@@ -32,7 +32,7 @@ describe('tickets IPC handlers', () => {
 });
 
 // Archive (AL-088) and reconciliation (AL-090) are not used by tickets:get.
-const unusedServices = {} as Pick<Services, 'archive' | 'ticketArchive' | 'reconcile'>;
+const unusedServices = {} as Pick<Services, 'archive' | 'ticketArchive' | 'reconcile' | 'ticketLauncher'>;
 
 describe('tickets:get (AL-170)', () => {
   let cleanup: (() => Promise<void>) | undefined;

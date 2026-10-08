@@ -24,6 +24,7 @@ export {
   type ToastState,
 } from './toasts';
 export { closeNewTicket, openNewTicket, useNewTicketOpen } from './new-ticket';
+export { LAUNCH_HIGHLIGHT_MS, clearLaunchedTicket, markLaunchedTicket, useIsLaunchedTicket } from './launched-ticket';
 export {
   closeConnections,
   connectionKindOf,
