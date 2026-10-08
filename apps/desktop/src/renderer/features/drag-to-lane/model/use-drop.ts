@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { allowedLanes, type DropAction } from '@/entities/agent-ticket';
 import { toast } from '@/shared/model';
 import { clearPendingLane, setPendingLane } from './drag-store';
+import { dragMembers } from './lane-state';
 import type { LaneDragCard, LaunchFromLane } from './types';
 
 /** The team board's ADO queries (TB§6): a drop updates them optimistically and refetches them once main answers. */
@@ -89,33 +90,49 @@ export type DropOnLane = (card: LaneDragCard, lane: Lane, options?: { alt?: bool
  * item, moves to In Progress assigned to you), then hands the drop to the launch (AL-236). When main
  * confirms, the team board's queries are refetched; when it refuses or fails, the optimistic change is
  * rolled back first. Resolves true when the launch was confirmed.
+ *
+ * A group (the Backlog popout's selection, TB§5) starts one agent per card, one after another, so
+ * main puts those over the agent limit in Queued; every card shows "Agent in <lane>" at once. Alt
+ * opens the launch sheet for a single card only. Resolves true when any launch was confirmed.
  */
 export function useDropOnLane(onLaunch?: LaunchFromLane): DropOnLane {
   const queryClient = useQueryClient();
   return useCallback<DropOnLane>(
     async (card, lane, options = {}) => {
-      const action = allowedLanes(card.card, card.me)[lane];
-      if (!action) return false;
-      const itemId = card.card.kind === 'pull-request' ? null : card.card.id;
-
-      // A refetch already on its way would overwrite the optimistic board.
-      await queryClient.cancelQueries({ queryKey: DROP_QUERY_KEYS[0] });
-      const rollback = updateBoardsOptimistically(queryClient, card, action);
-      if (itemId !== null) setPendingLane(itemId, lane);
-
-      let confirmed = false;
-      try {
-        const result = onLaunch ? await onLaunch({ source: card.source, lane }, { alt: options.alt === true, action }) : await launchUnavailable();
-        confirmed = result !== null && result !== undefined;
-      } catch {
-        confirmed = false;
-      } finally {
-        if (!confirmed) rollback();
-        if (itemId !== null) clearPendingLane(itemId);
-        for (const queryKey of DROP_QUERY_KEYS) void queryClient.invalidateQueries({ queryKey });
+      const members = dragMembers(card);
+      if (members.length <= 1) return dropCard(queryClient, onLaunch, card, lane, options.alt === true);
+      for (const member of members) {
+        if (member.card.kind !== 'pull-request' && allowedLanes(member.card, member.me)[lane]) setPendingLane(member.card.id, lane);
       }
+      let confirmed = false;
+      for (const member of members) confirmed = (await dropCard(queryClient, onLaunch, member, lane, false)) || confirmed;
       return confirmed;
     },
     [onLaunch, queryClient],
   );
+}
+
+/** One card's drop: the optimistic update, the launch, and the rollback when main did not confirm it. */
+async function dropCard(queryClient: QueryClient, onLaunch: LaunchFromLane | undefined, card: LaneDragCard, lane: Lane, alt: boolean): Promise<boolean> {
+  const action = allowedLanes(card.card, card.me)[lane];
+  if (!action) return false;
+  const itemId = card.card.kind === 'pull-request' ? null : card.card.id;
+
+  // A refetch already on its way would overwrite the optimistic board.
+  await queryClient.cancelQueries({ queryKey: DROP_QUERY_KEYS[0] });
+  const rollback = updateBoardsOptimistically(queryClient, card, action);
+  if (itemId !== null) setPendingLane(itemId, lane);
+
+  let confirmed = false;
+  try {
+    const result = onLaunch ? await onLaunch({ source: card.source, lane }, { alt, action }) : await launchUnavailable();
+    confirmed = result !== null && result !== undefined;
+  } catch {
+    confirmed = false;
+  } finally {
+    if (!confirmed) rollback();
+    if (itemId !== null) clearPendingLane(itemId);
+    for (const queryKey of DROP_QUERY_KEYS) void queryClient.invalidateQueries({ queryKey });
+  }
+  return confirmed;
 }

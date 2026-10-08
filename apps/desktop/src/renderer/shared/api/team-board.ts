@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { BACKLOG_PAGE_SIZE, type BacklogFilters } from '@agent-lanes/contracts';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { ADO_REFETCH_INTERVAL_MS } from './ado';
 import { invoke, unwrap } from './ipc';
 
@@ -14,6 +15,8 @@ export const teamBoardKeys = {
   teamBoard: (team: string | null, sprint: string | null) => ['ado', 'teamBoard', team, sprint] as const,
   activePrs: (team: string | null) => ['ado', 'activePrs', team] as const,
   backlogTotal: (team: string | null) => ['ado', 'backlog', team, 'total'] as const,
+  /** The Backlog popout's rows for a team and filters (TB§6 `['ado','backlog',filters]`), page by page. */
+  backlog: (team: string | null, filters: BacklogFilters) => ['ado', 'backlog', team, 'pages', filters] as const,
 };
 
 const live = {
@@ -45,6 +48,22 @@ export function useBacklogTotal(team: string | null) {
   return useQuery({
     queryKey: teamBoardKeys.backlogTotal(team),
     queryFn: async () => unwrap(await invoke('ado:backlog', { ...(team ? { team } : {}), page: { index: 0, size: 1 } })).total,
+    ...live,
+  });
+}
+
+/**
+ * The Backlog popout's rows (AL-239, TB§5): the team's backlog in backlog order, grouped by Feature,
+ * filtered in main (AL-233), 50 rows a page; `fetchNextPage` reads the next. Refreshed like the board.
+ */
+export function useBacklog(team: string | null, filters: BacklogFilters, options: { enabled?: boolean } = {}) {
+  return useInfiniteQuery({
+    queryKey: teamBoardKeys.backlog(team, filters),
+    queryFn: async ({ pageParam }) =>
+      unwrap(await invoke('ado:backlog', { ...(team ? { team } : {}), filters, page: { index: pageParam, size: BACKLOG_PAGE_SIZE } })),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.page.index + 1 < last.page.count ? last.page.index + 1 : undefined),
+    enabled: options.enabled ?? true,
     ...live,
   });
 }

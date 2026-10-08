@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type Modifier,
   type Over,
 } from '@dnd-kit/core';
 import { useEffect, useMemo, useRef } from 'react';
@@ -24,12 +25,27 @@ import { useDropOnLane } from '../model/use-drop';
 import { AnnouncementRegion } from './AnnouncementRegion';
 import { DragToLaneContext } from './context';
 import { DragPreview } from './DragPreview';
+import { useNativeBacklogDrops } from './native-drop.web';
 import type { DragToLaneProviderProps } from './DragToLaneProvider';
 
 function laneOf(over: Over | null): Lane | null {
   const lane = (over?.data.current as { lane?: Lane } | undefined)?.lane;
   return lane ?? null;
 }
+
+/**
+ * The preview's centre follows the pointer. dnd-kit keeps the pointer's offset inside the card it
+ * picked up, which for a wide Backlog row puts the small preview far from the pointer (AL-239).
+ * Keyboard drags have no pointer: the preview stays where dnd-kit puts it.
+ */
+const previewAtPointer: Modifier = ({ activatorEvent, draggingNodeRect, overlayNodeRect, transform }) => {
+  if (!(activatorEvent instanceof MouseEvent) || !draggingNodeRect || !overlayNodeRect) return transform;
+  return {
+    ...transform,
+    x: transform.x + activatorEvent.clientX - draggingNodeRect.left - overlayNodeRect.width / 2,
+    y: transform.y + activatorEvent.clientY - draggingNodeRect.top - overlayNodeRect.height / 2,
+  };
+};
 
 /** The pointer has to be inside a lane; a keyboard drag (no pointer) lands on the lane the card overlaps most. */
 const laneCollisions: CollisionDetection = (args) => (args.pointerCoordinates ? pointerWithin(args) : rectIntersection(args));
@@ -39,11 +55,14 @@ const laneCollisions: CollisionDetection = (args) => (args.pointerCoordinates ? 
  * pointer picks a card up after 4 px; Space picks up a focused card, arrows move between the lanes
  * that take it, Space or Enter drops, Escape cancels. Every pick-up, move, drop and cancel is
  * announced ("Over Code review: start agentic review"). Holding Alt at the drop is passed on, for the
- * launch sheet (AL-240). Wraps the whole board, so the lanes and the team board share one drag.
+ * launch sheet (AL-240). Wraps the whole board, so the lanes, the team board and the Backlog popout
+ * share one drag; native drags from the popped-out Backlog window land on the same lanes.
  */
 export function DragToLaneProvider({ onLaunch, children }: DragToLaneProviderProps) {
   const drop = useDropOnLane(onLaunch);
   const value = useMemo(() => ({ drop }), [drop]);
+  // Rows dragged in from the popped-out Backlog window (TB§5).
+  useNativeBacklogDrops(drop);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
@@ -110,7 +129,7 @@ export function DragToLaneProvider({ onLaunch, children }: DragToLaneProviderPro
         onDragCancel={() => endDrag()}
       >
         {children}
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} modifiers={[previewAtPointer]}>
           <DragPreview />
         </DragOverlay>
       </DndContext>

@@ -5,9 +5,10 @@ import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
 import { DragStatusPill, DragToLaneProvider, useActiveDrag } from '@/features/drag-to-lane';
 import { useLaunchFromAdo } from '@/features/launch-from-ado';
-import { useAppInfo } from '@/shared/api';
-import { useBoardSprint, useBoardTeam } from '@/shared/model';
-import { TeamBoard } from '@/widgets/team-board';
+import { invoke, useAppInfo } from '@/shared/api';
+import { toast, useBoardSprint, useBoardTeam } from '@/shared/model';
+import { BacklogPopout } from '@/widgets/backlog-popout';
+import { TeamBoard, useTeamBoardSession } from '@/widgets/team-board';
 import { boardSubheader } from '../model/header';
 import { useBoardTickets } from '../model/use-board-tickets';
 import { BoardHeader } from './BoardHeader';
@@ -35,6 +36,8 @@ function BoardContent() {
   useBoardTickets();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [needsYouOnly, setNeedsYouOnly] = useState(false);
+  const [backlogOpen, setBacklogOpen] = useState(false);
+  const backlogTeam = useTeamBoardSession().teamId;
   const needsYou = useAgentTicketCount('needs-you');
 
   return (
@@ -67,21 +70,36 @@ function BoardContent() {
         <BoardLanes needsYouOnly={needsYouOnly} />
 
         {/* The team's Azure DevOps board under the agent lanes (AL-234, artboard 08). */}
-        <BoardTeamBoard />
+        <BoardTeamBoard onOpenBacklog={() => setBacklogOpen(true)} />
       </ScrollView>
       <View style={styles.dock}>
         <LiveDock />
       </View>
+      {/* The Backlog popout over the lower board; its rows drag onto the lanes above it (AL-239, TB§5). */}
+      <BacklogPopout
+        visible={backlogOpen}
+        teamId={backlogTeam}
+        onClose={() => setBacklogOpen(false)}
+        onPopOut={() => void popOutBacklog(backlogTeam).then((opened) => opened && setBacklogOpen(false))}
+      />
       <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </View>
   );
 }
 
 /** The team board on the board's sprint, which belongs to the team picked in the header's Team menu. */
-function BoardTeamBoard() {
+function BoardTeamBoard({ onOpenBacklog }: { onOpenBacklog(): void }) {
   const sprint = useBoardSprint();
   const team = useBoardTeam();
-  return <TeamBoard sprintPath={sprint?.path ?? null} sprintTeamId={team?.id ?? null} />;
+  return <TeamBoard sprintPath={sprint?.path ?? null} sprintTeamId={team?.id ?? null} onOpenBacklog={onOpenBacklog} />;
+}
+
+/** Moves the Backlog to its own window (TB§5); resolves whether it opened. */
+async function popOutBacklog(team: string | null): Promise<boolean> {
+  const result = await invoke('app:popOutBacklog', team ? { team } : {});
+  if (result.ok) return true;
+  toast({ id: 'backlog-pop-out', tone: 'warning', title: "Couldn't pop out the backlog", body: result.message });
+  return false;
 }
 
 /** "Sprint 42 · 7 – 20 Oct · 8 agent tickets". */

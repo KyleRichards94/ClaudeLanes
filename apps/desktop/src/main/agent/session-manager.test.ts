@@ -81,6 +81,15 @@ describe('session manager: starting a session', () => {
     await sessions.dispose();
   });
 
+  it('starts nothing once the app is closing, so a queued launch never takes the slot a stopped session freed', async () => {
+    const { fake, sessions } = await setup();
+    await sessions.start({ ticketId: '71273', jobDescription: JOB });
+    const closing = sessions.dispose();
+    expect(await sessions.start({ ticketId: '71274', jobDescription: JOB })).toMatchObject({ ok: false, code: 'VALIDATION' });
+    await closing;
+    expect(fake.calls).toHaveLength(1);
+  });
+
   it('runs with the saved API key when the Claude connection is an API key', async () => {
     const { fake, sessions } = await setup(answering, { connections: fakeClaudeConnections('api-key', TEST_KEY) });
     await sessions.start({ ticketId: '71273', jobDescription: JOB });
