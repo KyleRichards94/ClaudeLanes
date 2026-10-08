@@ -12,6 +12,8 @@ import {
   type StageGates,
   type TicketAdoRef,
   type TicketRecord,
+  type WorktreePreview,
+  type WorktreePreviewRequest,
 } from '@agent-lanes/contracts';
 import { isGitError } from '../git/git-error';
 import type { CallOptions } from '../git/git-service';
@@ -52,6 +54,13 @@ import {
  */
 export interface TicketWorktreeService {
   create(input: CreateTicketWorktreeInput): Promise<Result<CreatedTicketWorktree>>;
+  /**
+   * The workspace the New agent ticket modal shows (AL-164): the branch and folder `create` would
+   * pick now, and whether an edited branch name would be refused and why. Creates nothing and
+   * claims nothing, so `create` re-validates. When git can't list branches, the name is still
+   * checked against git's rules and the other tickets' branches.
+   */
+  preview(input: WorktreePreviewRequest): Promise<Result<WorktreePreview>>;
 }
 
 /** What the ticket works on (artboard 2 left column). */
@@ -342,7 +351,66 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
     }
   }
 
+  async function preview(input: WorktreePreviewRequest): Promise<Result<WorktreePreview>> {
+    const repoSettings = settings.get().repos.find((repo) => isSameRepoPath(repo.path, input.repo));
+    if (!repoSettings) return refuse('repo-not-registered', `${input.repo} is not a registered repo.`, { repo: input.repo });
+    const repo = repoSettings.path;
+    const root = isAbsolute(repoSettings.worktreeRoot) ? normalize(repoSettings.worktreeRoot) : null;
+
+    const all = await tickets.list();
+    const ticketBranches = all
+      .filter((record) => isSameRepoPath(record.repo, repo))
+      .flatMap((record) => [record.branch, ...record.subBranches.map((sub) => sub.branch)]);
+    // Without git the preview still names the ticket and applies git's rules; launch asks git again.
+    let gitBranches: string[] = [];
+    let gitWorks = true;
+    try {
+      gitBranches = await listBranchNames(git, repo);
+    } catch {
+      gitWorks = false;
+    }
+    const branches = [...gitBranches, ...ticketBranches];
+
+    let generatedBranch: string | null = null;
+    let ticketId: string | null = null;
+    const subject = input.subject;
+    if (subject?.kind === 'work-item') {
+      ticketId = String(subject.workItemId);
+      generatedBranch = nameWorkItemTicket(subject.workItemId, subject.title, branches).branch;
+    } else if (subject?.kind === 'no-ticket') {
+      const takenIds = all.map((record) => record.id);
+      const names = nameNoTicket(new Date(now()), subject.description, [...branches, ...takenIds, ...(root ? await folderNames(root) : [])]);
+      ticketId = names.worktreeDirName;
+      generatedBranch = names.branch;
+    }
+
+    let problem: WorktreePreview['problem'] = null;
+    const edited = input.branch;
+    if (edited !== null && edited !== generatedBranch) {
+      const check = await validateBranchName(edited, {
+        checkRefFormat: gitWorks ? checkRefFormat(repo) : async () => true,
+        existingBranches: branches,
+      }).catch(() => checkBranchName(edited));
+      if (!check.ok) problem = { reason: check.problem === 'taken' ? 'branch-taken' : 'invalid-branch', message: check.message };
+    }
+
+    return ok({
+      repo,
+      repoName: repoSettings.name,
+      baseBranch: repoSettings.baseBranch,
+      generatedBranch,
+      branch: edited ?? generatedBranch,
+      worktreePath: root && ticketId ? join(root, ticketId) : null,
+      problem,
+    });
+  }
+
   return {
+    preview: (input) =>
+      preview(input).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        return err('INTERNAL', `Previewing the worktree failed: ${message}`, { reason: 'unexpected' });
+      }),
     async create(input) {
       const repoSettings = settings.get().repos.find((repo) => isSameRepoPath(repo.path, input.repo));
       if (!repoSettings) return refuse('repo-not-registered', `${input.repo} is not a registered repo.`, { repo: input.repo });
