@@ -1,6 +1,7 @@
 import {
   STAGES,
   type BuildJob,
+  type DesignSpecChange,
   type Effort,
   type Lane,
   type Model,
@@ -13,6 +14,7 @@ import {
   SUB_AGENT_STATES,
   type AgentTicket,
   type AgentTicketBuildJob,
+  type AgentTicketDesign,
   type AgentTicketPullRequest,
   type AgentTicketRun,
   type NeedsYouReason,
@@ -78,6 +80,17 @@ function sameLastBuild(a: TicketLastBuild | null, b: TicketLastBuild | null): bo
   );
 }
 
+/** The latest shipped design spec on the record (AL-197, AL-199); null when none was shipped. */
+function designFromRecord(record: TicketRecord): AgentTicketDesign | null {
+  const latest = record.design.specs.at(-1);
+  if (!latest) return null;
+  return { version: latest.version, used: latest.usedAt !== null, at: latest.usedAt ?? latest.shippedAt };
+}
+
+function sameDesign(a: AgentTicketDesign | null, b: AgentTicketDesign | null): boolean {
+  return a === b || (a !== null && b !== null && a.version === b.version && a.used === b.used && a.at === b.at);
+}
+
 function lastRunFromRecord(record: TicketRecord): AgentTicketRun {
   const last = record.lastRun;
   if (!last) return { state: 'stopped', url: null, startedAt: null };
@@ -106,8 +119,11 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     effort: record.effort,
   } satisfies Partial<AgentTicket>;
 
+  const design = designFromRecord(record);
+
   if (previous) {
-    if (sameRecordFields(previous, recordFields) && sameLastBuild(previous.build.last, record.lastBuild)) return previous;
+    const keepDesign = sameDesign(previous.design, design);
+    if (sameRecordFields(previous, recordFields) && sameLastBuild(previous.build.last, record.lastBuild) && keepDesign) return previous;
     const switching =
       previous.switching && previous.switching.model === record.model && previous.switching.effort === record.effort
         ? null
@@ -117,6 +133,7 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
       ...recordFields,
       switching,
       build: sameLastBuild(previous.build.last, record.lastBuild) ? previous.build : { ...previous.build, last: record.lastBuild },
+      design: keepDesign ? previous.design : design,
     };
     // A stage change resolves a waiting gate, as `withStage` does.
     return previous.stage === record.stage ? merged : withGateResolved(merged);
@@ -135,7 +152,25 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     run: lastRunFromRecord(record),
     // The PR the Create PR stage opened (AL-181); its checks come with the next 'pr:status'.
     pullRequest: record.pullRequest ? { id: record.pullRequest.id, status: record.pullRequest.status, checks: null } : null,
+    design,
   };
+}
+
+/**
+ * A `design:spec` event (AL-197, AL-198): `shipped` makes the version the latest, not yet used;
+ * `used` marks the latest one acknowledged. `delivered` and `fetched` change nothing on the card, and
+ * an event about an older version than the latest is ignored.
+ */
+export function withDesignSpec(ticket: AgentTicket, version: number, change: DesignSpecChange, at: number): AgentTicket {
+  const current = ticket.design;
+  if (current && version < current.version) return ticket;
+  if (change === 'shipped' || !current || version > current.version) {
+    const used = change === 'used';
+    if (current?.version === version && current.used === used) return ticket;
+    return { ...ticket, design: { version, used, at } };
+  }
+  if (change === 'used' && !current.used) return { ...ticket, design: { version, used: true, at } };
+  return ticket;
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   ticketFromRecord,
   withActivity,
   withBuildJob,
+  withDesignSpec,
   withGateOpened,
   withGateResolved,
   withLastBuild,
@@ -52,6 +53,7 @@ describe('ticketFromRecord', () => {
       build: { job: null, last: { outcome: 'failed', startedAt: 10, finishedAt: 20, errors: 3, warnings: 0 } },
       run: { state: 'stopped', url: null, startedAt: null },
       pullRequest: null,
+      design: null,
     });
   });
 
@@ -233,5 +235,33 @@ describe('ticket changes', () => {
     const running = withRun(built, run);
     expect(running.run).toBe(run);
     expect(withRun(running, { ...run })).toBe(running);
+  });
+});
+
+describe('design specs (AL-200)', () => {
+  const spec = (version: number, usedAt: number | null) => ({ version, shippedAt: version * 100, approvedBy: 'Kyle', artboardCount: 2, usedAt, fetchedAt: null, deliveredAt: null });
+
+  it("takes the record's latest spec, used or not yet used", () => {
+    expect(ticketFromRecord(fakeTicketRecord({ design: { canvas: null, lastViewUrl: null, specs: [spec(1, 150), spec(2, null)] } })).design).toEqual({ version: 2, used: false, at: 200 });
+    expect(ticketFromRecord(fakeTicketRecord({ design: { canvas: null, lastViewUrl: null, specs: [spec(1, 150)] } })).design).toEqual({ version: 1, used: true, at: 150 });
+  });
+
+  it('refreshes the design from a newer record and keeps the same object when nothing changed', () => {
+    const before = ticketFromRecord(fakeTicketRecord({ design: { canvas: null, lastViewUrl: null, specs: [spec(1, null)] } }));
+    const same = ticketFromRecord(fakeTicketRecord({ design: { canvas: null, lastViewUrl: null, specs: [spec(1, null)] } }), before);
+    expect(same).toBe(before);
+    const used = ticketFromRecord(fakeTicketRecord({ design: { canvas: null, lastViewUrl: null, specs: [spec(1, 180)] } }), before);
+    expect(used.design).toEqual({ version: 1, used: true, at: 180 });
+  });
+
+  it('follows shipped and used events, ignoring older versions and events that change nothing', () => {
+    const shipped = withDesignSpec(ticket(), 2, 'shipped', 10);
+    expect(shipped.design).toEqual({ version: 2, used: false, at: 10 });
+    expect(withDesignSpec(shipped, 2, 'delivered', 11)).toBe(shipped);
+    expect(withDesignSpec(shipped, 1, 'used', 12)).toBe(shipped);
+    const used = withDesignSpec(shipped, 2, 'used', 13);
+    expect(used.design).toEqual({ version: 2, used: true, at: 13 });
+    expect(withDesignSpec(used, 2, 'used', 14)).toBe(used);
+    expect(withDesignSpec(used, 3, 'shipped', 15).design).toEqual({ version: 3, used: false, at: 15 });
   });
 });
