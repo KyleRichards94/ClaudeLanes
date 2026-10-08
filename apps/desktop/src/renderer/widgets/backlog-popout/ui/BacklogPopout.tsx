@@ -1,6 +1,6 @@
 import type { BacklogPage } from '@agent-lanes/contracts';
-import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type ViewProps } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { color, overlay, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Switch, Text, TextField } from '@agent-lanes/ui';
 import { useWorkItemLanes, type AgentTicketStore } from '@/entities/agent-ticket';
@@ -11,6 +11,7 @@ import { HeaderMenu } from '@/shared/ui';
 import { setBacklogSearch, useBacklogSearch, type BacklogKindFilter } from '../model/session';
 import { areaLabel, backlogFilters, backlogGroups, clickSelection, filterChoices, rowDrag, rowOrder, type BacklogGroupView, type BacklogMe } from '../model/view';
 import { BacklogRow } from './BacklogRow';
+import { onEscape } from './escape';
 import { rememberFocus } from './focus';
 
 export interface BacklogPopoutProps {
@@ -98,18 +99,18 @@ function BacklogPanel({ teamId, onClose, onPopOut, mode = 'page', store }: Backl
   const [restoreFocus] = useState(rememberFocus);
   useEffect(() => restoreFocus, [restoreFocus]);
 
-  const panel = useRef<ComponentRef<typeof View>>(null);
-  const keys = {
-    // Capture: react-native-web's TextInput stops keydown from bubbling (D702).
-    onKeyDownCapture: (event: { key: string; preventDefault(): void; nativeEvent?: { target?: unknown } }) => {
-      // Escape during a keyboard drag cancels the drag; in a dropdown it closes the dropdown.
-      if (event.key !== 'Escape' || active) return;
-      const node = panel.current as unknown as { contains?(target: unknown): boolean } | null;
-      if (node?.contains && event.nativeEvent?.target && !node.contains(event.nativeEvent.target)) return;
-      event.preventDefault();
-      onClose();
-    },
-  } as unknown as ViewProps;
+  // Escape closes it, except while a drag is under way: then Escape cancels the drag.
+  const escapeState = useRef({ active, onClose });
+  useEffect(() => {
+    escapeState.current = { active, onClose };
+  });
+  useEffect(
+    () =>
+      onEscape(() => {
+        if (!escapeState.current.active) escapeState.current.onClose();
+      }),
+    [],
+  );
 
   const first = pages[0];
   const subtitle = [first?.team.name ?? null, first ? `${first.total} ${first.total === 1 ? 'item' : 'items'}` : null, 'unassigned items can be dragged onto Planning or Implementing']
@@ -117,7 +118,7 @@ function BacklogPanel({ teamId, onClose, onPopOut, mode = 'page', store }: Backl
     .join(' · ');
 
   const content = (
-    <View ref={panel} role="dialog" aria-label="Backlog" style={styles.dialog} testID="backlog-popout-panel" {...keys}>
+    <View role="dialog" aria-label="Backlog" style={styles.dialog} testID="backlog-popout-panel">
       <View style={styles.header}>
         <View style={styles.titleBlock}>
           <Text variant="title" size="xl" role="heading" aria-level={2}>
