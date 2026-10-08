@@ -34,7 +34,7 @@ export class IpcError extends Error {
   constructor(
     readonly code: string,
     message: string,
-    /** The Result's `details` (e.g. the conflicting files of a MERGE_CONFLICT), for the error's recovery (AL-211). */
+    /** The Result's `details`, e.g. MERGE_CONFLICT's conflicted files (AL-086), for the error's recovery (AL-211). */
     readonly details?: unknown,
   ) {
     super(message);

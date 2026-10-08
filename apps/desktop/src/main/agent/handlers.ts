@@ -9,7 +9,8 @@ export function createAgentHandlers({
   stages,
   mcpStatus,
   permissions,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  subagents,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     'agent:getStatus': ({ ticketId }) => ok(sessions.status(ticketId)),
     'agent:getTranscript': async ({ ticketId }) => ok(await transcripts.get(ticketId)),
@@ -25,5 +26,10 @@ export function createAgentHandlers({
     'agent:getMcpStatus': () => ok(mcpStatus.summary()),
     'agent:resolvePermission': ({ ticketId, requestId, decision }) => ok({ resolved: permissions.resolve(ticketId, requestId, decision) }),
     'agent:getPermission': ({ ticketId }) => ok({ request: permissions.pending(ticketId) }),
+    'agent:setModel': ({ ticketId, model }) => sessions.setModel(ticketId, model),
+    'agent:setEffort': ({ ticketId, effort }) => sessions.setEffort(ticketId, effort),
+    'agent:applyModelNow': ({ ticketId }) => sessions.applyModelNow(ticketId),
+    'agent:getModel': ({ ticketId }) => sessions.modelState(ticketId),
+    'agent:getSubagents': ({ ticketId }) => ok(subagents.get(ticketId)),
   };
 }

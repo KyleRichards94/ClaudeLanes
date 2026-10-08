@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, fakeTicketRecord } from '@/shared/testing';
+import { fakeGateEvent, fakeOutputEvent, fakeStageEvent, fakeSubagentEvent, fakeTicketRecord } from '@/shared/testing';
 import { agentTicketEventHandlers, createAgentTicketEventHandlers } from './event-handlers';
 import { selectLaneNeedsYouCount, selectTicket, ticketNeedsYou } from './selectors';
 import { createAgentTicketStore } from './store';
@@ -13,16 +13,27 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:permission, build:queued, build:finished and run:status', () => {
+  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished and run:status', () => {
     expect(Object.keys(agentTicketEventHandlers).sort()).toEqual([
       'agent:gate',
+      'agent:model',
       'agent:output',
       'agent:permission',
       'agent:stage',
+      'agent:subagent',
       'build:finished',
       'build:queued',
       'run:status',
     ]);
+  });
+
+  it("agent:subagent sets that ticket's sub-agent counts from the SDK's task states (AL-107)", () => {
+    const { store, handlers } = setup();
+
+    handlers['agent:subagent']?.(fakeSubagentEvent('71273', 2_000, { counts: { queued: 1, running: 2, done: 1, failed: 0 } }));
+
+    expect(selectTicket(store.getState(), '71273')?.subAgents).toEqual({ queued: 1, running: 2, done: 1, failed: 0 });
+    expect(selectTicket(store.getState(), '71288')?.subAgents).toEqual({ queued: 0, running: 0, done: 0, failed: 0 });
   });
 
   it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {
