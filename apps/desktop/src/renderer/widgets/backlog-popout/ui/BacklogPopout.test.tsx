@@ -115,6 +115,9 @@ describe('Backlog popout (AL-239, TB§5, artboard 11)', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByTestId('backlog-popout-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(3);
+    // Wherever focus is: after a pointer drop it is on the page, not in the popout.
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(4);
   });
 
   it('offers Pop out when the host can open the backlog in its own window', async () => {
@@ -189,7 +192,6 @@ describe('Backlog popout (AL-239, TB§5, artboard 11)', () => {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
-    fireEvent.keyDown(row(71360), { code: 'Escape', key: 'Escape' });
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' });
     await waitFor(() => expect(getComputedStyle(layer).opacity).not.toBe('0.35'));
     expect(onClose).not.toHaveBeenCalled();
