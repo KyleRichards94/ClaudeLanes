@@ -44,4 +44,5 @@ export {
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
+export { createDesignSpecEventHandlers } from './design-specs';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';

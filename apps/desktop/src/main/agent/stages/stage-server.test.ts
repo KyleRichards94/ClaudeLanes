@@ -1,11 +1,16 @@
+import { join } from 'node:path';
 import type { McpServerConfig, SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 import { STAGES, defaultStageGates, type StageGates } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { createClaudeLauncher, loadClaudeSdk } from '../claude-sdk';
 import { createSessionManager } from '../session-manager';
 import { createFakeClaude, fakeInit } from '../testing/fake-claude';
-import { eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from '../testing/sessions';
-import { STAGE_PROTOCOL, STAGE_PROTOCOL_REMINDER, STAGE_SERVER_TOOLS, sdkStageServer, stageServerTools, stageSessionExtras } from './stage-server';
+import { SESSION_TEST_BASE, eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from '../testing/sessions';
+import { createDesignSpecFiles } from '../../design/spec-store';
+import { fakeSpec } from '../../design/testing/specs';
+import { createDesignSpecService } from '../../design/specs';
+import { createMemoryRecordFs } from '../../tickets/testing';
+import { DESIGN_SPEC_TOOLS, STAGE_PROTOCOL, STAGE_PROTOCOL_REMINDER, STAGE_SERVER_TOOLS, sdkStageServer, stageServerTools, stageSessionExtras } from './stage-server';
 import { createStageService } from './stage-service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the handlers take each tool's own input
@@ -193,5 +198,72 @@ describe('set_stage through a stage gate (AL-104)', () => {
     await expect(call).resolves.toMatchObject({ isError: true });
     expect(stages.pendingGate('71273')).toBeNull();
     expect(events.of('agent:gate').at(-1)).toMatchObject({ state: 'cancelled' });
+  });
+});
+
+describe('design-spec tools on the agent_lanes server (AL-198)', () => {
+  async function withSpecs() {
+    const tickets = await memoryTickets({ id: '71273', stage: 'implementing', gates: ALL_AUTO });
+    const events = recordingEmit();
+    const stages = createStageService({ tickets, emit: events.emit, userName: () => 'Kyle' });
+    const files = createDesignSpecFiles({ rootDir: join(SESSION_TEST_BASE, 'design-specs'), fs: createMemoryRecordFs() });
+    const record = (await tickets.get('71273'))!;
+    await files.write(record.repo, fakeSpec(1));
+    await files.write(record.repo, fakeSpec(2));
+    await tickets.update('71273', (current) => ({
+      ...current,
+      design: {
+        ...current.design,
+        specs: [1, 2].map((version) => ({ version, shippedAt: version, approvedBy: 'Kyle', artboardCount: 2, usedAt: null, fetchedAt: null })),
+      },
+    }));
+    const specs = createDesignSpecService({ tickets, files, emit: events.emit, now: () => 14 * 3_600_000 });
+    const tools = stageServerTools('71273', stages, specs) as AnyTool[];
+    const tool = (name: string) => tools.find((candidate) => candidate.name === name)!;
+    return { tickets, events, stages, specs, tools, tool };
+  }
+
+  it('adds get_design_spec, list_design_specs and ack_design_spec when the session has specs', async () => {
+    const { tools, stages } = await withSpecs();
+    expect(tools.map((candidate) => candidate.name)).toEqual(['set_stage', 'report_activity', 'get_design_spec', 'list_design_specs', 'ack_design_spec']);
+    expect(stageServerTools('71273', stages).map((candidate) => candidate.name)).toEqual(['set_stage', 'report_activity']);
+    expect(DESIGN_SPEC_TOOLS).toEqual(['mcp__agent_lanes__get_design_spec', 'mcp__agent_lanes__list_design_specs', 'mcp__agent_lanes__ack_design_spec']);
+  });
+
+  it('get_design_spec returns the latest spec and marks it fetched; ack_design_spec marks it used', async () => {
+    const { tickets, events, tool } = await withSpecs();
+    const fetched = await tool('get_design_spec').handler({}, {});
+    expect(fetched.isError).toBeUndefined();
+    const text = (fetched.content[0] as { text: string }).text;
+    expect(text).toContain('Design v2, approved by Kyle');
+    expect(text).toContain('It supersedes v1');
+    expect((await tickets.get('71273'))?.design.specs.at(-1)?.fetchedAt).toBe(14 * 3_600_000);
+
+    await expect(tool('list_design_specs').handler({}, {})).resolves.toEqual({
+      content: [{ type: 'text', text: 'v1 · approved by Kyle · 2 artboards · superseded by v2\nv2 · approved by Kyle · 2 artboards · sent, not yet acknowledged' }],
+    });
+
+    await expect(tool('ack_design_spec').handler({ version: 2, note: 'Built JobGrid.razor' }, {})).resolves.toEqual({ content: [{ type: 'text', text: 'Noted: Design v2 is marked as used.' }] });
+    expect((await tickets.get('71273'))?.design.specs.at(-1)?.usedAt).toBe(14 * 3_600_000);
+    expect(events.of('design:spec').map((event) => event['change'])).toEqual(['fetched', 'used']);
+
+    await expect(tool('ack_design_spec').handler({ version: 7, note: '' }, {})).resolves.toMatchObject({ isError: true });
+    await expect(tool('get_design_spec').handler({ version: 7 }, {})).resolves.toMatchObject({ isError: true });
+  });
+
+  it('lets sessions call the design tools without asking, and the protocol says when to use them', async () => {
+    const { tickets, stages, specs } = await withSpecs();
+    const servers: AnyTool[][] = [];
+    const createServer = (tools: AnyTool[]) => {
+      servers.push(tools);
+      return { type: 'sdk', name: 'agent_lanes', instance: {} } as unknown as McpServerConfig;
+    };
+    const extras = await stageSessionExtras({ stages, designSpecs: specs, createServer })((await tickets.get('71273'))!);
+    expect(extras.allowedTools).toEqual([...STAGE_SERVER_TOOLS, ...DESIGN_SPEC_TOOLS]);
+    expect(servers[0]!.map((candidate) => candidate.name)).toContain('get_design_spec');
+    expect(STAGE_PROTOCOL).toContain('get_design_spec');
+    expect(STAGE_PROTOCOL).toContain('ack_design_spec');
+    expect(STAGE_PROTOCOL).toContain('in Planning, fold it into the plan');
+    expect(STAGE_PROTOCOL).toContain('A later version supersedes earlier ones');
   });
 });

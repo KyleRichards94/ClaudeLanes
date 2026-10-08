@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import type { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './design.names';
+import { DesignSpecChangeSchema } from './design.specs';
 import { TicketDesignSchema } from './tickets.schemas';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
@@ -152,7 +153,12 @@ export const designInvokeContracts = {
  * `design:spec`: a design spec was shipped to the ticket's agent or acknowledged by it (AL-197, AL-198).
  * Starts as the ticket envelope `{ ticketId, at }` (AL-012); those tickets add their fields.
  */
-export const DesignSpecEventSchema = TicketEventEnvelopeSchema.extend({});
+export const DesignSpecEventSchema = TicketEventEnvelopeSchema.extend({
+  /** The spec version that changed (AL-198). */
+  version: z.int().min(1),
+  /** `shipped` (AL-197), `delivered` to the agent's session, `fetched` by `get_design_spec`, `used` once acknowledged (AL-198). */
+  change: DesignSpecChangeSchema,
+});
 export type DesignSpecEvent = z.infer<typeof DesignSpecEventSchema>;
 
 /**
