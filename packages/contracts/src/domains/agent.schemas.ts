@@ -338,6 +338,8 @@ export const agentInvokeContracts = {
   /** Allow once / Allow for this ticket / Deny on a waiting permission request (AL-109). */
   'agent:resolvePermission': { request: ResolvePermissionRequestSchema, response: ResolvePermissionResponseSchema },
   'agent:getPermission': { request: AgentTicketRequestSchema, response: GetPermissionResponseSchema },
+  /** Reconnect (AL-110): resumes a lost session from its saved session id in the same worktree. */
+  'agent:reconnect': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

@@ -7,6 +7,8 @@ export interface ToastIntentContext {
   navigate(route: Route): void;
   /** Opens the Connections modal, on a saved row when given (AL-046). */
   openConnections(options: OpenConnectionsOptions): void;
+  /** Resumes a lost agent session in its worktree (AL-110). */
+  reconnectSession(ticketId: string): void;
 }
 
 type IntentOf<T extends ToastIntent['type']> = Extract<ToastIntent, { type: T }>;
@@ -19,6 +21,8 @@ const intentHandlers: { readonly [T in ToastIntent['type']]: (intent: IntentOf<T
   navigate: (intent, context) => context.navigate(intent.route),
   // Reconnect: the modal lands on that row with its token field focused (design §8).
   openConnections: (intent, context) => context.openConnections(intent.connectionId ? { connectionId: intent.connectionId } : {}),
+  // Reconnect: a new session resumed from the saved session id, in the same worktree (AL-110).
+  reconnectSession: (intent, context) => context.reconnectSession(intent.ticketId),
 };
 
 /** Carries out a toast button's intent: opens a page, or opens Connections on a row (AL-046). */

@@ -11,6 +11,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:getMcpStatus', // AL-108
   'agent:resolvePermission', // AL-109
   'agent:getPermission', // AL-109
+  'agent:reconnect', // AL-110
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

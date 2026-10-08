@@ -9,7 +9,8 @@ export function createAgentHandlers({
   stages,
   mcpStatus,
   permissions,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  recovery,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'recovery'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     'agent:getStatus': ({ ticketId }) => ok(sessions.status(ticketId)),
     'agent:getTranscript': async ({ ticketId }) => ok(await transcripts.get(ticketId)),
@@ -25,5 +26,6 @@ export function createAgentHandlers({
     'agent:getMcpStatus': () => ok(mcpStatus.summary()),
     'agent:resolvePermission': ({ ticketId, requestId, decision }) => ok({ resolved: permissions.resolve(ticketId, requestId, decision) }),
     'agent:getPermission': ({ ticketId }) => ok({ request: permissions.pending(ticketId) }),
+    'agent:reconnect': ({ ticketId }) => recovery.reconnect(ticketId),
   };
 }

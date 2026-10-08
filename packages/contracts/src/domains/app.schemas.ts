@@ -118,6 +118,8 @@ export const ToastIntentSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('navigate'), route: ToastRouteSchema }),
   // AL-046: Reconnect opens the Connections modal on that row, with its token field focused (design §8).
   z.object({ type: z.literal('openConnections'), connectionId: ConnectionIdSchema.optional() }),
+  // AL-110: Reconnect resumes a lost agent session from its saved session id in the same worktree.
+  z.object({ type: z.literal('reconnectSession'), ticketId: TicketIdSchema }),
 ]);
 export type ToastIntent = z.infer<typeof ToastIntentSchema>;
 
