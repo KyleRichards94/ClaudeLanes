@@ -95,6 +95,12 @@ export interface ConnectionsService {
    */
   noteAdoResponse(id: string, response: AdoResponseNote): Promise<void>;
   /**
+   * Main process only (AL-048, design §8 last bullet): Azure DevOps answered 401 with this
+   * organisation's token, so its row turns red with `message` until the token is replaced or passes a
+   * test again. Resolves true when the row changed (it was not already red with this message).
+   */
+  markUnauthorized(id: string, message: string): Promise<boolean>;
+  /**
    * Main process only (AL-108): the MCP servers a new agent session starts, keyed by the name the
    * session knows each by, with tokens put in their env var or header (AL-045). The user's servers,
    * plus the built-in Azure DevOps server for `adoConnectionId` (the work item's organisation) under
@@ -127,6 +133,8 @@ export interface ConnectionsServiceOptions {
   now?: () => Date;
   /** Where start-up problems are reported; the console until the app log exists (AL-214). Never given a token. */
   warn?: (message: string) => void;
+  /** Called after every change that emits `connections:changed` (AL-048 resumes paused agents after a reconnect). */
+  onChanged?: () => void;
 }
 
 export const CLAUDE_CONNECTION_ID = 'claude';
@@ -275,6 +283,11 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
 
   function changed(): void {
     emit('connections:changed', {});
+    try {
+      options.onChanged?.();
+    } catch (cause) {
+      warn(`A connections change listener failed: ${describe(cause)}`);
+    }
   }
 
   /** Validates a draft and normalises what the user typed (the ADO organisation URL). */
@@ -831,6 +844,22 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
           return;
         }
         changed();
+      }),
+
+    markUnauthorized: (id, message) =>
+      exclusive(async () => {
+        const record = findRecord(id);
+        if (record?.kind !== 'ado' || !writable) return false;
+        if (record.status === 'error' && record.statusMessage === message) return false;
+        // updatedAt stays: it dates the token, and replacing the token is what reconnects.
+        const updated: StoredConnection = { ...record, status: 'error', statusMessage: message };
+        const written = writeRecords(records.map((item) => (item.id === id ? updated : item)));
+        if (!written.ok) {
+          warn(`Could not mark ${id} as refused by Azure DevOps: ${written.message}`);
+          return false;
+        }
+        changed();
+        return true;
       }),
   };
 }
