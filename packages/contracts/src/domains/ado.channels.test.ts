@@ -6,6 +6,7 @@ import { adoFixture, ADO_FIXTURE_ORG_ID, ADO_FIXTURE_PROJECT, ADO_FIXTURE_REPOSI
 /** AL-065: every `ado:*` channel's request and response contract. */
 
 const fixture = adoFixture();
+const TEAM = { id: 'team-osc', name: 'OSC Developers' };
 
 /** A request each channel accepts, and the fixture reply it answers with. */
 const examples = {
@@ -30,10 +31,35 @@ const examples = {
     request: { project: ADO_FIXTURE_PROJECT, repository: ADO_FIXTURE_REPOSITORY.id, pullRequestId: 10612 },
     response: fixture.pullRequests[0],
   },
+  'ado:listTeams': { request: { project: ADO_FIXTURE_PROJECT }, response: { teams: [TEAM], defaultTeamId: TEAM.id } },
+  'ado:teamBoard': {
+    request: { team: 'OSC Developers', sprint: ADO_FIXTURE_SPRINT_42_PATH },
+    response: {
+      team: TEAM,
+      sprint: { id: 'it-42', name: 'Sprint 42', path: ADO_FIXTURE_SPRINT_42_PATH },
+      columns: [{ id: 'c-failed', name: 'Failed', kind: 'failed' }],
+      items: [
+        {
+          id: 71318,
+          type: 'Bug',
+          title: 'Quote PDF totals round incorrectly',
+          state: 'Failed UAT',
+          points: 2,
+          columnId: 'c-failed',
+          column: 'Failed',
+          columnKind: 'failed',
+          assignee: { id: 'kr', displayName: 'Kyle Richards', uniqueName: null, initials: 'KR' },
+          branch: null,
+          pullRequestId: null,
+          webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_workitems/edit/71318',
+        },
+      ],
+    },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
-  it('declares the seven channels from the ticket, each with a contract', () => {
+  it('declares the channels from AL-065 and E14, each with a contract', () => {
     expect([...ADO_INVOKE_CHANNELS]).toEqual([
       'ado:listSprints',
       'ado:listWorkItems',
@@ -42,6 +68,8 @@ describe('ado:* channel contracts', () => {
       'ado:getComments',
       'ado:createPullRequest',
       'ado:getPullRequest',
+      'ado:listTeams',
+      'ado:teamBoard',
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

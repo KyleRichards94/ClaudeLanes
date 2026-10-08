@@ -3,7 +3,9 @@ import {
   createAdoClient,
   createPullRequest,
   getPullRequestSnapshot,
+  getTeamBoard,
   getWorkItem,
+  listMyTeams,
   listSprints,
   listSprintWorkItems,
   listWorkItemComments,
@@ -22,11 +24,15 @@ import {
   type GetPullRequestRequest,
   type GetWorkItemRequest,
   type ListSprintsRequest,
+  type ListTeamsRequest,
   type ListWorkItemsRequest,
   type PullRequestSnapshot,
   type Result,
   type SearchWorkItemsRequest,
   type SprintList,
+  type TeamBoard,
+  type TeamBoardRequest,
+  type TeamList,
   type WorkItem,
   type WorkItemComment,
 } from '@agent-lanes/contracts';
@@ -59,6 +65,10 @@ export interface AdoService {
   getComments(request: GetCommentsRequest): Promise<Result<WorkItemComment[]>>;
   createPullRequest(request: CreatePullRequestRequest): Promise<Result<CreatedPullRequest>>;
   getPullRequest(request: GetPullRequestRequest): Promise<Result<PullRequestSnapshot>>;
+  /** The user's teams and the default one, for the team board's dropdown (AL-231). */
+  listTeams(request: ListTeamsRequest): Promise<Result<TeamList>>;
+  /** A team's ADO board for one sprint (AL-231). */
+  teamBoard(request: TeamBoardRequest): Promise<Result<TeamBoard>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -193,6 +203,13 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
 
     getPullRequest: ({ org, project, repository, pullRequestId }) =>
       withClient({ org, project }, (client) => getPullRequestSnapshot(client, { project, repository, pullRequestId })),
+
+    listTeams: (request) => withClient(request, (client, project) => listMyTeams(client, project)),
+
+    teamBoard: (request) =>
+      withClient(request, (client, project) =>
+        getTeamBoard(client, { project, ...(request.team === undefined ? {} : { team: request.team }), ...(request.sprint === undefined ? {} : { sprint: request.sprint }) }),
+      ),
   };
 }
 
