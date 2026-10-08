@@ -38,6 +38,7 @@ import { createBranchStatusService, type BranchStatusService } from './worktrees
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
 import { createArchiveService, type ArchiveService } from './worktrees/archive';
 import { createDiffService, type DiffService } from './worktrees/diff';
+import { createMergeSubBranchesService, type MergeSubBranchesService } from './worktrees/merge-sub-branches';
 import { createSubWorktreeService, subWorktreeHooks, type SubWorktreeService } from './worktrees/sub-worktree';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
@@ -112,6 +113,8 @@ export interface Services {
   readonly reconcile: ReconcileService;
   /** Writer sub-agents' worktrees on `sub/<ticket>-<name>`, created through each session's WorktreeCreate hook (AL-084, D9). */
   readonly subWorktrees: SubWorktreeService;
+  /** Merge sub-branches → ticket branch, stopping at the first conflict; Hand to lead agent / I'll resolve it (AL-086). */
+  readonly mergeSubBranches: MergeSubBranchesService;
   /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
   readonly credentialFailures: CredentialFailureService;
 }
@@ -265,6 +268,15 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const mergeSubBranches = createMergeSubBranchesService({
+    git,
+    tickets,
+    branches,
+    sessions,
+    openPath: (path) => shell.openPath(path),
+    queue: repoQueue,
+    log: log.child('merge'),
+  });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
   late.credentialFailures = credentialFailureService;
@@ -300,6 +312,7 @@ export function createServices(options: ServiceOptions): Services {
     diffs,
     reconcile,
     subWorktrees,
+    mergeSubBranches,
     credentialFailures: credentialFailureService,
   };
 }

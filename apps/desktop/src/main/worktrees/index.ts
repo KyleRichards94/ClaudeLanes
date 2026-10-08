@@ -45,3 +45,9 @@ export {
   type SubWorktreeService,
   type SubWorktreeServiceOptions,
 } from './sub-worktree';
+export {
+  conflictHandOffMessage,
+  createMergeSubBranchesService,
+  type MergeSubBranchesService,
+  type MergeSubBranchesServiceOptions,
+} from './merge-sub-branches';
