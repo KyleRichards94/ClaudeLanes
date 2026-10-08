@@ -5,7 +5,7 @@ import { agentTickets } from '@/entities/agent-ticket';
 import { adoFixture } from '@agent-lanes/contracts/testing';
 import { getConnectionsModal, resetConnectionsModal, useUiPrefs } from '@/shared/model';
 import { RouterProvider, createRouter } from '@/shared/routing';
-import { fakeMcpRow, fakeTicketRecord, installFakeBridge } from '@/shared/testing';
+import { fakeTicketRecord, installFakeBridge } from '@/shared/testing';
 import { BoardPage } from './BoardPage';
 
 const fixture = adoFixture();
@@ -101,7 +101,8 @@ describe('BoardPage header (AL-142)', () => {
       },
       'ado:listSprints': { ok: true, data: fixture.sprints },
       'repos:list': { ok: true, data: repos },
-      'connections:list': { ok: true, data: [fakeMcpRow({ status: 'ok' })] },
+      // The running sessions' MCP servers (AL-108's live pill).
+      'agent:getMcpStatus': { ok: true, data: { state: 'online', servers: [{ name: 'azure-devops', state: 'connected', error: null, ticketIds: ['71273'] }] } },
       ...extra,
     });
   }
