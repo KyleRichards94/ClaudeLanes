@@ -1,3 +1,4 @@
+import type { Services } from '../services';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import { skillCommand } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
@@ -52,6 +53,9 @@ async function setup() {
     usage: createUsageService({ sessions, emit: recordingEmit().emit }),
     recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }),
     launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }),
+    // Launch from the team board (AL-236) has its own tests.
+    adoLauncher: {} as Services['adoLauncher'],
+    launchUndo: {} as Services['launchUndo'],
   });
   await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
   const call = fake.calls[0]!;

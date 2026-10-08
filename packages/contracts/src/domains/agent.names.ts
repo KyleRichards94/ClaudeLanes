@@ -19,6 +19,8 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:getSubagents', // AL-107
   'agent:reconnect', // AL-110
   'agent:startNow', // AL-111
+  'agent:launchFromAdo', // AL-236
+  'agent:undoLaunch', // AL-237
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

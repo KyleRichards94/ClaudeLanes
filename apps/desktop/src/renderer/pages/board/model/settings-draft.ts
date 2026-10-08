@@ -1,4 +1,8 @@
 import {
+  DROP_KINDS,
+  dropDefaultsOf,
+  type DropDefaults,
+  type DropKind,
   BUILD_QUEUE_SIZE_LIMIT,
   MAX_CONCURRENT_AGENTS_LIMIT,
   agentPermissionPolicy,
@@ -42,6 +46,15 @@ export interface SettingsDraft {
   repos: Readonly<Record<string, RepoDraft>>;
   /** The headless permission policy (AL-109); `bashAllow` is the text of its field. */
   permissions: PermissionsDraft;
+  /** Settings › Drops (AL-240): each kind of drop's skills (as typed), model and effort. */
+  drops: Readonly<Record<DropKind, DropDraft>>;
+}
+
+export interface DropDraft {
+  /** Skill names separated by commas or spaces, with or without the leading slash. */
+  skills: string;
+  model: Model;
+  effort: Effort;
 }
 
 export interface PermissionsDraft {
@@ -67,7 +80,8 @@ export type DraftAction =
   | { type: 'repoText'; repo: RepoSettings; field: RepoTextField; value: string }
   | { type: 'repoWriteBack'; repo: RepoSettings; value: boolean }
   | { type: 'permission'; field: PermissionSwitch; value: boolean }
-  | { type: 'bashAllow'; value: string };
+  | { type: 'bashAllow'; value: string }
+  | { type: 'drop'; kind: DropKind; change: Partial<DropDraft> };
 
 export function repoDraft(repo: RepoSettings): RepoDraft {
   return {
@@ -91,7 +105,14 @@ export function draftFromSettings(settings: Settings): SettingsDraft {
     adoStateTransitions: settings.adoStateTransitions,
     repos: {},
     permissions: permissionsDraft(agentPermissionPolicy(settings)),
+    drops: dropsDraft(dropDefaultsOf(settings)),
   };
+}
+
+function dropsDraft(defaults: DropDefaults): Record<DropKind, DropDraft> {
+  return Object.fromEntries(
+    DROP_KINDS.map((kind) => [kind, { skills: defaults[kind].skills.map((skill) => `/${skill}`).join(' '), model: defaults[kind].model, effort: defaults[kind].effort }]),
+  ) as Record<DropKind, DropDraft>;
 }
 
 function permissionsDraft(policy: AgentPermissions): PermissionsDraft {
@@ -130,6 +151,8 @@ export function draftReducer(draft: SettingsDraft, action: DraftAction): Setting
       return { ...draft, permissions: { ...draft.permissions, [action.field]: action.value } };
     case 'bashAllow':
       return { ...draft, permissions: { ...draft.permissions, bashAllow: action.value } };
+    case 'drop':
+      return { ...draft, drops: { ...draft.drops, [action.kind]: { ...draft.drops[action.kind], ...action.change } } };
   }
 }
 
@@ -155,6 +178,11 @@ function wholeNumber(text: string, min: number, max: number): number | null {
 /** Field errors, keyed `buildQueueSize`, `skills`, or `<repo path>:<field>`. Empty when the draft can be saved. */
 export type DraftErrors = Readonly<Record<string, string>>;
 
+/** The error key of a drop row's skills field. */
+export function dropErrorKey(kind: DropKind): string {
+  return `drops:${kind}`;
+}
+
 export function repoErrorKey(repo: Pick<RepoSettings, 'path'>, field: RepoTextField): string {
   return `${repo.path}:${field}`;
 }
@@ -166,6 +194,12 @@ export function validateDraft(draft: SettingsDraft, repos: readonly RepoSettings
   }
   const badSkill = parseSkills(draft.skills).find((name) => !SKILL_NAME.test(name));
   if (badSkill) errors['skills'] = `"${badSkill}" is not a skill name. Use names like /code-review.`;
+  for (const kind of DROP_KINDS) {
+    const skills = parseSkills(draft.drops[kind].skills);
+    const bad = skills.find((name) => !SKILL_NAME.test(name));
+    if (bad) errors[dropErrorKey(kind)] = `"${bad}" is not a skill name. Use names like /code-review.`;
+    else if (skills.length > 16) errors[dropErrorKey(kind)] = 'Enter at most 16 skills.';
+  }
   const commands = parseCommandPrefixes(draft.permissions.bashAllow);
   const chained = commands.find((command) => /[;&|`$<>]/.test(command));
   if (chained) errors['bashAllow'] = `"${chained}" chains or redirects commands. Enter plain commands such as npm run lint.`;
@@ -245,6 +279,14 @@ export function draftToPatch(draft: SettingsDraft, settings: Settings): Settings
   const saved = agentPermissionPolicy(settings);
   if (policy.edits !== saved.edits || policy.gitRead !== saved.gitRead || policy.buildAndTest !== saved.buildAndTest || !sameList(policy.bashAllow, saved.bashAllow)) {
     patch.agentPermissions = policy;
+  }
+
+  const savedDrops = dropDefaultsOf(settings);
+  const drops = Object.fromEntries(
+    DROP_KINDS.map((kind) => [kind, { skills: parseSkills(draft.drops[kind].skills), model: draft.drops[kind].model, effort: draft.drops[kind].effort }]),
+  ) as DropDefaults;
+  if (DROP_KINDS.some((kind) => !sameList(drops[kind].skills, savedDrops[kind].skills) || drops[kind].model !== savedDrops[kind].model || drops[kind].effort !== savedDrops[kind].effort)) {
+    patch.dropDefaults = drops;
   }
 
   const repos = settings.repos.map((repo) => {

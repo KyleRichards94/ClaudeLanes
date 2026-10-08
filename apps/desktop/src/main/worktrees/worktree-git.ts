@@ -121,6 +121,30 @@ export async function addWorktree(
   });
 }
 
+/**
+ * A worktree on a branch that already exists (AL-236, AL-238: the item's branch, a pull request's source
+ * branch): `detached` checks out `commit` with no branch (a read-only review, so several can share the
+ * PR); otherwise the local branch, or a new local branch tracking `origin/<branch>` when only origin
+ * has it. Resolves whether a branch was created, so a rollback deletes only that.
+ */
+export async function addCheckoutWorktree(
+  git: WorktreeGit,
+  repo: string,
+  target: { path: string; branch: string; commit: string; detached: boolean },
+  call: CallOptions = {},
+): Promise<{ createdBranch: boolean }> {
+  if (target.detached) {
+    await git.run(['worktree', 'add', '--detach', '--end-of-options', target.path, target.commit], { cwd: repo, ...call });
+    return { createdBranch: false };
+  }
+  if ((await commitOf(git, repo, `${HEADS}${target.branch}`, call)) !== null) {
+    await git.run(['worktree', 'add', '--end-of-options', target.path, target.branch], { cwd: repo, ...call });
+    return { createdBranch: false };
+  }
+  await git.run(['worktree', 'add', '--track', '-b', target.branch, '--end-of-options', target.path, `${ORIGIN}${target.branch}`], { cwd: repo, ...call });
+  return { createdBranch: true };
+}
+
 /** Whether git lists a worktree at `path` (its folder may be missing). */
 export async function findRegisteredWorktree(git: WorktreeGit, repo: string, path: string, call: CallOptions = {}) {
   return (await git.worktrees(repo, call)).find((entry) => isSameRepoPath(entry.path, path));
@@ -164,6 +188,8 @@ export interface UndoAddOptions {
   rootBefore: boolean;
   /** Waits between attempts to remove a worktree Windows still has files open in (antivirus, indexer). */
   retryDelaysMs?: readonly number[];
+  /** The branch existed before (a checkout of the item's or a PR's branch, or a detached review): it is never deleted. */
+  keepBranch?: boolean;
 }
 
 const DEFAULT_RETRY_DELAYS_MS = [250, 1_000];
@@ -238,7 +264,7 @@ export async function undoWorktreeAdd(git: WorktreeGit, options: UndoAddOptions)
   // 3. The branch. Git creates it before it looks at the folder, so it exists even when the add failed
   //    straight away. It is deleted only while no worktree has it checked out and it is still at `commit`.
   const ref = `${HEADS}${branch}`;
-  const branchExists = await commitOf(git, repo, ref, {}).then((commit) => commit !== null, () => true);
+  const branchExists = !options.keepBranch && (await commitOf(git, repo, ref, {}).then((commit) => commit !== null, () => true));
   if (branchExists) {
     const checkedOut = await git.worktrees(repo).then((list) => list.some((entry) => entry.branchRef === ref), () => true);
     const deleted = !checkedOut && (await attempt(() => git.run(['update-ref', '-d', ref, options.commit], { cwd: repo })));

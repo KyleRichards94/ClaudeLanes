@@ -94,3 +94,22 @@ test('edits agent defaults and a repo from the board header and saves them', asy
   await expect(panel.getByTestId('settings-build-queue-size')).toHaveValue('3');
   await expect(panel.getByRole('radio', { name: 'Sonnet' })).toHaveAttribute('aria-checked', 'true');
 });
+
+test('sets the agents team board drops start, per lane, on the Drops tab (AL-240)', async () => {
+  const page = await launch();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const panel = page.getByRole('dialog', { name: 'Settings' });
+  await panel.getByRole('tab', { name: 'Drops' }).click();
+
+  const qa = panel.getByTestId('settings-drop-qa');
+  await expect(panel.getByTestId('settings-drop-code-review-skills')).toHaveValue('/code-review /pr-comment-actioner');
+  await expect(qa.getByRole('radio', { name: 'Sonnet' })).toHaveAttribute('aria-checked', 'true');
+  await panel.getByTestId('settings-drop-qa-skills').fill('/cs-qa-wip /cs-smoke');
+  await qa.getByRole('radio', { name: 'Haiku' }).click();
+  await page.screenshot({ path: test.info().outputPath('settings-drops.png') });
+  await panel.getByRole('button', { name: 'Save settings' }).click();
+  await expect(panel).toBeHidden();
+
+  await expect.poll(() => savedSettings().dropDefaults?.qa).toEqual({ skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku', effort: 'medium' });
+  expect(savedSettings().dropDefaults?.['code-review']).toEqual({ skills: ['code-review', 'pr-comment-actioner'], model: 'opus', effort: 'high' });
+});

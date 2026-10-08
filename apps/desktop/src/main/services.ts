@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, dropDefaultsOf, dropKindOf } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -50,6 +50,10 @@ import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
 import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discovery';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
+import { createTicketLauncher, type TicketLauncher } from './tickets/launch';
+import { createAdoLauncher, type AdoLauncher } from './agent/launch-from-ado';
+import { createLaunchUndo, type LaunchUndo } from './agent/undo-launch';
+import { findRegisteredRepo } from './ado/registered-repos';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
@@ -156,6 +160,12 @@ export interface Services {
   readonly mergeSubBranches: MergeSubBranchesService;
   /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
   readonly credentialFailures: CredentialFailureService;
+  /** Launch from the New agent ticket modal: work item, worktree and record, then the session or Queued (AL-165). */
+  readonly ticketLauncher: TicketLauncher;
+  /** Launch from the team board: recheck, the one ADO change, worktree, ticket and session, with rollback (AL-236). */
+  readonly adoLauncher: AdoLauncher;
+  /** Undo of a team board launch for 10 s or until the first turn ends; watches each session for a push or a comment (AL-237). */
+  readonly launchUndo: LaunchUndo;
 }
 
 export interface ServiceOptions {
@@ -175,7 +185,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -350,6 +360,8 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
     // Each lane change posts one comment to the work item (AL-115).
     onStageChanged: (change) => stageComments.stageChanged(change),
+    // A team board drop starts its ticket in the lane it was dropped on (AL-236).
+    startLane: (ticketId) => late.adoLauncher?.startLane(ticketId),
   });
   const pullRequests = createPullRequestService({ tickets, ado, connections, git: git.run, emit: options.emit, transcripts, log: log.child('pr') });
   // Open PRs from before a restart are read again from the start (AL-181).
@@ -406,6 +418,21 @@ export function createServices(options: ServiceOptions): Services {
   const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
   late.credentialFailures = credentialFailureService;
   const buildContext = createBuildContext({ sessions, log: log.child('agent') });
+  const ticketLauncher = createTicketLauncher({ ado, worktrees, launches, tickets, log: log.child('launch') });
+  const adoLauncher = createAdoLauncher({
+    ado,
+    connections,
+    worktrees,
+    launches,
+    tickets,
+    settings,
+    repoForPullRequest: (orgUrl, pullRequest) => findRegisteredRepo(settings.get().repos, git.run, orgUrl, pullRequest.repository),
+    // Settings › Drops (AL-240), read at each drop.
+    laneDefaults: (action) => dropDefaultsOf(settings.get())[dropKindOf(action)],
+    log: log.child('launch'),
+  });
+  late.adoLauncher = adoLauncher;
+  const launchUndo = createLaunchUndo({ launcher: adoLauncher, sessions, launches, worktrees, ado, emit: options.emit, log: log.child('launch') });
 
   return {
     appDataDir: options.appDataDir,
@@ -451,6 +478,9 @@ export function createServices(options: ServiceOptions): Services {
     subagents,
     mergeSubBranches,
     credentialFailures: credentialFailureService,
+    ticketLauncher,
+    adoLauncher,
+    launchUndo,
   };
 }
 
@@ -461,6 +491,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
   services.claude.closeAll();
   services.mcpStatus.dispose();
+  services.launchUndo.dispose();
   services.transcripts.dispose();
   services.pullRequests.dispose();
   services.designShip.dispose();

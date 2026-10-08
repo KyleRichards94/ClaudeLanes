@@ -342,6 +342,7 @@ describe('failure leaves no half-created worktree or branch', () => {
       get: (id) => tickets.get(id),
       list: (filter) => tickets.list(filter),
       create: async () => err('INTERNAL', 'Could not write 71273.json (ENOSPC)'),
+      delete: (id) => tickets.delete(id),
     };
 
     const result = await service({ tickets: failingTickets }).worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
@@ -452,6 +453,92 @@ describe('failure leaves no half-created worktree or branch', () => {
   });
 });
 
+describe('discarding a ticket this run created (AL-165, AL-237)', () => {
+  it('removes its worktree, branch and record, leaving the repo as before the launch', async () => {
+    const before = await snapshot();
+    const { worktrees } = service();
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
+    expect(created.ok).toBe(true);
+    // The agent may already have written files in it.
+    await writeFile(join(root, '71273', 'notes.md'), 'plan\n');
+
+    await expect(worktrees.discard('71273')).resolves.toEqual({ ok: true, data: { complete: true, leftovers: [] } });
+    expect(await snapshot()).toEqual(before);
+    expect(await tickets.get('71273')).toBeUndefined();
+    // Only once.
+    await expect(worktrees.discard('71273')).resolves.toMatchObject({ ok: false, details: { reason: 'not-created-here' } });
+  });
+
+  it('keeps a branch the agent already committed to and says so', async () => {
+    const { worktrees } = service();
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
+    expect(created.ok).toBe(true);
+    const path = join(root, '71273');
+    await writeFile(join(path, 'grid.cs'), 'class Grid {}\n');
+    await repo.exec(['add', 'grid.cs'], path);
+    await repo.exec(['-c', 'user.name=Agent', '-c', 'user.email=agent@example.invalid', 'commit', '--quiet', '-m', 'Grid'], path);
+
+    const result = await worktrees.discard('71273');
+    expect(result).toEqual({ ok: true, data: { complete: false, leftovers: ['branch 71273-cutover-frmjobcontrol-to'] } });
+    expect(await worktreeOf(path)).toBeUndefined();
+  });
+});
+
+describe('worktrees on a branch that already exists (AL-236)', () => {
+  /** Pushes `branch` with one commit to origin and forgets it locally, as a teammate's branch would be. */
+  async function originOnlyBranch(branch: string): Promise<string> {
+    await repo.exec(['switch', '--quiet', '-c', branch]);
+    await repo.write('src/notes.cs', `// ${branch}\n`);
+    const commit = await repo.commit(`Work on ${branch}`);
+    await repo.exec(['push', '--quiet', 'origin', branch]);
+    await repo.exec(['switch', '--quiet', 'main']);
+    await repo.exec(['branch', '--quiet', '-D', branch]);
+    return commit;
+  }
+
+  it("checks out the item's branch from origin, tracking it, and a discard deletes only the local branch it made", async () => {
+    const commit = await originOnlyBranch('71273-cutover-frmjobcontrol-to');
+    const { worktrees } = service();
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor', { checkout: { branch: '71273-cutover-frmjobcontrol-to' } }));
+
+    expect(created).toMatchObject({ ok: true, data: { record: { id: '71273', branch: '71273-cutover-frmjobcontrol-to' }, start: { commit } } });
+    const path = join(root, '71273');
+    expect(await worktreeOf(path)).toMatchObject({ branch: '71273-cutover-frmjobcontrol-to', head: commit });
+    expect(await repo.exec(['rev-parse', '--abbrev-ref', '71273-cutover-frmjobcontrol-to@{upstream}'])).toBe('origin/71273-cutover-frmjobcontrol-to');
+
+    await expect(worktrees.discard('71273')).resolves.toEqual({ ok: true, data: { complete: true, leftovers: [] } });
+    expect(await repo.exec(['branch', '--list', '71273-*'])).toBe('');
+    expect(await repo.exec(['ls-remote', '--heads', 'origin', '71273-cutover-frmjobcontrol-to'])).toContain(commit);
+  });
+
+  it('never deletes a local branch that was there before, and a review is detached so others can review too', async () => {
+    await repo.exec(['branch', 'users/ty/71298-invoice-matching']);
+    const { worktrees } = service();
+    const review = await worktrees.create({
+      repo: repo.dir,
+      subject: { kind: 'pull-request', pullRequestId: 10598, title: '!10598 Supplier invoice matching rules', purpose: 'review' },
+      checkout: { branch: 'users/ty/71298-invoice-matching', detached: true },
+      baseBranch: 'main',
+    });
+    expect(review).toMatchObject({ ok: true, data: { record: { id: 'pr-10598-review', ado: null, branch: 'users/ty/71298-invoice-matching', title: '!10598 Supplier invoice matching rules' } } });
+    expect(await worktreeOf(join(root, 'pr-10598-review'))).toMatchObject({ detached: true, branch: null });
+
+    const local = await worktrees.create(workItem(71298, 'Supplier invoice matching rules', { checkout: { branch: 'users/ty/71298-invoice-matching' } }));
+    expect(local).toMatchObject({ ok: true, data: { record: { id: '71298' } } });
+    await worktrees.discard('71298');
+    await worktrees.discard('pr-10598-review');
+    expect(await repo.exec(['branch', '--list', 'users/ty/71298-invoice-matching'])).toContain('users/ty/71298-invoice-matching');
+  });
+
+  it('refuses a branch that exists nowhere, creating nothing', async () => {
+    const before = await snapshot();
+    const { worktrees } = service();
+    const result = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor', { checkout: { branch: 'gone-branch' } }));
+    expect(result).toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'branch-not-found' } });
+    expect(await snapshot()).toEqual(before);
+  });
+});
+
 describe('titleFromDescription', () => {
   it.each([
     ['Fix the login redirect', 'Fix the login redirect'],
@@ -555,5 +642,42 @@ describe('previewing the workspace (AL-164)', () => {
       code: 'VALIDATION',
       details: { reason: 'repo-not-registered' },
     });
+  });
+});
+
+describe('pull request worktrees (AL-238)', () => {
+  it('two reviews of one PR at once get their own read-only worktrees, beside the author answering its comments', async () => {
+    await repo.exec(['switch', '--quiet', '-c', 'users/ty/71298-invoice-matching']);
+    await repo.write('src/invoices.cs', 'class Invoices {}\n');
+    const commit = await repo.commit('Invoice matching');
+    await repo.exec(['push', '--quiet', 'origin', 'users/ty/71298-invoice-matching']);
+    await repo.exec(['switch', '--quiet', 'main']);
+    await repo.exec(['branch', '--quiet', '-D', 'users/ty/71298-invoice-matching']);
+
+    const { worktrees } = service();
+    const review = (n: number) =>
+      worktrees.create({
+        repo: repo.dir,
+        subject: { kind: 'pull-request', pullRequestId: 10598, title: `!10598 Supplier invoice matching rules (${n})`, purpose: 'review' },
+        checkout: { branch: 'users/ty/71298-invoice-matching', detached: true },
+        baseBranch: 'main',
+      });
+    const [first, second] = await Promise.all([review(1), review(2)]);
+    const answer = await worktrees.create({
+      repo: repo.dir,
+      subject: { kind: 'pull-request', pullRequestId: 10598, title: '!10598 Supplier invoice matching rules', purpose: 'answer' },
+      checkout: { branch: 'users/ty/71298-invoice-matching' },
+      baseBranch: 'main',
+    });
+
+    expect([first, second, answer].map((result) => (result.ok ? result.data.record.id : result.message)).toSorted()).toEqual(['pr-10598', 'pr-10598-review', 'pr-10598-review-2']);
+    const paths = [first, second].map((result) => (result.ok ? result.data.record.worktreePath : ''));
+    expect(new Set(paths).size).toBe(2);
+    for (const path of paths) expect(await worktreeOf(path)).toMatchObject({ detached: true, head: commit });
+    expect(await worktreeOf(join(root, 'pr-10598'))).toMatchObject({ branch: 'users/ty/71298-invoice-matching', head: commit });
+    // A second agent answering the same PR's comments is refused: one per PR.
+    await expect(
+      worktrees.create({ repo: repo.dir, subject: { kind: 'pull-request', pullRequestId: 10598, title: 'x', purpose: 'answer' }, checkout: { branch: 'users/ty/71298-invoice-matching' } }),
+    ).resolves.toMatchObject({ ok: false, details: { reason: 'ticket-exists' } });
   });
 });

@@ -86,6 +86,15 @@ describe('stage service (AL-103)', () => {
     expect(implementing.events.events).toEqual([]);
   });
 
+  it('moves a ticket launched from the team board into the lane it was dropped on (AL-236)', async () => {
+    const tickets = await memoryTickets({ id: '71273', stage: 'queued', gates: ALL_AUTO });
+    const events = recordingEmit();
+    const stages = createStageService({ tickets, emit: events.emit, startLane: (id) => (id === '71273' ? 'implementing' : undefined) });
+    await stages.sessionStarting('71273');
+    expect((await tickets.get('71273'))?.stage).toBe('implementing');
+    expect(events.of('agent:stage')).toEqual([{ ticketId: '71273', change: 'stage', stage: 'implementing', from: 'queued', activity: null, progress: 0 }]);
+  });
+
   it('refuses an unknown ticket', async () => {
     const { stages } = await setup();
     await expect(stages.setStage('99999', 'implementing', 'x')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });

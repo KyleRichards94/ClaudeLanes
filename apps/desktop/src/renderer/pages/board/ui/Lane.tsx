@@ -1,6 +1,7 @@
 import type { Lane as LaneName } from '@agent-lanes/contracts';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { color, glass, radius, space, tone } from '@agent-lanes/tokens';
+import type { ReactNode } from 'react';
+import { color, focusRing, glass, radius, space, tone } from '@agent-lanes/tokens';
 import { Badge, GlassPanel, Text } from '@agent-lanes/ui';
 import {
   AgentTicketCard,
@@ -13,7 +14,7 @@ import {
 import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
-import { useUiPrefs } from '@/shared/model';
+import { useIsLaunchedTicket, useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
 import { EMPTY_LANE_COPY, collapsedLaneLabel, laneBadgeLabel, needsYouEmptyCopy } from '../model/lane-copy';
 
@@ -91,17 +92,27 @@ export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneP
           </View>
         ) : (
           ids.map((id) => (
-            <View key={id} style={styles.cardSlot}>
+            <LaunchedCardSlot key={id} ticketId={id}>
               <AgentTicketCard ticketId={id} store={store} testID={`card-${id}`} onPress={() => router.navigate(routes.ticket(id))} />
               {/* Allow once / Allow for this ticket / Deny under the card while a tool call waits (AL-109). */}
               <PermissionPrompt ticketId={id} />
               {/* Approve / Request changes while a gate waits; the drill-in stepper shows the same action (AL-171). */}
               <GateActions ticketId={id} placement="card" store={store} />
-            </View>
+            </LaunchedCardSlot>
           ))
         )}
       </View>
     </GlassPanel>
+  );
+}
+
+/** A card and what sits under it; the card just launched gets a ring for a few seconds (AL-165). */
+function LaunchedCardSlot({ ticketId, children }: { ticketId: string; children: ReactNode }) {
+  const launched = useIsLaunchedTicket(ticketId);
+  return (
+    <View style={[styles.cardSlot, launched && styles.launched]} testID={launched ? `card-${ticketId}-launched` : undefined}>
+      {children}
+    </View>
   );
 }
 
@@ -116,6 +127,13 @@ const verticalLine = 20;
 const styles = StyleSheet.create({
   cardSlot: {
     gap: space.sm,
+    borderRadius: radius.card,
+  },
+  launched: {
+    outlineColor: focusRing.color,
+    outlineWidth: focusRing.width,
+    outlineOffset: focusRing.offset,
+    outlineStyle: 'solid',
   },
   lane: {
     flexGrow: 1,

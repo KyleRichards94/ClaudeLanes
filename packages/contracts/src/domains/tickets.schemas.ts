@@ -2,6 +2,8 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketIdSchema } from '../events';
 import { EffortSchema, LaneSchema, ModelSchema } from '../vocabulary';
+import { AgentSessionStatusSchema } from './agent.status';
+import { WorkItemIdSchema } from './ado.ids';
 import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
 import { TicketPullRequestSchema } from './pr.schemas';
@@ -300,6 +302,41 @@ export type GetTicketRequest = z.infer<typeof GetTicketRequestSchema>;
 export const GetTicketResponseSchema = z.object({ record: TicketRecordSchema.nullable() });
 export type GetTicketResponse = z.infer<typeof GetTicketResponseSchema>;
 
+// ── Launch (AL-165, design §9 step 1, artboard 2 "Launch agent →") ──────────────────────────────
+
+/** The longest job description a launch takes (the modal's limit). */
+export const LAUNCH_DESCRIPTION_MAX_LENGTH = 20_000;
+
+/**
+ * `tickets:launch`: what the New agent ticket modal launches. Main reads the work item from Azure
+ * DevOps again (its project, description and acceptance criteria for the first turn), creates the
+ * worktree and the ticket record (AL-083), then starts the session or queues it at the repo's cap
+ * (AL-111). A step that fails rolls back the ones before it.
+ */
+export const LaunchTicketRequestSchema = z.strictObject({
+  /** The registered repo the workspace preview showed (settings `repos[].path`). */
+  repo: LocalPathSchema,
+  /** The picked work item; null for "No ticket" (`nt-…` naming). */
+  workItem: z.strictObject({ id: WorkItemIdSchema, title: z.string().max(1000) }).nullable(),
+  /** "What should the agent do?"; may be empty when a work item is picked. */
+  description: z.string().max(LAUNCH_DESCRIPTION_MAX_LENGTH),
+  /** Skill names without the leading slash. */
+  skills: z.array(z.string().min(1).max(200)).max(TICKET_RECORD_LIMITS.skills).refine(unique, 'Each skill can be listed once'),
+  model: ModelSchema,
+  effort: EffortSchema,
+  gates: StageGatesSchema,
+  /** The branch name as the user edited it; null uses the generated name. */
+  worktreeName: BranchNameSchema.nullable(),
+});
+export type LaunchTicketRequest = z.infer<typeof LaunchTicketRequestSchema>;
+
+/** The new ticket (in Planning once its session started, else in Queued) and its session status. */
+export const LaunchTicketResponseSchema = z.object({
+  record: TicketRecordSchema,
+  status: AgentSessionStatusSchema,
+});
+export type LaunchTicketResponse = z.infer<typeof LaunchTicketResponseSchema>;
+
 export const ticketsInvokeContracts = {
   /** Every ticket record, oldest first (AL-143). */
   'tickets:list': { request: z.undefined(), response: TicketRecordListSchema },
@@ -315,6 +352,12 @@ export const ticketsInvokeContracts = {
   'tickets:archived': { request: z.undefined(), response: z.array(ArchivedTicketSchema) },
   /** One ticket's record, or null when no ticket has that id (AL-170). */
   'tickets:get': { request: GetTicketRequestSchema, response: GetTicketResponseSchema },
+  /**
+   * Launch (AL-165). VALIDATION with `details.reason`: the worktree service's (`branch-taken`,
+   * `ticket-exists`, …), `repo-not-registered`, or `session-failed` with the rollback report; ADO_*
+   * when the work item can't be read.
+   */
+  'tickets:launch': { request: LaunchTicketRequestSchema, response: LaunchTicketResponseSchema },
 } as const satisfies Record<(typeof TICKETS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const ticketsEventContracts = {} as const satisfies Record<(typeof TICKETS_EVENT_CHANNELS)[number], z.ZodType>;

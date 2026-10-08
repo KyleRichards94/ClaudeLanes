@@ -2,6 +2,8 @@ import type { z } from 'zod';
 import {
   AgentDefaultsSchema,
   AgentPermissionsSchema,
+  DropDefaultsSchema,
+  defaultDropDefaults,
   RepoSettingsSchema,
   defaultAgentPermissions,
   SETTINGS_VERSION,
@@ -63,6 +65,10 @@ function toCurrent(document: unknown, dropped: string[]): Settings {
   // AL-109: kept only once the user saved a policy; unset means the D18 default.
   if (stored['agentPermissions'] !== undefined) {
     settings.agentPermissions = salvageObject(AgentPermissionsSchema, stored['agentPermissions'], defaultAgentPermissions(), 'agentPermissions', dropped);
+  }
+  // AL-240: kept only once the user saved the Drops tab; unset means TB§3's defaults.
+  if (stored['dropDefaults'] !== undefined) {
+    settings.dropDefaults = salvageObject(DropDefaultsSchema, stored['dropDefaults'], defaultDropDefaults(), 'dropDefaults', dropped);
   }
   // Valid by construction; parse anyway so a mistake here fails loudly instead of saving bad settings.
   return SettingsSchema.parse(settings);

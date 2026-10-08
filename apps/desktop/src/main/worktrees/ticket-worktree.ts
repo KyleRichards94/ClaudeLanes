@@ -24,6 +24,7 @@ import type { SettingsService } from '../settings/service';
 import type { TicketRecordStore } from '../tickets/record-store';
 import { createKeyedQueue } from './keyed-queue';
 import {
+  addCheckoutWorktree,
   addWorktree,
   fetchBase,
   findRegisteredWorktree,
@@ -32,6 +33,7 @@ import {
   resolveStart,
   undoWorktreeAdd,
   type RollbackReport,
+  type UndoAddOptions,
   type WorktreeGit,
   type WorktreeStart,
 } from './worktree-git';
@@ -61,6 +63,13 @@ export interface TicketWorktreeService {
    * checked against git's rules and the other tickets' branches.
    */
   preview(input: WorktreePreviewRequest): Promise<Result<WorktreePreview>>;
+  /**
+   * Takes back a ticket `create` made in this app run: removes its worktree and folder, the branch it
+   * created (only while the branch still points where it started), and its record. For a launch that
+   * failed after the worktree existed (AL-165) and for Undo (AL-237). What could not be removed is in
+   * the report. VALIDATION `not-created-here` for a ticket this run did not create.
+   */
+  discard(ticketId: string): Promise<Result<RollbackReport>>;
 }
 
 /** What the ticket works on (artboard 2 left column). */
@@ -75,6 +84,17 @@ export type TicketSubject =
       /** "No ticket": named `nt-<yyyymmdd>-<slug>` from the job description. */
       kind: 'no-ticket';
       description: string;
+    }
+  | {
+      /**
+       * A pull request from the team board (AL-236, AL-238), on its source branch (`checkout`). Answering
+       * its comments is ticket `pr-<id>`; a review is `pr-<id>-review` (`-2`, `-3`, … when one already
+       * runs), so several reviews of one PR never share a worktree.
+       */
+      kind: 'pull-request';
+      pullRequestId: number;
+      title: string;
+      purpose: 'review' | 'answer';
     };
 
 export interface CreateTicketWorktreeInput {
@@ -83,8 +103,15 @@ export interface CreateTicketWorktreeInput {
   subject: TicketSubject;
   /** The branch name as the user edited it in the modal (AL-164); generated from the subject when omitted. */
   branch?: string;
-  /** Start from this branch instead of the repo's base branch setting. */
+  /** Start from this branch instead of the repo's base branch setting. With `checkout`, only recorded as the base. */
   baseBranch?: string;
+  /**
+   * Work on a branch that already exists instead of a new one (AL-236: the item's branch, a pull
+   * request's source branch): fetched from origin, then checked out, or `detached` at its commit for a
+   * read-only review. The ticket's branch is this branch; it is never deleted on a rollback unless the
+   * launch created the local branch.
+   */
+  checkout?: { branch: string; detached?: boolean };
   /** Card title. Defaults to the work item title, or the first line of the job description. */
   title?: string;
   /** The rest default to the agent defaults in settings. */
@@ -115,6 +142,8 @@ export type TicketWorktreeFailure =
   | 'invalid-base-branch'
   /** VALIDATION: the base branch exists neither locally nor on origin. */
   | 'base-not-found'
+  /** VALIDATION: the branch to check out exists neither locally nor on origin (AL-236). */
+  | 'branch-not-found'
   /** VALIDATION: the edited branch name breaks git's or Windows' rules (`details.problem`). */
   | 'invalid-branch'
   /** VALIDATION: the edited branch name is an existing branch, remote branch or another ticket's branch. */
@@ -134,12 +163,14 @@ export type TicketWorktreeFailure =
   /** INTERNAL: the caller's signal fired. */
   | 'aborted'
   /** INTERNAL: anything else (a bug); the message says what. */
-  | 'unexpected';
+  | 'unexpected'
+  /** VALIDATION (`discard`): this app run did not create the ticket, so it is not taken back. */
+  | 'not-created-here';
 
 export interface TicketWorktreeServiceOptions {
   git: WorktreeGit;
   settings: Pick<SettingsService, 'get'>;
-  tickets: Pick<TicketRecordStore, 'get' | 'list' | 'create'>;
+  tickets: Pick<TicketRecordStore, 'get' | 'list' | 'create' | 'delete'>;
   /** For `nt-<yyyymmdd>` names. */
   now?: () => number;
   /** One line per created worktree and per rollback. */
@@ -184,6 +215,8 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
   const naming = createKeyedQueue();
   /** Ticket ids claimed by launches still running, in any repo. A launch keeps its claim until its record exists. */
   const creating = new Set<string>();
+  /** How to take back each ticket created in this app run (`discard`): what its worktree add made. */
+  const undoPlans = new Map<string, UndoAddOptions>();
 
   const checkRefFormat =
     (cwd: string): CheckRefFormat =>
@@ -226,7 +259,22 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
       if (takenIds.has(ticketId)) {
         return refuse('ticket-exists', `Work item #${workItemId} already has an agent ticket.`, { ticketId });
       }
-      generated = nameWorkItemTicket(workItemId, input.subject.title, branches).branch;
+      generated = input.checkout ? input.checkout.branch : nameWorkItemTicket(workItemId, input.subject.title, branches).branch;
+    } else if (input.subject.kind === 'pull-request') {
+      const { pullRequestId, purpose } = input.subject;
+      if (!input.checkout) return refuse('branch-not-found', `Pull request !${pullRequestId} needs its source branch to work on.`, { pullRequestId });
+      const base = `pr-${pullRequestId}`;
+      if (purpose === 'answer') {
+        ticketId = base;
+        if (takenIds.has(ticketId)) return refuse('ticket-exists', `Pull request !${pullRequestId} already has an agent answering its comments.`, { ticketId });
+      } else {
+        // Reviews of one PR each get their own ticket and folder (T7: several reviewers at once).
+        const folders = new Set(await folderNames(root));
+        let n = 1;
+        ticketId = `${base}-review`;
+        while (takenIds.has(ticketId) || folders.has(ticketId)) ticketId = `${base}-review-${++n}`;
+      }
+      generated = input.checkout.branch;
     } else {
       // The `nt-…` name is also the ticket id and the folder, so it must be free as all three.
       const names = nameNoTicket(new Date(now()), input.subject.description, [...branches, ...takenIds, ...(await folderNames(root))]);
@@ -234,6 +282,8 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
       generated = names.branch;
     }
 
+    // An existing branch is checked out as it is: nothing to name or validate.
+    if (input.checkout) return ok({ ticketId, branch: input.checkout.branch, worktreePath: join(root, ticketId) });
     let branch = generated;
     if (input.branch !== undefined && input.branch !== generated) {
       const check = await validateBranchName(input.branch, { checkRefFormat: checkRefFormat(repo), existingBranches: branches });
@@ -277,9 +327,14 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
         return refuse('worktree-registered', `Git already has a worktree registered at ${worktreePath}.`, { ticketId, worktreePath });
       }
 
-      const fetchError = await fetchBase(git, repo, baseBranch, call);
-      if (fetchError !== null) log.warn(`Ticket ${ticketId}: ${fetchError} Starting from the local ${baseBranch}.`);
-      const start = await resolveStart(git, repo, baseBranch, fetchError, call);
+      // A checkout starts from its own branch; a new ticket branch from the base.
+      const startBranch = input.checkout?.branch ?? baseBranch;
+      const fetchError = await fetchBase(git, repo, startBranch, call);
+      if (fetchError !== null) log.warn(`Ticket ${ticketId}: ${fetchError} Starting from the local ${startBranch}.`);
+      const start = await resolveStart(git, repo, startBranch, fetchError, call);
+      if (!start && input.checkout) {
+        return refuse('branch-not-found', `The branch "${startBranch}" was not found locally or on origin.`, { branch: startBranch, fetchError });
+      }
       if (!start) {
         return refuse('base-not-found', `The base branch "${baseBranch}" was not found locally or on origin.`, {
           baseBranch,
@@ -288,24 +343,32 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
       }
 
       const rootBefore = (await inspectPath(root)) !== 'missing';
+      const undoPlan: UndoAddOptions = {
+        repo,
+        path: worktreePath,
+        branch,
+        commit: start.commit,
+        pathBefore,
+        root,
+        rootBefore,
+        retryDelaysMs: options.rollbackRetryDelaysMs,
+        // A checked-out branch existed before; only one this launch creates may be deleted (set below).
+        keepBranch: input.checkout !== undefined,
+      };
       const rollBack = async (): Promise<RollbackReport> => {
-        const report = await undoWorktreeAdd(git, {
-          repo,
-          path: worktreePath,
-          branch,
-          commit: start.commit,
-          pathBefore,
-          root,
-          rootBefore,
-          retryDelaysMs: options.rollbackRetryDelaysMs,
-        });
+        const report = await undoWorktreeAdd(git, undoPlan);
         if (report.complete) log.info(`Ticket ${ticketId}: rolled back the worktree and branch ${branch}.`);
         else log.warn(`Ticket ${ticketId}: rollback left ${report.leftovers.join(', ')}.`);
         return report;
       };
 
       try {
-        await addWorktree(git, repo, { path: worktreePath, branch, commit: start.commit }, call);
+        if (input.checkout) {
+          const added = await addCheckoutWorktree(git, repo, { path: worktreePath, branch, commit: start.commit, detached: input.checkout.detached === true }, call);
+          undoPlan.keepBranch = !added.createdBranch;
+        } else {
+          await addWorktree(git, repo, { path: worktreePath, branch, commit: start.commit }, call);
+        }
       } catch (error) {
         const rollback = await rollBack();
         if (isGitError(error, 'ABORTED')) return err('INTERNAL', 'Creating the worktree was cancelled.', { reason: 'aborted', rollback });
@@ -322,7 +385,7 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
       const created = await tickets
         .create({
           id: ticketId,
-          title: input.title ?? (subject.kind === 'work-item' ? subject.title : titleFromDescription(subject.description)),
+          title: input.title ?? (subject.kind === 'no-ticket' ? titleFromDescription(subject.description) : subject.title),
           ado: subject.kind === 'work-item' ? subject.ado : null,
           repo,
           baseBranch,
@@ -344,6 +407,7 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
         });
       }
 
+      undoPlans.set(ticketId, undoPlan);
       log.info(`Ticket ${ticketId}: worktree ${worktreePath} on ${branch} from ${start.ref} (${start.commit.slice(0, 12)}).`);
       return ok({ record: created.data, start });
     } finally {
@@ -405,7 +469,27 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
     });
   }
 
+  async function discard(ticketId: string): Promise<Result<RollbackReport>> {
+    const plan = undoPlans.get(ticketId);
+    if (!plan) return refuse('not-created-here', `Ticket ${ticketId} was not created in this app run, so it is not taken back.`, { ticketId });
+    return inRepo(repoPathKey(plan.repo), async () => {
+      const report = await undoWorktreeAdd(git, plan);
+      const removed = await tickets.delete(ticketId).catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
+      if (!removed.ok) report.leftovers.push(`record ${ticketId}`);
+      undoPlans.delete(ticketId);
+      const complete = report.leftovers.length === 0;
+      if (complete) log.info(`Ticket ${ticketId}: discarded its worktree, branch ${plan.branch} and record.`);
+      else log.warn(`Ticket ${ticketId}: discarding left ${report.leftovers.join(', ')}.`);
+      return ok({ complete, leftovers: report.leftovers });
+    });
+  }
+
   return {
+    discard: (ticketId) =>
+      discard(ticketId).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        return err('INTERNAL', `Removing the ticket's worktree failed: ${message}`, { reason: 'unexpected' });
+      }),
     preview: (input) =>
       preview(input).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);

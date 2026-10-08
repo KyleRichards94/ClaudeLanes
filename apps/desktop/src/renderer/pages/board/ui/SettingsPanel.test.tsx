@@ -2,13 +2,14 @@ import {
   AgentDefaultsSchema,
   RepoSettingsSchema,
   SettingsSchema,
+  defaultDropDefaults,
   defaultSettings,
   type RepoCommands,
   type RepoSettings,
   type Settings,
 } from '@agent-lanes/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clearToasts, getToasts } from '@/shared/model';
 import { installFakeSettings, type FakeSettings } from '@/shared/testing';
@@ -175,6 +176,7 @@ describe('SettingsPanel', () => {
       buildQueueSize: 'Builds at once',
       adoStateTransitions: 'Move work items to the next state in Azure DevOps',
       agentPermissions: 'Agent permissions', // AL-109
+      dropDefaults: null, // The Drops tab (AL-240) has its own tests below.
       repos: 'Repo',
       'repo.path': null, // Picked with the native folder dialog: Add repo….
       'repo.name': 'Name',
@@ -206,5 +208,32 @@ describe('SettingsPanel', () => {
       expect(shown(), key).toContain(label);
     }
     expect(screen.getByRole('button', { name: 'Add repo…' })).toBeTruthy();
+  });
+});
+
+describe('Settings › Drops (AL-240)', () => {
+  it("edits each kind of drop's skills, model and effort, seeded from TB§3, and saves them whole", async () => {
+    const { onClose } = renderPanel({ section: 'drops' });
+    await screen.findByTestId('settings-drops');
+    expect(input('settings-drop-code-review-skills').value).toBe('/code-review /pr-comment-actioner');
+    expect(input('settings-drop-planning-skills').value).toBe('');
+    const qa = within(screen.getByTestId('settings-drop-qa'));
+    expect(qa.getByRole('radio', { name: 'Sonnet' }).getAttribute('aria-checked')).toBe('true');
+    expect(qa.getByRole('radio', { name: 'Med' }).getAttribute('aria-checked')).toBe('true');
+
+    type('settings-drop-qa-skills', '/cs-qa-wip, cs-smoke');
+    fireEvent.click(qa.getByRole('radio', { name: 'Haiku' }));
+    fireEvent.click(save());
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(fake.updates).toEqual([{ dropDefaults: { ...defaultDropDefaults(), qa: { skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku', effort: 'medium' } } }]);
+  });
+
+  it('blocks Save on a skill name that is not one', async () => {
+    renderPanel({ section: 'drops' });
+    await screen.findByTestId('settings-drops');
+    type('settings-drop-planning-skills', '/plan it!');
+    expect(screen.getByText('"it!" is not a skill name. Use names like /code-review.')).toBeTruthy();
+    expect(save().getAttribute('aria-disabled')).toBe('true');
   });
 });
