@@ -28,6 +28,8 @@ export interface AdoScope {
 /** Query keys, from the general to the particular, so `adoKeys.all` invalidates everything ADO. */
 export const adoKeys = {
   all: ['ado'] as const,
+  /** The user's teams in a project (`ado:listTeams`), for the board's Team menu. */
+  teams: (scope: AdoScope = {}) => ['ado', 'teams', scope] as const,
   sprints: (scope: AdoScope & { team?: string } = {}) => ['ado', 'sprints', scope] as const,
   workItems: (iterationPath: string, scope: AdoScope = {}) => ['ado', 'workItems', iterationPath, scope] as const,
   search: (query: string, scope: AdoScope = {}) => ['ado', 'search', query, scope] as const,
@@ -54,11 +56,28 @@ function refetchPolicy({ live = false }: AdoQueryOptions) {
   };
 }
 
-/** A team's sprints, for the Sprint dropdown (AL-142); `pickSprint` chooses the one to show. */
-export function useSprints(scope: AdoScope & { team?: string } = {}, options: AdoQueryOptions = {}) {
+/**
+ * The user's teams in the project and the one ADO opens on (`defaultTeamId`), for the board's Team
+ * menu; `useBoardTeam` (shared/model) picks the one the board shows.
+ */
+export function useTeams(scope: AdoScope = {}, options: AdoQueryOptions = {}) {
+  return useQuery({
+    queryKey: adoKeys.teams(scope),
+    queryFn: async () => unwrap(await invoke('ado:listTeams', scope)),
+    ...refetchPolicy(options),
+  });
+}
+
+/**
+ * A team's sprints, for the Sprint dropdown (AL-142); `pickSprint` chooses the one to show. Pass the
+ * board's team (`useBoardSprints` in shared/model does); without one, main resolves the user's
+ * default team. `enabled: false` holds the query, e.g. while the team is still loading.
+ */
+export function useSprints(scope: AdoScope & { team?: string } = {}, options: AdoQueryOptions & { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: adoKeys.sprints(scope),
     queryFn: async () => unwrap(await invoke('ado:listSprints', scope)),
+    enabled: options.enabled ?? true,
     ...refetchPolicy(options),
   });
 }

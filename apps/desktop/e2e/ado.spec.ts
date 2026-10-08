@@ -20,6 +20,8 @@ import {
   ADO_FIXTURE_PROJECT,
   ADO_FIXTURE_REPOSITORY,
   ADO_FIXTURE_SPRINT_42_PATH,
+  ADO_FIXTURE_TEAM,
+  ADO_FIXTURE_TEAM_ID,
   adoFixture,
   type AdoFixture,
 } from '@agent-lanes/contracts/testing';
@@ -60,7 +62,8 @@ async function data<T>(channel: string, payload?: unknown): Promise<T> {
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
-  ado = await startFakeAdoServer();
+  // Like the on-prem Azure DevOps Server: the project-level sprints route is a 404, only the team's works.
+  ado = await startFakeAdoServer({ projectIterations: false });
   fixture = adoFixture(ado.orgUrl);
   userDataDir = mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-ado-'));
   app = await electron.launch({
@@ -114,6 +117,29 @@ test('every ado channel reads the fake organisation through the saved connection
   // Every request reached the fake with the PAT, and the fake answered all of them.
   expect(ado.org.state.requests.length).toBeGreaterThan(10);
   expect(ado.org.state.requests.every((request) => request.authorized)).toBe(true);
+  expect(ado.org.state.unhandled).toEqual([]);
+});
+
+test('the board reads sprints for the user’s team, with a Team menu and a grouped Sprint menu', async () => {
+  expect(await data('ado:listTeams', {})).toEqual({ teams: [{ id: ADO_FIXTURE_TEAM_ID, name: ADO_FIXTURE_TEAM }], defaultTeamId: ADO_FIXTURE_TEAM_ID });
+
+  // The connection was saved over IPC, so reload to let the board read it.
+  await page.reload();
+  await expect(page.getByTestId('board-team')).toHaveText(ADO_FIXTURE_TEAM);
+  await expect(page.getByTestId('board-sprint')).toHaveText('42');
+  await expect(page.getByTestId('board-subheader')).toContainText('Sprint 42');
+
+  await page.getByRole('button', { name: 'Sprint: 42' }).click();
+  const menu = page.getByRole('menu', { name: 'Sprint' });
+  await expect(menu.getByRole('group')).toHaveCount(3);
+  await expect(menu.getByRole('group', { name: 'Past' }).getByRole('menuitem')).toHaveText([/Sprint 41/, /Sprint 40/]);
+  await menu.getByRole('group', { name: 'Upcoming' }).getByRole('menuitem', { name: 'Sprint 43' }).click();
+  await expect(page.getByTestId('board-sprint')).toHaveText('43');
+
+  // Every sprint read went to the team route; none to the project-level one the server refuses.
+  const paths = ado.org.state.requests.map((request) => decodeURIComponent(request.path.split('?')[0] ?? ''));
+  expect(paths.some((path) => path.endsWith(`/${ADO_FIXTURE_PROJECT}/_apis/work/teamsettings/iterations`))).toBe(false);
+  expect(paths.some((path) => path.endsWith(`/${ADO_FIXTURE_PROJECT}/${ADO_FIXTURE_TEAM_ID}/_apis/work/teamsettings/iterations`))).toBe(true);
   expect(ado.org.state.unhandled).toEqual([]);
 });
 

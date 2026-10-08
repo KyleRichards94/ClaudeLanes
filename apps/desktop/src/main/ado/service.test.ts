@@ -11,6 +11,7 @@ import {
   ADO_FIXTURE_PROJECT,
   ADO_FIXTURE_REPOSITORY,
   ADO_FIXTURE_SPRINT_42_PATH,
+  ADO_FIXTURE_TEAM_ID,
   adoFixture,
 } from '@agent-lanes/contracts/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,7 +21,7 @@ import { SECRETS_FILE_NAME, createSecretStore, type SecretStore } from '../secre
 import { createFakeSafeStorage } from '../secrets/testing';
 import { createSettingsService } from '../settings/service';
 import { createMemorySettingsFile } from '../settings/settings-file';
-import { createAdoService } from './service';
+import { RESOLVED_TEAM_TTL_MS, createAdoService } from './service';
 
 /**
  * AL-065: AdoService against the shared fake organisation, with the real ConnectionsService and
@@ -51,7 +52,7 @@ function route(...orgs: FakeAdoOrg[]): FetchLike {
   };
 }
 
-async function setup(options: { orgs?: FakeAdoOrg[]; stateTransitions?: boolean } = {}) {
+async function setup(options: { orgs?: FakeAdoOrg[]; stateTransitions?: boolean; fetch?: FetchLike; now?: () => number } = {}) {
   const contoso = createFakeAdoOrg();
   const orgs = options.orgs ?? [contoso];
   const secrets: SecretStore = createSecretStore({
@@ -65,8 +66,8 @@ async function setup(options: { orgs?: FakeAdoOrg[]; stateTransitions?: boolean 
     warn: () => undefined,
   });
   const log = { log: vi.fn() };
-  const fetch = vi.fn(route(...orgs));
-  const ado = createAdoService({ connections, settings, fetch, log });
+  const fetch = vi.fn(options.fetch ?? route(...orgs));
+  const ado = createAdoService({ connections, settings, fetch, log, ...(options.now ? { now: options.now } : {}) });
   return { ado, connections, secrets, settings, log, fetch, contoso };
 }
 
@@ -122,6 +123,73 @@ describe('AdoService reads', () => {
     expect(await ado.listSprints({ project: ADO_FIXTURE_PROJECT })).toMatchObject({ ok: true, data: { currentId: adoFixture().sprints.currentId } });
     expect(await ado.getWorkItem({ id: 71273 })).toMatchObject({ ok: true, data: { id: 71273 } });
     expect(await ado.listSprints({ project: 'Other Project' })).toMatchObject({ ok: false, details: { status: 404 } });
+  });
+});
+
+describe('AdoService resolves the team for team-scoped reads (Azure DevOps Server)', () => {
+  const PROJECT_ITERATIONS = `/${ADO_FIXTURE_PROJECT}/_apis/work/teamsettings/iterations`;
+  const TEAM_ITERATIONS = `/${ADO_FIXTURE_PROJECT}/${ADO_FIXTURE_TEAM_ID}/_apis/work/teamsettings/iterations`;
+  const paths = (org: FakeAdoOrg) => org.state.requests.map((request) => decodeURIComponent(request.path.split('?')[0] ?? ''));
+
+  it('reads sprints from the team route when the project-level route answers 404, as on-prem servers do', async () => {
+    const onPrem = createFakeAdoOrg({ projectIterations: false });
+    const { ado, connections } = await setup({ orgs: [onPrem] });
+    await connectContoso(connections);
+
+    expect(await ado.listSprints({})).toEqual({ ok: true, data: adoFixture().sprints });
+    expect(paths(onPrem).filter((path) => path.endsWith(TEAM_ITERATIONS))).toHaveLength(2);
+    expect(paths(onPrem).some((path) => path.endsWith(PROJECT_ITERATIONS))).toBe(false);
+    expect(onPrem.state.unhandled).toEqual([]);
+  });
+
+  it('a named team is used as given, without looking up the user’s teams', async () => {
+    const onPrem = createFakeAdoOrg({ projectIterations: false });
+    const { ado, connections } = await setup({ orgs: [onPrem] });
+    await connectContoso(connections);
+
+    expect(await ado.listSprints({ team: ADO_FIXTURE_TEAM_ID })).toMatchObject({ ok: true });
+    expect(paths(onPrem).some((path) => path.includes('/_apis/projects/'))).toBe(false);
+  });
+
+  it('resolves the team once per organisation and project, and again after a few minutes', async () => {
+    let clock = 1_000_000;
+    const onPrem = createFakeAdoOrg({ projectIterations: false });
+    const { ado, connections } = await setup({ orgs: [onPrem], now: () => clock });
+    await connectContoso(connections);
+    const teamLookups = () => paths(onPrem).filter((path) => path.endsWith(`/_apis/projects/${ADO_FIXTURE_PROJECT}/teams`)).length;
+
+    await ado.listSprints({});
+    await ado.listSprints({});
+    expect(teamLookups()).toBe(1);
+
+    clock += RESOLVED_TEAM_TTL_MS + 1;
+    expect(await ado.listSprints({})).toMatchObject({ ok: true });
+    expect(teamLookups()).toBe(2);
+  });
+
+  it('says VALIDATION, pointing at the Team menu, when the user has no team and the project no default', async () => {
+    const onPrem = createFakeAdoOrg({ projectIterations: false });
+    // The user is in no team, and the project names no default team.
+    const noTeams: FetchLike = (input, init) => {
+      const path = decodeURIComponent(new URL(input).pathname);
+      if (path.endsWith(`/_apis/projects/${ADO_FIXTURE_PROJECT}/teams`)) return Promise.resolve(Response.json({ count: 0, value: [] }));
+      if (path.endsWith(`/_apis/projects/${ADO_FIXTURE_PROJECT}`)) return Promise.resolve(Response.json({ id: 'p1', name: ADO_FIXTURE_PROJECT }));
+      return onPrem.fetch(input, init);
+    };
+    const { ado, connections } = await setup({ fetch: noTeams });
+    await connectContoso(connections);
+
+    const expected = {
+      ok: false,
+      code: 'VALIDATION',
+      message: `No Azure DevOps team found for you in ${ADO_FIXTURE_PROJECT}. Pick a team from the Team menu.`,
+      details: { reason: 'no-team' },
+    };
+    expect(await ado.listSprints({})).toMatchObject(expected);
+    expect(await ado.backlog({})).toMatchObject(expected);
+    expect(await ado.activePrs({})).toMatchObject(expected);
+    expect(await ado.teamBoard({})).toMatchObject(expected);
+    expect(paths(onPrem).some((path) => path.includes('teamsettings'))).toBe(false);
   });
 });
 

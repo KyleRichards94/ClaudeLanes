@@ -167,7 +167,10 @@ const AdoScopeShape = {
 /** `ado:listSprints`: a team's sprints, past, current and future. */
 export const ListSprintsRequestSchema = z.strictObject({
   ...AdoScopeShape,
-  /** Team name or id. Left out, ADO uses the project's default team. */
+  /**
+   * Team name or id. Left out, main uses the user's default team (`ado:listTeams`), so the request
+   * always goes to the team-scoped route, which Azure DevOps Server needs.
+   */
   team: adoText(256).optional(),
 });
 export type ListSprintsRequest = z.infer<typeof ListSprintsRequestSchema>;

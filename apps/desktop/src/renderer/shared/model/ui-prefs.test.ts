@@ -24,7 +24,7 @@ describe('UI prefs store', () => {
   it('hydrates from the settings in the main process', async () => {
     installFakeSettings({
       ...defaultSettings(),
-      ui: { lastRepo: 'C:/src/osc', lastSprint: 'sprint-42', collapsedLanes: ['queued'], embedModeByTicket: { '71273': 'mcp-link' } },
+      ui: { lastRepo: 'C:/src/osc', lastSprint: 'sprint-42', lastTeam: 'team-osc', collapsedLanes: ['queued'], embedModeByTicket: { '71273': 'mcp-link' } },
     });
     const store = newStore();
     await hydrateUiPrefs(store);
@@ -33,6 +33,7 @@ describe('UI prefs store', () => {
     expect(store.getState()).toMatchObject({
       lastRepo: 'C:/src/osc',
       lastSprint: 'sprint-42',
+      lastTeam: 'team-osc',
       collapsedLanes: ['queued'],
       embedModeByTicket: { '71273': 'mcp-link' },
     });
@@ -86,6 +87,17 @@ describe('UI prefs store', () => {
       lastSprint: 'sprint-43',
       embedModeByTicket: { '71273': 'mcp-link', '71330': 'webview' },
     });
+  });
+
+  it('picking a team saves it and goes back to that team’s current sprint', async () => {
+    const main = installFakeSettings();
+    const store = newStore();
+    await hydrateUiPrefs(store);
+
+    store.getState().setLastSprint('sprint-43');
+    store.getState().setLastTeam('team-release');
+    expect(store.getState()).toMatchObject({ lastTeam: 'team-release', lastSprint: null });
+    await vi.waitFor(() => expect(main.settings.ui).toMatchObject({ lastTeam: 'team-release', lastSprint: null }));
   });
 
   it('finishes hydrating on the defaults when the main process cannot answer', async () => {
