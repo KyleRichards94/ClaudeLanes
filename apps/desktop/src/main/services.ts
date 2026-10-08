@@ -4,7 +4,7 @@ import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
-import { createSessionManager, type SessionManager } from './agent/session-manager';
+import { createSessionManager, mergeSessionExtras, type SessionManager } from './agent/session-manager';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -38,6 +38,7 @@ import { createBranchStatusService, type BranchStatusService } from './worktrees
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
 import { createArchiveService, type ArchiveService } from './worktrees/archive';
 import { createDiffService, type DiffService } from './worktrees/diff';
+import { createSubWorktreeService, subWorktreeHooks, type SubWorktreeService } from './worktrees/sub-worktree';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
@@ -109,6 +110,8 @@ export interface Services {
   readonly diffs: DiffService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
+  /** Writer sub-agents' worktrees on `sub/<ticket>-<name>`, created through each session's WorktreeCreate hook (AL-084, D9). */
+  readonly subWorktrees: SubWorktreeService;
   /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
   readonly credentialFailures: CredentialFailureService;
 }
@@ -188,6 +191,7 @@ export function createServices(options: ServiceOptions): Services {
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
   const diffs = createDiffService({ git, tickets });
+  const subWorktrees = createSubWorktreeService({ git, tickets, queue: repoQueue, log: log.child('worktrees') });
   const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
   const diagnostics = createDiagnostics({
@@ -247,7 +251,8 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     log: log.child('agent'),
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
-    extras: (record) => stageExtras(record),
+    // …and the WorktreeCreate / WorktreeRemove hooks that give writer sub-agents their own worktrees (AL-084).
+    extras: async (record) => mergeSessionExtras(await stageExtras(record), { hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees')) }),
     // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
     onEnded: (ticketId) => stages.cancelGate(ticketId),
   });
@@ -294,6 +299,7 @@ export function createServices(options: ServiceOptions): Services {
     archive,
     diffs,
     reconcile,
+    subWorktrees,
     credentialFailures: credentialFailureService,
   };
 }
