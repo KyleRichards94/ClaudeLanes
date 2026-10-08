@@ -7,6 +7,11 @@ import { DragToLaneContext } from './context';
 export interface DragToLaneProviderProps {
   /** Starts the agent for a drop (AL-236's `useLaunchFromAdo`). Without it a drop says it can't start one yet. */
   onLaunch?: LaunchFromLane;
+  /**
+   * Scroll the board when a dragged card nears its edge (default true). The board turns it off while
+   * its collapsed strip is pinned at the top, so hovering a strip cell doesn't scroll the page under it.
+   */
+  autoScroll?: boolean;
   children: ReactNode;
 }
 
