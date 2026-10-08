@@ -132,3 +132,51 @@ describe('HandOffSection (AL-195)', () => {
     expect(listCalls()).toBe(0);
   });
 });
+
+describe('Send artboards to agent as spec (AL-197)', () => {
+  beforeEach(() => {
+    resetArtboardSelection();
+    answerWith(FIRST);
+    bridge = installFakeBridge({});
+  });
+
+  function replyShip(shipReply: unknown) {
+    vi.mocked(bridge.invoke).mockImplementation(async (channel) => {
+      if (channel === 'design:listArtboards') return reply;
+      if (channel === 'design:shipSpec') return shipReply;
+      return { ok: false, code: 'INTERNAL', message: 'no fake reply' };
+    });
+  }
+
+  it('is disabled until an artboard is picked, then ships the picks and the note as the next version', async () => {
+    replyShip({ ok: true, data: { spec: { version: 2, shippedAt: 5, approvedBy: 'Kyle', artboardCount: 2, usedAt: null, fetchedAt: null, deliveredAt: 5 }, delivered: true } });
+    renderSection();
+    await screen.findByRole('checkbox', { name: 'JobControl · desktop, 1440×900' });
+    expect(screen.getByRole('button', { name: 'Send 0 artboards to agent as spec' }).getAttribute('aria-disabled')).toBe('true');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'JobControl · desktop, 1440×900' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'JobFilter · side panel, 420×900' }));
+    fireEvent.change(screen.getByTestId('ship-note'), { target: { value: '  Keep the filter panel narrow ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send 2 artboards to agent as spec' }));
+
+    expect((await screen.findByTestId('ship-result')).textContent).toBe('Design v2 approved and sent to the agent.');
+    expect(vi.mocked(bridge.invoke)).toHaveBeenCalledWith('design:shipSpec', {
+      ticketId: '71273',
+      artboards: [CONTROL, { id: 'job-filter.html', name: 'JobFilter · side panel', width: 420, height: 900 }],
+      note: 'Keep the filter panel narrow',
+    });
+    expect((screen.getByTestId('ship-note') as HTMLInputElement).value).toBe('');
+  });
+
+  it('says when the spec is held for a session that is not running, and shows a failure', async () => {
+    replyShip({ ok: true, data: { spec: { version: 1, shippedAt: 5, approvedBy: 'Kyle', artboardCount: 1, usedAt: null, fetchedAt: null, deliveredAt: null }, delivered: false } });
+    renderSection();
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'JobControl · desktop, 1440×900' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send 1 artboard to agent as spec' }));
+    expect((await screen.findByTestId('ship-result')).textContent).toBe('Design v1 approved. The agent gets it first when its session runs.');
+
+    replyShip({ ok: false, code: 'INTERNAL', message: 'Design v2 could not be saved.' });
+    fireEvent.click(screen.getByRole('button', { name: 'Send 1 artboard to agent as spec' }));
+    expect((await screen.findByTestId('ship-error')).textContent).toBe('Design v2 could not be saved.');
+  });
+});

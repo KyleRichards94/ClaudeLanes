@@ -13,7 +13,13 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished and run:status', () => {
+  it("shows the Create PR stage's pull request and its checks from pr:status (AL-181)", () => {
+    const { store, handlers } = setup();
+    handlers['pr:status']?.({ ticketId: '71273', at: 5, pullRequestId: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 }, webUrl: 'https://dev.azure.com/contoso/p/_git/r/pullrequest/10612' });
+    expect(selectTicket(store.getState(), '71273')?.pullRequest).toEqual({ id: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 } });
+  });
+
+  it('handles the batched agent:output channel, agent:stage, agent:gate, agent:model, agent:subagent, agent:permission, build:queued, build:finished, pr:status and run:status', () => {
     expect(Object.keys(agentTicketEventHandlers).sort()).toEqual([
       'agent:gate',
       'agent:model',
@@ -23,6 +29,7 @@ describe('agent ticket event handlers', () => {
       'agent:subagent',
       'build:finished',
       'build:queued',
+      'pr:status',
       'run:status',
     ]);
   });

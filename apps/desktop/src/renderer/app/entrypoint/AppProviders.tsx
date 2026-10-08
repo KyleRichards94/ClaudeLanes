@@ -4,6 +4,7 @@ import {
   agentUsageEventHandlers,
   connectionsEventHandlers,
   createBranchStatusEventHandlers,
+  createDesignSpecEventHandlers,
   designThreadEventHandlers,
   mcpStatusEventHandlers,
 } from '@/shared/api';
@@ -39,6 +40,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(connectionsEventHandlers(queryClient)), [queryClient]);
   // `agent:usage` keeps each ticket's session pill and Lead agent tokens current (AL-113).
   useEffect(() => runningEventHub()?.register(agentUsageEventHandlers(queryClient)), [queryClient]);
+  // `design:spec` reads the ticket record again: shipped specs, "Used · 14:01" (AL-198).
+  useEffect(() => runningEventHub()?.register(createDesignSpecEventHandlers(queryClient)), [queryClient]);
   // `agent:mcpStatus` keeps the header's MCP pill current (AL-108).
   useEffect(() => runningEventHub()?.register(mcpStatusEventHandlers(queryClient)), [queryClient]);
   // `agent:permission` keeps each ticket's waiting permission request current (AL-109).

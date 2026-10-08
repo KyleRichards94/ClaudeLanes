@@ -39,6 +39,8 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
     // AL-107: the card's "N sub-agents" follows the SDK's task states.
     'agent:subagent': (event) => store.setSubAgentCounts(event.ticketId, event.counts),
     'build:queued': (event) => store.applyBuildJob(event),
+    // The Create PR stage's pull request (AL-181): "PR !10612 · 3 / 4 checks" on the card.
+    'pr:status': (event) => store.setPullRequest(event.ticketId, { id: event.pullRequestId, status: event.status, checks: event.checks }),
     // A tool call outside the permission policy waits (AL-109): "Needs you · allow Bash" while one does.
     'agent:permission': (event) => {
       if (event.waiting) store.setNeedsYou(event.ticketId, { kind: 'permission', tool: event.waiting.tool, since: event.waiting.openedAt });

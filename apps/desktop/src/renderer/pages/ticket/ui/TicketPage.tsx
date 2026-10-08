@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
+import { OutputStream } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { GateActions } from '@/features/resolve-gate';
@@ -11,8 +12,9 @@ import { QueuedNotice } from '@/features/start-queued-agent';
 import { useAgentUsage, useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
-import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
+import { ErrorBoundary, PanelErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
+import { CreatePullRequestPanel } from './CreatePullRequestPanel';
 import { AdoTab } from './AdoTab';
 import { DiffTab } from './DiffTab';
 import { StageStepper } from './StageStepper';
@@ -117,12 +119,19 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         <MergePanel ticket={ticket} subBranches={subBranches} />
       </View>
 
+      {/* The Create PR stage (AL-181): from entering Create PR, and for as long as the ticket has a PR. */}
+      {ticket.stage === 'create-pr' || ticket.pullRequest || record?.pullRequest ? <CreatePullRequestPanel ticket={ticket} saved={record?.pullRequest} /> : null}
+
       <TicketTabBar ticketId={ticket.id} value={tab} idPrefix={TABS_ID} style={styles.tabs} />
       <View style={[styles.body, wide ? styles.bodyWide : styles.bodyStacked]} testID={wide ? 'ticket-body-wide' : 'ticket-body-stacked'}>
         <TabPanel idPrefix={TABS_ID} value={tab} style={[styles.tabPanel, wide && styles.tabPanelWide]} testID="ticket-tab-panel">
           <ErrorBoundary key={tab} name={`ticket:tab:${tab}`} label={`the ${TAB_TITLES[tab]} tab`}>
             {tab === 'build-log' ? (
               <BuildLog ticketId={ticket.id} style={styles.buildLog} />
+            ) : tab === 'output' ? (
+              <PanelErrorBoundary panel="output" ticketId={ticket.id}>
+                <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
+              </PanelErrorBoundary>
             ) : tab === 'diff' ? (
               <DiffTab ticketId={ticket.id} branch={ticket.branch} subBranches={subBranches} />
             ) : tab === 'ado' ? (
@@ -150,7 +159,7 @@ const TAB_EMPTY: Record<TicketPageTab, string> = {
   ado: 'The work item, its acceptance criteria, comments and linked pull request.',
 };
 
-/** What the Output tab shows until AL-175 lands. Build log is AL-135's BuildLog, Diff AL-179's DiffTab, ADO AL-180's AdoTab. */
+/** A tab without its own view. Every tab has one now: Output (AL-175), Diff (AL-179), Build log (AL-135), ADO (AL-180). */
 function TabPlaceholder({ tab, ticket }: { tab: TicketPageTab; ticket: AgentTicket }) {
   const activity = tab === 'output' ? ticket.activity?.text : undefined;
   return (
@@ -260,6 +269,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     flexBasis: 560,
     height: 560,
+  },
+  // The output stream virtualises its rows too (AL-175): a bounded height, flush with the card's edges.
+  output: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 620,
+    height: 620,
+    margin: -space.xl,
   },
   side: {
     gap: space.lg,

@@ -133,7 +133,8 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     subAgents: NO_SUB_AGENTS,
     build: { job: null, last: record.lastBuild },
     run: lastRunFromRecord(record),
-    pullRequest: null,
+    // The PR the Create PR stage opened (AL-181); its checks come with the next 'pr:status'.
+    pullRequest: record.pullRequest ? { id: record.pullRequest.id, status: record.pullRequest.status, checks: null } : null,
   };
 }
 
