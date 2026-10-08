@@ -1,9 +1,10 @@
-import { LANES, type BuildJob, type StageGates, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
+import { LANES, type BuildJob, type DesignSpecChange, type StageGates, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   ticketFromRecord,
   withActivity,
   withBuildJob,
+  withDesignSpec,
   withGateOpened,
   withGateResolved,
   withGates,
@@ -85,6 +86,8 @@ export interface AgentTicketStore extends Pick<StoreApi<AgentTicketsState>, 'get
   applyBuildJob(job: Pick<BuildJob, 'ticketId' | 'jobId' | 'kind' | 'state' | 'position'>): void;
   setLastBuild(ticketId: string, build: TicketLastBuild): void;
   setRun(ticketId: string, run: AgentTicketRun): void;
+  /** A `design:spec` event: a spec was shipped or acknowledged (AL-197, AL-198, AL-200). */
+  setDesignSpec(ticketId: string, version: number, change: DesignSpecChange, at: number): void;
 }
 
 function emptyLanes(): Record<Lane, readonly string[]> {
@@ -211,6 +214,7 @@ export function createAgentTicketStore(): AgentTicketStore {
     applyBuildJob: (job) => update(job.ticketId, (ticket) => withBuildJob(ticket, job)),
     setLastBuild: (ticketId, build) => update(ticketId, (ticket) => withLastBuild(ticket, build)),
     setRun: (ticketId, run) => update(ticketId, (ticket) => withRun(ticket, run)),
+    setDesignSpec: (ticketId, version, change, at) => update(ticketId, (ticket) => withDesignSpec(ticket, version, change, at)),
   };
 }
 

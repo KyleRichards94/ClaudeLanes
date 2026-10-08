@@ -46,6 +46,8 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       if (event.waiting) store.setNeedsYou(event.ticketId, { kind: 'permission', tool: event.waiting.tool, since: event.waiting.openedAt });
       else store.clearNeedsYou(event.ticketId, 'permission');
     },
+    // "Design v2" / "Design v3 not yet used" on the card and in the live dock (AL-200).
+    'design:spec': (event) => store.setDesignSpec(event.ticketId, event.version, event.change, event.at),
     // The Worktree panel's Build / Run / Stop and status lines follow these (AL-173).
     'run:status': ({ ticketId, state, url, startedAt }) => store.setRun(ticketId, { state, url, startedAt }),
     'build:finished': (result) =>

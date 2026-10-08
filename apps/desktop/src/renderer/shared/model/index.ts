@@ -61,3 +61,4 @@ export {
   type Recovery,
   type RecoveryContext,
 } from './error-recovery';
+export { markDesignThreadSeen, resetDesignThreadSeen, unreadDesignReplies, useDesignThreadSeenAt } from './design-thread-seen';

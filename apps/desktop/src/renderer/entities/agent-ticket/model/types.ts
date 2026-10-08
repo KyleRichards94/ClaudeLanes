@@ -64,6 +64,17 @@ export interface AgentTicket {
   readonly run: AgentTicketRun;
   /** The pull request the Create PR stage opened (AL-181); null before one exists. */
   readonly pullRequest: AgentTicketPullRequest | null;
+  /** The latest design spec shipped to the agent (AL-197, AL-200): "Design v2" on the card; null before any. */
+  readonly design: AgentTicketDesign | null;
+}
+
+/** The ticket's latest design spec (AL-200): the card shows "Design v2", or amber "Design v3 not yet used". */
+export interface AgentTicketDesign {
+  readonly version: number;
+  /** The agent acknowledged it (`ack_design_spec`, AL-198). */
+  readonly used: boolean;
+  /** When it was shipped, or when the agent acknowledged it once used. */
+  readonly at: number;
 }
 
 export interface AgentTicketActivity {
