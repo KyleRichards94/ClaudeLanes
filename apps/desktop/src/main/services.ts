@@ -46,6 +46,8 @@ import { createSettingsService, type SettingsService } from './settings/service'
 import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discovery';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketLauncher, type TicketLauncher } from './tickets/launch';
+import { createAdoLauncher, type AdoLauncher } from './agent/launch-from-ado';
+import { findRegisteredRepo } from './ado/registered-repos';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
@@ -148,6 +150,8 @@ export interface Services {
   readonly credentialFailures: CredentialFailureService;
   /** Launch from the New agent ticket modal: work item, worktree and record, then the session or Queued (AL-165). */
   readonly ticketLauncher: TicketLauncher;
+  /** Launch from the team board: recheck, the one ADO change, worktree, ticket and session, with rollback (AL-236). */
+  readonly adoLauncher: AdoLauncher;
 }
 
 export interface ServiceOptions {
@@ -167,7 +171,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -342,6 +346,8 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
     // Each lane change posts one comment to the work item (AL-115).
     onStageChanged: (change) => stageComments.stageChanged(change),
+    // A team board drop starts its ticket in the lane it was dropped on (AL-236).
+    startLane: (ticketId) => late.adoLauncher?.startLane(ticketId),
   });
   const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
   late.subagents = subagents;
@@ -379,6 +385,17 @@ export function createServices(options: ServiceOptions): Services {
   late.credentialFailures = credentialFailureService;
   const buildContext = createBuildContext({ sessions, log: log.child('agent') });
   const ticketLauncher = createTicketLauncher({ ado, worktrees, launches, tickets, log: log.child('launch') });
+  const adoLauncher = createAdoLauncher({
+    ado,
+    connections,
+    worktrees,
+    launches,
+    tickets,
+    settings,
+    repoForPullRequest: (orgUrl, pullRequest) => findRegisteredRepo(settings.get().repos, git.run, orgUrl, pullRequest.repository),
+    log: log.child('launch'),
+  });
+  late.adoLauncher = adoLauncher;
 
   return {
     appDataDir: options.appDataDir,
@@ -422,6 +439,7 @@ export function createServices(options: ServiceOptions): Services {
     mergeSubBranches,
     credentialFailures: credentialFailureService,
     ticketLauncher,
+    adoLauncher,
   };
 }
 

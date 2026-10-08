@@ -13,7 +13,8 @@ export function createAgentHandlers({
   usage,
   recovery,
   launches,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  adoLauncher,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -38,5 +39,6 @@ export function createAgentHandlers({
     'agent:getSubagents': ({ ticketId }) => ok(subagents.get(ticketId)),
     'agent:reconnect': ({ ticketId }) => recovery.reconnect(ticketId),
     'agent:startNow': ({ ticketId }) => launches.startNow(ticketId),
+    'agent:launchFromAdo': (request) => adoLauncher.launch(request),
   };
 }

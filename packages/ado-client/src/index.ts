@@ -100,3 +100,14 @@ export {
   type PullRequestThread,
 } from './active-prs';
 export { BACKLOG_MAX_ITEMS, backlogQuery, getBacklog, groupByFeature, type BacklogOptions } from './backlog';
+export {
+  getSignedInUser,
+  getWorkItemAssignment,
+  inProgressStateOf,
+  setWorkItemAssignment,
+  type AdoPerson,
+  type AssignmentCallOptions,
+  type AssignmentChange,
+  type AssignmentRef,
+  type WorkItemAssignment,
+} from './assignment';

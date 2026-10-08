@@ -12,6 +12,13 @@ export default defineConfig([
     },
   },
   {
+    files: ['./apps/desktop/src/renderer/features/launch-from-ado/**'],
+    rules: {
+      // AL-236 builds the drop's launch before anything drops: the drag (AL-235) and the Alt sheet's host (AL-240) use it.
+      'fsd/insignificant-slice': 'off',
+    },
+  },
+  {
     rules: {
       // Design §5 keeps the processes layer for flows across pages (first run, AL-047; new ticket).
       'fsd/no-processes': 'off',

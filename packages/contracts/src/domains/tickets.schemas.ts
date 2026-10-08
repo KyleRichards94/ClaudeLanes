@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketIdSchema } from '../events';
 import { EffortSchema, LaneSchema, ModelSchema } from '../vocabulary';
-import { AgentSessionStatusSchema } from './agent.schemas';
+import { AgentSessionStatusSchema } from './agent.status';
 import { WorkItemIdSchema } from './ado.ids';
 import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
