@@ -19,6 +19,12 @@ import { startTeamBoardApp, type TeamBoardApp } from './support/team-board-app';
 let board: TeamBoardApp;
 let page: Page;
 
+/**
+ * The agent behind #71318's first turn asks for plan approval and waits, so artboard 10's
+ * "Agent started in Planning" toast is still up when it is captured (as in team-board-drops.spec.ts).
+ */
+const PLANNING_AGENT = { turns: [{ match: '#71318', steps: [{ tool: 'set_stage' as const, input: { stage: 'implementing', summary: 'Plan: round each line, then total' } }] }] };
+
 /** Artboard 1's tickets, one per lane and two in Implementing. */
 function boardTickets(repo: string): TicketRecord[] {
   const ticket = (id: string, stage: Lane, title: string, step: number, model: TicketRecord['model'], effort: TicketRecord['effort']): TicketRecord =>
@@ -93,6 +99,7 @@ test.beforeAll(async () => {
     name: 'visual-qa',
     teamItems: [...items, ...artboard11Backlog().filter((item) => !ids.has(item.id))],
     tickets: boardTickets,
+    claude: { lead: PLANNING_AGENT },
   });
   page = board.page;
   await expect(page.getByTestId('lane-implementing').getByText('Cutover frmJobControl to Blazor')).toBeVisible({ timeout: 20_000 });
@@ -163,6 +170,9 @@ test('10 · after dropping Failed #71318 on Planning', async () => {
   await expect(page.getByTestId('toast-launch-from-ado:71318')).toContainText('Agent started in Planning', { timeout: 30_000 });
   await expect(page.getByTestId('lane-planning').getByTestId('card-71318')).toBeVisible();
   await capture('10-team-board-after-drop');
+  // Take the launch back so no agent is left mid-turn on the plan gate (quitting would ask first).
+  await page.getByTestId('toast-launch-from-ado:71318').getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('toast-launch-from-ado:71318')).toContainText('Launch undone', { timeout: 30_000 });
 });
 
 test('11 · the Backlog popout', async () => {
