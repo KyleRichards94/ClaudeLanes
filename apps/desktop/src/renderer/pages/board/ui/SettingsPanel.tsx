@@ -1,4 +1,4 @@
-import { EFFORTS, MODELS, STAGES, type RepoSettings, type Settings } from '@agent-lanes/contracts';
+import { DROP_KINDS, DROP_KIND_LABELS, EFFORTS, MODELS, STAGES, type RepoSettings, type Settings } from '@agent-lanes/contracts';
 import { useId, useMemo, useReducer, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { color, space } from '@agent-lanes/tokens';
@@ -10,6 +10,7 @@ import {
   draftFromSettings,
   draftReducer,
   draftToPatch,
+  dropErrorKey,
   isEmptyPatch,
   repoErrorKey,
   repoValues,
@@ -19,7 +20,7 @@ import {
   type SettingsDraft,
 } from '../model/settings-draft';
 
-export type SettingsSection = 'defaults' | 'repos';
+export type SettingsSection = 'defaults' | 'drops' | 'repos';
 
 export interface SettingsPanelProps {
   visible: boolean;
@@ -72,6 +73,7 @@ const SUBTITLE = 'Repos and agent defaults. Tokens and MCP servers are in Connec
 
 const TABS = [
   { value: 'defaults', label: 'Agent defaults' },
+  { value: 'drops', label: 'Drops' },
   { value: 'repos', label: 'Repos' },
 ] as const;
 
@@ -119,6 +121,8 @@ function SettingsForm({ settings, tab, onTab, idPrefix, initialRepo, onClose }: 
         <TabPanel idPrefix={idPrefix} value={tab}>
           {tab === 'defaults' ? (
             <DefaultsSection draft={draft} errors={errors} dispatch={dispatch} />
+          ) : tab === 'drops' ? (
+            <DropsSection draft={draft} errors={errors} dispatch={dispatch} />
           ) : (
             <ReposSection settings={settings} draft={draft} errors={errors} dispatch={dispatch} initialRepo={initialRepo} />
           )}
@@ -136,6 +140,42 @@ interface SectionProps {
 
 const MODEL_OPTIONS = MODELS.map((model) => ({ value: model, label: MODEL_LABELS[model] }));
 const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_LABELS[effort] }));
+
+/**
+ * Settings › Drops (AL-240, TB§3): the skills, model and effort each kind of team board drop starts its
+ * agent with. Holding Alt while dropping changes them for one drop.
+ */
+function DropsSection({ draft, errors, dispatch }: SectionProps) {
+  return (
+    <View style={styles.section} testID="settings-drops">
+      <Heading>Agents started by a drop on a lane</Heading>
+      <Text variant="meta" size="sm">
+        Hold Alt while you drop to change these for one drop.
+      </Text>
+      {DROP_KINDS.map((kind) => {
+        const row = draft.drops[kind];
+        const label = `${DROP_KIND_LABELS[kind].lane} · ${DROP_KIND_LABELS[kind].what}`;
+        return (
+          <View key={kind} style={styles.gates} testID={`settings-drop-${kind}`}>
+            <Text variant="title" size="md" role="heading" aria-level={3}>
+              {label}
+            </Text>
+            <TextField
+              label={`${label}: skills`}
+              value={row.skills}
+              onChangeText={(skills) => dispatch({ type: 'drop', kind, change: { skills } })}
+              placeholder="No skills"
+              error={errors[dropErrorKey(kind)]}
+              testID={`settings-drop-${kind}-skills`}
+            />
+            <SegmentedControl label={`${label}: model`} options={MODEL_OPTIONS} value={row.model} onChange={(model) => dispatch({ type: 'drop', kind, change: { model } })} fill />
+            <SegmentedControl label={`${label}: effort`} options={EFFORT_OPTIONS} value={row.effort} onChange={(effort) => dispatch({ type: 'drop', kind, change: { effort } })} fill />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 function DefaultsSection({ draft, errors, dispatch }: SectionProps) {
   return (

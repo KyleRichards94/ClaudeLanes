@@ -1,13 +1,21 @@
-import type { LaunchFromAdoRequest, LaunchFromAdoResponse, Result } from '@agent-lanes/contracts';
+import type { DropAction, LaunchFromAdoRequest, LaunchFromAdoResponse, Result } from '@agent-lanes/contracts';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { agentTickets, type AgentTicketStore } from '@/entities/agent-ticket';
 import { invoke, ticketsQueryKey, useAddRepo } from '@/shared/api';
 import { markLaunchedTicket, showErrorRecovery, toast } from '@/shared/model';
+import { openLaunchSheet } from '../model/launch-sheet';
 import { showLaunchToast } from './undo';
 
 /** A drop as the drag (AL-235), the keyboard "Send to lane" menu and the Backlog popout hand it over. */
 export type AdoDrop = LaunchFromAdoRequest;
+
+export interface AdoDropOptions {
+  /** Alt was held as the card was dropped: the launch sheet opens first (AL-240). */
+  alt?: boolean;
+  /** What the drop rules say the drop does (`allowedLanes(card, me)[lane]`); the sheet needs it. */
+  action?: DropAction;
+}
 
 /** The team board's ADO queries (TB§6), refetched after every drop: the card may have moved or been assigned. */
 export const TEAM_BOARD_QUERY_KEYS = [
@@ -47,14 +55,22 @@ export function refreshTeamBoard(queryClient: QueryClient): void {
  * Launch from the team board (AL-236): main rechecks the card, makes the one ADO change a To Do or
  * Failed drop makes, creates the worktree and starts the agent. On success the card is put on the board
  * and highlighted, and the success toast says what changed; a refusal says why and refreshes the board.
+ * With Alt held, the launch sheet (AL-240) opens first and Cancel sends nothing to main.
  * Resolves the launch, or null when it did not happen.
  */
-export function useLaunchFromAdo(store: AgentTicketStore = agentTickets): (drop: AdoDrop) => Promise<LaunchFromAdoResponse | null> {
+export function useLaunchFromAdo(store: AgentTicketStore = agentTickets): (drop: AdoDrop, options?: AdoDropOptions) => Promise<LaunchFromAdoResponse | null> {
   const queryClient = useQueryClient();
   const addRepo = useAddRepo();
   return useCallback(
-    async (drop: AdoDrop) => {
-      const result = await invoke('agent:launchFromAdo', drop);
+    async (drop: AdoDrop, options: AdoDropOptions = {}) => {
+      let request = drop;
+      if (options.alt && options.action) {
+        const overrides = await openLaunchSheet({ drop, action: options.action });
+        // Cancelled: nothing changes in Azure DevOps or on disk.
+        if (!overrides) return null;
+        request = { ...drop, overrides };
+      }
+      const result = await invoke('agent:launchFromAdo', request);
       refreshTeamBoard(queryClient);
       if (!result.ok) {
         reportLaunchFailure(result, () => addRepo.mutate());

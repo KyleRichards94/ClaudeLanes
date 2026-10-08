@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, dropDefaultsOf, dropKindOf } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -396,6 +396,8 @@ export function createServices(options: ServiceOptions): Services {
     tickets,
     settings,
     repoForPullRequest: (orgUrl, pullRequest) => findRegisteredRepo(settings.get().repos, git.run, orgUrl, pullRequest.repository),
+    // Settings › Drops (AL-240), read at each drop.
+    laneDefaults: (action) => dropDefaultsOf(settings.get())[dropKindOf(action)],
     log: log.child('launch'),
   });
   late.adoLauncher = adoLauncher;
