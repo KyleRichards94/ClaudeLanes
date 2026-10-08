@@ -388,8 +388,12 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     return ok(session);
   }
 
+  // Set once the app is quitting: no new session starts after that (a queued launch would take the slot a stopped one freed).
+  let disposing = false;
+
   async function start(request: SessionStartRequest): Promise<Result<AgentSessionStatus>> {
     const { ticketId } = request;
+    if (disposing) return err('VALIDATION', 'Agent Lanes is closing; the agent was not started.');
     const existing = sessions.get(ticketId);
     if (existing && LIVE_STATES.has(existing.state)) return ok(statusOf(ticketId, existing));
 
@@ -664,6 +668,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     },
 
     async dispose() {
+      disposing = true;
       await Promise.all([...sessions.values()].filter((session) => LIVE_STATES.has(session.state)).map(stopSession));
     },
   };

@@ -32,6 +32,11 @@ export interface LaneDragCard {
   /** The signed-in user's display name, for the optimistic "assigned to you" (T5). */
   meName: string | null;
   source: LaneDropSource;
+  /**
+   * Every card dragged together with this one, this one included (the Backlog popout's shift-click
+   * selection, TB§5): a drop starts one agent per card. Left out, or one card, for a single drag.
+   */
+  group?: readonly LaneDragCard[];
 }
 
 /** One drop: shaped like AL-236's `agent:launchFromAdo` request, so its launch can take it as it is. */

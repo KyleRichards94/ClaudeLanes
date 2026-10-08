@@ -2,7 +2,7 @@ import { Suspense, useDeferredValue, type ReactElement } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { routeToPath, useRoute, type Route } from '@/shared/routing';
 import { PageErrorBoundary } from '@/shared/ui';
-import { BoardPage, DesignTabPage, GalleryPage, TicketPage } from './pages';
+import { BacklogWindowPage, BoardPage, DesignTabPage, GalleryPage, TicketPage } from './pages';
 
 /**
  * Shows the page for the current route, each loaded lazily behind Suspense (design §12).
@@ -37,6 +37,8 @@ function RoutePage({ route }: { route: Route }): ReactElement {
     case 'gallery':
       // Development only (AL-032); a production build has no gallery and shows the board.
       return GalleryPage ? <GalleryPage /> : <BoardPage />;
+    case 'backlogWindow':
+      return <BacklogWindowPage teamId={route.teamId} />;
   }
 }
 
@@ -51,6 +53,8 @@ function pageLabel(route: Route): string {
       return `the Claude Design tab of #${route.ticketId}`;
     case 'gallery':
       return 'the component gallery';
+    case 'backlogWindow':
+      return 'the backlog';
   }
 }
 

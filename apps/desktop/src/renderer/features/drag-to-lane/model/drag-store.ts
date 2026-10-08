@@ -81,9 +81,13 @@ export function useLaneDropState(lane: Lane): LaneDropState {
   return laneDropState(active, lane, overLane);
 }
 
-/** True while this card is the one being dragged. */
+/** True while this card is being dragged, alone or with the rest of its group. */
 export function useIsDragging(key: string): boolean {
-  return useDragStore((state) => state.active?.card.key === key);
+  return useDragStore((state) => {
+    const card = state.active?.card;
+    if (!card) return false;
+    return card.key === key || (card.group?.some((member) => member.key === key) ?? false);
+  });
 }
 
 export function usePendingDropLanes(): Readonly<Record<string, Lane>> {
