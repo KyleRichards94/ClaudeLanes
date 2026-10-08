@@ -12,6 +12,7 @@ describe('event contracts', () => {
         'agent:stage',
         'agent:status',
         'agent:subagent',
+        'agent:usage', // AL-113
         'build:log',
         'build:queued', // AL-131
         'build:finished', // AL-132
