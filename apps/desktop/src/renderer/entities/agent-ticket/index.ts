@@ -21,12 +21,23 @@ export {
   AGENT_TICKET_COUNTS,
   ticketNeedsYou,
   selectLaneNeedsYouCount,
+  selectLaneNeedsYouTicketIds,
   selectLaneTicketIds,
   selectTicket,
   selectTicketCount,
+  selectTicketTotal,
+  selectWorkItemLanes,
   type AgentTicketCount,
 } from './model/selectors';
-export { useAgentTicket, useAgentTicketCount, useLaneNeedsYouCount, useLaneTicketIds } from './model/hooks';
+export {
+  useAgentTicket,
+  useAgentTicketCount,
+  useAgentTicketTotal,
+  useLaneNeedsYouCount,
+  useLaneNeedsYouTicketIds,
+  useLaneTicketIds,
+  useWorkItemLanes,
+} from './model/hooks';
 export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
 export {
   AgentTicketCard,

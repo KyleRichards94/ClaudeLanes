@@ -4,6 +4,7 @@ import type {
   Lane,
   Model,
   PullRequestStatus,
+  RunState,
   Stage,
   StageGates,
   TicketAdoRef,
@@ -123,7 +124,11 @@ export interface AgentTicketBuild {
 }
 
 export interface AgentTicketRun {
-  readonly state: 'stopped' | 'running';
+  /**
+   * Where the run is (AL-133 `RunState`): `building`, `starting`, `running`, `stopping`, then
+   * `stopped` or `failed`. A record read at start-up is only ever `running` or `stopped`.
+   */
+  readonly state: RunState;
   /** "Running · localhost:5080" for a web project; null otherwise. */
   readonly url: string | null;
   /** When the current or last run started; null if the ticket never ran. */

@@ -6,6 +6,7 @@ import {
   AgentTicketCard,
   agentTickets,
   useLaneNeedsYouCount,
+  useLaneNeedsYouTicketIds,
   useLaneTicketIds,
   type AgentTicketStore,
 } from '@/entities/agent-ticket';
@@ -13,11 +14,13 @@ import { PermissionPrompt } from '@/features/resolve-permission';
 import { LANE_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
 import { useRouter, routes } from '@/shared/routing';
-import { EMPTY_LANE_COPY, collapsedLaneLabel, laneBadgeLabel } from '../model/lane-copy';
+import { EMPTY_LANE_COPY, collapsedLaneLabel, laneBadgeLabel, needsYouEmptyCopy } from '../model/lane-copy';
 
 export interface LaneProps {
   lane: LaneName;
   store?: AgentTicketStore;
+  /** Show only the cards that need the user (the header's "need you" filter, AL-142). */
+  needsYouOnly?: boolean;
 }
 
 /**
@@ -25,8 +28,10 @@ export interface LaneProps {
  * cards oldest first, or the empty-lane copy (artboard 6). Pressing the header collapses the lane to
  * a vertical strip, as Done is by default; the choice is saved with the UI prefs (AL-041).
  */
-export function Lane({ lane, store = agentTickets }: LaneProps) {
-  const ids = useLaneTicketIds(lane, store);
+export function Lane({ lane, store = agentTickets, needsYouOnly = false }: LaneProps) {
+  const allIds = useLaneTicketIds(lane, store);
+  const needsYouIds = useLaneNeedsYouTicketIds(lane, store);
+  const ids = needsYouOnly ? needsYouIds : allIds;
   const needsYou = useLaneNeedsYouCount(lane, store);
   const collapsed = useUiPrefs((state) => state.collapsedLanes.includes(lane));
   const toggleLane = useUiPrefs((state) => state.toggleLane);
@@ -58,7 +63,7 @@ export function Lane({ lane, store = agentTickets }: LaneProps) {
     );
   }
 
-  const empty = EMPTY_LANE_COPY[lane];
+  const empty = needsYouOnly ? needsYouEmptyCopy(name) : EMPTY_LANE_COPY[lane];
   return (
     <GlassPanel level="md" style={styles.lane} testID={`lane-${lane}`}>
       <Pressable

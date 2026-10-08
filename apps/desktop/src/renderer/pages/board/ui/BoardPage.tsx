@@ -1,70 +1,108 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { color, radius, space } from '@agent-lanes/tokens';
-import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
-import { SettingsPanel } from './SettingsPanel';
-import { useAppInfo, useRepos } from '@/shared/api';
-import { openConnections, openNewTicket, useUiPrefs } from '@/shared/model';
+import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { Button, Text } from '@agent-lanes/ui';
+import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
+import { useAppInfo } from '@/shared/api';
+import { boardSubheader } from '../model/header';
+import { useBoardSprint } from '../model/use-board-sprint';
 import { useBoardTickets } from '../model/use-board-tickets';
+import { BoardHeader } from './BoardHeader';
 import { BoardLanes } from './BoardLanes';
 import { LiveDock } from './LiveDock';
-import { McpStatusPill } from './McpStatusPill';
+import { SettingsPanel } from './SettingsPanel';
 
 /**
- * The agent board (artboard 1). The header is still the walking skeleton's until AL-142; the lanes
- * (AL-143) show every ticket record loaded into the agent ticket store, and the live dock (AL-145)
- * sits under them.
+ * The agent board (artboard 1): the header (AL-142), the sub-header, title and legend, the lanes
+ * (AL-143) with every ticket record loaded into the agent ticket store, and the live dock (AL-145).
+ * The header's "need you" pill narrows the lanes to the tickets waiting on the user.
  */
 export function BoardPage() {
-  const appInfo = useAppInfo();
   useBoardTickets();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const repos = useRepos();
-  const lastRepo = useUiPrefs((state) => state.lastRepo);
-  const repo = repos.data?.find((candidate) => candidate.path === lastRepo);
+  const [needsYouOnly, setNeedsYouOnly] = useState(false);
+  const needsYou = useAgentTicketCount('needs-you');
 
   return (
     <View style={styles.page}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <GlassPanel style={styles.header} testID="board-header">
-          <View style={styles.logo}>
-            <Text variant="title" size="lg" color={color.surface}>
-              ≡
-            </Text>
+        <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} />
+
+        <View style={styles.titleBlock}>
+          <View style={styles.subheaderRow}>
+            <BoardSubheader />
+            <RuntimeInfo />
           </View>
-          <Text variant="display" size="lg">
-            Agent Lanes
-          </Text>
-          {/* The repo first run picked (AL-047); AL-142 turns this into the Repo dropdown. */}
-          {repo ? <Pill tone="neutral" size="md" label={repo.name} testID="board-repo" /> : null}
-          <View style={styles.spacer} />
-          {/* Selectable so the version line can be copied into a bug report. */}
-          <Text variant="mono" color={color.muted} selectable testID="runtime-info">
-            {appInfo.data
-              ? `v${appInfo.data.version} · Electron ${appInfo.data.versions.electron} · ${appInfo.data.platform}`
-              : appInfo.isError
-                ? 'Main process unreachable'
-                : 'Connecting…'}
-          </Text>
-          {/* MCP servers of the running sessions (AL-108); AL-142 adds the count pills beside it. */}
-          <McpStatusPill />
-          {/* Artboard 1's Connections icon button (AL-046); AL-142 builds the rest of the header. */}
-          <Button label="Connections" icon="link" iconOnly onPress={() => openConnections()} testID="open-connections" />
-          {/* The header menu's Settings until AL-142 builds the full header (repo dropdown included). */}
-          <Button variant="secondary" size="sm" label="Settings" onPress={() => setSettingsOpen(true)} testID="open-settings" />
-          <Button variant="primary" size="sm" icon="plus" label="New agent ticket" onPress={openNewTicket} testID="open-new-ticket" />
-        </GlassPanel>
+          <View style={styles.titleRow}>
+            <Text variant="display" role="heading" aria-level={1}>
+              Agent board
+            </Text>
+            <Legend />
+          </View>
+        </View>
 
-        <Text variant="display" role="heading" aria-level={1}>
-          Agent board
-        </Text>
+        {needsYouOnly ? (
+          <View style={styles.filterBar} testID="board-needs-you-filter">
+            <Text variant="body" color={tone.attention.text}>
+              {needsYou === 0 ? 'Nothing needs you right now.' : `Showing the ${needsYou === 1 ? 'ticket' : `${needsYou} tickets`} that need you.`}
+            </Text>
+            <Button size="sm" label="Show all tickets" onPress={() => setNeedsYouOnly(false)} />
+          </View>
+        ) : null}
 
-        <BoardLanes />
+        <BoardLanes needsYouOnly={needsYouOnly} />
       </ScrollView>
       <View style={styles.dock}>
         <LiveDock />
       </View>
       <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </View>
+  );
+}
+
+/** "Sprint 42 · 7 – 20 Oct · 8 agent tickets". */
+function BoardSubheader() {
+  const sprint = useBoardSprint();
+  const total = useAgentTicketTotal();
+  return (
+    <Text variant="body" color={color.muted} testID="board-subheader">
+      {boardSubheader(sprint, total)}
+    </Text>
+  );
+}
+
+/** The app version and runtime, selectable so it can be copied into a bug report. */
+function RuntimeInfo() {
+  const appInfo = useAppInfo();
+  return (
+    <Text variant="mono" color={color.muted} selectable testID="runtime-info">
+      {appInfo.data
+        ? `v${appInfo.data.version} · Electron ${appInfo.data.versions.electron} · ${appInfo.data.platform}`
+        : appInfo.isError
+          ? 'Main process unreachable'
+          : 'Connecting…'}
+    </Text>
+  );
+}
+
+const LEGEND = [
+  { label: 'Azure DevOps', swatch: color.ado },
+  { label: 'Claude activity', swatch: color.claude },
+  { label: 'Needs you', swatch: color.attention },
+] as const;
+
+/** Artboard 1's colour key: what blue, violet and amber mean on the cards. */
+function Legend() {
+  return (
+    <View style={styles.legend} testID="board-legend">
+      {LEGEND.map((entry) => (
+        <View key={entry.label} style={styles.legendEntry}>
+          <View aria-hidden style={[styles.swatch, { backgroundColor: entry.swatch }]} />
+          <Text variant="body" size="sm">
+            {entry.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -85,22 +123,49 @@ const styles = StyleSheet.create({
     padding: space.xl,
     gap: space.xl,
   },
-  header: {
+  titleBlock: {
+    gap: space.xs,
+  },
+  subheaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: space.md,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: space.md,
+  },
+  legend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.lg,
+    paddingBottom: space.xs,
+  },
+  legendEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  swatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: space.md,
     paddingHorizontal: space.lg,
-    paddingVertical: space.md,
-  },
-  logo: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.chip,
-    backgroundColor: color.claude,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spacer: {
-    flex: 1,
+    paddingVertical: space.sm,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: tone.attention.border,
+    backgroundColor: tone.attention.band,
   },
 });

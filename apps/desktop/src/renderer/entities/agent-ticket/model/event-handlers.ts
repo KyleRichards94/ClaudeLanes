@@ -11,8 +11,8 @@ import { agentTickets, type AgentTicketStore } from './store';
  * whose payloads carry something the store uses are handled; the tickets that add fields to the other
  * ticket events add a line here calling the matching store action: `agent:status` → `setNeedsYou` for
  * permissions (AL-109) and `applyModelChange` (AL-106), `agent:subagent` → `setSubAgentCounts`
- * (AL-107), `run:status` → `setRun` (AL-133), the build result → `setLastBuild` (AL-132), and the pull
- * request → `setPullRequest` (AL-181).
+ * (AL-107), and the pull request → `setPullRequest` (AL-181). `run:status` → `setRun` and
+ * `build:finished` → `setLastBuild` are handled (AL-173).
  */
 export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHandlers {
   return {
@@ -36,6 +36,17 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       if (event.waiting) store.setNeedsYou(event.ticketId, { kind: 'permission', tool: event.waiting.tool, since: event.waiting.openedAt });
       else store.clearNeedsYou(event.ticketId, 'permission');
     },
+    // The Worktree panel's Build / Run / Stop and status lines follow these (AL-173).
+    'run:status': ({ ticketId, state, url, startedAt }) => store.setRun(ticketId, { state, url, startedAt }),
+    'build:finished': (result) =>
+      store.setLastBuild(result.ticketId, {
+        outcome: result.outcome,
+        startedAt: result.startedAt,
+        finishedAt: result.finishedAt,
+        errors: result.errors,
+        warnings: result.warnings,
+        firstError: result.diagnostics.find((item) => item.severity === 'error') ?? null,
+      }),
   };
 }
 

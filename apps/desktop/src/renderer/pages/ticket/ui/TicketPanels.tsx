@@ -4,8 +4,8 @@ import type { TicketSubBranch } from '@agent-lanes/contracts';
 import { color, radius, space } from '@agent-lanes/tokens';
 import { GlassPanel, Icon, Pill, Text } from '@agent-lanes/ui';
 import { EFFORT_LABELS, MODEL_LABELS, modelEffortLabel, subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
+import { BuildRunControls } from '@/features/build-run';
 import { ErrorBoundary } from '@/shared/ui';
-import { formatClock } from '../lib/format';
 
 /**
  * The drill-in's panels as read-only summaries (artboard 3). The controls inside them are later
@@ -59,18 +59,8 @@ export function AgentPanel({ ticket }: { ticket: AgentTicket }) {
   );
 }
 
+/** Branch name, Build / Run / Stop and their status (AL-173, features/build-run). */
 export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
-  const last = ticket.build.last;
-  const job = ticket.build.job;
-  const buildLine = job
-    ? job.state === 'queued'
-      ? `${job.kind === 'run' ? 'Run' : 'Build'} queued${job.position ? ` · #${job.position}` : ''}`
-      : `${job.kind === 'run' ? 'Starting run' : 'Building'}…`
-    : last
-      ? `Last build ${formatClock(last.finishedAt)} · ${last.outcome}`
-      : 'Not built yet';
-  const runLine = ticket.run.state === 'running' ? (ticket.run.url ? `Running · ${ticket.run.url}` : 'Running') : 'Not running';
-
   return (
     <Panel
       title="Worktree"
@@ -82,14 +72,7 @@ export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
         </Text>
       }
     >
-      <View style={styles.statusRow}>
-        <Text variant="meta" size="md">
-          {buildLine}
-        </Text>
-        <Text variant="meta" size="md">
-          {runLine}
-        </Text>
-      </View>
+      <BuildRunControls ticket={ticket} />
     </Panel>
   );
 }
@@ -214,11 +197,6 @@ const styles = StyleSheet.create({
   },
   valueChipStrong: {
     borderColor: color.claudeTint,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: space.md,
   },
   mergeRow: {
     flexDirection: 'row',
