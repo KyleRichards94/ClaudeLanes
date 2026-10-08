@@ -32,6 +32,7 @@ import {
   resolveStart,
   undoWorktreeAdd,
   type RollbackReport,
+  type UndoAddOptions,
   type WorktreeGit,
   type WorktreeStart,
 } from './worktree-git';
@@ -61,6 +62,13 @@ export interface TicketWorktreeService {
    * checked against git's rules and the other tickets' branches.
    */
   preview(input: WorktreePreviewRequest): Promise<Result<WorktreePreview>>;
+  /**
+   * Takes back a ticket `create` made in this app run: removes its worktree and folder, the branch it
+   * created (only while the branch still points where it started), and its record. For a launch that
+   * failed after the worktree existed (AL-165) and for Undo (AL-237). What could not be removed is in
+   * the report. VALIDATION `not-created-here` for a ticket this run did not create.
+   */
+  discard(ticketId: string): Promise<Result<RollbackReport>>;
 }
 
 /** What the ticket works on (artboard 2 left column). */
@@ -134,12 +142,14 @@ export type TicketWorktreeFailure =
   /** INTERNAL: the caller's signal fired. */
   | 'aborted'
   /** INTERNAL: anything else (a bug); the message says what. */
-  | 'unexpected';
+  | 'unexpected'
+  /** VALIDATION (`discard`): this app run did not create the ticket, so it is not taken back. */
+  | 'not-created-here';
 
 export interface TicketWorktreeServiceOptions {
   git: WorktreeGit;
   settings: Pick<SettingsService, 'get'>;
-  tickets: Pick<TicketRecordStore, 'get' | 'list' | 'create'>;
+  tickets: Pick<TicketRecordStore, 'get' | 'list' | 'create' | 'delete'>;
   /** For `nt-<yyyymmdd>` names. */
   now?: () => number;
   /** One line per created worktree and per rollback. */
@@ -184,6 +194,8 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
   const naming = createKeyedQueue();
   /** Ticket ids claimed by launches still running, in any repo. A launch keeps its claim until its record exists. */
   const creating = new Set<string>();
+  /** How to take back each ticket created in this app run (`discard`): what its worktree add made. */
+  const undoPlans = new Map<string, UndoAddOptions>();
 
   const checkRefFormat =
     (cwd: string): CheckRefFormat =>
@@ -288,17 +300,18 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
       }
 
       const rootBefore = (await inspectPath(root)) !== 'missing';
+      const undoPlan: UndoAddOptions = {
+        repo,
+        path: worktreePath,
+        branch,
+        commit: start.commit,
+        pathBefore,
+        root,
+        rootBefore,
+        retryDelaysMs: options.rollbackRetryDelaysMs,
+      };
       const rollBack = async (): Promise<RollbackReport> => {
-        const report = await undoWorktreeAdd(git, {
-          repo,
-          path: worktreePath,
-          branch,
-          commit: start.commit,
-          pathBefore,
-          root,
-          rootBefore,
-          retryDelaysMs: options.rollbackRetryDelaysMs,
-        });
+        const report = await undoWorktreeAdd(git, undoPlan);
         if (report.complete) log.info(`Ticket ${ticketId}: rolled back the worktree and branch ${branch}.`);
         else log.warn(`Ticket ${ticketId}: rollback left ${report.leftovers.join(', ')}.`);
         return report;
@@ -344,6 +357,7 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
         });
       }
 
+      undoPlans.set(ticketId, undoPlan);
       log.info(`Ticket ${ticketId}: worktree ${worktreePath} on ${branch} from ${start.ref} (${start.commit.slice(0, 12)}).`);
       return ok({ record: created.data, start });
     } finally {
@@ -405,7 +419,27 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
     });
   }
 
+  async function discard(ticketId: string): Promise<Result<RollbackReport>> {
+    const plan = undoPlans.get(ticketId);
+    if (!plan) return refuse('not-created-here', `Ticket ${ticketId} was not created in this app run, so it is not taken back.`, { ticketId });
+    return inRepo(repoPathKey(plan.repo), async () => {
+      const report = await undoWorktreeAdd(git, plan);
+      const removed = await tickets.delete(ticketId).catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
+      if (!removed.ok) report.leftovers.push(`record ${ticketId}`);
+      undoPlans.delete(ticketId);
+      const complete = report.leftovers.length === 0;
+      if (complete) log.info(`Ticket ${ticketId}: discarded its worktree, branch ${plan.branch} and record.`);
+      else log.warn(`Ticket ${ticketId}: discarding left ${report.leftovers.join(', ')}.`);
+      return ok({ complete, leftovers: report.leftovers });
+    });
+  }
+
   return {
+    discard: (ticketId) =>
+      discard(ticketId).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        return err('INTERNAL', `Removing the ticket's worktree failed: ${message}`, { reason: 'unexpected' });
+      }),
     preview: (input) =>
       preview(input).catch((error: unknown) => {
         const message = error instanceof Error ? error.message : String(error);

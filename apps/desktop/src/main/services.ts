@@ -45,6 +45,7 @@ import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
 import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discovery';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
+import { createTicketLauncher, type TicketLauncher } from './tickets/launch';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
 import { createMergeToMainService, type MergeToMainService } from './worktrees/merge-to-main';
@@ -145,6 +146,8 @@ export interface Services {
   readonly mergeSubBranches: MergeSubBranchesService;
   /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
   readonly credentialFailures: CredentialFailureService;
+  /** Launch from the New agent ticket modal: work item, worktree and record, then the session or Queued (AL-165). */
+  readonly ticketLauncher: TicketLauncher;
 }
 
 export interface ServiceOptions {
@@ -375,6 +378,7 @@ export function createServices(options: ServiceOptions): Services {
   const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
   late.credentialFailures = credentialFailureService;
   const buildContext = createBuildContext({ sessions, log: log.child('agent') });
+  const ticketLauncher = createTicketLauncher({ ado, worktrees, launches, tickets, log: log.child('launch') });
 
   return {
     appDataDir: options.appDataDir,
@@ -417,6 +421,7 @@ export function createServices(options: ServiceOptions): Services {
     subagents,
     mergeSubBranches,
     credentialFailures: credentialFailureService,
+    ticketLauncher,
   };
 }
 

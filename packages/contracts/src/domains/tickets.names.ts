@@ -11,5 +11,7 @@ export const TICKETS_INVOKE_CHANNELS = [
   'tickets:ignoreWorktree',
   // One ticket's record for the drill-in and the design tab (AL-170).
   'tickets:get',
+  // Launch from the New agent ticket modal: worktree, record, then the session or the Queued lane (AL-165).
+  'tickets:launch',
 ] as const;
 export const TICKETS_EVENT_CHANNELS = [] as const;
