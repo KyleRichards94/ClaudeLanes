@@ -56,6 +56,8 @@ function interactiveClaude(respond: Responder, tools: string[] = ['ClaudeDesign'
       interrupt: async () => undefined,
       setModel: async () => undefined,
       applyFlagSettings: async () => undefined,
+      mcpServerStatus: async () => [],
+      reconnectMcpServer: async () => undefined,
     }) as ClaudeQuery;
   };
   return { query, calls };
