@@ -4,6 +4,7 @@ export const APP_INVOKE_CHANNELS = [
   'app:getDiagnostics',
   'app:copyDiagnostics',
   'app:logError',
+  'app:popOutBacklog', // AL-239: the Backlog popout in its own window
 ] as const;
 export const APP_EVENT_CHANNELS = [
   'toast',

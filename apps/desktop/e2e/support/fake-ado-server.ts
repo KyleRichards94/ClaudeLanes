@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createFakeAdoOrg, createFakeTeamOrg, FAKE_TEAM_PAT, type FakeAdoOrg, type FakeAdoOrgOptions, type FakeTeamOrg } from '@agent-lanes/ado-client/testing';
+import { createFakeAdoOrg, createFakeTeamOrg, FAKE_TEAM_PAT, type FakeAdoOrg, type FakeAdoOrgOptions, type FakeTeamOrg, type FakeWorkItem } from '@agent-lanes/ado-client/testing';
 
 /**
  * The shared fake Azure DevOps organisation (AL-065, `@agent-lanes/ado-client/testing`) served on
@@ -20,9 +20,14 @@ export interface FakeAdoServer {
 }
 
 export async function startFakeAdoServer(
-  options: Omit<FakeAdoOrgOptions, 'orgUrl'> & { orgName?: string; teamBoard?: boolean } = {},
+  options: Omit<FakeAdoOrgOptions, 'orgUrl'> & {
+    orgName?: string;
+    teamBoard?: boolean;
+    /** With `teamBoard`: the team org's work items instead of artboard 08's board (AL-239 adds artboard 11's backlog). */
+    teamItems?: FakeWorkItem[];
+  } = {},
 ): Promise<FakeAdoServer> {
-  const { orgName = 'contoso', teamBoard = false, ...orgOptions } = options;
+  const { orgName = 'contoso', teamBoard = false, teamItems, ...orgOptions } = options;
   // Created once the port is known; requests before that get a 500.
   const ready: { org?: FakeAdoOrg; teamOrg?: FakeTeamOrg } = {};
 
@@ -66,7 +71,7 @@ export async function startFakeAdoServer(
   const orgUrl = `http://127.0.0.1:${port}/${orgName}`;
   const org = createFakeAdoOrg({ ...orgOptions, ...(teamBoard ? { pat: FAKE_TEAM_PAT } : {}), orgUrl });
   ready.org = org;
-  ready.teamOrg = teamBoard ? createFakeTeamOrg({ orgUrl }) : undefined;
+  ready.teamOrg = teamBoard ? createFakeTeamOrg({ orgUrl, ...(teamItems ? { items: teamItems } : {}) }) : undefined;
 
   return {
     orgUrl: org.orgUrl,

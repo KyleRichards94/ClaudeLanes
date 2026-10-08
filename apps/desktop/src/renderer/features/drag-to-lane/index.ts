@@ -1,5 +1,6 @@
 export type { LaneDrop, LaneDropOptions, LaneDropSource, LaneDragCard as LaneDragData, LaunchFromLane } from './model/types';
-export { DRAG_INSTRUCTIONS, activeDrag, allowedLaneList, dragStatusText, laneDropState, type ActiveDrag, type LaneDropState } from './model/lane-state';
+export { DRAG_INSTRUCTIONS, activeDrag, allowedLaneList, dragLabel, dragMembers, dragStatusText, laneDropState, type ActiveDrag, type LaneDropState } from './model/lane-state';
+export { NATIVE_BACKLOG_DRAG_TYPE, decodeNativeBacklogDrag, encodeNativeBacklogDrag } from './model/native-drag';
 export { resetDragToLane, useActiveDrag, useLaneDropState, usePendingDropLanes } from './model/drag-store';
 export { DROP_QUERY_KEYS, initialsOf, useDropOnLane, withItemInProgress, type DropOnLane } from './model/use-drop';
 export { LANE_KEYBOARD_CODES, laneKeyboardCoordinates } from './model/keyboard';

@@ -17,3 +17,8 @@ export const DesignTabPage = lazy(() =>
 export const GalleryPage = __GALLERY__
   ? lazy(() => import('@/pages/gallery').then((page) => ({ default: page.GalleryPage })))
   : null;
+
+/** The popped-out Backlog window's page (AL-239): only that window opens it. */
+export const BacklogWindowPage = lazy(() =>
+  import('@/pages/backlog-window').then((page) => ({ default: page.BacklogWindowPage })),
+);

@@ -4,7 +4,7 @@ import { Dimensions, Modal, Pressable, StyleSheet, View, type ViewProps } from '
 import { color, glass, radius, shadow, space, tone } from '@agent-lanes/tokens';
 import { Text } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/entities/agent-ticket';
-import { allowedLaneList } from '../model/lane-state';
+import { allowedLaneList, dragLabel } from '../model/lane-state';
 import type { LaneDragCard } from '../model/types';
 
 /** Where the menu opens: under the card, or over it when there is no room below. */
@@ -79,13 +79,13 @@ export function SendToLaneMenu({
       {anchor ? (
         <View
           role="menu"
-          aria-label={`Send ${card.label} to a lane`}
+          aria-label={`Send ${dragLabel(card)} to a lane`}
           style={[styles.menu, { top, left, width: MENU_WIDTH }]}
           testID="send-to-lane-menu"
           {...keys}
         >
           <Text variant="meta" style={styles.heading}>
-            {`Send ${card.label} to`}
+            {`Send ${dragLabel(card)} to`}
           </Text>
           {lanes.length === 0 ? (
             <Text variant="body" style={styles.empty}>

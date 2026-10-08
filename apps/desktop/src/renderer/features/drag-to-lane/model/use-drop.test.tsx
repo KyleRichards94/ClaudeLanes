@@ -174,3 +174,50 @@ describe('useDropOnLane (AL-235)', () => {
     expect(client.getQueryData<TeamBoard>(KEY)?.items[0]).toMatchObject({ columnKind: 'failed' });
   });
 });
+
+describe('group drops (AL-239, TB§5)', () => {
+  const backlog = (id: number): LaneDragCard => ({
+    key: `backlog:${id}`,
+    label: `#${id}`,
+    title: `Backlog ${id}`,
+    card: { kind: 'backlog-item', id, assignee: null, agentLane: null },
+    me: { id: 'me' },
+    meName: 'Kyle Richards',
+    source: { kind: 'backlog-item', id },
+  });
+
+  it('starts one agent per selected row, one after another, every row tagged at once', async () => {
+    const first = deferred<unknown>();
+    const second = deferred<unknown>();
+    const onLaunch = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { result } = setup(onLaunch);
+    const rows = [backlog(71360), backlog(71335)];
+    let done!: Promise<boolean>;
+    act(() => {
+      done = result.current.drop({ ...rows[0]!, group: rows }, 'planning', { alt: true });
+    });
+    await vi.waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(1));
+    expect(result.current.pending).toEqual({ '71360': 'planning', '71335': 'planning' });
+    // The second launch waits for the first, so main queues it when the first took the last slot.
+    expect(onLaunch).toHaveBeenLastCalledWith({ source: { kind: 'backlog-item', id: 71360 }, lane: 'planning' }, expect.objectContaining({ alt: false }));
+    await act(async () => first.resolve({ ticketId: '71360' }));
+    await vi.waitFor(() => expect(onLaunch).toHaveBeenCalledTimes(2));
+    expect(onLaunch).toHaveBeenLastCalledWith({ source: { kind: 'backlog-item', id: 71335 }, lane: 'planning' }, expect.objectContaining({ alt: false }));
+    await act(async () => second.resolve({ ticketId: '71335', status: 'queued' }));
+    await act(async () => {
+      expect(await done).toBe(true);
+    });
+    expect(result.current.pending).toEqual({});
+  });
+
+  it('carries on with the rest of the group when one launch is refused', async () => {
+    const onLaunch = vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce({ ticketId: '71335' });
+    const { result } = setup(onLaunch);
+    const rows = [backlog(71360), backlog(71335)];
+    await act(async () => {
+      expect(await result.current.drop({ ...rows[0]!, group: rows }, 'implementing')).toBe(true);
+    });
+    expect(onLaunch).toHaveBeenCalledTimes(2);
+    expect(result.current.pending).toEqual({});
+  });
+});

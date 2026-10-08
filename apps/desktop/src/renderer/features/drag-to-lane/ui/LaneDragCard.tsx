@@ -15,6 +15,13 @@ export interface LaneDragCardProps {
   label: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /**
+   * A control that sits on the card but is not part of the drag handle (the Backlog popout's
+   * checkbox): rendered beside the card in the same list item, so controls never nest.
+   */
+  accessory?: ReactNode;
+  /** A click on the card that did not start a drag (the Backlog popout's shift-click selection). */
+  onClick?: (event: { shiftKey: boolean }) => void;
   children: ReactNode;
 }
 
@@ -23,20 +30,22 @@ export interface LaneDragCardProps {
  * pointer or with Space, and sent from the keyboard with Enter, which opens the "Send to lane" menu of
  * the lanes that take it. It is a list item either way; one that can't be dragged is only that.
  */
-export function LaneDragCard({ drag, label, style, testID, children }: LaneDragCardProps) {
+export function LaneDragCard({ drag, label, style, testID, accessory, onClick, children }: LaneDragCardProps) {
   const context = useDragToLane();
   if (!drag || !context) {
     return (
       <View role="listitem" aria-label={label} style={style} testID={testID}>
         {children}
+        {accessory}
       </View>
     );
   }
   return (
     <View role="listitem" style={styles.item}>
-      <DraggableCard drag={drag} context={context} label={label} style={style} testID={testID}>
+      <DraggableCard drag={drag} context={context} label={label} style={style} testID={testID} onClick={onClick}>
         {children}
       </DraggableCard>
+      {accessory}
     </View>
   );
 }
@@ -51,9 +60,10 @@ function DraggableCard({
   label,
   style,
   testID,
+  onClick,
   children,
 }: Required<Pick<LaneDragCardProps, 'label' | 'children'>> &
-  Pick<LaneDragCardProps, 'style' | 'testID'> & {
+  Pick<LaneDragCardProps, 'style' | 'testID' | 'onClick'> & {
     drag: DragCard;
     context: DragToLaneContextValue;
   }) {
@@ -93,6 +103,7 @@ function DraggableCard({
     ...bindings.attributes,
     ...listeners,
     onKeyDown,
+    ...(onClick ? { onClick: (event: { shiftKey?: boolean }) => onClick({ shiftKey: event.shiftKey === true }) } : {}),
     role: 'button',
     tabIndex: 0,
     'aria-roledescription': 'draggable card',

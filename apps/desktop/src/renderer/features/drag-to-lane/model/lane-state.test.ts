@@ -5,6 +5,7 @@ import {
   activeDrag,
   allowedLaneList,
   cancelAnnouncement,
+  dragLabel,
   dragStatusText,
   dropAnnouncement,
   laneDropState,
@@ -92,5 +93,48 @@ describe('announcements (TB§7)', () => {
     expect(pickUpAnnouncement(activeDrag(unregistered, 'pointer'))).toBe('Picked up !10590. No lane takes it.');
     expect(dragStatusText(activeDrag(unregistered, 'pointer'))).toBe('No lane takes !10590');
     expect(dragStatusText(activeDrag(PR_10571, 'pointer'))).toBe('Drop !10571 on a highlighted lane');
+  });
+});
+
+describe('group drags (AL-239, TB§5, artboard 12)', () => {
+  const backlog = (id: number, assignee: typeof KR | null = null): LaneDragCard => ({
+    key: `backlog:${id}`,
+    label: `#${id}`,
+    title: `Backlog ${id}`,
+    card: { kind: 'backlog-item', id, assignee, agentLane: null },
+    me: ME,
+    meName: 'Kyle Richards',
+    source: { kind: 'backlog-item', id },
+  });
+  const pair = [backlog(71360), backlog(71335, KR)];
+  const group: LaneDragCard = { ...pair[0]!, group: pair };
+
+  it('lights only Planning and Implementing for two backlog rows, titled for several', () => {
+    const active = activeDrag(group, 'pointer');
+    expect(active.card.label).toBe('2 items');
+    expect(LANES.filter((lane) => active.allowed[lane])).toEqual(['planning', 'implementing']);
+    expect(active.allowed.planning).toMatchObject({ title: 'Plan these', detail: 'Assigns you · moves it to In Progress · starts planning' });
+    expect(active.allowed.implementing).toMatchObject({ title: 'Skip to implementing' });
+    expect(dragStatusText(active)).toBe('Dragging 2 items — drop on Planning or Implementing');
+    expect(pickUpAnnouncement(active)).toBe('Picked up 2 items. Planning and Implementing take it.');
+    expect(dragLabel(group)).toBe('2 items');
+    expect(allowedLaneList(group).map(({ lane, action }) => [lane, action.title])).toEqual([
+      ['planning', 'Plan these'],
+      ['implementing', 'Skip to implementing'],
+    ]);
+  });
+
+  it('goes only to lanes that take every card of the group', () => {
+    const testing = drag({ kind: 'board-item', id: 71318, column: 'testing', assignee: null, agentLane: null, pullRequestId: null, branch: null }, '#71318');
+    const mixed: LaneDragCard = { ...pair[0]!, group: [pair[0]!, testing] };
+    expect(LANES.filter((lane) => activeDrag(mixed, 'pointer').allowed[lane])).toEqual([]);
+  });
+
+  it('is an ordinary drag for a group of one', () => {
+    const one: LaneDragCard = { ...pair[0]!, group: [pair[0]!] };
+    const active = activeDrag(one, 'pointer');
+    expect(active.card.label).toBe('#71360');
+    expect(active.allowed.planning?.title).toBe('Plan this');
+    expect(dragStatusText(active)).toBe('Drop #71360 on a highlighted lane');
   });
 });
