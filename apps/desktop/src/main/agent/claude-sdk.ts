@@ -11,9 +11,11 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 
 /**
  * The part of the SDK's `Query` the app uses: the message stream, the account, stopping, and the
- * streaming-input controls agent sessions use (AL-100: interrupt, model and effort changes).
+ * streaming-input controls agent sessions use (AL-100: interrupt, model and effort changes; AL-108: MCP
+ * server status and reconnect).
  */
-export type ClaudeQuery = AsyncIterable<SDKMessage> & Pick<Query, 'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings'>;
+export type ClaudeQuery = AsyncIterable<SDKMessage> &
+  Pick<Query, 'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings' | 'mcpServerStatus' | 'reconnectMcpServer'>;
 
 export type ClaudeQueryFunction = (params: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => ClaudeQuery;
 

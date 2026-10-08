@@ -1,4 +1,4 @@
-import type { McpServerConfig, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { McpServerConfig, McpServerStatus, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
   SDK_MODEL_IDS,
   err,
@@ -59,6 +59,12 @@ export interface SessionManager {
   /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. */
   stop(ticketId: string): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
+  /** The status of every session the app has started since it opened, live or not. */
+  list(): AgentSessionStatus[];
+  /** The MCP servers of the ticket's live session, as Claude Code reports them (AL-108). */
+  mcpServerStatus(ticketId: string): Promise<Result<McpServerStatus[]>>;
+  /** Asks the ticket's live session to restart one of its MCP servers (AL-108). */
+  reconnectMcpServer(ticketId: string, serverName: string): Promise<Result<void>>;
   /** Every message of every session, tagged with its ticket. Returns an unsubscribe function. */
   subscribe(listener: SessionMessageListener): () => void;
   /** Stops every session (app quit, AL-213). */
@@ -432,6 +438,30 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     },
 
     status: (ticketId) => statusOf(ticketId, sessions.get(ticketId)),
+
+    list: () => [...sessions.values()].map((session) => statusOf(session.ticketId, session)),
+
+    async mcpServerStatus(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      if (!found.data.query) return ok([]);
+      try {
+        return ok(await found.data.query.mcpServerStatus());
+      } catch (error) {
+        return err('INTERNAL', `Could not read the MCP servers of ticket ${ticketId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    async reconnectMcpServer(ticketId, serverName) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      try {
+        await found.data.query?.reconnectMcpServer(serverName);
+        return ok(undefined);
+      } catch (error) {
+        return err('INTERNAL', `Could not reconnect ${serverName}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
 
     subscribe(listener) {
       listeners.add(listener);
