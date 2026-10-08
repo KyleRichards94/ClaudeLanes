@@ -4,12 +4,13 @@ import type { TicketRecord, WorkItem } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
 import { WorkItemChip } from '@/entities/ado-work-item';
+import { OutputStream } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
-import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
+import { ErrorBoundary, PanelErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
 import { StageStepper } from './StageStepper';
 import { TicketMeta, TicketTopBar } from './TicketHeader';
@@ -99,6 +100,10 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           <ErrorBoundary key={tab} name={`ticket:tab:${tab}`} label={`the ${TAB_TITLES[tab]} tab`}>
             {tab === 'build-log' ? (
               <BuildLog ticketId={ticket.id} style={styles.buildLog} />
+            ) : tab === 'output' ? (
+              <PanelErrorBoundary panel="output" ticketId={ticket.id}>
+                <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
+              </PanelErrorBoundary>
             ) : (
               <TabPlaceholder tab={tab} ticket={ticket} workItem={workItem.data} />
             )}
@@ -122,7 +127,7 @@ const TAB_EMPTY: Record<TicketPageTab, string> = {
   ado: 'The work item, its acceptance criteria, comments and linked pull request.',
 };
 
-/** What each tab shows until its feature lands (AL-175, AL-179, AL-180). The Build log tab is AL-135's BuildLog. */
+/** What each tab shows until its feature lands (AL-179, AL-180). Output is AL-175's OutputStream, Build log AL-135's BuildLog. */
 function TabPlaceholder({ tab, ticket, workItem }: { tab: TicketPageTab; ticket: AgentTicket; workItem: WorkItem | undefined }) {
   const activity = tab === 'output' ? ticket.activity?.text : undefined;
   return (
@@ -234,6 +239,14 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     flexBasis: 560,
     height: 560,
+  },
+  // The output stream virtualises its rows too (AL-175): a bounded height, flush with the card's edges.
+  output: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 620,
+    height: 620,
+    margin: -space.xl,
   },
   side: {
     gap: space.lg,
