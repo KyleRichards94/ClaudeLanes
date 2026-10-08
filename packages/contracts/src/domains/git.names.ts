@@ -8,5 +8,7 @@ export const GIT_INVOKE_CHANNELS = [
   // Files changed against the base or a sub-branch, and one file's unified diff on demand (AL-089).
   'git:diff',
   'git:diffFile',
+  // Workspace preview in the New agent ticket modal (AL-164).
+  'git:previewWorktree',
 ] as const;
 export const GIT_EVENT_CHANNELS = [] as const;
