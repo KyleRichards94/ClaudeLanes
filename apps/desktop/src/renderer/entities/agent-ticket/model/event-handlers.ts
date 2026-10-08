@@ -31,6 +31,11 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       else store.resolveGate(event.ticketId);
     },
     'build:queued': (event) => store.applyBuildJob(event),
+    // A tool call outside the permission policy waits (AL-109): "Needs you · allow Bash" while one does.
+    'agent:permission': (event) => {
+      if (event.waiting) store.setNeedsYou(event.ticketId, { kind: 'permission', tool: event.waiting.tool, since: event.waiting.openedAt });
+      else store.clearNeedsYou(event.ticketId, 'permission');
+    },
   };
 }
 
