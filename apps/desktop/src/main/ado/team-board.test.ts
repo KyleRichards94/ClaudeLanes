@@ -176,3 +176,16 @@ describe('ado:backlog (AL-233)', () => {
     expect(org.state.requests).toEqual([]);
   });
 });
+
+describe('ado:workItemColors', () => {
+  it("returns the project's type and state colours and reuses them instead of reading the process again", async () => {
+    const { call, org } = await setupTeamOrg();
+    const first = await call('ado:workItemColors', {});
+    if (!first.ok) throw new Error(first.message);
+    expect(first.data.types['Bug']).toBe('#CC293D');
+    expect(first.data.states['User Story']?.['Active']).toBe('#007ACC');
+
+    expect(await call('ado:workItemColors', { project: FAKE_TEAM_PROJECT })).toEqual(first);
+    expect(org.state.workItems.typeReads).toEqual([FAKE_TEAM_PROJECT]);
+  });
+});

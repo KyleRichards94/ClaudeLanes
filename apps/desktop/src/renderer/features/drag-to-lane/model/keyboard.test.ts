@@ -42,6 +42,25 @@ describe('laneKeyboardCoordinates (AL-235, TB§7)', () => {
     expect(press('ArrowLeft', 'lane:implementing').result).toBeUndefined();
   });
 
+  it("goes to the collapsed board's strip cells, not the lanes scrolled away, meeting each at its top edge", () => {
+    const strip = new Map([
+      ['lane:implementing', rect(250, -300, 200, 400)],
+      ['lane:implementing:strip', rect(280, 70, 180, 96)],
+    ]);
+    const event = { code: 'ArrowRight', preventDefault: vi.fn() } as unknown as KeyboardEvent;
+    const result = laneKeyboardCoordinates(event, {
+      active: 'pr:10571',
+      currentCoordinates: { x: 1200, y: 800 },
+      context: {
+        collisionRect: rect(1200, 800, 220, 120),
+        droppableRects: strip,
+        droppableContainers: { getEnabled: () => [...strip.keys()].map((id) => ({ id })) },
+        over: null,
+      } as unknown as SensorContext,
+    });
+    expect(result).toEqual({ x: 280 + (180 - 220) / 2, y: 70 });
+  });
+
   it('leaves other keys to the sensor and stops arrows scrolling the page', () => {
     expect(press('KeyA', null).result).toBeUndefined();
     expect(press('KeyA', null).event.preventDefault).not.toHaveBeenCalled();

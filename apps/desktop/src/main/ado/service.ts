@@ -6,6 +6,7 @@ import {
   getPullRequestSnapshot,
   getTeamBoard,
   getWorkItem,
+  getWorkItemColors,
   listActivePullRequests,
   listMyTeams,
   listSprints,
@@ -41,6 +42,8 @@ import {
   type TeamBoardRequest,
   type TeamList,
   type WorkItem,
+  type WorkItemColors,
+  type WorkItemColorsRequest,
   type WorkItemComment,
 } from '@agent-lanes/contracts';
 import type { ConnectionsService } from '../connections';
@@ -81,6 +84,8 @@ export interface AdoService {
   activePrs(request: ActivePrsRequest): Promise<Result<ActivePullRequestList>>;
   /** One page of the team's backlog, grouped by Feature, filtered in WIQL (AL-233). */
   backlog(request: BacklogRequest): Promise<Result<BacklogPage>>;
+  /** The project's work item type and state colours, kept for {@link WORK_ITEM_COLORS_TTL_MS} per organisation and project. */
+  workItemColors(request: WorkItemColorsRequest): Promise<Result<WorkItemColors>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -107,10 +112,19 @@ export type AdoUnavailableReason = 'not-connected' | 'reconnect';
 /** How long a team resolved for a request without one is reused, per organisation and project. */
 export const RESOLVED_TEAM_TTL_MS = 5 * 60_000;
 
+/** How long a project's work item colours are reused: they change only when someone edits the process. */
+export const WORK_ITEM_COLORS_TTL_MS = 30 * 60_000;
+
 interface CachedClient {
   /** The organisation URL and a hash of the PAT the client was built with; a replaced token changes it. */
   key: string;
   client: AdoClient;
+}
+
+interface CachedColors {
+  /** Shared by concurrent callers; a failed read is dropped so the next call tries again. */
+  colors: Promise<Result<WorkItemColors>>;
+  expiresAt: number;
 }
 
 interface ResolvedTeam {
@@ -122,6 +136,7 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
   const { connections, settings } = options;
   const clients = new Map<string, CachedClient>();
   const resolvedTeams = new Map<string, ResolvedTeam>();
+  const colorCache = new Map<string, CachedColors>();
   const now = options.now ?? Date.now;
 
   function logEntry(entry: AdoLogEntry): void {
@@ -289,6 +304,19 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
           ...(request.page === undefined ? {} : { page: request.page }),
         }),
       ),
+
+    workItemColors: (request) =>
+      withClient(request, (client, project, connection) => {
+        const key = `${connection.id}\n${client.orgUrl}\n${project.trim().toLowerCase()}`;
+        const cached = colorCache.get(key);
+        if (cached && cached.expiresAt > now()) return cached.colors;
+        const colors = getWorkItemColors(client, { project }).then((result) => {
+          if (!result.ok && colorCache.get(key)?.colors === colors) colorCache.delete(key);
+          return result;
+        });
+        colorCache.set(key, { colors, expiresAt: now() + WORK_ITEM_COLORS_TTL_MS });
+        return colors;
+      }),
 
     listTeams: (request) => withClient(request, (client, project) => listMyTeams(client, project)),
 

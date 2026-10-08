@@ -5,7 +5,7 @@ import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Text } from '@agent-lanes/ui';
 import { useWorkItemLanes, type AgentTicketStore } from '@/entities/agent-ticket';
 import { usePendingDropLanes } from '@/features/drag-to-lane';
-import { useActivePrs, useBacklogTotal, useConnections, useTeamBoard, useTeams } from '@/shared/api';
+import { useActivePrs, useBacklogTotal, useConnections, useTeamBoard, useTeams, useWorkItemColors } from '@/shared/api';
 import { openConnections } from '@/shared/model';
 import { HeaderMenu } from '@/shared/ui';
 import { setTeamBoardFilter, setTeamBoardTeam, useTeamBoardSession } from '../model/session';
@@ -46,13 +46,15 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   const board = useTeamBoard(pickedTeam, onSprintTeam ? sprintPath : null);
   const prs = useActivePrs(pickedTeam);
   const backlog = useBacklogTotal(pickedTeam);
+  // ADO's own type and state colours; the cards use the token colours until (or unless) they arrive.
+  const colors = useWorkItemColors();
   const agentLanes = useWorkItemLanes(store);
   // A drop main has not confirmed yet already shows "Agent in <lane>" (AL-235's optimistic update).
   const pendingLanes = usePendingDropLanes();
   const workItemLanes = useMemo(() => ({ ...agentLanes, ...pendingLanes }), [agentLanes, pendingLanes]);
 
   const me: TeamBoardMe | null = ado?.identity ? { displayName: ado.identity } : null;
-  const columns = teamBoardColumns({ board: board.data, pullRequests: prs.data?.pullRequests, me, workItemLanes, filter: session.filter });
+  const columns = teamBoardColumns({ board: board.data, pullRequests: prs.data?.pullRequests, me, workItemLanes, filter: session.filter, colors: colors.data ?? null });
   const team = board.data?.team ?? teamList.find((candidate) => candidate.id === (pickedTeam ?? defaultTeamId)) ?? null;
 
   const state: TeamBoardViewProps['state'] =

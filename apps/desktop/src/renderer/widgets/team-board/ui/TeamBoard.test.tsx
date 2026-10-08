@@ -126,6 +126,23 @@ describe('TeamBoard (AL-234)', () => {
     expect(screen.queryByTestId('team-card-71318-lock')).toBeNull();
   });
 
+  it("edges each card in its ADO type's colour and puts a dot in the state's colour before the state's name", async () => {
+    const { bridge } = setup({ 'ado:workItemColors': { ok: true, data: { types: { Bug: '#CC293D' }, states: { Bug: { 'Failed UAT': '#E60017' } } } } });
+    const card = await screen.findByTestId('team-card-71318');
+    await waitFor(() => expect(getComputedStyle(card).borderLeftColor).toBe('rgb(204, 41, 61)'));
+    expect(getComputedStyle(screen.getByTestId('team-card-71318-state-dot')).backgroundColor).toBe('rgb(230, 0, 23)');
+    expect(screen.getByTestId('team-card-71318-state').textContent).toBe('Failed UAT');
+    expect(card.getAttribute('aria-label')).toContain('state Failed UAT');
+    expect(bridge.invoke).toHaveBeenCalledWith('ado:workItemColors', {});
+  });
+
+  it('keeps the token colours when ADO colours cannot be read', async () => {
+    setup();
+    const card = await screen.findByTestId('team-card-71318');
+    expect(getComputedStyle(card).borderLeftColor).toBe('rgb(3, 105, 161)');
+    expect(screen.getByTestId('team-card-71318-state').textContent).toBe('Failed UAT');
+  });
+
   it('filters to Me and to Unassigned, and keeps the choice for the session', async () => {
     const { view, client } = setup();
     await screen.findByTestId('team-board-columns');

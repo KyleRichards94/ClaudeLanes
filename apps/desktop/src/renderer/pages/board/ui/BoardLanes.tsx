@@ -1,5 +1,5 @@
 import { LANES } from '@agent-lanes/contracts';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { space } from '@agent-lanes/tokens';
 import { agentTickets, type AgentTicketStore } from '@/entities/agent-ticket';
 import { COLLAPSED_LANE_WIDTH, LANE_MIN_WIDTH, Lane } from './Lane';
@@ -12,11 +12,18 @@ export const LANES_MIN_WIDTH = (LANES.length - 1) * LANE_MIN_WIDTH + COLLAPSED_L
  * Done (collapsed to a strip by default). With `needsYouOnly` each lane shows only its cards that need the user. They share the width; in a narrower window the row keeps
  * its minimum width and scrolls horizontally (artboard 1).
  */
-export function BoardLanes({ store = agentTickets, needsYouOnly = false }: { store?: AgentTicketStore; needsYouOnly?: boolean }) {
+export interface BoardLanesProps {
+  store?: AgentTicketStore;
+  needsYouOnly?: boolean;
+  onLayout?: (event: LayoutChangeEvent) => void;
+}
+
+export function BoardLanes({ store = agentTickets, needsYouOnly = false, onLayout }: BoardLanesProps) {
   return (
     <ScrollView
       horizontal
       testID="board-lanes"
+      onLayout={onLayout}
       style={styles.scroller}
       contentContainerStyle={styles.content}
       showsHorizontalScrollIndicator

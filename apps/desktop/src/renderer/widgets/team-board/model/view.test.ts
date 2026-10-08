@@ -68,7 +68,8 @@ describe('itemView (AL-234)', () => {
     expect(itemView(item(71318, { assignee: KR, columnKind: 'failed', state: 'Failed UAT' }), me, null)).toMatchObject({
       lock: null,
       draggable: true,
-      detail: 'Failed UAT',
+      state: 'Failed UAT',
+      detail: null,
       avatar: { initials: 'KR', mine: true },
     });
   });
@@ -87,6 +88,19 @@ describe('itemView (AL-234)', () => {
       lock: null,
       draggable: true,
     });
+  });
+});
+
+describe('itemView colours', () => {
+  const colors = { types: { Bug: '#CC293D', 'User Story': '#009CCC' }, states: { Bug: { Active: '#007ACC' } } };
+
+  it("carries ADO's type and state colours, matched by ADO's own type name", () => {
+    expect(itemView(item(71318), me, null, null, colors)).toMatchObject({ type: 'Bug', typeColor: '#CC293D', state: 'Active', stateColor: '#007ACC' });
+    expect(itemView(item(71335, { type: 'User Story', state: 'New' }), me, null, null, colors)).toMatchObject({ type: 'Story', typeColor: '#009CCC', stateColor: null });
+  });
+
+  it('has no colours while they are unknown, so the card uses the token colours', () => {
+    expect(itemView(item(71318), me, null)).toMatchObject({ typeColor: null, stateColor: null, state: 'Active' });
   });
 });
 

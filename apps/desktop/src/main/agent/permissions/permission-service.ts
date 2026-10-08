@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { CanUseTool, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, HookCallback, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import {
   PERMISSION_TEXT_LIMIT,
+  agentPermissionMode,
   agentPermissionPolicy,
+  type AgentPermissionMode,
   type PermissionDecision,
   type PermissionRequest,
   type TicketRecord,
@@ -12,18 +14,25 @@ import type { BuildCommands } from '../../build/commands';
 import type { Emit } from '../../ipc/emit';
 import type { Logger } from '../../logging';
 import type { SettingsService } from '../../settings/service';
+import type { TicketRecordStore } from '../../tickets';
 import type { TranscriptService } from '../output/transcript';
 import type { SessionExtras } from '../session-manager';
 import { firstName } from '../stages/stage-service';
-import { allowedBashPrefixes, bashAllowRules, bashCommandAllowed } from './policy';
+import { allowedBashPrefixes, bashAllowRules, bashCommandAllowed, workItemCommentBody, workItemCommentVerdict, type WorkItemCommentVerdict } from './policy';
 
 /**
- * Permissions of headless sessions (AL-109, design §4, Q9, Decision D18). A ticket's session runs
- * with `acceptEdits` (unless the policy asks for every edit), Bash rules for git read commands and the
- * repo's build and test commands, and `canUseTool` for everything else. `canUseTool` never answers on
+ * Permissions of headless sessions (AL-109, design §4, Q9, Decision D18). A ticket's session runs in
+ * the Settings permission mode (`sdkPermissionMode`: auto by default, where Claude Code's classifier
+ * allows lower-risk actions and only what it blocks or can't decide reaches `canUseTool`), with Bash
+ * rules for git read commands and the repo's build and test commands, and `canUseTool` for the rest. `canUseTool` never answers on
  * its own: the request is shown on the card ("Needs you · allow Bash", `agent:permission`), stays
  * readable through `agent:getPermission`, and waits for Allow once / Allow for this ticket / Deny. So
  * no session ever waits on a prompt nobody can see. Each answer is written to the ticket's output.
+ *
+ * Work item comments are the exception: the agent may only report a QA failure or answer one
+ * (`workItemCommentVerdict`). A PreToolUse hook enforces that in every permission mode, and
+ * `canUseTool` checks it again; a refused comment is denied with a message the agent reads and never
+ * becomes a Needs-you prompt.
  */
 export interface PermissionService {
   /** The permission part of a ticket session's options; see `combineSessionExtras`. */
@@ -40,6 +49,8 @@ export interface PermissionService {
 
 export interface PermissionServiceOptions {
   settings: Pick<SettingsService, 'get'>;
+  /** The ticket as it is now (its stage), for the work item comment gate. */
+  tickets?: Pick<TicketRecordStore, 'get'>;
   buildCommands: Pick<BuildCommands, 'forRepo'>;
   emit: Emit;
   transcripts?: Pick<TranscriptService, 'appendSystem'>;
@@ -65,6 +76,11 @@ interface Waiting {
 function clip(text: string): string {
   const line = text.replace(/\s+/g, ' ').trim();
   return line.length > PERMISSION_TEXT_LIMIT ? `${line.slice(0, PERMISSION_TEXT_LIMIT - 1)}…` : line;
+}
+
+/** The SDK's permission mode for a Settings mode: auto, `acceptEdits`, or `default` (every edit asks). */
+export function sdkPermissionMode(mode: AgentPermissionMode): PermissionMode {
+  return mode === 'auto' ? 'auto' : mode === 'accept-edits' ? 'acceptEdits' : 'default';
 }
 
 /** `mcp__azure-devops__wit_update_work_item` → `azure-devops · wit_update_work_item`. */
@@ -148,8 +164,41 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
     });
   }
 
+  /** The comment gate's answer for a tool call, or null when the call posts no work item comment. */
+  async function commentVerdict(ticketId: string, toolName: string, input: Record<string, unknown>): Promise<WorkItemCommentVerdict | null> {
+    const body = workItemCommentBody(toolName, input);
+    if (body === null) return null;
+    const record = await options.tickets?.get(ticketId).catch(() => undefined);
+    const verdict = workItemCommentVerdict(body, record);
+    if (!verdict.allowed) {
+      log?.info(`Ticket ${ticketId}: refused a work item comment through ${toolLabel(toolName)}`);
+      options.transcripts?.appendSystem(ticketId, `Agent Lanes refused a work item comment (${toolLabel(toolName)}): only QA failure reports and answers are posted`);
+    }
+    return verdict;
+  }
+
+  /** PreToolUse: settles work item comments before any mode, rule or classifier does. */
+  function commentHook(ticketId: string): HookCallback {
+    return async (hookInput) => {
+      if (hookInput.hook_event_name !== 'PreToolUse') return {};
+      const input = hookInput.tool_input !== null && typeof hookInput.tool_input === 'object' ? (hookInput.tool_input as Record<string, unknown>) : {};
+      const verdict = await commentVerdict(ticketId, hookInput.tool_name, input);
+      if (!verdict) return {};
+      return {
+        hookSpecificOutput: verdict.allowed
+          ? { hookEventName: 'PreToolUse', permissionDecision: 'allow', permissionDecisionReason: 'A QA failure report or answer' }
+          : { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: verdict.message },
+      };
+    };
+  }
+
   function canUseTool(ticketId: string): CanUseTool {
     return async (toolName, input, context) => {
+      // Only a call that posts a work item comment waits for the ticket; every other answer starts at once.
+      if (workItemCommentBody(toolName, input) !== null) {
+        const comment = await commentVerdict(ticketId, toolName, input);
+        if (comment) return comment.allowed ? { behavior: 'allow', updatedInput: input } : { behavior: 'deny', message: comment.message };
+      }
       if (toolName === 'Bash' && typeof input['command'] === 'string' && bashCommandAllowed(input['command'], bashPrefixes.get(ticketId) ?? [])) {
         return { behavior: 'allow', updatedInput: input };
       }
@@ -166,9 +215,10 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       const prefixes = allowedBashPrefixes(policy, commands?.ok ? commands.data : null);
       bashPrefixes.set(record.id, prefixes);
       return {
-        permissionMode: policy.edits === 'accept' ? 'acceptEdits' : 'default',
+        permissionMode: sdkPermissionMode(agentPermissionMode(policy)),
         allowedTools: bashAllowRules(prefixes),
         canUseTool: canUseTool(record.id),
+        hooks: { PreToolUse: [{ matcher: '^mcp__', hooks: [commentHook(record.id)] }] },
       };
     },
 

@@ -53,12 +53,12 @@ describe('settings draft', () => {
       { type: 'repoText', repo: osc, field: 'buildCommand', value: '  dotnet build OnSite.sln -c Release ' },
       { type: 'repoText', repo: osc, field: 'baseBranch', value: 'develop' },
       { type: 'repoText', repo: osc, field: 'maxConcurrentAgents', value: '5' },
-      { type: 'repoWriteBack', repo: osc, value: false },
+      { type: 'repoWriteBack', repo: osc, value: true },
       { type: 'repoText', repo: lanes, field: 'runCommand', value: '   ' },
     );
     expect(draftToPatch(draft, settings())).toEqual({
       repos: [
-        { ...osc, baseBranch: 'develop', buildCommand: 'dotnet build OnSite.sln -c Release', maxConcurrentAgents: 5, adoWriteBack: false },
+        { ...osc, baseBranch: 'develop', buildCommand: 'dotnet build OnSite.sln -c Release', maxConcurrentAgents: 5, adoWriteBack: true },
         lanes,
       ],
     });
@@ -96,11 +96,21 @@ describe('settings draft', () => {
 
   it('saves the agent permission policy only when it changed (AL-109)', () => {
     expect(draftToPatch(apply({ type: 'permission', field: 'gitRead', value: true }), settings())).toEqual({});
-    const draft = apply({ type: 'permission', field: 'acceptEdits', value: false }, { type: 'bashAllow', value: 'npm run lint,  dotnet format, npm run lint' });
+    const draft = apply({ type: 'permissionMode', mode: 'ask' }, { type: 'bashAllow', value: 'npm run lint,  dotnet format, npm run lint' });
     expect(validateDraft(draft, settings().repos)).toEqual({});
     expect(draftToPatch(draft, settings())).toEqual({
-      agentPermissions: { edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: ['npm run lint', 'dotnet format'] },
+      agentPermissions: { mode: 'ask', edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: ['npm run lint', 'dotnet format'] },
     });
+  });
+
+  it('starts on Auto, and saves Accept edits or Ask as the permission mode', () => {
+    expect(draftFromSettings(settings()).permissions.mode).toBe('auto');
+    expect(draftToPatch(apply({ type: 'permissionMode', mode: 'auto' }), settings())).toEqual({});
+    expect(draftToPatch(apply({ type: 'permissionMode', mode: 'accept-edits' }), settings())).toEqual({
+      agentPermissions: { mode: 'accept-edits', edits: 'accept', gitRead: true, buildAndTest: true, bashAllow: [] },
+    });
+    // A policy saved before modes, asking for every edit, opens on Ask.
+    expect(draftFromSettings({ ...settings(), agentPermissions: { edits: 'ask', gitRead: true, buildAndTest: true, bashAllow: [] } }).permissions.mode).toBe('ask');
   });
 
   it('refuses a permitted command that chains or redirects (AL-109)', () => {

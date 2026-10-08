@@ -67,6 +67,11 @@ export interface SessionManager {
   applyModelNow(ticketId: string): Promise<Result<AgentModelState>>;
   /** What the ticket's agent runs with now, and the change waiting for it (AL-106). */
   modelState(ticketId: string): Promise<Result<AgentModelState>>;
+  /**
+   * Switches every live session to another permission mode (Settings › Permission mode); new sessions
+   * take it from their extras. Resolves the tickets whose session could not switch (it keeps its mode).
+   */
+  setPermissionMode(mode: PermissionMode): Promise<string[]>;
   /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. */
   stop(ticketId: string): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
@@ -572,6 +577,21 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       }
       requestChange(session, { model });
       return ok(modelStateOf(session));
+    },
+
+    async setPermissionMode(mode) {
+      const failed: string[] = [];
+      for (const [ticketId, session] of sessions) {
+        if (!LIVE_STATES.has(session.state) || !session.query) continue;
+        try {
+          await session.query.setPermissionMode(mode);
+          log?.info(`Ticket ${ticketId}: permission mode is now ${mode}`);
+        } catch (error) {
+          failed.push(ticketId);
+          log?.warn(`Ticket ${ticketId} keeps its permission mode until its next session: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      return failed;
     },
 
     async setEffort(ticketId, effort) {
