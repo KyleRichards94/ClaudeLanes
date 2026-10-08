@@ -249,14 +249,29 @@ describe('session manager: controls', () => {
     await sessions.start({ ticketId: '71273', jobDescription: JOB });
 
     await expect(sessions.interrupt('71273')).resolves.toEqual({ ok: true, data: undefined });
-    await expect(sessions.setModel('71273', 'sonnet')).resolves.toEqual({ ok: true, data: undefined });
-    await expect(sessions.setEffort('71273', 'high')).resolves.toEqual({ ok: true, data: undefined });
+    await expect(sessions.setModel('71273', 'sonnet')).resolves.toMatchObject({ ok: true, data: { pending: { model: 'sonnet' } } });
+    await expect(sessions.setEffort('71273', 'high')).resolves.toMatchObject({ ok: true, data: { pending: { model: 'sonnet', effort: 'high' } } });
 
     expect(fake.calls[0]!.interrupts).toBe(1);
     expect(fake.calls[0]!.models).toEqual(['claude-sonnet-5-5']);
     expect(fake.calls[0]!.flagSettings).toEqual([{ effortLevel: 'high' }]);
     expect(await tickets.get('71273')).toMatchObject({ model: 'sonnet', effort: 'high' });
     await sessions.dispose();
+  });
+
+  it('applies a model switch before the next message reaches the session, in order (AL-221 kit log)', async () => {
+    const { fake, sessions } = await setup();
+    await sessions.start({ ticketId: '71273', jobDescription: JOB });
+    const call = fake.calls[0]!;
+    await call.sentCount(1);
+
+    await sessions.setModel('71273', 'sonnet');
+    sessions.send('71273', { text: 'now with the faster model' });
+    await call.sentCount(2);
+    await sessions.stop('71273');
+
+    expect(call.log.map((entry) => entry.kind)).toEqual(['input', 'setModel', 'input', 'close']);
+    expect(call.inputs()[1]).toEqual({ text: 'now with the faster model', priority: 'next', shouldQuery: undefined });
   });
 
   it('saves model and effort for a ticket without a live session', async () => {
@@ -284,6 +299,19 @@ describe('session manager: closing sessions', () => {
     expect(events.of('agent:status', '71273').at(-1)).toMatchObject({ state: 'stopped' });
     expect(sessions.send('71273', { text: 'hello?' })).toMatchObject({ ok: false });
     await expect(sessions.stop('71273')).resolves.toEqual({ ok: true, data: false });
+  });
+
+  it('midTurn lists the tickets whose agent is in a turn, not idle or stopped ones (AL-213)', async () => {
+    const { fake, sessions } = await setup({ live: true, messages: [fakeInit('session-busy')] });
+    expect(sessions.midTurn()).toEqual([]);
+    await sessions.start({ ticketId: '71273', jobDescription: JOB });
+    expect(sessions.midTurn()).toEqual(['71273']);
+    // The turn ends: the agent is idle and quitting no longer cuts it off.
+    fake.calls[0]!.push(fakeResult());
+    await eventually(() => sessions.status('71273').state === 'idle');
+    expect(sessions.midTurn()).toEqual([]);
+    await sessions.dispose();
+    expect(sessions.midTurn()).toEqual([]);
   });
 
   it('dispose closes every live session (app quit)', async () => {

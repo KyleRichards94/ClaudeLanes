@@ -35,6 +35,7 @@ export {
   usePullRequest,
   useSprints,
   useWorkItem,
+  useWorkItemComments,
   useWorkItemSearch,
   useWorkItems,
   windowVisibilityEventHandlers,
@@ -45,4 +46,12 @@ export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
 export { createDesignSpecEventHandlers, designSpecQueryKey, useDesignSpec, useReshipDesignSpec, useShipDesignSpec } from './design-specs';
+export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';
+export {
+  designThreadEventHandlers,
+  designThreadQueryKey,
+  useAnswerDesignApproval,
+  useDesignThread,
+  useSendDesignMessage,
+} from './design-thread';

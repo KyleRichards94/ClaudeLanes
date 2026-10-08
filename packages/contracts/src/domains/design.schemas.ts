@@ -11,6 +11,13 @@ import {
   ShippedDesignSpecSchema,
 } from './design.specs';
 import { TicketDesignSchema } from './tickets.schemas';
+import {
+  AnswerDesignThreadApprovalRequestSchema,
+  DesignThreadEventSchema,
+  DesignThreadRequestSchema,
+  DesignThreadSchema,
+  SendDesignThreadMessageRequestSchema,
+} from './design.thread';
 
 // ── Design view (AL-191, design §4 Design view, R10, R11) ──────────────────────────────────────────
 
@@ -160,6 +167,12 @@ export const designInvokeContracts = {
   'design:getSpec': { request: DesignSpecRequestSchema, response: DesignSpecSchema },
   /** Ships an earlier version again as the newest version, delivered like a new ship (AL-199). */
   'design:reshipSpec': { request: ReshipDesignSpecRequestSchema, response: ShippedDesignSpecSchema },
+  /** The ticket's design thread (AL-196). */
+  'design:getThread': { request: DesignThreadRequestSchema, response: DesignThreadSchema },
+  /** Sends a message to the ticket's design session; replies arrive as `design:thread` events (AL-196). */
+  'design:sendThreadMessage': { request: SendDesignThreadMessageRequestSchema, response: DesignThreadSchema },
+  /** Approves or declines the canvas change the design session asked for (AL-196, D121). */
+  'design:answerThreadApproval': { request: AnswerDesignThreadApprovalRequestSchema, response: DesignThreadSchema },
 } as const satisfies Record<(typeof DESIGN_INVOKE_CHANNELS)[number], InvokeContract>;
 
 /**
@@ -189,4 +202,5 @@ export type DesignViewEvent = z.infer<typeof DesignViewEventSchema>;
 export const designEventContracts = {
   'design:spec': DesignSpecEventSchema,
   'design:view': DesignViewEventSchema,
+  'design:thread': DesignThreadEventSchema,
 } as const satisfies Record<(typeof DESIGN_EVENT_CHANNELS)[number], z.ZodType>;

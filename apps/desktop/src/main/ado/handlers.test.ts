@@ -150,6 +150,10 @@ describe('ado:* IPC handlers', () => {
       'ado:getComments': { workItemId: 71273 },
       'ado:createPullRequest': { ...PR_REF, sourceBranch: 'a', targetBranch: 'main', title: 'x' },
       'ado:getPullRequest': PR_REF,
+      'ado:listTeams': {},
+      'ado:teamBoard': {},
+      'ado:activePrs': {},
+      'ado:backlog': {},
     };
     for (const channel of ADO_INVOKE_CHANNELS) {
       expect(await call(channel, requests[channel])).toMatchObject({ ok: false, code: 'ADO_UNAUTHORIZED', details: { reason: 'not-connected' } });

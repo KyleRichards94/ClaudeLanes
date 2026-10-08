@@ -89,4 +89,19 @@ describe('createClaudeLauncher', () => {
       message: expect.stringContaining('Cannot find module'),
     });
   });
+
+  it('closeAll closes every process still open on quit, and not the ones already closed (AL-213)', async () => {
+    const fake = createFakeClaude({ hang: true });
+    const launcher = createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query });
+
+    const first = await launcher.launch({ credential: { mode: 'login' }, prompt: 'one' });
+    await launcher.launch({ credential: { mode: 'login' }, prompt: 'two' });
+    await launcher.launch({ credential: { mode: 'login' }, prompt: 'three' });
+    first.close();
+    expect(fake.calls.map((call) => call.closed)).toEqual([true, false, false]);
+
+    expect(launcher.closeAll()).toBe(2);
+    expect(fake.calls.map((call) => call.closed)).toEqual([true, true, true]);
+    expect(launcher.closeAll()).toBe(0);
+  });
 });

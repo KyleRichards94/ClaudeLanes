@@ -21,10 +21,27 @@ export interface FakeWorkItem {
   iterationPath: string;
   /** ISO time; WIQL search orders by it. */
   changedDate: string;
-  assignedTo?: { displayName: string; uniqueName: string } | string;
+  assignedTo?: { displayName: string; uniqueName: string; id?: string } | string;
   description?: string;
   acceptanceCriteria?: string;
+  // Team board and backlog fields (AL-231, AL-233).
+  areaPath?: string;
+  /** `System.Tags`: `jobs; search`. */
+  tags?: string;
+  storyPoints?: number;
+  priority?: number;
+  /** Backlog order (`Microsoft.VSTS.Common.StackRank`). */
+  stackRank?: number;
+  /** `System.Parent`: the parent Feature's id. */
+  parentId?: number;
+  /** The team board column, read as `System.BoardColumn` and as the board's own `WEF_…_Kanban.Column` field. */
+  boardColumn?: string;
+  /** Links, as `$expand=relations` returns them (branches and pull requests are `ArtifactLink`s). */
+  relations?: Array<{ rel: string; url: string; attributes?: { name?: string } }>;
 }
+
+/** The board column field the fake team board (AL-231) names in its board settings. */
+export const FAKE_KANBAN_COLUMN_FIELD = 'WEF_6A3C1F_Kanban.Column';
 
 type FakeWorkItemInput = Omit<FakeWorkItem, 'project' | 'iterationPath' | 'changedDate'> & Partial<FakeWorkItem>;
 
@@ -109,6 +126,14 @@ const FIELDS: Record<string, { name: string; get: (item: FakeWorkItem) => unknow
       ['System.ChangedDate', (i) => i.changedDate],
       ['System.Description', (i) => i.description],
       ['Microsoft.VSTS.Common.AcceptanceCriteria', (i) => i.acceptanceCriteria],
+      ['System.AreaPath', (i) => i.areaPath],
+      ['System.Tags', (i) => i.tags],
+      ['System.Parent', (i) => i.parentId],
+      ['System.BoardColumn', (i) => i.boardColumn],
+      [FAKE_KANBAN_COLUMN_FIELD, (i) => i.boardColumn],
+      ['Microsoft.VSTS.Scheduling.StoryPoints', (i) => i.storyPoints],
+      ['Microsoft.VSTS.Common.Priority', (i) => i.priority],
+      ['Microsoft.VSTS.Common.StackRank', (i) => i.stackRank],
     ] as Array<[string, (item: FakeWorkItem) => unknown]>
   ).map(([name, get]) => [name.toLowerCase(), { name, get }]),
 );
@@ -174,19 +199,29 @@ export function fakeWorkItemHandlers(fake: FakeAdo, orgUrl: string = ORG_URL) {
 
     http.post(`${orgUrl}/_apis/wit/workitemsbatch`, async ({ request }) => {
       fake.requests += 1;
-      const body = (await request.json()) as { ids: number[]; fields: string[]; errorPolicy?: string };
+      const body = (await request.json()) as { ids: number[]; fields?: string[]; errorPolicy?: string; $expand?: string };
       fake.batches.push(body.ids);
       if (body.ids.length > 200) {
         return HttpResponse.json({ message: 'VS403474: The number of work items requested exceeds the limit of 200.' }, { status: 400 });
       }
-      const unknown = body.fields.find((field) => !FIELDS[field.toLowerCase()]);
+      // As ADO: `$expand` can't be combined with `fields`; with it, every field comes back (AL-231).
+      const expand = body.$expand?.toLowerCase();
+      if (expand && expand !== 'none' && body.fields) {
+        return HttpResponse.json({ message: 'VS403437: The expand parameter can not be used with the fields parameter.' }, { status: 400 });
+      }
+      const fields = body.fields ?? Object.values(FIELDS).map((field) => field.name);
+      const unknown = fields.find((field) => !FIELDS[field.toLowerCase()]);
       if (unknown) return HttpResponse.json({ message: `TF51535: Cannot find field ${unknown}.` }, { status: 400 });
 
       const value = body.ids.map((id) => byId(id) ?? null);
       if (body.errorPolicy?.toLowerCase() !== 'omit' && value.includes(null)) {
         return HttpResponse.json({ message: 'TF401232: Work item does not exist, or you do not have permissions to read it.' }, { status: 404 });
       }
-      return HttpResponse.json({ count: value.length, value: value.map((found) => found && toAdo(found, body.fields, orgUrl)) });
+      const withRelations = expand === 'relations' || expand === 'all';
+      return HttpResponse.json({
+        count: value.length,
+        value: value.map((found) => found && { ...toAdo(found, fields, orgUrl), ...(withRelations ? { relations: found.relations ?? [] } : {}) }),
+      });
     }),
 
     http.get(`${orgUrl}/_apis/wit/workitems/:id`, ({ request, params }) => {

@@ -9,7 +9,8 @@ export function createDesignHandlers({
   designArtboards,
   designShip,
   designSpecs,
-}: Pick<Services, 'designView' | 'designCanvases' | 'designArtboards' | 'designShip' | 'designSpecs'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
+  designThreads,
+}: Pick<Services, 'designView' | 'designCanvases' | 'designArtboards' | 'designShip' | 'designSpecs' | 'designThreads'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
   return {
     'design:open': ({ ticketId, url, bounds }) => designView.open(ticketId, url, bounds),
     'design:setBounds': ({ ticketId, bounds }) => ok({ found: designView.setBounds(ticketId, bounds) }),
@@ -24,5 +25,8 @@ export function createDesignHandlers({
     'design:shipSpec': (request) => designShip.ship(request),
     'design:getSpec': ({ ticketId, version }) => designSpecs.get(ticketId, version),
     'design:reshipSpec': ({ ticketId, version }) => designShip.reship(ticketId, version),
+    'design:getThread': ({ ticketId }) => designThreads.get(ticketId),
+    'design:sendThreadMessage': ({ ticketId, text }) => designThreads.send(ticketId, text),
+    'design:answerThreadApproval': ({ ticketId, approvalId, approve }) => designThreads.answer(ticketId, approvalId, approve),
   };
 }

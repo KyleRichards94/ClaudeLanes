@@ -26,6 +26,16 @@ export interface TempRepo {
   write(path: string, content: string, cwd?: string): Promise<string>;
   /** Stages everything and commits; returns the new commit id. */
   commit(message: string, cwd?: string): Promise<string>;
+  /**
+   * Adds a linked worktree of `dir` under `root/worktrees/` on a new `branch` cut from `from`
+   * (the default branch), as a ticket worktree would be (AL-221); returns its path.
+   */
+  addWorktree(branch: string, from?: string): Promise<string>;
+  /**
+   * Another clone of `origin` under `root/<name>` (AL-221): a teammate who pushes to the remote
+   * while the app's checkout falls behind. Throws when the repo was made without an origin.
+   */
+  clone(name?: string): Promise<string>;
   cleanup(): Promise<void>;
 }
 
@@ -96,11 +106,24 @@ export async function createTempRepo(options: TempRepoOptions = {}): Promise<Tem
   await write('README.md', '# temp repo\n');
   await commit('Initial commit');
 
-  if (options.withOrigin ?? true) {
+  const withOrigin = options.withOrigin ?? true;
+  if (withOrigin) {
     await exec(['init', '--quiet', '--bare', `--initial-branch=${branch}`, origin], root);
     await exec(['remote', 'add', 'origin', origin]);
     await exec(['push', '--quiet', '-u', 'origin', branch]);
   }
+
+  const addWorktree = async (name: string, from = branch) => {
+    const path = join(root, 'worktrees', name.replace(/[\\/:*?"<>|]/g, '-'));
+    await exec(['worktree', 'add', '--quiet', '-b', name, path, from]);
+    return path;
+  };
+  const clone = async (name = 'teammate') => {
+    if (!withOrigin) throw new Error('This temp repo has no origin to clone.');
+    const path = join(root, name);
+    await exec(['clone', '--quiet', origin, path], root);
+    return path;
+  };
 
   return {
     root,
@@ -111,6 +134,8 @@ export async function createTempRepo(options: TempRepoOptions = {}): Promise<Tem
     exec,
     write,
     commit,
+    addWorktree,
+    clone,
     cleanup: () => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }),
   };
 }

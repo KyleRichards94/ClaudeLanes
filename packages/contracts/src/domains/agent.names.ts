@@ -8,6 +8,14 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:send', // AL-105
   'agent:pause', // AL-105
   'agent:resume', // AL-105
+  'agent:getMcpStatus', // AL-108
+  'agent:resolvePermission', // AL-109
+  'agent:getPermission', // AL-109
+  'agent:setModel', // AL-106
+  'agent:setEffort', // AL-106
+  'agent:applyModelNow', // AL-106
+  'agent:getModel', // AL-106
+  'agent:getSubagents', // AL-107
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',
@@ -15,4 +23,7 @@ export const AGENT_EVENT_CHANNELS = [
   'agent:subagent',
   'agent:gate',
   'agent:status',
+  'agent:mcpStatus', // AL-108
+  'agent:permission', // AL-109
+  'agent:model', // AL-106
 ] as const;

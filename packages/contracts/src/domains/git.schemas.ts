@@ -251,6 +251,62 @@ export const GitDiffFileSchema = z.discriminatedUnion('kind', [
 ]);
 export type GitDiffFile = z.infer<typeof GitDiffFileSchema>;
 
+// ── Merge sub-branches → ticket branch (AL-086, design §9 step 4, R9) ───────────────────────────
+//
+// Merges every ready sub-branch (clean, its sub-agent finished, commits ahead) into the ticket branch
+// in creation order, each with `--no-ff`, in the ticket worktree. Stops at the first conflict and
+// leaves that merge in progress there, so the lead agent or the user can resolve it; nothing after
+// the conflicting branch is merged. Error Results carry `details.reason`:
+// - MERGE_CONFLICT `conflict`: `details.branch`, `details.files`, `details.merged` (branches merged before it).
+// - MERGE_CONFLICT `merge-in-progress`: an earlier conflict is not resolved yet (`details.files`).
+// - GIT_DIRTY `worktree-dirty`: the ticket worktree has uncommitted changes (`details.files`).
+// - VALIDATION `ticket-not-found`, `worktree-missing`, `no-conflict`; INTERNAL `git-failed`.
+
+/** One sub-branch merged into the ticket branch. */
+export const MergedSubBranchSchema = z.object({
+  name: z.string().min(1),
+  branch: z.string().min(1),
+  /** The merge commit on the ticket branch. */
+  commit: z.string().min(1),
+});
+export type MergedSubBranch = z.infer<typeof MergedSubBranchSchema>;
+
+/** A sub-branch left out: not ready (dirty, missing, or its sub-agent still runs), or nothing new on it. */
+export const SkippedSubBranchSchema = z.object({
+  name: z.string().min(1),
+  branch: z.string().min(1),
+  reason: z.enum(['not-ready', 'nothing-to-merge']),
+});
+export type SkippedSubBranch = z.infer<typeof SkippedSubBranchSchema>;
+
+export const MergeSubBranchesResultSchema = z.object({
+  ticketId: TicketIdSchema,
+  /** The ticket branch merged into. */
+  target: z.string().min(1),
+  /** In the order they were merged (creation order). */
+  merged: z.array(MergedSubBranchSchema),
+  skipped: z.array(SkippedSubBranchSchema),
+});
+export type MergeSubBranchesResult = z.infer<typeof MergeSubBranchesResultSchema>;
+
+/** "Hand to lead agent": the conflicted files were sent to the lead agent as a user turn (`held` while it is paused). */
+export const HandConflictResultSchema = z.object({
+  files: z.array(z.string().min(1)),
+  held: z.boolean(),
+});
+export type HandConflictResult = z.infer<typeof HandConflictResultSchema>;
+
+/** Most files "I'll resolve it" opens at once. */
+export const OPEN_CONFLICT_FILES_LIMIT = 20;
+
+/** "I'll resolve it": the conflicted files opened in the user's editor (absolute paths). */
+export const OpenConflictFilesResultSchema = z.object({
+  opened: z.array(z.string().min(1)).max(OPEN_CONFLICT_FILES_LIMIT),
+  /** How many files conflict; at most OPEN_CONFLICT_FILES_LIMIT are opened. */
+  fileCount: CountSchema,
+});
+export type OpenConflictFilesResult = z.infer<typeof OpenConflictFilesResultSchema>;
+
 export const gitInvokeContracts = {
   /** `VALIDATION` with `details.reason: 'ticket-not-found'` for an unknown ticket. */
   'branches:status': { request: TicketRefRequestSchema, response: BranchStatusSchema },
@@ -260,6 +316,11 @@ export const gitInvokeContracts = {
   'git:diff': { request: GitDiffRequestSchema, response: GitDiffSchema },
   /** VALIDATION `invalid-path` for an absolute path or one that leaves the worktree. */
   'git:diffFile': { request: GitDiffFileRequestSchema, response: GitDiffFileSchema },
+  'git:mergeSubBranches': { request: TicketRefRequestSchema, response: MergeSubBranchesResultSchema },
+  /** "Hand to lead agent": a user turn listing the conflicted files. */
+  'git:handConflictToLead': { request: TicketRefRequestSchema, response: HandConflictResultSchema },
+  /** "I'll resolve it": opens the conflicted files in the user's editor. */
+  'git:openConflictFiles': { request: TicketRefRequestSchema, response: OpenConflictFilesResultSchema },
   /** Previews the ticket's branch and worktree and validates an edited branch name (AL-164). VALIDATION for an unregistered repo. */
   'git:previewWorktree': { request: WorktreePreviewRequestSchema, response: WorktreePreviewSchema },
 } as const satisfies Record<(typeof GIT_INVOKE_CHANNELS)[number], InvokeContract>;

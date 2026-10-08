@@ -6,6 +6,7 @@ import { adoFixture, ADO_FIXTURE_ORG_ID, ADO_FIXTURE_PROJECT, ADO_FIXTURE_REPOSI
 /** AL-065: every `ado:*` channel's request and response contract. */
 
 const fixture = adoFixture();
+const TEAM = { id: 'team-osc', name: 'OSC Developers' };
 
 /** A request each channel accepts, and the fixture reply it answers with. */
 const examples = {
@@ -30,10 +31,88 @@ const examples = {
     request: { project: ADO_FIXTURE_PROJECT, repository: ADO_FIXTURE_REPOSITORY.id, pullRequestId: 10612 },
     response: fixture.pullRequests[0],
   },
+  'ado:listTeams': { request: { project: ADO_FIXTURE_PROJECT }, response: { teams: [TEAM], defaultTeamId: TEAM.id } },
+  'ado:teamBoard': {
+    request: { team: 'OSC Developers', sprint: ADO_FIXTURE_SPRINT_42_PATH },
+    response: {
+      team: TEAM,
+      sprint: { id: 'it-42', name: 'Sprint 42', path: ADO_FIXTURE_SPRINT_42_PATH },
+      columns: [{ id: 'c-failed', name: 'Failed', kind: 'failed' }],
+      items: [
+        {
+          id: 71318,
+          type: 'Bug',
+          title: 'Quote PDF totals round incorrectly',
+          state: 'Failed UAT',
+          points: 2,
+          columnId: 'c-failed',
+          column: 'Failed',
+          columnKind: 'failed',
+          assignee: { id: 'kr', displayName: 'Kyle Richards', uniqueName: null, initials: 'KR' },
+          branch: null,
+          pullRequestId: null,
+          webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_workitems/edit/71318',
+        },
+      ],
+    },
+  },
+  'ado:activePrs': {
+    request: { team: 'OSC Developers' },
+    response: {
+      team: TEAM,
+      pullRequests: [
+        {
+          id: 10571,
+          title: 'Job notes rich text editor',
+          isDraft: false,
+          author: { id: 'kr', displayName: 'Kyle Richards', uniqueName: null, initials: 'KR' },
+          reviewers: [{ id: 'ty', displayName: 'Tom Young', uniqueName: null, initials: 'TY', vote: 0, isRequired: false, isContainer: false }],
+          sourceBranch: '71240-job-notes-editor',
+          targetBranch: 'main',
+          repository: { id: ADO_FIXTURE_REPOSITORY.id, name: ADO_FIXTURE_REPOSITORY.name, projectId: 'p', projectName: ADO_FIXTURE_PROJECT },
+          createdAt: '2026-10-06T09:00:00.000Z',
+          unresolvedThreads: 6,
+          repoRegistered: true,
+          webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_git/onsite-companion/pullrequest/10571',
+        },
+      ],
+    },
+  },
+  'ado:backlog': {
+    request: { team: 'OSC Developers', filters: { kinds: ['story', 'bug'], priorities: [1], text: 'jobs', includeInSprint: false }, page: { index: 0, size: 20 } },
+    response: {
+      team: TEAM,
+      total: 1,
+      page: { index: 0, size: 20, count: 1 },
+      groups: [
+        {
+          feature: { id: 70101, title: 'Job management' },
+          items: [
+            {
+              id: 71360,
+              type: 'User Story',
+              kind: 'story',
+              title: 'Bulk reassign jobs between technicians',
+              state: 'New',
+              points: 5,
+              priority: 1,
+              tags: ['jobs'],
+              areaPath: 'OnSite Companion\\OSC',
+              iterationPath: 'OnSite Companion',
+              inSprint: false,
+              assignee: null,
+              parentId: 70101,
+              webUrl: 'https://dev.azure.com/contoso/OnSite%20Companion/_workitems/edit/71360',
+            },
+          ],
+        },
+      ],
+    },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
-  it('declares the seven channels from the ticket, each with a contract', () => {
+  it('declares the channels from AL-065 and E14, each with a contract', () => {
     expect([...ADO_INVOKE_CHANNELS]).toEqual([
       'ado:listSprints',
       'ado:listWorkItems',
@@ -42,6 +121,10 @@ describe('ado:* channel contracts', () => {
       'ado:getComments',
       'ado:createPullRequest',
       'ado:getPullRequest',
+      'ado:listTeams',
+      'ado:teamBoard',
+      'ado:activePrs',
+      'ado:backlog',
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

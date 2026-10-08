@@ -21,12 +21,23 @@ export {
   AGENT_TICKET_COUNTS,
   ticketNeedsYou,
   selectLaneNeedsYouCount,
+  selectLaneNeedsYouTicketIds,
   selectLaneTicketIds,
   selectTicket,
   selectTicketCount,
+  selectTicketTotal,
+  selectWorkItemLanes,
   type AgentTicketCount,
 } from './model/selectors';
-export { useAgentTicket, useAgentTicketCount, useLaneNeedsYouCount, useLaneTicketIds } from './model/hooks';
+export {
+  useAgentTicket,
+  useAgentTicketCount,
+  useAgentTicketTotal,
+  useLaneNeedsYouCount,
+  useLaneNeedsYouTicketIds,
+  useLaneTicketIds,
+  useWorkItemLanes,
+} from './model/hooks';
 export { agentTicketEventHandlers, createAgentTicketEventHandlers } from './model/event-handlers';
 export {
   AgentTicketCard,
@@ -46,3 +57,26 @@ export {
 export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from './api/archive';
 export { ticketBoardQueryKey, useAdoptWorktree, useIgnoreWorktree, useTicketBoard } from './api/board';
 export { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS, modelEffortLabel, stageProgressLabel } from './model/labels';
+export { useHandConflictToLead, useMergeSubBranches, useOpenConflictFiles } from './api/merge-sub-branches';
+export { useApplyModelNow, useSetAgentEffort, useSetAgentModel } from './api/model';
+export {
+  DROP_REFUSALS,
+  TEAM_BOARD_COLUMN_KINDS,
+  allowedLanes,
+  dragLock,
+  dropVerdict,
+  isMe,
+  refusedLanes,
+  type BacklogItemCard,
+  type BoardItemCard,
+  type DropAction,
+  type DropAdoChange,
+  type DropCard,
+  type DropMe,
+  type DropPerson,
+  type DropRefusal,
+  type DropVerdict,
+  type DropWorktreeSource,
+  type PullRequestCard,
+  type TeamBoardColumnKind,
+} from './model/drop-rules';

@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import type { TicketRecord, WorkItem } from '@agent-lanes/contracts';
+import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
-import { WorkItemChip } from '@/entities/ado-work-item';
 import { OutputStream } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
+import { PermissionPrompt } from '@/features/resolve-permission';
 import { useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
 import { CreatePullRequestPanel } from './CreatePullRequestPanel';
+import { AdoTab } from './AdoTab';
+import { DiffTab } from './DiffTab';
 import { StageStepper } from './StageStepper';
 import { TicketMeta, TicketTopBar } from './TicketHeader';
 import { AgentPanel, MergePanel, SubAgentsPanel, SubBranchesPanel, WorktreePanel } from './TicketPanels';
@@ -89,6 +91,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         <StageStepper steps={stageSteps(ticket.stage, history)} progress={ticket.progress} />
       </ErrorBoundary>
 
+      {/* A tool call outside the permission policy waits for the user (AL-109). */}
+      <PermissionPrompt ticketId={ticket.id} />
+
       <View style={styles.panels}>
         <AgentPanel ticket={ticket} />
         <WorktreePanel ticket={ticket} />
@@ -108,8 +113,12 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
               <PanelErrorBoundary panel="output" ticketId={ticket.id}>
                 <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
               </PanelErrorBoundary>
+            ) : tab === 'diff' ? (
+              <DiffTab ticketId={ticket.id} branch={ticket.branch} subBranches={subBranches} />
+            ) : tab === 'ado' ? (
+              <AdoTab ticket={ticket} />
             ) : (
-              <TabPlaceholder tab={tab} ticket={ticket} workItem={workItem.data} />
+              <TabPlaceholder tab={tab} ticket={ticket} />
             )}
           </ErrorBoundary>
         </TabPanel>
@@ -131,16 +140,14 @@ const TAB_EMPTY: Record<TicketPageTab, string> = {
   ado: 'The work item, its acceptance criteria, comments and linked pull request.',
 };
 
-/** What each tab shows until its feature lands (AL-179, AL-180). Output is AL-175's OutputStream, Build log AL-135's BuildLog. */
-function TabPlaceholder({ tab, ticket, workItem }: { tab: TicketPageTab; ticket: AgentTicket; workItem: WorkItem | undefined }) {
+/** A tab without its own view. Every tab has one now: Output (AL-175), Diff (AL-179), Build log (AL-135), ADO (AL-180). */
+function TabPlaceholder({ tab, ticket }: { tab: TicketPageTab; ticket: AgentTicket }) {
   const activity = tab === 'output' ? ticket.activity?.text : undefined;
   return (
     <View style={styles.placeholder} testID={`ticket-tab-${tab}`}>
       <Text variant="title" size="lg">
         {TAB_TITLES[tab]}
       </Text>
-      {/* The work item from Azure DevOps (AL-066) until AL-180 builds the ADO tab. */}
-      {tab === 'ado' && workItem ? <WorkItemChip item={workItem} testID="ticket-work-item" /> : null}
       {activity ? (
         <Text variant="body" color={color.claudeText}>
           {activity}

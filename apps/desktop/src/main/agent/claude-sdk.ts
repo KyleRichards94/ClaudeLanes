@@ -11,9 +11,11 @@ import type { Options, Query, SDKMessage, SDKUserMessage } from '@anthropic-ai/c
 
 /**
  * The part of the SDK's `Query` the app uses: the message stream, the account, stopping, and the
- * streaming-input controls agent sessions use (AL-100: interrupt, model and effort changes).
+ * streaming-input controls agent sessions use (AL-100: interrupt, model and effort changes; AL-108: MCP
+ * server status and reconnect).
  */
-export type ClaudeQuery = AsyncIterable<SDKMessage> & Pick<Query, 'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings'>;
+export type ClaudeQuery = AsyncIterable<SDKMessage> &
+  Pick<Query, 'accountInfo' | 'close' | 'interrupt' | 'setModel' | 'applyFlagSettings' | 'mcpServerStatus' | 'reconnectMcpServer'>;
 
 export type ClaudeQueryFunction = (params: { prompt: string | AsyncIterable<SDKUserMessage>; options?: Options }) => ClaudeQuery;
 
@@ -73,6 +75,11 @@ export interface ClaudeLaunchRequest {
 export interface ClaudeLauncher {
   /** Starts a `claude` process. Rejects with a `ClaudeLaunchError` when the binary or the SDK is missing. */
   launch(request: ClaudeLaunchRequest): Promise<ClaudeQuery>;
+  /**
+   * Closes every `claude` process this launcher started that is still open: sessions, design reads,
+   * login checks and connection tests alike (app quit, AL-213). Returns how many it closed.
+   */
+  closeAll(): number;
 }
 
 export interface ClaudeLauncherOptions {
@@ -119,8 +126,23 @@ export function loadClaudeSdk(): Promise<ClaudeSdkModule> {
 export function createClaudeLauncher(options: ClaudeLauncherOptions): ClaudeLauncher {
   const loadQuery = options.query ?? loadClaudeQuery;
   const baseEnv = options.baseEnv ?? (() => process.env);
+  // Each process until it is closed, so quitting can close the ones a caller has not.
+  const open = new Set<ClaudeQuery>();
 
   return {
+    closeAll() {
+      const closing = [...open];
+      open.clear();
+      for (const query of closing) {
+        try {
+          query.close();
+        } catch {
+          // Already gone: nothing left to stop.
+        }
+      }
+      return closing.length;
+    },
+
     async launch({ credential, prompt, options: sdkOptions }) {
       const executable = options.executable();
       if (!executable) {
@@ -135,10 +157,17 @@ export function createClaudeLauncher(options: ClaudeLauncherOptions): ClaudeLaun
       } catch (cause) {
         throw new ClaudeLaunchError('SDK_UNAVAILABLE', `The Claude Agent SDK could not be loaded: ${cause instanceof Error ? cause.message : String(cause)}`);
       }
-      return query({
+      const started = query({
         prompt,
         options: { ...sdkOptions, pathToClaudeCodeExecutable: executable, env: claudeProcessEnv(baseEnv(), credential, options.clientApp) },
       });
+      open.add(started);
+      const close = started.close.bind(started);
+      started.close = () => {
+        open.delete(started);
+        close();
+      };
+      return started;
     },
   };
 }

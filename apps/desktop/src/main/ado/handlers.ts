@@ -15,5 +15,9 @@ export function createAdoHandlers(ado: AdoService): HandlersFor<(typeof ADO_INVO
     'ado:getComments': (request) => ado.getComments(request),
     'ado:createPullRequest': (request) => ado.createPullRequest(request),
     'ado:getPullRequest': (request) => ado.getPullRequest(request),
+    'ado:listTeams': (request) => ado.listTeams(request),
+    'ado:teamBoard': (request) => ado.teamBoard(request),
+    'ado:activePrs': (request) => ado.activePrs(request),
+    'ado:backlog': (request) => ado.backlog(request),
   };
 }

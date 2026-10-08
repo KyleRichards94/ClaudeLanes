@@ -189,3 +189,22 @@ test('Stop and quitting leave no orphan node processes', async () => {
   app = undefined;
   await expect.poll(() => [...before].filter(isAlive)).toEqual([]);
 });
+
+test("the drill-in's Worktree panel runs, shows the URL and stops from its buttons (AL-173)", async () => {
+  const page = await launchWithTwoTickets();
+  // Deep link to the drill-in (D161); a string, because the e2e project has no DOM types.
+  await page.evaluate("window.location.hash = '#/ticket/71273'");
+  const panel = page.getByTestId('worktree-panel');
+  await expect(panel.getByText('Not running')).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Stop' })).toBeDisabled();
+
+  await panel.getByRole('button', { name: 'Run' }).click();
+  await expect(panel.getByTestId('build-run-url')).toContainText(/^Running · http:\/\/localhost:\d+\/$/, { timeout: 30_000 });
+  await expect(panel.getByRole('button', { name: 'Build' })).toBeDisabled();
+  await expect.poll(async () => (pids = await serverPids(page)).length, { timeout: 10_000 }).toBe(2);
+  await panel.screenshot({ path: test.info().outputPath('worktree-panel-running.png') });
+
+  await panel.getByRole('button', { name: 'Stop' }).click();
+  await expect(panel.getByText('Not running')).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByRole('button', { name: 'Run' })).toBeEnabled();
+});
