@@ -76,3 +76,27 @@ export {
   type ConnectionCallOptions,
   type ProbeAdoScopesOptions,
 } from './connection-test';
+export {
+  BOARD_COLUMN_FIELD,
+  boardColumnKind,
+  getTeamBoard,
+  gitLinksOf,
+  listMyTeams,
+  MY_TEAMS_PAGE_SIZE,
+  resolveTeam,
+  TEAM_BOARD_MAX_ITEMS,
+  teamFieldClause,
+  toPerson,
+  type TeamBoardOptions,
+  type TeamCallOptions,
+} from './team-board';
+export {
+  ACTIVE_PRS_PAGE_SIZE,
+  isUnresolvedThread,
+  listActivePullRequests,
+  TEAM_MEMBERS_PAGE_SIZE,
+  THREAD_READS_IN_PARALLEL,
+  type ActivePullRequestsOptions,
+  type PullRequestThread,
+} from './active-prs';
+export { BACKLOG_MAX_ITEMS, backlogQuery, getBacklog, groupByFeature, type BacklogOptions } from './backlog';

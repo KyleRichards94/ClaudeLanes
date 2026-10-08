@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { createAdoService, type AdoService } from './ado';
+import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
@@ -266,6 +266,8 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     log: log.child('ado'),
     onUnauthorized: (connectionId) => void late.credentialFailures?.adoUnauthorized(connectionId),
+    // AL-232: a PR in a repo that isn't registered here is flagged, so its drop asks to add the repo.
+    registeredRemotes: () => readRegisteredRemotes(settings.get().repos, git.run),
   });
 
   const sessions = createSessionManager({
@@ -361,11 +363,12 @@ export function createServices(options: ServiceOptions): Services {
   };
 }
 
-/** Stops child processes and flushes state on quit (AL-213 fills this in). */
+/** Stops every child process the app started and flushes state on quit (AL-213, design §10). */
 export async function disposeServices(services: Services): Promise<void> {
-  void services;
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
+  services.claude.closeAll();
   services.mcpStatus.dispose();
   services.transcripts.dispose();
   services.credentialFailures.dispose();

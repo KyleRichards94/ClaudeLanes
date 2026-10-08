@@ -301,6 +301,19 @@ describe('session manager: closing sessions', () => {
     await expect(sessions.stop('71273')).resolves.toEqual({ ok: true, data: false });
   });
 
+  it('midTurn lists the tickets whose agent is in a turn, not idle or stopped ones (AL-213)', async () => {
+    const { fake, sessions } = await setup({ live: true, messages: [fakeInit('session-busy')] });
+    expect(sessions.midTurn()).toEqual([]);
+    await sessions.start({ ticketId: '71273', jobDescription: JOB });
+    expect(sessions.midTurn()).toEqual(['71273']);
+    // The turn ends: the agent is idle and quitting no longer cuts it off.
+    fake.calls[0]!.push(fakeResult());
+    await eventually(() => sessions.status('71273').state === 'idle');
+    expect(sessions.midTurn()).toEqual([]);
+    await sessions.dispose();
+    expect(sessions.midTurn()).toEqual([]);
+  });
+
   it('dispose closes every live session (app quit)', async () => {
     const { fake, sessions } = await setup();
     await sessions.start({ ticketId: '71273', jobDescription: JOB });
