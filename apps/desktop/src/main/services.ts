@@ -24,6 +24,8 @@ import { createDesignNavigationPolicy, createDesignViewService, type DesignViewS
 import { createDesignCanvasLinks, type DesignCanvasLinks } from './design/canvas-links';
 import { createDesignArtboardReader, type DesignArtboardReader } from './design/artboards';
 import { createElectronDesignPlatform } from './design/electron-platform';
+import { createDesignSpecFiles, designSpecsRootDir } from './design/spec-store';
+import { createDesignSpecService, type DesignSpecService } from './design/specs';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
@@ -111,6 +113,8 @@ export interface Services {
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
   readonly pullRequests: PullRequestService;
+  /** Shipped design specs in `<userData>/design-specs` (D8): the agent's get / list / ack tools and the design tab (AL-198). */
+  readonly designSpecs: DesignSpecService;
 }
 
 export interface ServiceOptions {
@@ -254,7 +258,14 @@ export function createServices(options: ServiceOptions): Services {
   const pullRequests = createPullRequestService({ tickets, ado, connections, git: git.run, emit: options.emit, transcripts, log: log.child('pr') });
   // Open PRs from before a restart are read again from the start (AL-181).
   pullRequests.watch();
-  const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
+  const designSpecs = createDesignSpecService({
+    tickets,
+    files: createDesignSpecFiles({ rootDir: designSpecsRootDir(options.appDataDir), warn: (message) => log.child('design').warn(message) }),
+    emit: options.emit,
+    transcripts,
+    log: log.child('design'),
+  });
+  const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
 
   return {
     appDataDir: options.appDataDir,
@@ -287,6 +298,7 @@ export function createServices(options: ServiceOptions): Services {
     diffs,
     reconcile,
     pullRequests,
+    designSpecs,
   };
 }
 

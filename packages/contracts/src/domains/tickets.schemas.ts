@@ -110,6 +110,8 @@ export const TicketDesignSpecSchema = z.object({
   artboardCount: z.int().nonnegative(),
   /** When the agent acknowledged it with `ack_design_spec` ("Used · 14:01", AL-198); null until then. */
   usedAt: EpochMsSchema.nullable(),
+  /** When the agent first fetched it with `get_design_spec` ("Agent is watching this canvas", AL-198); null or absent until then. */
+  fetchedAt: EpochMsSchema.nullable().optional(),
 });
 export type TicketDesignSpec = z.infer<typeof TicketDesignSpecSchema>;
 

@@ -95,7 +95,7 @@ describe('emit', () => {
       const { frame, send } = fakeFrame('https://claude.ai/design');
       const log = vi.fn();
       const emit = createEmitter({ frame: () => frame, renderer: devServer, strict: true, log });
-      emit('design:spec', { ticketId: '71273', at: 5 });
+      emit('design:spec', { ticketId: '71273', at: 5, version: 1, change: 'shipped' });
       expect(send).not.toHaveBeenCalled();
       expect(log).toHaveBeenCalledWith('Refused design:spec for an untrusted frame');
     });
@@ -103,7 +103,7 @@ describe('emit', () => {
     it('refuses a different local file when packaged', () => {
       const { frame, send } = fakeFrame(pathToFileURL(rendererFile.replace('index.html', 'evil.html')).href);
       const emit = createEmitter({ frame: () => frame, renderer: packaged, strict: true, log: vi.fn() });
-      emit('design:spec', { ticketId: '71273', at: 5 });
+      emit('design:spec', { ticketId: '71273', at: 5, version: 1, change: 'shipped' });
       expect(send).not.toHaveBeenCalled();
     });
 
