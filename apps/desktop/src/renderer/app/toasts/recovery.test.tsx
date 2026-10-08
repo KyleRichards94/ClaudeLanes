@@ -78,10 +78,19 @@ describe('error recovery actions (AL-211)', () => {
     expect(getConnectionsModal()).toMatchObject({ open: true, tab: 'ado', target: null });
   });
 
-  it('SESSION_LOST: Reconnect opens the ticket where its session shows', async () => {
+  it('SESSION_LOST: Reconnect resumes the ticket\'s saved session (AL-110)', async () => {
+    vi.mocked(bridge.invoke).mockResolvedValue({ ok: true, data: { ticketId: '71273', state: 'running', sessionId: 's-1', message: null } });
     await recover({ code: 'SESSION_LOST', message: 'cc-71273 stopped responding.' }, { ticketId: '71273' }, 'Reconnect');
-    expect(selectRoute(router.getState())).toEqual(routes.ticket('71273'));
-    expect(screen.getByTestId('tab-probe').textContent).toBe('output');
+    expect(vi.mocked(bridge.invoke)).toHaveBeenCalledWith('agent:reconnect', { ticketId: '71273' });
+    await waitFor(() => expect(getToasts()).toEqual([]));
+  });
+
+  it('SESSION_LOST: a failed Reconnect says why', async () => {
+    vi.mocked(bridge.invoke).mockResolvedValue({ ok: false, code: 'SESSION_LOST', message: '71273 has no saved session to resume.' });
+    await recover({ code: 'SESSION_LOST', message: 'cc-71273 stopped responding.' }, { ticketId: '71273' }, 'Reconnect');
+    await waitFor(() =>
+      expect(getToasts()).toEqual([expect.objectContaining({ title: "Couldn't reconnect 71273", body: '71273 has no saved session to resume.' })]),
+    );
   });
 
   it('BUILD_FAILED: Open build log opens the ticket on its Build log tab', async () => {
