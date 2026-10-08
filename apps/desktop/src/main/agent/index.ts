@@ -7,6 +7,7 @@ export {
   RESUME_MESSAGE,
   SESSION_ENDED_MESSAGE,
   createSessionManager,
+  mergeSessionExtras,
   sessionOptions,
   userMessage,
   type SessionExtras,

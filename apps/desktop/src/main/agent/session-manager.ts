@@ -1,4 +1,4 @@
-import type { McpServerConfig, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { HookEvent, McpServerConfig, Options, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
   SDK_MODEL_IDS,
   err,
@@ -101,6 +101,29 @@ export interface SessionExtras {
   systemPromptAppend?: string;
   /** Sections added to a new session's first user turn. */
   firstTurnAppendix?: string[];
+  /** SDK hooks, e.g. AL-084's WorktreeCreate / WorktreeRemove for sub-agent worktrees (D9). */
+  hooks?: Options['hooks'];
+}
+
+/** Several tickets' extras for one session: servers, tools and hooks are combined, texts joined in order. */
+export function mergeSessionExtras(...all: SessionExtras[]): SessionExtras {
+  const merged: SessionExtras = {};
+  for (const extras of all) {
+    if (extras.mcpServers) merged.mcpServers = { ...merged.mcpServers, ...extras.mcpServers };
+    if (extras.allowedTools) merged.allowedTools = [...(merged.allowedTools ?? []), ...extras.allowedTools];
+    if (extras.systemPromptAppend) {
+      merged.systemPromptAppend = merged.systemPromptAppend ? `${merged.systemPromptAppend}\n\n${extras.systemPromptAppend}` : extras.systemPromptAppend;
+    }
+    if (extras.firstTurnAppendix) merged.firstTurnAppendix = [...(merged.firstTurnAppendix ?? []), ...extras.firstTurnAppendix];
+    if (extras.hooks) {
+      const hooks: NonNullable<Options['hooks']> = { ...merged.hooks };
+      for (const event of Object.keys(extras.hooks) as HookEvent[]) {
+        hooks[event] = [...(hooks[event] ?? []), ...(extras.hooks[event] ?? [])];
+      }
+      merged.hooks = hooks;
+    }
+  }
+  return merged;
 }
 
 export interface SessionManagerOptions {
@@ -162,6 +185,7 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
     permissionMode: 'acceptEdits',
     ...(extras.mcpServers && Object.keys(extras.mcpServers).length > 0 ? { mcpServers: extras.mcpServers } : {}),
     ...(extras.allowedTools && extras.allowedTools.length > 0 ? { allowedTools: extras.allowedTools } : {}),
+    ...(extras.hooks && Object.keys(extras.hooks).length > 0 ? { hooks: extras.hooks } : {}),
     ...(record.sessionId ? { resume: record.sessionId } : {}),
   };
 }

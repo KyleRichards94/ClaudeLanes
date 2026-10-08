@@ -36,3 +36,12 @@ export {
 export { createMergeToMainService, qaPassed, type MergeToMainService, type MergeToMainServiceOptions } from './merge-to-main';
 export { createArchiveService, type ArchiveService, type ArchiveServiceOptions } from './archive';
 export { createDiffService, parseNameStatus, parseNumstat, safeRelativePath, type DiffService, type DiffServiceOptions } from './diff';
+export {
+  READ_ONLY_AGENT_TYPES,
+  createSubWorktreeService,
+  isReadOnlyAgentType,
+  subWorktreeHooks,
+  type SubWorktree,
+  type SubWorktreeService,
+  type SubWorktreeServiceOptions,
+} from './sub-worktree';
