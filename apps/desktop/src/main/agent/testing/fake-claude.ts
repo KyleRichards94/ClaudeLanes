@@ -1,4 +1,4 @@
-import type { AccountInfo, McpServerStatus, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { AccountInfo, McpServerStatus, Options, SDKAssistantMessageError, SDKMessage, SDKResultMessage, SDKUserMessage, SlashCommand } from '@anthropic-ai/claude-agent-sdk';
 import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
 
 /**
@@ -13,6 +13,10 @@ import type { ClaudeQuery, ClaudeQueryFunction } from '../claude-sdk';
 export interface FakeClaudeScript {
   /** What `accountInfo()` resolves to (or rejects with); never settles when `'hang'`. */
   account?: AccountInfo | Error | 'hang';
+  /** What `getContextUsage()` reports (AL-113): tokens used of the window; rejects when an Error. */
+  contextUsage?: { totalTokens: number; maxTokens: number; percentage: number } | Error;
+  /** What `supportedCommands()` lists (AL-114); rejects when an Error, never settles when `'hang'`. */
+  commands?: SlashCommand[] | Error | 'hang';
   /** Messages the stream yields, in order, after the prompt is read. */
   messages?: SDKMessage[];
   /** Thrown by the stream after `messages`, like a process that died. */
@@ -216,6 +220,18 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       applyFlagSettings: async (settings: Record<string, unknown>) => {
         call.flagSettings.push(settings);
         call.log.push({ kind: 'applyFlagSettings', settings });
+      },
+      supportedCommands: () => {
+        const commands = plan.commands ?? [];
+        if (commands === 'hang') return new Promise<SlashCommand[]>(() => undefined);
+        return commands instanceof Error ? Promise.reject(commands) : Promise.resolve(commands);
+      },
+      getContextUsage: async () => {
+        const usage = plan.contextUsage ?? { totalTokens: 0, maxTokens: 200_000, percentage: 0 };
+        if (usage instanceof Error) throw usage;
+        return { categories: [], gridRows: [], model: 'fake', memoryFiles: [], rawMaxTokens: usage.maxTokens, ...usage } as unknown as Awaited<
+          ReturnType<ClaudeQuery['getContextUsage']>
+        >;
       },
       mcpServerStatus: async () => call.mcpStatus.map((server) => ({ ...server })),
       reconnectMcpServer: async (serverName: string) => {

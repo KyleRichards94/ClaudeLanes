@@ -72,6 +72,8 @@ export interface SessionManager {
   status(ticketId: string): AgentSessionStatus;
   /** Tickets whose agent is starting or in a turn (not idle or paused): quitting now would cut them off (AL-213). */
   midTurn(): string[];
+  /** The live session's context window (`getContextUsage`, AL-113), from the last response's usage. */
+  contextUsage(ticketId: string): Promise<Result<{ totalTokens: number; maxTokens: number; percentage: number }>>;
   /** The status of every session the app has started since it opened, live or not. */
   list(): AgentSessionStatus[];
   /** The MCP servers of the ticket's live session, as Claude Code reports them (AL-108). */
@@ -568,6 +570,18 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     status: (ticketId) => statusOf(ticketId, sessions.get(ticketId)),
 
     midTurn: () => [...sessions.values()].filter((session) => MID_TURN_STATES.has(session.state)).map((session) => session.ticketId),
+    async contextUsage(ticketId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      const query = found.data.query;
+      if (!query) return err('VALIDATION', `The agent session of ticket ${ticketId} is still starting.`);
+      try {
+        const usage = await query.getContextUsage({ detail: 'summary' });
+        return ok({ totalTokens: usage.totalTokens, maxTokens: usage.maxTokens, percentage: usage.percentage });
+      } catch (error) {
+        return err('INTERNAL', `The context window could not be read: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
 
     list: () => [...sessions.values()].map((session) => statusOf(session.ticketId, session)),
 

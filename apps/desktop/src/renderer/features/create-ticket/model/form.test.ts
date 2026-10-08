@@ -17,6 +17,7 @@ describe('new ticket form', () => {
       effort: 'xhigh',
       gates: defaults.stageGates,
       worktreeName: null,
+      prefilled: null,
     });
   });
 
@@ -94,5 +95,36 @@ describe('new ticket form', () => {
       kind: 'no-ticket',
       description: 'Fix it',
     });
+  });
+});
+
+describe('job description prefill and skills (AL-162)', () => {
+  const quoted = '> Cut frmJobControl over to Blazor.\n\n';
+
+  it("prefills the description from the picked work item until the user edits it", () => {
+    const picked = run({ type: 'workItem', workItem: item }, { type: 'prefill', description: quoted });
+    expect(picked.description).toBe(quoted);
+
+    // Another item replaces an unedited prefill…
+    const other = newTicketReducer(newTicketReducer(picked, { type: 'workItem', workItem: { ...item, id: 71330 } }), { type: 'prefill', description: '> Paging.\n\n' });
+    expect(other.description).toBe('> Paging.\n\n');
+
+    // …but never what the user wrote.
+    const edited = newTicketReducer(picked, { type: 'description', description: `${quoted}Stop before the PR.` });
+    expect(newTicketReducer(edited, { type: 'prefill', description: '> Paging.\n\n' }).description).toBe(`${quoted}Stop before the PR.`);
+
+    // "No ticket" clears an unedited prefill.
+    expect(newTicketReducer(picked, { type: 'source', source: 'none' }).description).toBe('');
+  });
+
+  it('passes the selected skills to the launch request', () => {
+    const form = run(
+      { type: 'workItem', workItem: item },
+      { type: 'skill', skill: 'osc-blazor-cutover-invoke', selected: true },
+      { type: 'skill', skill: 'code-review', selected: false },
+      { type: 'skill', skill: 'cs-qa-wip', selected: true },
+    );
+    const launch = launchRequest(form);
+    expect(launch.ok && launch.request.skills).toEqual(['osc-blazor-cutover-invoke', 'cs-qa-wip']);
   });
 });

@@ -16,6 +16,8 @@ export { reposQueryKey, useAddRepo, useRemoveRepo, useRepos } from './repos';
 export { ticketRecordQueryKey, ticketsQueryKey, useTicketRecord, useTicketRecords } from './tickets';
 export { repoCommandsQueryKey, useRepoCommands } from './build-commands';
 export { branchesQueryKey, createBranchStatusEventHandlers, useBranchStatus } from './branches';
+export { agentUsageEventHandlers, agentUsageQueryKey, useAgentUsage } from './agent-usage';
+export { skillsQueryKey, useRefreshSkills, useSkills } from './skills';
 export { diffFileQueryKey, diffQueryKey, useDiffFile, useTicketDiff } from './diff';
 export {
   claudeLoginQueryKey,

@@ -145,3 +145,24 @@ test('model and effort changes answer over IPC and are saved on the ticket recor
   const records = savedRecords(ticketsDir);
   expect(records.some((record) => record.model === 'sonnet' && record.effort === 'high')).toBe(true);
 });
+
+test('agent:getUsage reports no tokens for a ticket whose session has not run (AL-113)', async () => {
+  expect(await invoke(page, 'agent:getUsage', { ticketId: '71273' })).toEqual({
+    ok: true,
+    data: {
+      ticketId: '71273',
+      totalTokens: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+      leadTokens: 0,
+      subagents: [],
+      costUsd: 0,
+      turns: 0,
+      context: null,
+      updatedAt: null,
+    },
+  });
+  expect(await invoke(page, 'agent:getUsage', { ticketId: 'NOT A TICKET' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+});

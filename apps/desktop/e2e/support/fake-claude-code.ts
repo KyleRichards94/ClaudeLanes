@@ -14,6 +14,8 @@ export interface FakeClaudeState {
     /** What the design thread's session answers each message with (AL-196); `{prompt}` is the message. */
     reply?: string;
   };
+  /** What `supportedCommands()` lists (AL-114); empty by default. */
+  commands?: { name: string; description: string; argumentHint: string; builtin?: boolean }[];
 }
 
 export const FAKE_LOGIN = { email: 'kyle@example.com', organization: 'Example', subscriptionType: 'max' } as const;

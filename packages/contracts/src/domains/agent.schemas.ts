@@ -3,6 +3,7 @@ import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
+import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -457,6 +458,8 @@ export const agentInvokeContracts = {
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
   'agent:resume': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** The session's tokens, cost and context window so far (AL-113). */
+  'agent:getUsage': { request: AgentTicketRequestSchema, response: AgentUsageSchema },
   /** The MCP servers of the running sessions, for the header pill (AL-108). */
   'agent:getMcpStatus': { request: z.undefined(), response: McpStatusSummarySchema },
   /** Allow once / Allow for this ticket / Deny on a waiting permission request (AL-109). */
@@ -545,6 +548,7 @@ export const agentEventContracts = {
   'agent:subagent': AgentSubagentEventSchema,
   'agent:gate': AgentGateEventSchema,
   'agent:status': AgentStatusEventSchema,
+  'agent:usage': AgentUsageEventSchema,
   'agent:mcpStatus': McpStatusEventSchema,
   'agent:permission': AgentPermissionEventSchema,
   'agent:model': AgentModelEventSchema,

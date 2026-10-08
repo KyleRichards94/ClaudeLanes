@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createClaudeLauncher } from './claude-sdk';
 import { createAgentHandlers } from './handlers';
+import { createUsageService } from './usage/usage-service';
 import { createMcpStatusMonitor } from './mcp';
 import { testPermissions } from './testing/sessions';
 import { createTranscriptService } from './output/transcript';
@@ -46,6 +47,7 @@ async function setup() {
     mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }),
     permissions: testPermissions(),
     subagents: createSubagentTracker({ sessions, emit: events.emit }),
+    usage: createUsageService({ sessions, emit: recordingEmit().emit }),
   });
   await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
   const call = fake.calls[0]!;

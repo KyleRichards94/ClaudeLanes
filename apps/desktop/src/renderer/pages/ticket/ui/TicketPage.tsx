@@ -3,10 +3,11 @@ import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
-import { agentTickets, ticketFromRecord, useAgentTicket, type AgentTicket } from '@/entities/agent-ticket';
+import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
+import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
-import { useTicketRecord, useWorkItem } from '@/shared/api';
+import { useAgentUsage, useTicketRecord, useWorkItem } from '@/shared/api';
 import { useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, TicketTabBar } from '@/shared/ui';
@@ -63,6 +64,8 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const now = useNow(60_000);
   const history = record?.stageHistory ?? [{ stage: ticket.stage, at: ticket.stageEnteredAt }];
   const subBranches = record?.subBranches ?? [];
+  const usage = useAgentUsage(ticket.id).data;
+  const setGate = useSetGate();
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.page} testID="ticket-page">
@@ -70,7 +73,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         <TicketTopBar
           ticketId={ticket.id}
           repo={ticket.repo}
-          session={{ id: record?.sessionId ?? null, startedAt: sessionStartedAt(history), now }}
+          session={{ id: record?.sessionId ?? null, startedAt: sessionStartedAt(history), now, usage }}
         />
       </ErrorBoundary>
 
@@ -86,7 +89,19 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       </View>
 
       <ErrorBoundary name="ticket:stepper" label="the stage stepper">
-        <StageStepper steps={stageSteps(ticket.stage, history)} progress={ticket.progress} />
+        <StageStepper
+          steps={stageSteps(ticket.stage, history)}
+          progress={ticket.progress}
+          gates={ticket.gates}
+          onGateChange={(stage, gate) => setGate.mutate({ ticketId: ticket.id, stage, gate })}
+          waitingStage={ticket.gate?.stage ?? null}
+          gateActions={<GateActions ticketId={ticket.id} placement="stepper" />}
+        />
+        {setGate.error ? (
+          <Text variant="body" size="sm" color={color.danger} role="alert">
+            {`The gate couldn't be changed: ${setGate.error.message}`}
+          </Text>
+        ) : null}
       </ErrorBoundary>
 
       {/* A tool call outside the permission policy waits for the user (AL-109). */}
@@ -114,7 +129,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           </ErrorBoundary>
         </TabPanel>
         <View style={[styles.side, wide ? styles.sideWide : null]} testID="ticket-side-column">
-          <SubAgentsPanel ticket={ticket} />
+          <SubAgentsPanel ticket={ticket} leadTokens={usage?.leadTokens} />
           <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
         </View>
       </View>

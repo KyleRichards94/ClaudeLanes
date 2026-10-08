@@ -5,6 +5,7 @@ import {
   type Lane,
   type Model,
   type Stage,
+  type StageGates,
   type TicketLastBuild,
   type TicketRecord,
 } from '@agent-lanes/contracts';
@@ -205,6 +206,12 @@ export function withGateOpened(ticket: AgentTicket, stage: Stage, at: number): A
 export function withGateResolved(ticket: AgentTicket): AgentTicket {
   if (ticket.gate === null && !ticket.needsYou.some((reason) => reason.kind === 'approval')) return ticket;
   return { ...ticket, gate: null, needsYou: dropReason(ticket.needsYou, 'approval') };
+}
+
+/** The ticket's gates as main saved them (AL-171); unchanged when every stage matches. */
+export function withGates(ticket: AgentTicket, gates: StageGates): AgentTicket {
+  const same = (Object.keys(gates) as (keyof StageGates)[]).every((stage) => ticket.gates[stage] === gates[stage]);
+  return same ? ticket : { ...ticket, gates: { ...gates } };
 }
 
 /** Adds or replaces a permission or QA-gap reason. Gate approvals go through `withGateOpened`. */
