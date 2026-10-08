@@ -17,7 +17,7 @@ import { createJobQueue, type JobQueue } from './job-queue';
  */
 
 // Git calls and the build's shell are process spawns (slow on Windows with antivirus).
-vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
 
 /** Logs when it starts and ends to `builds.log` at the temp repo root, and fails while `fail.txt` exists. */
 const BUILD_SCRIPT = `import { appendFileSync, existsSync } from 'node:fs';
@@ -83,10 +83,16 @@ describe('build queue on temp repo worktrees', () => {
 
     expect(first).toMatchObject({ ok: true, data: { outcome: 'succeeded', exitCode: 0 } });
     expect(second).toMatchObject({ ok: true, data: { outcome: 'succeeded', exitCode: 0 } });
+    // Each build reads its git fingerprint before it joins the queue, so under load either one can
+    // join first. What matters is that they never overlap and the later one waits as Queued.
     const log = (await readFile(join(repo.root, 'builds.log'), 'utf8')).trim().split('\n');
-    expect(log).toEqual(['start 71273-cutover-job-control', 'end 71273-cutover-job-control', 'start 71274-fix-date-filter', 'end 71274-fix-date-filter']);
-    expect(queued.filter((event) => event.ticketId === '71274').map((event) => event.state)).toContain('queued');
-    expect(queued.find((event) => event.ticketId === '71274' && event.state === 'queued')?.position).toBe(1);
+    const firstRun = log[0]?.replace('start ', '') ?? '';
+    const secondRun = log[2]?.replace('start ', '') ?? '';
+    expect(log).toEqual([`start ${firstRun}`, `end ${firstRun}`, `start ${secondRun}`, `end ${secondRun}`]);
+    expect([firstRun, secondRun].sort()).toEqual(['71273-cutover-job-control', '71274-fix-date-filter']);
+    const waiting = secondRun.slice(0, 5);
+    expect(queued.filter((event) => event.ticketId === waiting).map((event) => event.state)).toContain('queued');
+    expect(queued.find((event) => event.ticketId === waiting && event.state === 'queued')?.position).toBe(1);
   });
 
   it('reports BUILD_FAILED from the real build output and saves it on the ticket', async () => {
