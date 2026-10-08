@@ -112,7 +112,8 @@ test('the Merge panel merges sub-branches and opens the conflict view (AL-174)',
   });
 
   const mergeSubs = page.getByTestId('merge-sub-branches');
-  await expect(mergeSubs).toHaveText(/Merge 3 sub-branches → 71273-cutover-job-control/);
+  // branches:status runs real git per sub-branch: give it time on a busy machine.
+  await expect(mergeSubs).toHaveText(/Merge 3 sub-branches → 71273-cutover-job-control/, { timeout: 30_000 });
   await expect(mergeSubs).toBeEnabled();
   // Nothing is on the ticket branch itself yet, so Merge worktree → main is off and says why.
   await expect(page.getByTestId('merge-to-main')).toBeDisabled();
