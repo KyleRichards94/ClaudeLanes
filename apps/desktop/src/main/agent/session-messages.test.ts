@@ -7,6 +7,7 @@ import { createAgentHandlers } from './handlers';
 import { createTranscriptService } from './output/transcript';
 import { RESUME_MESSAGE, createSessionManager } from './session-manager';
 import { createStageService } from './stages/stage-service';
+import { createSubagentTracker } from './subagents/subagent-tracker';
 import { createFakeClaude, fakeAssistant, fakeInit, fakeResult, type FakeClaudeCall } from './testing/fake-claude';
 import { eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from './testing/sessions';
 
@@ -36,7 +37,7 @@ async function setup() {
   });
   const transcripts = createTranscriptService({ sessions, tickets, emit: events.emit });
   const stages = createStageService({ tickets, emit: events.emit });
-  const handlers = createAgentHandlers({ sessions, transcripts, stages });
+  const handlers = createAgentHandlers({ sessions, transcripts, stages, subagents: createSubagentTracker({ sessions, emit: events.emit }) });
   await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
   const call = fake.calls[0]!;
   await call.sentCount(1);

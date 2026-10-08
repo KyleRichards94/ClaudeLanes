@@ -19,12 +19,15 @@ export function useBranchStatus(ticketId: string) {
 }
 
 /**
- * Event handlers that keep branch status current: a sub-agent that starts, commits or finishes
- * (`agent:subagent`) changes its branch, so the ticket's status is read again. The app registers
+ * Event handlers that keep branch status current: a sub-agent that starts or finishes (`agent:subagent`,
+ * AL-107) changes its branch and whether it is ready, so the ticket's status is read again. Progress
+ * updates in between change neither and are ignored. The app registers
  * these with its event hub once the query client exists.
  */
 export function createBranchStatusEventHandlers(queryClient: QueryClient): EventHandlers {
   return {
-    'agent:subagent': (event) => void queryClient.invalidateQueries({ queryKey: branchesQueryKey(event.ticketId) }),
+    'agent:subagent': (event) => {
+      if (event.change !== 'updated') void queryClient.invalidateQueries({ queryKey: branchesQueryKey(event.ticketId) });
+    },
   };
 }

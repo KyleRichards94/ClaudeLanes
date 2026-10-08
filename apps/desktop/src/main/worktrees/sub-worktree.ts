@@ -166,6 +166,8 @@ export function subWorktreeHooks(
   service: SubWorktreeService,
   ticketId: string,
   log?: { warn(message: string): void },
+  /** A writer sub-agent got its sub-branch (sub-agent tracking links it to the sub-agent, AL-107). */
+  onSubBranch?: (sub: { name: string; branch: string; agentType?: string; agentId?: string }) => void,
 ): Partial<Record<HookEvent, HookCallbackMatcher[]>> {
   const onCreate: HookCallback = async (input): Promise<HookJSONOutput> => {
     if (input.hook_event_name !== 'WorktreeCreate') return {};
@@ -174,6 +176,14 @@ export function subWorktreeHooks(
       log?.warn(`Ticket ${ticketId}: no worktree for sub-agent "${input.name}": ${result.message}`);
       // Blocking fails the sub-agent's spawn with the reason, rather than letting it edit the ticket worktree.
       return { decision: 'block', reason: result.message };
+    }
+    if (!result.data.shared) {
+      onSubBranch?.({
+        name: input.name,
+        branch: result.data.branch,
+        ...(input.agent_type ? { agentType: input.agent_type } : {}),
+        ...(input.agent_id ? { agentId: input.agent_id } : {}),
+      });
     }
     return { hookSpecificOutput: { hookEventName: 'WorktreeCreate', worktreePath: result.data.worktreePath } };
   };

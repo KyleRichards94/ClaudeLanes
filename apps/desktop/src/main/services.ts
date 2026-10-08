@@ -5,6 +5,7 @@ import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
 import { createTranscriptService, type TranscriptService } from './agent/output/transcript';
 import { createSessionManager, mergeSessionExtras, type SessionManager } from './agent/session-manager';
+import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -113,6 +114,8 @@ export interface Services {
   readonly reconcile: ReconcileService;
   /** Writer sub-agents' worktrees on `sub/<ticket>-<name>`, created through each session's WorktreeCreate hook (AL-084, D9). */
   readonly subWorktrees: SubWorktreeService;
+  /** Each ticket's sub-agent tree and counts from its session (`agent:subagent`, AL-107). */
+  readonly subagents: SubagentTracker;
   /** Merge sub-branches → ticket branch, stopping at the first conflict; Hand to lead agent / I'll resolve it (AL-086). */
   readonly mergeSubBranches: MergeSubBranchesService;
   /** A 401 from Azure DevOps turns its org red, pauses that org's agents and raises Reconnect; a reconnect resumes them (AL-048). */
@@ -136,7 +139,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -187,7 +190,8 @@ export function createServices(options: ServiceOptions): Services {
   });
   const repos = createRepoRegistry({ git, settings, dialogs: createElectronRepoDialogs() });
   const worktrees = createTicketWorktreeService({ git, settings, tickets, log: log.child('worktrees') });
-  const branches = createBranchStatusService({ git, tickets });
+  // A sub-branch is Ready only once its sub-agent finished (AL-107); the tracker is created after the sessions.
+  const branches = createBranchStatusService({ git, tickets, subagents: { isRunning: (ticketId, name) => late.subagents?.isRunning(ticketId, name) ?? false } });
   // Merges and archives in one repo run one at a time.
   const repoQueue = createKeyedQueue();
   const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
@@ -255,7 +259,13 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
     // Each session gets the `agent_lanes` stage server and protocol (AL-103); `stages` is created below.
     // …and the WorktreeCreate / WorktreeRemove hooks that give writer sub-agents their own worktrees (AL-084).
-    extras: async (record) => mergeSessionExtras(await stageExtras(record), { hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees')) }),
+    // …and the SubagentStart / SubagentStop hooks of sub-agent tracking (AL-107).
+    extras: async (record) =>
+      mergeSessionExtras(
+        await stageExtras(record),
+        { hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees'), (sub) => late.subagents?.noteSubBranch(record.id, sub)) },
+        { hooks: late.subagents?.hooks(record.id) ?? {} },
+      ),
     // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
     onEnded: (ticketId) => stages.cancelGate(ticketId),
   });
@@ -268,6 +278,8 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
+  const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
+  late.subagents = subagents;
   const mergeSubBranches = createMergeSubBranchesService({
     git,
     tickets,
@@ -312,6 +324,7 @@ export function createServices(options: ServiceOptions): Services {
     diffs,
     reconcile,
     subWorktrees,
+    subagents,
     mergeSubBranches,
     credentialFailures: credentialFailureService,
   };
@@ -324,6 +337,7 @@ export async function disposeServices(services: Services): Promise<void> {
   await services.sessions.dispose();
   services.transcripts.dispose();
   services.credentialFailures.dispose();
+  services.subagents.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

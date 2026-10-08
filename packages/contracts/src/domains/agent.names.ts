@@ -12,6 +12,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:setEffort', // AL-106
   'agent:applyModelNow', // AL-106
   'agent:getModel', // AL-106
+  'agent:getSubagents', // AL-107
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

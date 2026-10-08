@@ -6,6 +6,7 @@ import { createAgentHandlers } from './handlers';
 import { createTranscriptService } from './output/transcript';
 import { createSessionManager, type SessionManager } from './session-manager';
 import { createStageService } from './stages/stage-service';
+import { createSubagentTracker } from './subagents/subagent-tracker';
 import { createFakeClaude, fakeAssistant, fakeInit, fakeResult } from './testing/fake-claude';
 import { eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from './testing/sessions';
 
@@ -13,7 +14,8 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
   const emit = recordingEmit();
   const transcripts = createTranscriptService({ sessions, tickets, emit: emit.emit, now });
   const stages = createStageService({ tickets, emit: emit.emit, transcripts, userName: () => 'Kyle', now });
-  return { handlers: createAgentHandlers({ sessions, transcripts, stages }), stages, emit };
+  const subagents = createSubagentTracker({ sessions, emit: emit.emit });
+  return { handlers: createAgentHandlers({ sessions, transcripts, stages, subagents }), stages, emit };
 }
 
 function idleSessions(tickets: TicketRecordStore): SessionManager {
@@ -46,6 +48,15 @@ describe('agent IPC handlers', () => {
     const { handlers } = handlersFor(idleSessions(tickets), tickets);
     await expect(handleInvoke('agent:getStatus', { ticketId: '../etc' }, handlers['agent:getStatus'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
     await expect(handleInvoke('agent:getStatus', undefined, handlers['agent:getStatus'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+  });
+
+  it("agent:getSubagents returns the ticket's sub-agent tree and counts (AL-107)", async () => {
+    const tickets = await memoryTickets({ id: '71273' });
+    const { handlers } = handlersFor(idleSessions(tickets), tickets);
+    await expect(handleInvoke('agent:getSubagents', { ticketId: '71273' }, handlers['agent:getSubagents'])).resolves.toEqual({
+      ok: true,
+      data: { ticketId: '71273', leadTokens: 0, nodes: [], counts: { queued: 0, running: 0, done: 0, failed: 0 } },
+    });
   });
 
   it('agent:getTranscript returns the ticket output buffered in main', async () => {
