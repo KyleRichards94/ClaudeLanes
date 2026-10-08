@@ -126,7 +126,7 @@ test('messages, skill chips and pause are refused with a reason when no session 
   expect(await invoke(page, 'agent:resume', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
 
-test('agent:getUsage reports no tokens for a ticket whose session has not run, and the drill-in pill has no tokens yet (AL-113)', async () => {
+test('agent:getUsage reports no tokens for a ticket whose session has not run (AL-113)', async () => {
   expect(await invoke(page, 'agent:getUsage', { ticketId: '71273' })).toEqual({
     ok: true,
     data: {
