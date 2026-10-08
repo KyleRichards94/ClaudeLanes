@@ -166,13 +166,13 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-236 | Launch from ADO transaction (`agent:launchFromAdo`) | E14 | L | AL-230, AL-100, AL-083, AL-063, AL-111, AL-165 | done |
 | AL-237 | Undo a launch (`agent:undoLaunch`) | E14 | M | AL-236, AL-030 | done |
 | AL-238 | PR launches: review and answer comments | E14 | M | AL-236, AL-232 | done |
-| AL-239 | Backlog popout | E14 | L | AL-233, AL-235, AL-236, AL-029 | todo |
+| AL-239 | Backlog popout | E14 | L | AL-233, AL-235, AL-236, AL-029 | partial |
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
-| AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | todo |
-| AL-220 | Feature integration tests | E13 | M | ongoing | todo |
+| AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
+| AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
-| AL-223 | Visual QA against the artboards | E13 | M | E8–E11, AL-234, AL-239 | todo |
+| AL-223 | Visual QA against the artboards | E13 | M | E8–E11, AL-234, AL-239 | partial |
 | AL-224 | Release build and signing | E13 | M | AL-007 | blocked (Q7) |
 | AL-225 | User guide | E13 | S | AL-047 | partial |
 | AL-226 | Register in the ai-tools index | E13 | S | — | blocked (Q8) |
@@ -1066,7 +1066,7 @@ implementation agent, mid-run if needed.
 - **Design:** §12 Testing (integration row) · **Depends on:** ongoing
 - **Scope:** Vitest + fake bridge + MSW for each feature: create ticket, change model, merge branches, build/run, connections, ship design. Written with each feature ticket; this ticket tracks gaps.
 - **Acceptance criteria:**
-  - [ ] Every feature slice has an integration test.
+  - [x] Every feature slice has an integration test. (all 14 slices, plus the team-board and backlog-popout widgets; ado-organisations, claude-sign-in, mcp-servers and resolve-gate got slice-level tests, and `pages/board/ui/TeamBoardLaunch.test.tsx` drives a real drop → `agent:launchFromAdo` → Undo on the board page)
 
 #### AL-221 · Main-process test kit
 - **Design:** §12 Testing (main process row) · **Depends on:** AL-080, AL-100
@@ -1084,7 +1084,7 @@ implementation agent, mid-run if needed.
 - **Depends on:** E8–E11, AL-234, AL-239 (artboards 08–12 too)
 - **Scope:** Capture each screen and state at 1440 × 960 and compare side by side with `docs/design/screens/*`; log differences as tickets or Decisions.
 - **Acceptance criteria:**
-  - [ ] All seven artboards reviewed and signed off.
+  - [ ] All seven artboards reviewed and signed off. (open: `e2e/visual-qa.spec.ts` captures all twelve artboards (01–12) at 1440 × 960 and each was compared with `docs/design/screens`; structure and placement match, the differences are listed in the Change log for batch 9; sign-off is Kyle's)
 
 #### AL-224 · Release build and signing
 - **Depends on:** AL-007 · **Blocked by:** Q7
@@ -1181,8 +1181,8 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 - **Design:** T6, TB§5, artboards 11 and 12 · **Depends on:** AL-233, AL-235, AL-236, AL-029
 - **Scope:** `widgets/backlog-popout`: modal over the lower board with search, type segmented control, priority/area/tag filters and the "in a sprint" toggle; rows grouped by Feature with grip, checkbox, id, type pill, title, tag, points and priority; shift-click multi-select (one agent per item, extras Queued); while dragging, the modal fades to 35 % and lets the pointer through; rows keep an "Agent in Planning" tag after a drop; Esc, close or an outside click closes it; search and filters are remembered for the session. Pop out moves it to its own window, with native HTML5 drag back to the main window.
 - **Acceptance criteria:**
-  - [ ] Matches artboards 11 and 12.
-  - [ ] Dragging two selected rows onto Planning starts two agents (or queues the second at the cap).
+  - [ ] Matches artboards 11 and 12. (open: close in `backlog-popout-1440x960.png` and `backlog-dragging-1440x960.png`, with deliberate differences D735–D736; sign-off at AL-223. Dragging from the popped-out window to the main window was checked only with synthetic DragEvents; a real mouse drag across two monitors needs a manual try)
+  - [x] Dragging two selected rows onto Planning starts two agents (or queues the second at the cap). (`e2e/backlog-popout.spec.ts` with the repo limit at 1: #71360 runs in Planning, #71362 is Queued, both assigned and Active in the fake org; `use-drop.test.tsx`)
 
 #### AL-240 · Per-lane drop defaults and Alt launch sheet
 - **Design:** TB§3 · **Depends on:** AL-146, AL-236
@@ -1194,7 +1194,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 - **Design:** E14 · **Depends on:** AL-237, AL-238, AL-239, AL-240
 - **Scope:** Playwright against fake ADO and a fake Agent SDK: Failed item → Planning (assign, In Progress, Undo), PR → Code review (no ADO writes), own PR → Implementing, backlog multi-drag, a drop refused by the recheck, and a keyboard-only drop.
 - **Acceptance criteria:**
-  - [ ] All six flows pass in CI.
+  - [ ] All six flows pass in CI. (open: `e2e/team-board-drops.spec.ts` passes 6/6 locally and in the full suite on main; not yet run in CI)
 
 ---
 
@@ -1932,6 +1932,25 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D728 | AL-235: Locked cards (someone else's item, or an agent already on it) stay plain list items, not tab stops; their lock is read out in the list item's label | Nothing to do with them from the keyboard | 2026-10-08 |
 | D729 | AL-235: The keyboard e2e waits one task after Space before pressing an arrow | The keyboard sensor starts listening on a 0 ms timer; without the wait the parallel run was flaky | 2026-10-08 |
 | D730 | AL-235: The Send to lane menu does not pass Alt (no launch sheet from the menu); pointer and keyboard drags do | Follow-up if wanted | 2026-10-08 |
+| D731 | AL-239: `LaneDragCard` gained an optional `group` (one agent per member, launched one after another so main queues the extras), group titles ("Plan these", "Dragging 2 items — drop on Planning or Implementing"), `accessory` and `onClick` props, and a modifier that centres the drag preview on the pointer | Without the modifier, wide rows put the preview off-screen | 2026-10-08 |
+| D732 | AL-239: Alt (the launch sheet) applies only to single-card drops; a group drop skips the sheet | Avoids opening one sheet per row | 2026-10-08 |
+| D733 | AL-239: A backlog row's checkbox is a sibling of the drag handle inside the list item, not nested in it | No interactive control nests in another | 2026-10-08 |
+| D734 | AL-239: The popout is a custom non-modal `role=dialog` layer, not the `packages/ui` Modal: no scrim or focus trap. Escape is a window-level listener, skipped during a drag (Escape cancels the drag) and inside menus or `aria-modal` dialogs | The lanes must stay visible and live under it | 2026-10-08 |
+| D735 | AL-239: The popout starts at max(276 px, 42 % of the window height), not artboard 11's 276 px | The app's header and title are taller than the artboard's, and the lane headers should stay visible | 2026-10-08 |
+| D736 | AL-239: Added a Tag menu and an "In a sprint" switch to the filter row; area and tag choices come from the loaded rows plus the current pick | The ticket asks for them; artboard 11 doesn't draw them | 2026-10-08 |
+| D737 | AL-239: Pop out is a new invoke channel `app:popOutBacklog({team?})` → `{opened}` in the app domain (route `#/backlog`, a `backlogWindow` service, `createBacklogWindowHandlers` in `ipc/handlers.ts`). One popped-out window per team; Pop out again focuses it, and it closes with the main window. Native drag data carries only ids and titles (at most 50 rows) and main rechecks every row before launching | Tokens and ADO calls stay in main; the drag payload is untrusted | 2026-10-08 |
+| D738 | AL-239: Keyboard users in the popped-out window can't drag to the main window's lanes (native drag is pointer-only); the in-page popout has the full keyboard path | Native HTML5 drag has no keyboard equivalent across windows | 2026-10-08 |
+| D739 | AL-239: `SessionManager.start` refuses while disposing (test added) | During quit, stopping sessions freed a slot and the launch queue started a queued agent, so quit hung (found by the e2e) | 2026-10-08 |
+| D740 | AL-239: `shared/api` gained `useBacklog` (infinite query, key `['ado','backlog',team,'pages',filters]`); the e2e fake server gained a `teamItems` option; `e2e/support/team-board-app.ts` sets up a registered repo whose origin points to a local bare repo via `url.<bare>.insteadOf`, plus the claude stand-in, shared by the AL-239, AL-241 and AL-223 specs | One harness for the team board e2e | 2026-10-08 |
+| D741 | AL-239: The e2e backlog uses artboard 08 plus artboard 11 data; where ids collide (#71335 and some generated 714xx rows) the board's items win, so the backlog shows 45 items, not 48 | Fixture overlap | 2026-10-08 |
+| D742 | AL-241: The Undo flow scripts the fake agent (the lead turn matching #71318 calls `set_stage` behind the plan gate), so its first turn doesn't end before Undo is pressed | Undo is only offered until the first turn ends | 2026-10-08 |
+| D743 | AL-241: "No ADO writes" means the fake team org received no request other than GETs and the POSTed WIQL and `workitemsbatch` reads after the drop | Those POSTs are reads | 2026-10-08 |
+| D744 | AL-241: Toasts sit over the board's right-hand columns at 1440 × 960, so the spec dismisses them, or moves the pointer off them and waits, before each drag | A toast under the pointer swallows the drop | 2026-10-08 |
+| D745 | AL-220: The "ship design" area in the scope has no feature slice (it lives in `pages/design-tab`), so it isn't counted as a slice gap | Covered by the design-tab page tests | 2026-10-08 |
+| D746 | AL-223: Artboards 06 and 07 are captured as viewport screenshots at their headings in the gallery build | `gallery.spec.ts`'s element screenshots of these sheets come out clipped (the card-states sheet is blank in its top half) | 2026-10-08 |
+| D747 | AL-223: The comparison uses seeded and fake data, so live-data content (activity lines, progress, needs-you colours, Done count, canvas artboards) differs by design and isn't reported | Not a design difference | 2026-10-08 |
+| D748 | AL-223 (integration): `visual-qa.spec.ts` holds #71318's first turn on the plan gate (as D742) and presses Undo after capturing artboard 10 | Under full-suite load the turn ended before the toast was checked; leaving it mid-turn would make quit ask first and hang the close | 2026-10-08 |
+| D749 | AL-220 (integration): `build-queue.kit.test.ts` checks that the two builds never overlap and the later one waits as Queued at position 1, whichever joins first, with a 120 s timeout | Each build reads its git fingerprint before joining the queue, so the order flipped under load | 2026-10-08 |
 
 ---
 
@@ -1994,6 +2013,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Integrator batch 6 (b51, b52): merged AL-165, AL-236, AL-237, AL-238, AL-240, AL-176 and AL-200 (done) and AL-212 (partial: the entry chunk is 215 kB and input latency is under 5 ms, but GPU-process Present stalls of 250–900 ms pull the average to 29–43 fps on this loaded machine; re-measure on an unloaded one). AL-162 set to done: AL-165's Launch passes the selected skills into the session's first turn. Nothing rejected. b51 merged cleanly; b52 conflicted with AL-172/AL-174 in `pages/gallery/ui/CardStatesSheet.tsx` (Agent and Merge panel samples + AL-176's Composer samples) and with main's team picker in `shared/model/index.ts` (`board-team` + `design-thread-seen` exports), both kept both sides. Lockfile unchanged after `pnpm install`. No integration fixes needed. Decisions D674–D714. `pnpm verify` green (3348 unit tests), e2e 138/138 on the first run. Neither agent could push its branch (Git Credential Manager waiting for an interactive sign-in); both were merged from the local branches. Follow-ups: AL-235 calls `useLaunchFromAdo()(drop, { alt: event.altKey, action })` for drag and keyboard drops, and AL-237's toast appears only once AL-235/AL-239 drop cards (AL-241 covers Undo end to end); manual check against a real org that `System.AssignedTo` accepts the connectionData Account value and Active lands in the team's In Progress column; tighten AL-109's permission policy for `pr-*-review` tickets so the read-only review is enforced; e2e with the fake `claude` binary sending while paused through Launch and Resume (AL-176); persist design-thread last-seen per ticket in UiPrefs if wanted (AL-200); optionally lazy-load NewTicketModal and ConnectionsModal (AL-212); make `build-queue.kit.test.ts` "runs one build at a time…" deterministic (start order flips under load, AL-220). |
 | 2026-10-08 | Integrator batch 7 (b54): merged AL-222 (partial: the golden-path e2e passes locally, about 13 s for the spec and 139/139 for the suite in 3.7 min, but has not yet run in CI because the agent's branch push needed an interactive Git Credential Manager sign-in). Nothing rejected. Merged cleanly; lockfile unchanged after `pnpm install`; no integration fixes. Includes a real fix: branch status is refreshed when a turn ends or the stage changes, so the Merge panel no longer shows a change the agent has since committed. Decisions D715–D719. `pnpm verify` green (293 files, 3353 unit tests); `pnpm e2e` 139/139. Follow-ups: tick AL-222's CI criterion once CI has run on main; CLAUDE.md's command table could note that `pnpm package` builds with `--mode release`, which leaves out the e2e test hooks; AL-224 should keep `--mode release` in any release script it adds. |
 | 2026-10-08 | Integrator batch 8 (b53): merged AL-235 (done). Clean merge; lockfile unchanged after `pnpm install`. Integration fix: BoardPage now passes AL-236's `useLaunchFromAdo()` to `DragToLaneProvider`, so a team board drop starts the agent. Decisions D720–D730. `pnpm verify` green (3382 unit tests), e2e 143/143 (a first run had one failure in `repos.spec.ts` "picking a non-git folder": the folder dialog was not parented because `BrowserWindow.getFocusedWindow()` was null under the parallel run; it passed 3/3 alone and the full rerun was green). |
+| 2026-10-08 | Integrator batch 9 (b55): merged AL-220 (done), AL-239 (partial: artboards 11/12 match closely with deliberate differences D735–D736, sign-off at AL-223; a real mouse drag from the popped-out window to the main window across two monitors needs a manual try), AL-241 (partial: the six flows pass locally and in the full suite, not yet run in CI) and AL-223 (partial: all twelve artboards captured by `e2e/visual-qa.spec.ts` and compared; sign-off is Kyle's). Nothing rejected. Clean merge; lockfile unchanged after `pnpm install`. Integration fixes: `build-queue.kit.test.ts` no longer depends on which build joins the queue first (D749; it failed the first `pnpm verify`); `visual-qa.spec.ts` holds #71318 on the plan gate and undoes the launch after capturing artboard 10 (D748; it failed the first e2e run). Decisions D731–D749. `pnpm verify` green (3437 unit tests), e2e 165/165. The b55 agent could not push its branch (Git Credential Manager sign-in); it was merged from the local branch. Visual QA differences for Kyle to sign off or turn into tickets: 01/08–10 the board header wraps to two rows at 1440 px (Team menu and Settings), moving the lanes down about 70 px, and New agent ticket drops to a second line; 08–10 the lanes and team board don't fit at 960 px tall (artboards are 1360 px), so dragging scrolls the lane tops, drop hints and the "Drop !10571" pill out of view; 08 the team board's Backlog button wraps under the title and shows its count as text (artboard: right-aligned count badge); 08 lock rows say "Assigned to Mia Davies" (artboard and TB§2: initials); 08 PR cards show the first reviewer's avatar while artboard 08 shows the author's (TB§2 says reviewer; design owner to pick); 08 cards ordered by id, not backlog rank (D590); 10 the launch toast sits bottom-right (artboard: top-right under the header) and the dropped card lands below #71322 instead of on top; 04 the "Design system" pill in Attached sits above its row's text (Pill `alignSelf: flex-start` in a row); 02 the Sprint 42 list includes a Closed item (#71250); 06 the card-states sheet has 4 cards per row (artboard 5) and the Status badges block isn't beside the toast; 07 two extra swatches (claude-text, danger); 11/12 see D735–D736. Other follow-ups: in the popped-out backlog the "Agent in …" tag updates only on refetch (agent events go to the main window only); AL-234's "Backlog stays disabled until AL-239" gap is now closed and its artboard 08 criterion can be re-checked at AL-223's sign-off. |
 ---
 
 ## 7. Parallel build rules
