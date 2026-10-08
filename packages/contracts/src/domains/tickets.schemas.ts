@@ -48,6 +48,11 @@ export const TicketAdoRefSchema = z.object({
   orgUrl: z.string().min(1).max(2048),
   project: z.string().min(1).max(256),
   workItemId: z.int().min(1).max(2_147_483_647),
+  /**
+   * The item was in its team board's Failed column (QA or UAT sent it back) when its agent was launched
+   * from it (AL-236): the agent may answer that failure on the work item. Absent otherwise.
+   */
+  fromFailed: z.literal(true).optional(),
 });
 export type TicketAdoRef = z.infer<typeof TicketAdoRefSchema>;
 

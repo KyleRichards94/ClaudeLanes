@@ -411,7 +411,7 @@ export function createServices(options: ServiceOptions): Services {
   const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
-  const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
+  const permissions = createPermissionService({ settings, tickets, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([
     stageExtras,
     mcpSessionExtras({ connections, log: log.child('agent') }),

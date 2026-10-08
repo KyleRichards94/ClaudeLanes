@@ -14,6 +14,7 @@ import { STAGE_SERVER_NAME, STAGE_SERVER_TOOLS, stageSessionExtras } from '../st
 import { createStageService } from '../stages/stage-service';
 import { createFakeClaude, fakeInit } from '../testing/fake-claude';
 import { fakeClaudeConnections, memoryTickets, recordingEmit } from '../testing/sessions';
+import { WORK_ITEM_COMMENT_RULE } from '../permissions/policy';
 import { ADO_MCP_ALLOWED_TOOLS, mcpSessionExtras } from './session-mcp';
 
 /** Made up for these tests; shaped like real tokens, valid nowhere. */
@@ -90,11 +91,16 @@ describe('MCP servers injected into each session (AL-108)', () => {
     });
     expect(servers['github']).toMatchObject({ env: { GITHUB_PERSONAL_ACCESS_TOKEN: MCP_TOKEN } });
     expect(call.options.allowedTools).toEqual([...STAGE_SERVER_TOOLS, ...ADO_MCP_ALLOWED_TOOLS]);
+    // Reading is pre-approved; commenting is not: the permission policy lets only QA failure reports and answers through.
+    expect(ADO_MCP_ALLOWED_TOOLS).toEqual(['mcp__azure-devops__wit_get_work_item', 'mcp__azure-devops__wit_list_work_item_comments']);
 
     // The first turn tells the agent where its work item is and which server reads and comments on it.
     const first = (call.sent[0] as SDKUserMessage).message.content as string;
     expect(first).toContain('#71273');
     expect(first).toContain('`azure-devops` MCP server');
+    expect(first).not.toContain('add comments');
+    expect(first).toContain(WORK_ITEM_COMMENT_RULE);
+    expect(call.options.systemPrompt).toMatchObject({ append: expect.stringContaining(WORK_ITEM_COMMENT_RULE) });
     await sessions.dispose();
   });
 

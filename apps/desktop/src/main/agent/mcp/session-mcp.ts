@@ -1,6 +1,7 @@
 import type { TicketAdoRef, TicketRecord } from '@agent-lanes/contracts';
 import { ADO_SESSION_SERVER_NAME, type ConnectionsService } from '../../connections';
 import type { Logger } from '../../logging';
+import { WORK_ITEM_COMMENT_RULE } from '../permissions/policy';
 import type { SessionExtras } from '../session-manager';
 
 /**
@@ -11,12 +12,11 @@ import type { SessionExtras } from '../session-manager';
 
 /**
  * Tools of the Azure DevOps server the agent may use without asking: reading its work item and its
- * comments, and adding a comment. Anything else the server offers goes through the permission
- * policy (AL-109).
+ * comments. Adding a comment is not one of them: the permission policy (AL-109) lets through only a
+ * QA failure report or an answer to one and refuses the rest. Anything else the server offers goes
+ * through the permission policy too.
  */
-export const ADO_MCP_ALLOWED_TOOLS = ['wit_get_work_item', 'wit_list_work_item_comments', 'wit_add_work_item_comment'].map(
-  (tool) => `mcp__${ADO_SESSION_SERVER_NAME}__${tool}`,
-);
+export const ADO_MCP_ALLOWED_TOOLS = ['wit_get_work_item', 'wit_list_work_item_comments'].map((tool) => `mcp__${ADO_SESSION_SERVER_NAME}__${tool}`);
 
 /** `https://dev.azure.com/Contoso/` and `https://dev.azure.com/contoso` name the same organisation. */
 function sameOrg(a: string, b: string): boolean {
@@ -28,9 +28,13 @@ function sameOrg(a: string, b: string): boolean {
 export function workItemMcpHint(ado: TicketAdoRef): string {
   return [
     `Your work item is #${ado.workItemId} in the Azure DevOps project "${ado.project}" (${ado.orgUrl}).`,
-    `Read it, its comments and add comments through the \`${ADO_SESSION_SERVER_NAME}\` MCP server; it is signed in as the user.`,
+    `Read it and its comments through the \`${ADO_SESSION_SERVER_NAME}\` MCP server; it is signed in as the user.`,
+    WORK_ITEM_COMMENT_RULE,
   ].join(' ');
 }
+
+/** The comment rule in the system prompt, so a resumed session (which gets no first turn) keeps it. */
+export const WORK_ITEM_COMMENT_PROMPT = `Azure DevOps work item comments: ${WORK_ITEM_COMMENT_RULE}`;
 
 export interface McpSessionExtrasOptions {
   connections: Pick<ConnectionsService, 'list' | 'sessionMcpServers'>;
@@ -50,6 +54,7 @@ export function mcpSessionExtras(options: McpSessionExtrasOptions): (record: Tic
     return {
       mcpServers: servers,
       allowedTools: hasAdo ? ADO_MCP_ALLOWED_TOOLS : [],
+      ...(hasAdo ? { systemPromptAppend: WORK_ITEM_COMMENT_PROMPT } : {}),
       firstTurnAppendix: hasAdo ? [workItemMcpHint(ado)] : [],
     };
   };

@@ -292,7 +292,12 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     const branch = fresh.card.kind === 'board-item' ? fresh.card.branch : null;
     return {
       ...common,
-      subject: { kind: 'work-item', ado: { orgUrl, project: fresh.project, workItemId }, title: fresh.title },
+      subject: {
+        kind: 'work-item',
+        // An item QA or UAT sent back may have its failure answered on the work item (the comment gate).
+        ado: { orgUrl, project: fresh.project, workItemId, ...(fresh.card.kind === 'board-item' && fresh.card.column === 'failed' ? { fromFailed: true as const } : {}) },
+        title: fresh.title,
+      },
       ...(action.worktree === 'item-branch' && branch ? { checkout: { branch } } : {}),
     };
   }

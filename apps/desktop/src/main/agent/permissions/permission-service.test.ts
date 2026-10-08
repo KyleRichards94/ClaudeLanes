@@ -148,3 +148,66 @@ describe('permission policy for headless sessions (AL-109)', () => {
     expect(extras.allowedTools).toEqual(['Bash(npm run lint:*)']);
   });
 });
+
+describe('work item comments: only QA failure reports and answers', () => {
+  const COMMENT_TOOL = 'mcp__azure-devops__wit_add_work_item_comment';
+
+  async function gated(stages: Array<'queued' | 'planning' | 'implementing' | 'code-review' | 'qa'>) {
+    const tickets = await memoryTickets({ id: '71273' });
+    for (const stage of stages) await tickets.update('71273', (record) => ({ ...record, stage }));
+    const events = recordingEmit();
+    const system: string[] = [];
+    const permissions = createPermissionService({
+      settings: { get: () => defaultSettings() },
+      tickets,
+      buildCommands: { forRepo: async () => ({ ok: true, data: dotnet }) },
+      emit: events.emit,
+      transcripts: { appendSystem: (_ticketId: string, text: string) => void system.push(text) } as never,
+    });
+    const extras = await permissions.sessionExtras((await tickets.get('71273'))!);
+    return { permissions, extras, events, system };
+  }
+
+  function hookOf(extras: Awaited<ReturnType<typeof gated>>['extras']) {
+    const matcher = extras.hooks?.PreToolUse?.[0];
+    if (!matcher) throw new Error('no PreToolUse hook');
+    expect(new RegExp(matcher.matcher!).test(COMMENT_TOOL)).toBe(true);
+    return (tool: string, input: Record<string, unknown>) =>
+      matcher.hooks[0]!({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, tool_use_id: 'toolu_9' } as never, 'toolu_9', { signal: new AbortController().signal });
+  }
+
+  it('denies any other comment in canUseTool with a message the agent reads, without a Needs-you prompt', async () => {
+    const { permissions, events, system } = await gated(['planning', 'implementing']);
+    const answer = await permissions.canUseTool('71273')(COMMENT_TOOL, { workItemId: 71273, comment: 'Agent Lanes · Implementing — plan approved by Kyle' }, context());
+    expect(answer).toMatchObject({ behavior: 'deny', message: expect.stringMatching(/^Agent Lanes only allows work item comments that report or answer a QA failure/) });
+    expect(events.of('agent:permission')).toEqual([]);
+    expect(permissions.pending('71273')).toBeNull();
+    expect(system).toEqual([expect.stringContaining('refused a work item comment')]);
+  });
+
+  it('lets a "QA failed" report through in QA, and a "QA fail answer" after QA sent the ticket back', async () => {
+    const inQa = await gated(['planning', 'implementing', 'code-review', 'qa']);
+    await expect(inQa.permissions.canUseTool('71273')(COMMENT_TOOL, { comment: '## QA failed\n- AC 2: evidence' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+
+    const bounced = await gated(['planning', 'implementing', 'code-review', 'qa', 'implementing']);
+    await expect(bounced.permissions.canUseTool('71273')(COMMENT_TOOL, { comment: 'QA fail answer: AC 2 fixed' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    await expect(bounced.permissions.canUseTool('71273')(COMMENT_TOOL, { comment: 'QA failed: again' }, context())).resolves.toMatchObject({ behavior: 'deny' });
+    expect(bounced.events.of('agent:permission')).toEqual([]);
+  });
+
+  it('enforces the same rule in a PreToolUse hook, so no permission mode or classifier lets a comment past it', async () => {
+    const { extras } = await gated(['planning', 'implementing', 'code-review', 'qa']);
+    const hook = hookOf(extras);
+    await expect(hook(COMMENT_TOOL, { comment: 'Started QA' })).resolves.toEqual({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: expect.stringMatching(/^Agent Lanes only allows/) },
+    });
+    await expect(hook(COMMENT_TOOL, { comment: 'QA failed\nAC 1: the total is 0.01 out' })).resolves.toMatchObject({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'allow' },
+    });
+    // A work item update that writes the discussion is a comment too; other MCP calls are left to the mode.
+    await expect(
+      hook('mcp__azure-devops__wit_update_work_item', { id: 71273, updates: [{ op: 'add', path: '/fields/System.History', value: 'Moved to QA' }] }),
+    ).resolves.toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } });
+    await expect(hook('mcp__azure-devops__wit_get_work_item', { id: 71273 })).resolves.toEqual({});
+  });
+});
