@@ -157,14 +157,12 @@ function DropsSection({ draft, errors, dispatch }: SectionProps) {
         const label = `${DROP_KIND_LABELS[kind].lane} · ${DROP_KIND_LABELS[kind].what}`;
         return (
           <View key={kind} style={styles.gates} testID={`settings-drop-${kind}`}>
-            <Text variant="title" size="md" role="heading" aria-level={3}>
-              {label}
-            </Text>
             <TextField
-              label={`${label}: skills`}
+              label={label}
               value={row.skills}
               onChangeText={(skills) => dispatch({ type: 'drop', kind, change: { skills } })}
               placeholder="No skills"
+              help="Skills, in the order they run; then the model and effort."
               error={errors[dropErrorKey(kind)]}
               testID={`settings-drop-${kind}-skills`}
             />
