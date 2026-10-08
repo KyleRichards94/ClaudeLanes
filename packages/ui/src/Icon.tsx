@@ -14,9 +14,11 @@ import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import ExternalLink from 'lucide-react-native/icons/external-link';
 import GitBranch from 'lucide-react-native/icons/git-branch';
 import GitMerge from 'lucide-react-native/icons/git-merge';
+import GripVertical from 'lucide-react-native/icons/grip-vertical';
 import Hammer from 'lucide-react-native/icons/hammer';
 import Info from 'lucide-react-native/icons/info';
 import Link from 'lucide-react-native/icons/link';
+import List from 'lucide-react-native/icons/list';
 import Lock from 'lucide-react-native/icons/lock';
 import Pause from 'lucide-react-native/icons/pause';
 import Play from 'lucide-react-native/icons/play';
@@ -64,6 +66,9 @@ const glyphs = {
   /** Info and warning toasts (AL-030); error toasts use `alert`, as on artboard 6. */
   info: { component: Info },
   warning: { component: TriangleAlert },
+  /** The team board's drag handle and Backlog button (AL-234, artboard 08). */
+  grip: { component: GripVertical },
+  backlog: { component: List },
 } as const satisfies Record<string, Glyph>;
 
 export type IconName = keyof typeof glyphs;

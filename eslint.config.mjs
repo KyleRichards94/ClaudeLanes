@@ -5,15 +5,16 @@ import tseslint from 'typescript-eslint';
 
 /**
  * Feature-Sliced Design layer direction (design §5): a layer may import only the layers below it.
+ * `widgets` (TB§6: the team board, the backlog popout) sits between pages and features.
  * Steiger (`pnpm lint:fsd`) checks the FSD semantics; these rules keep the direction honest in ESLint.
  */
-const layers = ['app', 'processes', 'pages', 'features', 'entities', 'shared'];
+const layers = ['app', 'processes', 'pages', 'widgets', 'features', 'entities', 'shared'];
 
 function forbidUpperLayers(layer) {
   const index = layers.indexOf(layer);
   const above = layers.slice(0, index);
   // Slices on the same layer must not import each other either (shared has no slices).
-  const sameLayer = ['pages', 'features', 'entities', 'processes'].includes(layer) ? [layer] : [];
+  const sameLayer = ['pages', 'widgets', 'features', 'entities', 'processes'].includes(layer) ? [layer] : [];
   return [...above, ...sameLayer].map((name) => ({
     group: [`@/${name}`, `@/${name}/**`],
     message: `${layer} may not import from ${name} (FSD layer rule, design §5). Use relative imports inside a slice.`,
@@ -41,7 +42,7 @@ const rawTextRules = [
 
 const deepSliceImport = {
   // The matcher has no brace expansion, so one glob per sliced layer.
-  group: ['processes', 'pages', 'features', 'entities'].map((name) => `@/${name}/*/**`),
+  group: ['processes', 'pages', 'widgets', 'features', 'entities'].map((name) => `@/${name}/*/**`),
   message: "Import a slice through its public API (its index.ts), not its internals.",
 };
 

@@ -4,6 +4,7 @@ import { Button, Text } from '@agent-lanes/ui';
 import { routes, useNavigation } from '@/shared/routing';
 import { CardStatesSheet } from './CardStatesSheet';
 import { PrimitivesSheet } from './PrimitivesSheet';
+import { TeamBoardSheet } from './TeamBoardSheet';
 import { TokensSheet } from './TokensSheet';
 
 /**
@@ -32,6 +33,7 @@ export function GalleryPage() {
       </View>
       <TokensSheet />
       <CardStatesSheet />
+      <TeamBoardSheet />
       <PrimitivesSheet />
     </ScrollView>
   );
