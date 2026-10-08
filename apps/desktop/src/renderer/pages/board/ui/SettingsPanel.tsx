@@ -347,7 +347,7 @@ function RepoFields({ repo, draft, errors, dispatch, onForget }: SectionProps & 
         testID="settings-repo-max-agents"
       />
       <Switch
-        label="Post stage comments to Azure DevOps"
+        label="Post a comment to the work item on each stage change"
         value={values.adoWriteBack}
         stateText={{ on: 'On', off: 'Off' }}
         onValueChange={(value) => dispatch({ type: 'repoWriteBack', repo, value })}

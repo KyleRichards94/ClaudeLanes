@@ -126,12 +126,12 @@ describe('SettingsPanel', () => {
     type('settings-repo-worktree-root', 'D:\\worktrees');
     type('settings-repo-run-command', 'dotnet run --project OnSite.Web');
     type('settings-repo-max-agents', '2');
-    fireEvent.click(screen.getByRole('switch', { name: 'Post stage comments to Azure DevOps On' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Post a comment to the work item on each stage change Off' }));
 
     fireEvent.click(save());
     await waitFor(() => expect(fake.updates).toHaveLength(1));
     expect(fake.settings.repos).toEqual([
-      { ...osc, baseBranch: 'develop', worktreeRoot: 'D:\\worktrees', runCommand: 'dotnet run --project OnSite.Web', maxConcurrentAgents: 2, adoWriteBack: false },
+      { ...osc, baseBranch: 'develop', worktreeRoot: 'D:\\worktrees', runCommand: 'dotnet run --project OnSite.Web', maxConcurrentAgents: 2, adoWriteBack: true },
       lanes,
     ]);
   });
@@ -185,7 +185,7 @@ describe('SettingsPanel', () => {
       'repo.buildCommand': 'Build command',
       'repo.runCommand': 'Run command',
       'repo.maxConcurrentAgents': 'Agents at once',
-      'repo.adoWriteBack': 'Post stage comments to Azure DevOps',
+      'repo.adoWriteBack': 'Post a comment to the work item on each stage change',
     };
     const stored = [
       ...Object.keys(SettingsSchema.shape).filter((key) => key !== 'defaults'),

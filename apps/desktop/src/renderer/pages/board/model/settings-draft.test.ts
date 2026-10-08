@@ -53,12 +53,12 @@ describe('settings draft', () => {
       { type: 'repoText', repo: osc, field: 'buildCommand', value: '  dotnet build OnSite.sln -c Release ' },
       { type: 'repoText', repo: osc, field: 'baseBranch', value: 'develop' },
       { type: 'repoText', repo: osc, field: 'maxConcurrentAgents', value: '5' },
-      { type: 'repoWriteBack', repo: osc, value: false },
+      { type: 'repoWriteBack', repo: osc, value: true },
       { type: 'repoText', repo: lanes, field: 'runCommand', value: '   ' },
     );
     expect(draftToPatch(draft, settings())).toEqual({
       repos: [
-        { ...osc, baseBranch: 'develop', buildCommand: 'dotnet build OnSite.sln -c Release', maxConcurrentAgents: 5, adoWriteBack: false },
+        { ...osc, baseBranch: 'develop', buildCommand: 'dotnet build OnSite.sln -c Release', maxConcurrentAgents: 5, adoWriteBack: true },
         lanes,
       ],
     });
