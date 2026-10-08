@@ -33,6 +33,7 @@ import { createElectronRepoDialogs, createRepoRegistry, type RepoRegistry } from
 import { SECRETS_FILE_NAME, createSecretStore, type SafeStorageLike, type SecretStore } from './secrets';
 import { createElectronSettingsFile } from './settings/electron-settings-file';
 import { createSettingsService, type SettingsService } from './settings/service';
+import { createSkillDiscovery, type SkillDiscovery } from './skills/skill-discovery';
 import { createTicketRecordStore, ticketsRootDir, type TicketRecordStore } from './tickets';
 import { createTicketWorktreeService, type TicketWorktreeService } from './worktrees';
 import { createBranchStatusService, type BranchStatusService } from './worktrees/branch-status';
@@ -93,6 +94,8 @@ export interface Services {
   readonly worktrees: TicketWorktreeService;
   /** One Claude Agent SDK session per ticket, in its worktree (AL-100). Main-only: holds the session processes. */
   readonly sessions: SessionManager;
+  /** Each registered repo's skills from a short Claude Code session, cached per repo (`skills:list`, AL-114). */
+  readonly skills: SkillDiscovery;
   /** Each ticket's normalised output (`agent:output`) and the buffer `agent:getTranscript` backfills from (AL-102). */
   readonly transcripts: TranscriptService;
   /** Moves tickets between lanes for the agent's `set_stage` and reports its activity (AL-103). */
@@ -253,6 +256,7 @@ export function createServices(options: ServiceOptions): Services {
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
+  const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
 
   return {
     appDataDir: options.appDataDir,
@@ -279,6 +283,7 @@ export function createServices(options: ServiceOptions): Services {
     transcripts,
     stages,
     usage,
+    skills,
     branches,
     mergeToMain,
     ticketArchive,

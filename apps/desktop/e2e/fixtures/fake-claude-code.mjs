@@ -6,7 +6,8 @@
 //     "apiKeys": ["keys this fake accepts"],
 //     "log": "path of a JSON-lines file to record each start in",
 //     "design": { "artboards": [{ id, name, width, height }] } (AL-195: Claude Design access and what a
-//       design session answers) }
+//       design session answers),
+//     "commands": [{ name, description, argumentHint, builtin? }] (AL-114: what supportedCommands() lists) }
 //
 // The log says whether an API key arrived and whether it was accepted, never the key itself.
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -114,7 +115,7 @@ lines.on('line', (line) => {
   if (message.type === 'control_request') {
     const response =
       message.request?.subtype === 'initialize'
-        ? { commands: [], agents: [], output_style: 'default', available_output_styles: ['default'], models: [], account: account() }
+        ? { commands: state.commands ?? [], agents: [], output_style: 'default', available_output_styles: ['default'], models: [], account: account() }
         : {};
     send({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response } });
   } else if (message.type === 'user') {
