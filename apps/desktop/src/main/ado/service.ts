@@ -97,10 +97,15 @@ export interface AdoServiceOptions {
   onUnauthorized?: (connectionId: string) => void;
   /** The Azure Repos remotes of the repos registered in Agent Lanes (AL-232). Default: none. */
   registeredRemotes?: () => Promise<AdoGitRemote[]>;
+  /** Clock for the resolved-team cache. Defaults to `Date.now`. */
+  now?: () => number;
 }
 
 /** Why there is no client for an organisation, in `Err.details.reason`. */
 export type AdoUnavailableReason = 'not-connected' | 'reconnect';
+
+/** How long a team resolved for a request without one is reused, per organisation and project. */
+export const RESOLVED_TEAM_TTL_MS = 5 * 60_000;
 
 interface CachedClient {
   /** The organisation URL and a hash of the PAT the client was built with; a replaced token changes it. */
@@ -108,9 +113,16 @@ interface CachedClient {
   client: AdoClient;
 }
 
+interface ResolvedTeam {
+  teamId: string;
+  expiresAt: number;
+}
+
 export function createAdoService(options: AdoServiceOptions): AdoService {
   const { connections, settings } = options;
   const clients = new Map<string, CachedClient>();
+  const resolvedTeams = new Map<string, ResolvedTeam>();
+  const now = options.now ?? Date.now;
 
   function logEntry(entry: AdoLogEntry): void {
     options.log?.log(entry.level, entry.message, { status: entry.status, attempt: entry.attempt, durationMs: entry.durationMs });
@@ -173,7 +185,7 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
   /** Runs `call` with the organisation's client and, when `needsProject`, the project (the request's or the default). */
   async function withClient<T>(
     request: { org?: string | undefined; project?: string | undefined },
-    call: (client: AdoClient, project: string) => Promise<Result<T>>,
+    call: (client: AdoClient, project: string, connection: AdoConnectionSummary) => Promise<Result<T>>,
     needsProject = true,
   ): Promise<Result<T>> {
     try {
@@ -188,10 +200,48 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
       }
       const client = await clientForConnection(connection.data);
       if (!client.ok) return client;
-      return await call(client.data, project ?? '');
+      return await call(client.data, project ?? '', connection.data);
     } catch (cause) {
       return err('INTERNAL', `Azure DevOps request failed unexpectedly: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
+  }
+
+  /**
+   * The team a team-scoped request reads: the request's own, else the user's default team in the
+   * project (`listMyTeams`: the project's default team when the user is in it, else their first
+   * team), kept for {@link RESOLVED_TEAM_TTL_MS} per organisation and project. Azure DevOps Server
+   * answers the project-level team settings routes with 404, so a request never goes without a team.
+   */
+  async function teamFor(client: AdoClient, connection: AdoConnectionSummary, project: string, team: string | undefined): Promise<Result<string>> {
+    if (team !== undefined) return ok(team);
+    const key = `${connection.id}\n${client.orgUrl}\n${project.trim().toLowerCase()}`;
+    const cached = resolvedTeams.get(key);
+    if (cached && cached.expiresAt > now()) return ok(cached.teamId);
+
+    const mine = await listMyTeams(client, project);
+    if (!mine.ok) return mine;
+    const teamId = mine.data.defaultTeamId ?? mine.data.teams[0]?.id;
+    if (teamId === undefined) {
+      resolvedTeams.delete(key);
+      return err('VALIDATION', `No Azure DevOps team found for you in ${project}. Pick a team from the Team menu.`, {
+        org: connection.id,
+        project,
+        reason: 'no-team',
+      });
+    }
+    resolvedTeams.set(key, { teamId, expiresAt: now() + RESOLVED_TEAM_TTL_MS });
+    return ok(teamId);
+  }
+
+  /** {@link withClient} for a team-scoped request: `call` gets the request's team or the resolved one. */
+  function withTeam<T>(
+    request: { org?: string | undefined; project?: string | undefined; team?: string | undefined },
+    call: (client: AdoClient, project: string, team: string) => Promise<Result<T>>,
+  ): Promise<Result<T>> {
+    return withClient(request, async (client, project, connection) => {
+      const team = await teamFor(client, connection, project, request.team);
+      return team.ok ? call(client, project, team.data) : team;
+    });
   }
 
   const writeBack = createWorkItemWriteBack({ clientFor: (org) => clientFor(org), settings });
@@ -200,8 +250,7 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
     clientFor,
     writeBack,
 
-    listSprints: (request) =>
-      withClient(request, (client, project) => listSprints(client, { project, ...(request.team === undefined ? {} : { team: request.team }) })),
+    listSprints: (request) => withTeam(request, (client, project, team) => listSprints(client, { project, team })),
 
     listWorkItems: (request) =>
       withClient(request, (client, project) => listSprintWorkItems(client, { project, iterationPath: request.iterationPath })),
@@ -222,20 +271,20 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
       withClient({ org, project }, (client) => getPullRequestSnapshot(client, { project, repository, pullRequestId })),
 
     activePrs: (request) =>
-      withClient(request, async (client, project) => {
+      withTeam(request, async (client, project, team) => {
         const remotes = (await options.registeredRemotes?.().catch(() => [])) ?? [];
         return listActivePullRequests(client, {
           project,
-          ...(request.team === undefined ? {} : { team: request.team }),
+          team,
           isRegistered: (repository) => isRegisteredRepository(remotes, client.orgUrl, repository),
         });
       }),
 
     backlog: (request) =>
-      withClient(request, (client, project) =>
+      withTeam(request, (client, project, team) =>
         getBacklog(client, {
           project,
-          ...(request.team === undefined ? {} : { team: request.team }),
+          team,
           ...(request.filters === undefined ? {} : { filters: request.filters }),
           ...(request.page === undefined ? {} : { page: request.page }),
         }),
@@ -244,8 +293,8 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
     listTeams: (request) => withClient(request, (client, project) => listMyTeams(client, project)),
 
     teamBoard: (request) =>
-      withClient(request, (client, project) =>
-        getTeamBoard(client, { project, ...(request.team === undefined ? {} : { team: request.team }), ...(request.sprint === undefined ? {} : { sprint: request.sprint }) }),
+      withTeam(request, (client, project, team) =>
+        getTeamBoard(client, { project, team, ...(request.sprint === undefined ? {} : { sprint: request.sprint }) }),
       ),
   };
 }

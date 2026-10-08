@@ -88,6 +88,11 @@ export const UiPrefsSchema = z.object({
   lastRepo: z.string().min(1).nullable(),
   /** ADO iteration id of the sprint the board last showed. */
   lastSprint: z.string().min(1).nullable(),
+  /**
+   * ADO team id the board's Team menu last showed; null follows the user's default team. Settings
+   * saved before it load it as null (the loader fills a missing field in from `defaultUiPrefs`).
+   */
+  lastTeam: z.string().min(1).nullable(),
   collapsedLanes: z.array(LaneSchema).refine(unique, 'Each lane can be listed once'),
   /** Claude Design embed mode per agent ticket id; tickets not listed use the webview (AL-194). */
   embedModeByTicket: z.record(z.string().min(1), EmbedModeSchema),
@@ -163,7 +168,7 @@ export function defaultAgentDefaults(): AgentDefaults {
 
 /** Done starts collapsed into its vertical strip (artboard 1). */
 export function defaultUiPrefs(): UiPrefs {
-  return { lastRepo: null, lastSprint: null, collapsedLanes: ['done'], embedModeByTicket: {} };
+  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {} };
 }
 
 /** Fresh profile: no repos yet (AL-047 asks for one). */

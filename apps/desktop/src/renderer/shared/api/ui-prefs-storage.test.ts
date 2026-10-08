@@ -6,6 +6,7 @@ import { createUiPrefsStorage } from './ui-prefs-storage';
 const prefs: UiPrefs = {
   lastRepo: 'C:/src/onsite-companion',
   lastSprint: 'sprint-42',
+  lastTeam: 'team-osc',
   collapsedLanes: ['qa', 'done'],
   embedModeByTicket: { '71273': 'mcp-link' },
 };
