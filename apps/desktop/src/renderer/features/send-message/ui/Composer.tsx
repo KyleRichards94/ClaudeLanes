@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View, type KeyDownEvent, type StyleProp, type ViewStyle } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, minTarget, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text, TextField } from '@agent-lanes/ui';
 import { useApplyModelNow } from '@/entities/agent-ticket';
 import { useSessionStatus } from '@/shared/api';
@@ -221,12 +221,17 @@ function Chip({ label, onPress, disabled = false, checked, accessibilityLabel, t
       aria-disabled={disabled}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, checked && styles.chipOn, disabled && styles.chipDisabled, pressed && styles.chipPressed]}
+      // The target is 44 px tall (AL-033); the chip drawn inside it is 34 px, as on the artboard.
+      style={styles.chipTarget}
       testID={testID}
     >
-      <Text variant="mono" size="sm" color={checked ? tone.claude.text : color.ink}>
-        {label}
-      </Text>
+      {({ pressed }) => (
+        <View style={[styles.chip, checked && styles.chipOn, disabled && styles.chipDisabled, pressed && styles.chipPressed]}>
+          <Text variant="mono" size="sm" color={checked ? tone.claude.text : color.ink}>
+            {label}
+          </Text>
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -249,6 +254,11 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flexGrow: 1,
+  },
+  chipTarget: {
+    minHeight: minTarget,
+    justifyContent: 'center',
+    borderRadius: radius.chip,
   },
   chip: {
     minHeight: 34,
