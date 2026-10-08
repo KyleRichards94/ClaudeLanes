@@ -59,6 +59,8 @@ export interface SessionManager {
   /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. */
   stop(ticketId: string): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
+  /** Tickets whose agent is starting or in a turn (not idle or paused): quitting now would cut them off (AL-213). */
+  midTurn(): string[];
   /** Every message of every session, tagged with its ticket. Returns an unsubscribe function. */
   subscribe(listener: SessionMessageListener): () => void;
   /** Stops every session (app quit, AL-213). */
@@ -136,6 +138,8 @@ export const CLAUDE_KEY_UNREADABLE_MESSAGE = "The saved Claude API key can't be 
 export const RESUME_MESSAGE = 'Continue where you left off.';
 
 const LIVE_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
+/** A turn is under way: closing the app now would cut the agent off (AL-213). */
+const MID_TURN_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running']);
 
 /** The SDK options for a ticket's session (AL-100 scope); `env` and the binary come from the launcher. */
 export function sessionOptions(record: TicketRecord, abortController: AbortController, extras: SessionExtras = {}): Omit<Options, 'pathToClaudeCodeExecutable' | 'env'> {
@@ -432,6 +436,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     },
 
     status: (ticketId) => statusOf(ticketId, sessions.get(ticketId)),
+
+    midTurn: () => [...sessions.values()].filter((session) => MID_TURN_STATES.has(session.state)).map((session) => session.ticketId),
 
     subscribe(listener) {
       listeners.add(listener);

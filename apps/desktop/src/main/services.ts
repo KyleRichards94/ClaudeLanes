@@ -283,11 +283,12 @@ export function createServices(options: ServiceOptions): Services {
   };
 }
 
-/** Stops child processes and flushes state on quit (AL-213 fills this in). */
+/** Stops every child process the app started and flushes state on quit (AL-213, design §10). */
 export async function disposeServices(services: Services): Promise<void> {
-  void services;
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
+  services.claude.closeAll();
   services.transcripts.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
