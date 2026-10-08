@@ -142,3 +142,22 @@ test('shows the live dock at the bottom, fed by events from main', async () => {
   }, START + 100);
   await expect(page.getByTestId('live-dock-builds')).toHaveText('Builds 1');
 });
+
+test('the header shows live counts, the legend and the Repo menu (AL-142)', async () => {
+  const page = await launch();
+  const header = page.getByTestId('board-header');
+  await expect(header.getByText('6 running')).toBeVisible();
+  await expect(header.getByText('0 need you')).toBeVisible();
+  await expect(header.getByText('1 queued')).toBeVisible();
+  await expect(page.getByTestId('board-subheader')).toHaveText(/7 agent tickets$/);
+  await expect(page.getByTestId('board-legend')).toContainText('Azure DevOps');
+  await expect(page.getByTestId('board-count-needs-you')).toBeDisabled();
+
+  // No event sets a needs-you reason yet (AL-104, AL-109), so the filter itself is covered by BoardPage.test.
+  await expect(page.getByRole('button', { name: 'Repo: Add a repo' })).toBeVisible();
+  await page.getByRole('button', { name: 'Repo: Add a repo' }).click();
+  await expect(page.getByRole('menu', { name: 'Repo' }).getByRole('menuitem', { name: 'Add repo…' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await page.getByTestId('board-header').screenshot({ path: test.info().outputPath('board-header.png') });
+});

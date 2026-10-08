@@ -33,6 +33,8 @@ export const adoKeys = {
   search: (query: string, scope: AdoScope = {}) => ['ado', 'search', query, scope] as const,
   /** `['ado', 'workItem', id]` (design §6), so a merge can invalidate one work item. */
   workItem: (id: number, org?: AdoOrgId) => (org ? (['ado', 'workItem', id, org] as const) : (['ado', 'workItem', id] as const)),
+  /** Under the work item's key, so invalidating a work item refreshes its discussion too (AL-180). */
+  comments: (id: number, project: string) => ['ado', 'workItem', id, 'comments', project] as const,
   pullRequest: (ref: PullRequestRef, org?: AdoOrgId) =>
     ['ado', 'pullRequest', ref.project, ref.repository, ref.pullRequestId, ...(org ? [org] : [])] as const,
 };
@@ -92,6 +94,16 @@ export function useWorkItem(id: number | null | undefined, org?: AdoOrgId, optio
   return useQuery({
     queryKey: adoKeys.workItem(id ?? 0, org),
     queryFn: async () => unwrap(await invoke('ado:getWorkItem', { id: id ?? 0, ...(org ? { org } : {}) })),
+    enabled: typeof id === 'number' && id > 0,
+    ...refetchPolicy(options),
+  });
+}
+
+/** A work item's discussion, oldest first, for the ADO tab (AL-180). Idle without an id. */
+export function useWorkItemComments(id: number | null | undefined, project: string, options: AdoQueryOptions = {}) {
+  return useQuery({
+    queryKey: adoKeys.comments(id ?? 0, project),
+    queryFn: async () => unwrap(await invoke('ado:getComments', { workItemId: id ?? 0, project })),
     enabled: typeof id === 'number' && id > 0,
     ...refetchPolicy(options),
   });

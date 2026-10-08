@@ -35,6 +35,7 @@ export {
   usePullRequest,
   useSprints,
   useWorkItem,
+  useWorkItemComments,
   useWorkItemSearch,
   useWorkItems,
   windowVisibilityEventHandlers,
