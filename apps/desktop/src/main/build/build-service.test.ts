@@ -180,6 +180,22 @@ describe('build service', () => {
     expect(stored.lastBuild!.finishedAt).toBeGreaterThan(stored.lastBuild!.startedAt);
   });
 
+  it('hands every finished build to onFinished, so the agent gets it as context (AL-112)', async () => {
+    const child = fakeProcess();
+    const onFinished = vi.fn(() => {
+      throw new Error('session gone');
+    });
+    const builds = service({ startCommand: child.start, onFinished });
+    const pending = builds.build('71273');
+    await vi.waitFor(() => expect(child.started).toHaveLength(1));
+    child.print('Startup.cs(9,9): error CS1002: ; expected [OnSite.csproj]');
+    child.exit(1);
+
+    // A failing hook never fails the build.
+    await expect(pending).resolves.toMatchObject({ ok: false, code: 'BUILD_FAILED' });
+    expect(onFinished).toHaveBeenCalledWith(expect.objectContaining({ ticketId: '71273', outcome: 'failed', errors: 1 }));
+  });
+
   it('kills the process when the job is cancelled and reports it cancelled', async () => {
     const child = fakeProcess();
     const builds = service({ startCommand: child.start });

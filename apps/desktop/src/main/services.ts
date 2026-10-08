@@ -11,6 +11,7 @@ import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from 
 import { createPermissionService, type PermissionService } from './agent/permissions';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
+import { createBuildContext } from './agent/build-context';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -183,6 +184,8 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     fingerprint: createGitFingerprint(git),
     warn: (message) => log.child('build').warn(message),
+    // The ticket's live session gets the result with its next turn (AL-112); `buildContext` is created below.
+    onFinished: (result) => buildContext.onBuildFinished(result),
   });
   const runs = createRunService({
     tickets,
@@ -292,6 +295,7 @@ export function createServices(options: ServiceOptions): Services {
   const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') }), permissions.sessionExtras]);
   const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
+  const buildContext = createBuildContext({ sessions, log: log.child('agent') });
 
   return {
     appDataDir: options.appDataDir,
