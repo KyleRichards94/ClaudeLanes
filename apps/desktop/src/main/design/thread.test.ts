@@ -58,6 +58,9 @@ function interactiveClaude(respond: Responder, tools: string[] = ['ClaudeDesign'
       applyFlagSettings: async () => undefined,
       mcpServerStatus: async () => [],
       reconnectMcpServer: async () => undefined,
+      // AL-113 / AL-114: the design thread never reads these, the type only needs them present.
+      supportedCommands: async () => [],
+      getContextUsage: async () => ({}) as Awaited<ReturnType<ClaudeQuery['getContextUsage']>>,
     }) as ClaudeQuery;
   };
   return { query, calls };
