@@ -20,6 +20,11 @@ export interface SessionRecovery {
 
 export interface SessionRecoveryOptions {
   sessions: Pick<SessionManager, 'start' | 'send' | 'status'>;
+  /**
+   * Starts the lost session again through the concurrency cap (AL-111's `LaunchQueue.restart`), running
+   * `onStarted` once it has started. Without it the session manager starts it directly.
+   */
+  restart?: (ticketId: string, onStarted: () => void) => Promise<Result<AgentSessionStatus>>;
   emit: Emit;
   log?: Pick<Logger, 'info' | 'warn'>;
   /** A loss within this long of the last automatic retry asks the user instead of retrying again. */
@@ -62,13 +67,20 @@ export function createSessionRecovery(options: SessionRecoveryOptions): SessionR
     if (!sessions.status(ticketId).sessionId) {
       return err('SESSION_LOST', `${ticketId} has no saved session to resume. Start it again from the board.`);
     }
-    const started = await sessions.start({ ticketId });
-    if (!started.ok) return started;
-    if (midTurn.get(ticketId)) {
+    const carryOn = (): void => {
+      if (!midTurn.get(ticketId)) return;
       midTurn.delete(ticketId);
       const sent = sessions.send(ticketId, { text: RECOVERED_MESSAGE });
       if (!sent.ok) log?.warn(`Could not ask the resumed session of ticket ${ticketId} to continue: ${sent.message}`);
+    };
+    // Through the concurrency cap (AL-111) when there is one: a full repo queues it first in line.
+    const started = options.restart ? await options.restart(ticketId, carryOn) : await sessions.start({ ticketId });
+    if (!started.ok) return started;
+    if (started.data.state === 'queued') {
+      log?.info(`The lost session of ticket ${ticketId} waits for a free slot`);
+      return started;
     }
+    if (!options.restart) carryOn();
     log?.info(`Resumed the lost session of ticket ${ticketId}`);
     return ok(sessions.status(ticketId));
   }

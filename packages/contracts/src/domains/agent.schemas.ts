@@ -25,9 +25,10 @@ export const SDK_MODEL_IDS = {
  * - `idle`: the turn ended and the session waits for the next user turn;
  * - `paused`: the user paused it (AL-105): the turn was interrupted and new messages wait for Resume;
  * - `stopped`: the app closed the session (its process is gone);
- * - `lost`: the session ended without being asked to (crash, process exit); AL-110 recovers it.
+ * - `lost`: the session ended without being asked to (crash, process exit); AL-110 recovers it;
+ * - `queued`: its repo is at the concurrency cap; it starts when a slot frees, or on "Start now" (AL-111).
  */
-export const AGENT_SESSION_STATES = ['none', 'starting', 'running', 'idle', 'paused', 'stopped', 'lost'] as const;
+export const AGENT_SESSION_STATES = ['none', 'starting', 'running', 'idle', 'paused', 'stopped', 'lost', 'queued'] as const;
 export const AgentSessionStateSchema = z.enum(AGENT_SESSION_STATES);
 export type AgentSessionState = z.infer<typeof AgentSessionStateSchema>;
 
@@ -340,6 +341,8 @@ export const agentInvokeContracts = {
   'agent:getPermission': { request: AgentTicketRequestSchema, response: GetPermissionResponseSchema },
   /** Reconnect (AL-110): resumes a lost session from its saved session id in the same worktree. */
   'agent:reconnect': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** "Start now" (AL-111): starts a queued ticket at once, over its repo's concurrency cap. */
+  'agent:startNow': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

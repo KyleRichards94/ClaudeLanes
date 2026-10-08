@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { connectionsEventHandlers, createBranchStatusEventHandlers, mcpStatusEventHandlers } from '@/shared/api';
 import { permissionEventHandlers } from '@/features/resolve-permission';
+import { sessionStatusEventHandlers } from '@/features/start-queued-agent';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
 import { runningEventHub } from './EventHub';
@@ -34,6 +35,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(mcpStatusEventHandlers(queryClient)), [queryClient]);
   // `agent:permission` keeps each ticket's waiting permission request current (AL-109).
   useEffect(() => runningEventHub()?.register(permissionEventHandlers(queryClient)), [queryClient]);
+  // `agent:status` keeps each ticket's session status current, e.g. Queued and Start now (AL-111).
+  useEffect(() => runningEventHub()?.register(sessionStatusEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

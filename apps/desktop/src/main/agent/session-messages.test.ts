@@ -5,6 +5,7 @@ import { handleInvoke } from '../ipc/handle-invoke';
 import { createClaudeLauncher } from './claude-sdk';
 import { createAgentHandlers } from './handlers';
 import { createMcpStatusMonitor } from './mcp';
+import { createLaunchQueue } from './launch-queue';
 import { createSessionRecovery } from './recovery';
 import { testPermissions } from './testing/sessions';
 import { createTranscriptService } from './output/transcript';
@@ -39,7 +40,7 @@ async function setup() {
   });
   const transcripts = createTranscriptService({ sessions, tickets, emit: events.emit });
   const stages = createStageService({ tickets, emit: events.emit });
-  const handlers = createAgentHandlers({ sessions, transcripts, stages, mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }), permissions: testPermissions(), recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }) });
+  const handlers = createAgentHandlers({ sessions, transcripts, stages, mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }), permissions: testPermissions(), recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }), launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }) });
   await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
   const call = fake.calls[0]!;
   await call.sentCount(1);

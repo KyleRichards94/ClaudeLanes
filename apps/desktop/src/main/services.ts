@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
+import { DEFAULT_MAX_CONCURRENT_AGENTS } from '@agent-lanes/contracts';
 import { createAdoService, type AdoService } from './ado';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
 import { createClaudeLauncher, loadClaudeSdk, type ClaudeLauncher } from './agent/claude-sdk';
@@ -9,6 +10,7 @@ import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
 import { createPermissionService, type PermissionService } from './agent/permissions';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
+import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -106,6 +108,8 @@ export interface Services {
   readonly permissions: PermissionService;
   /** Resumes a lost session once, then asks with the "MCP bridge lost the session" toast (AL-110). */
   readonly recovery: SessionRecovery;
+  /** Per-repo cap on running agents and the Queued lane: every session start goes through it (AL-111). */
+  readonly launches: LaunchQueue;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -155,7 +159,11 @@ export function createServices(options: ServiceOptions): Services {
     update(patch) {
       const result = settingsStore.update(patch);
       // A larger queue size starts waiting jobs straight away.
-      if (result.ok) buildQueue.refresh();
+      if (result.ok) {
+        buildQueue.refresh();
+        // A raised agent cap starts queued launches (AL-111).
+        void launches.refresh();
+      }
       return result;
     },
   };
@@ -256,6 +264,8 @@ export function createServices(options: ServiceOptions): Services {
       permissions.cancelAll(ticketId);
       // A lost session is resumed once in the same worktree, then the user is asked (AL-110).
       recovery.onEnded(ticketId, state, info);
+      // The ended session's slot goes to the oldest queued launch of its repo (AL-111).
+      void launches.refresh();
     },
     // A silent session is lost only while nobody is asked anything (AL-110).
     isWaitingOnUser: (ticketId) => stages.pendingGate(ticketId) !== null || permissions.pending(ticketId) !== null,
@@ -269,7 +279,15 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const stages = createStageService({ tickets, emit: options.emit, transcripts, log: log.child('agent') });
-  const recovery = createSessionRecovery({ sessions, emit: options.emit, log: log.child('agent') });
+  const recovery = createSessionRecovery({ sessions, restart: (ticketId, onStarted) => launches.restart(ticketId, onStarted), emit: options.emit, log: log.child('agent') });
+  const launches = createLaunchQueue({
+    sessions,
+    tickets,
+    // The repo's `maxConcurrentAgents` (default 3, Q5), read at each decision.
+    maxAgents: (repo) => settings.get().repos.find((item) => item.path === repo)?.maxConcurrentAgents ?? DEFAULT_MAX_CONCURRENT_AGENTS,
+    emit: options.emit,
+    log: log.child('agent'),
+  });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const permissions = createPermissionService({ settings, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
   const sessionExtras = combineSessionExtras([stageExtras, mcpSessionExtras({ connections, log: log.child('agent') }), permissions.sessionExtras]);
@@ -302,6 +320,7 @@ export function createServices(options: ServiceOptions): Services {
     mcpStatus,
     permissions,
     recovery,
+    launches,
     branches,
     mergeToMain,
     ticketArchive,
