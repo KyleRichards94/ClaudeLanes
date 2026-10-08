@@ -43,9 +43,23 @@ function clearSelection(): Promise<void> {
   });
 }
 
+/** The element's box once it has stopped moving (the board header can wrap after its menus and pills load). */
+async function settledBox(locator: Locator) {
+  let previous = await locator.boundingBox();
+  let still = 0;
+  for (let attempt = 0; attempt < 40 && still < 4; attempt += 1) {
+    await page.waitForTimeout(250);
+    const current = await locator.boundingBox();
+    const same = previous && current && previous.x === current.x && previous.y === current.y && previous.width === current.width;
+    still = same ? still + 1 : 0;
+    previous = current;
+  }
+  return previous;
+}
+
 /** Drags the mouse across the element's text, as a user selecting it would. */
 async function dragAcross(locator: Locator) {
-  const box = await locator.boundingBox();
+  const box = await settledBox(locator);
   if (!box) throw new Error('element is not visible');
   const y = box.y + box.height / 2;
   await page.mouse.move(box.x + 1, y);
