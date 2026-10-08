@@ -1,7 +1,9 @@
 import { join } from 'node:path';
-import { BrowserWindow, app, shell } from 'electron';
+import { BrowserWindow, app, dialog, screen, shell } from 'electron';
 import { color } from '@agent-lanes/tokens';
+import { createQuitConfirmation, quitQuestion, type QuitConfirmation } from './app/quit-confirmation';
 import { watchWindowVisibility } from './app/window-visibility';
+import { MIN_WINDOW_SIZE, currentWindowState, readWindowState, windowPlacement, windowStateFile, writeWindowState } from './app/window-state';
 import { createEmitter, type EventFrame } from './ipc/emit';
 import { checkGitOnStartup, showGitStartupNotice } from './git';
 import { createInvokeHandlers } from './ipc/handlers';
@@ -23,6 +25,7 @@ if (userDataOverride) app.setPath('userData', userDataOverride);
 
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
+let quitConfirmation: QuitConfirmation | null = null;
 
 /** Events go to the main window's top frame only (AL-012); nothing while there is no live window. */
 function mainWindowFrame(): EventFrame | undefined {
@@ -31,11 +34,18 @@ function mainWindowFrame(): EventFrame | undefined {
 }
 
 function createMainWindow(): BrowserWindow {
+  // AL-213: the window opens where it was left, or centred when that spot is off every screen now.
+  const stateFile = windowStateFile(app.getPath('userData'));
+  const primary = screen.getPrimaryDisplay();
+  const others = screen.getAllDisplays().filter((display) => display.id !== primary.id);
+  const placement = windowPlacement(readWindowState(stateFile), [primary.workArea, ...others.map((display) => display.workArea)]);
   const window = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 1100,
-    minHeight: 720,
+    x: placement.x,
+    y: placement.y,
+    width: placement.width,
+    height: placement.height,
+    minWidth: MIN_WINDOW_SIZE.width,
+    minHeight: MIN_WINDOW_SIZE.height,
     show: false,
     title: 'Agent Lanes',
     backgroundColor: color.bg,
@@ -49,7 +59,19 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => {
+    if (placement.maximized) window.maximize();
+    window.show();
+  });
+
+  // AL-213: closing while agents are mid-turn asks first; otherwise the size and position are saved.
+  window.on('close', (event) => {
+    if (quitConfirmation?.hold(() => app.quit())) {
+      event.preventDefault();
+      return;
+    }
+    writeWindowState(stateFile, currentWindowState(window), (message) => console.warn(message));
+  });
 
   // External links open in the user's browser; the app window never navigates away from the renderer.
   window.webContents.setWindowOpenHandler(({ url }) => {
@@ -124,6 +146,18 @@ if (!app.requestSingleInstanceLock()) {
       claudeExecutable: app.isPackaged ? undefined : process.env['AGENT_LANES_CLAUDE_EXECUTABLE'],
     });
     registerInvokeHandlers(createInvokeHandlers(services), renderer, log.child('ipc'));
+    const sessions = services.sessions;
+    quitConfirmation = createQuitConfirmation({
+      midTurn: () => sessions.midTurn(),
+      async confirm(ticketIds) {
+        const question = quitQuestion(ticketIds);
+        const options = { type: 'warning' as const, title: 'Quit Agent Lanes?', buttons: ['Quit', 'Cancel'], defaultId: 1, cancelId: 1, noLink: true, ...question };
+        const window = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+        const { response } = window ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options);
+        log.info(response === 0 ? 'Quitting with agents mid-turn' : 'Quit cancelled: agents mid-turn', { ticketIds });
+        return response === 0;
+      },
+    });
     mainWindow = createMainWindow();
     // AL-066: the renderer polls Azure DevOps only while the window can be seen.
     watchWindowVisibility(mainWindow, emit);
@@ -143,9 +177,14 @@ if (!app.requestSingleInstanceLock()) {
 
   // Hold the first quit until services have stopped their child processes, then quit for real.
   let disposed = false;
+  let disposing = false;
   app.on('before-quit', (event) => {
     if (disposed || !services) return;
     event.preventDefault();
+    // A quit from the menu or the taskbar asks first too when agents are mid-turn (AL-213).
+    if (quitConfirmation?.hold(() => app.quit())) return;
+    if (disposing) return;
+    disposing = true;
     log.info('Quitting: stopping services');
     void disposeServices(services).finally(() => {
       disposed = true;
