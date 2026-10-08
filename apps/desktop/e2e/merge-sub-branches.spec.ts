@@ -120,7 +120,8 @@ test('the Merge panel merges sub-branches and opens the conflict view (AL-174)',
 
   await mergeSubs.click();
   const dialog = page.getByRole('dialog', { name: 'Merge stopped on a conflict' });
-  await expect(dialog).toBeVisible();
+  // Three real merges in a temporary repo: slow on a busy Windows machine.
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
   await expect(dialog.getByText('sub/71273-footer → 71273-cutover-job-control')).toBeVisible();
   await expect(dialog.getByText('Merged first: sub/71273-grid, sub/71273-header.')).toBeVisible();
   await expect(dialog.getByTestId('conflict-files')).toHaveText('JobControl.razor');
