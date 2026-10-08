@@ -1,22 +1,28 @@
-import { EFFORTS, MODELS, defaultAgentDefaults, pickSprint, type Sprint } from '@agent-lanes/contracts';
+import { EFFORTS, defaultAgentDefaults, pickSprint, type Sprint } from '@agent-lanes/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type TextInputInstance } from 'react-native';
 import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, SegmentedControl, Text, TextField, type TextFieldHandle } from '@agent-lanes/ui';
-import { useSettings, useSprints } from '@/shared/api';
-import { EFFORT_LABELS, MODEL_LABELS } from '@/shared/config';
+import { fetchWorktreePreview, useSettings, useSprints, useWorktreePreview } from '@/shared/api';
+import { EFFORT_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
+import { useDebouncedValue } from '../lib/use-debounced-value';
 import {
   initialForm,
   launchRequest,
   launchSummary,
   newTicketReducer,
   validateForm,
+  worktreeSubject,
   type NewTicketErrors,
   type NewTicketRequest,
   type WorkItemSource,
 } from '../model/form';
+import { ModelPicker } from './ModelPicker';
+import { StageGates } from './StageGates';
 import { WorkItemPicker } from './WorkItemPicker';
+import { WorkspacePreview } from './WorkspacePreview';
 
 export interface NewTicketModalProps {
   visible: boolean;
@@ -46,8 +52,9 @@ function sourceOptions(sprint: Sprint | null): readonly { value: WorkItemSource;
     { value: 'none', label: 'No ticket' },
   ];
 }
-const MODEL_OPTIONS = MODELS.map((model) => ({ value: model, label: MODEL_LABELS[model] }));
 const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_LABELS[effort] }));
+/** How long typing in the description or the worktree name settles before the preview asks main. */
+const PREVIEW_DEBOUNCE_MS = 250;
 
 function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'visible'>) {
   const settings = useSettings();
@@ -68,12 +75,38 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
   const sprints = useSprints();
   const lastSprint = useUiPrefs((state) => state.lastSprint);
   const sprint = sprints.data ? pickSprint(sprints.data, lastSprint) : null;
+  const worktreeInput = useRef<TextInputInstance>(null);
+  const queryClient = useQueryClient();
+
+  // Workspace (AL-164): the board's repo, and the branch launch would create there.
+  const lastRepo = useUiPrefs((prefs) => prefs.lastRepo);
+  const repos = settings.data?.repos ?? [];
+  const repo = repos.find((candidate) => candidate.path === lastRepo) ?? repos[0] ?? null;
+  const settledSubject = useDebouncedValue(worktreeSubject(form), PREVIEW_DEBOUNCE_MS);
+  const settledName = useDebouncedValue(form.worktreeName, PREVIEW_DEBOUNCE_MS);
+  const preview = useWorktreePreview(repo ? { repo: repo.path, subject: settledSubject, branch: settledName } : null);
+  /** Why Launch refused the name it checked; cleared by editing the name. */
+  const [blockedName, setBlockedName] = useState<{ name: string; message: string } | null>(null);
+  const liveProblem =
+    form.worktreeName !== null && preview.data?.branch === form.worktreeName && preview.data.problem ? preview.data.problem.message : null;
+  const worktreeError = blockedName && blockedName.name === form.worktreeName ? blockedName.message : liveProblem;
 
   // Errors show after the first Launch, then follow the form as it is fixed.
   const shown = Object.keys(errors).length > 0 ? validateForm(form) : {};
 
+  /** Asks main about the name the user sees now; the reason Launch is blocked, or null. */
+  const checkWorktreeName = async (): Promise<string | null> => {
+    if (!repo || form.worktreeName === null) return null;
+    try {
+      const verdict = await fetchWorktreePreview(queryClient, { repo: repo.path, subject: worktreeSubject(form), branch: form.worktreeName });
+      return verdict.problem?.message ?? null;
+    } catch (cause) {
+      return `The worktree name could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
+    }
+  };
+
   const launch = async () => {
-    const result = launchRequest(form);
+    const result = launchRequest(form, repo?.path ?? null);
     if (!result.ok) {
       setErrors(result.errors);
       if (result.errors.description && !result.errors.workItem) description.current?.focus();
@@ -82,6 +115,13 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
     setErrors({});
     setLaunchError(null);
     setLaunching(true);
+    const worktreeProblem = await checkWorktreeName();
+    if (worktreeProblem !== null && form.worktreeName !== null) {
+      setBlockedName({ name: form.worktreeName, message: worktreeProblem });
+      setLaunching(false);
+      worktreeInput.current?.focus();
+      return;
+    }
     try {
       await onLaunch(result.request);
       onClose();
@@ -172,7 +212,7 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
             <Text variant="title" size="md">
               Model
             </Text>
-            <SegmentedControl label="Model" options={MODEL_OPTIONS} value={form.model} onChange={(model) => dispatch({ type: 'model', model })} fill />
+            <ModelPicker value={form.model} onChange={(model) => dispatch({ type: 'model', model })} />
           </View>
           <View style={styles.section}>
             <View style={styles.sectionHead}>
@@ -185,6 +225,17 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
             </View>
             <SegmentedControl label="Effort" options={EFFORT_OPTIONS} value={form.effort} onChange={(effort) => dispatch({ type: 'effort', effort })} fill />
           </View>
+          <WorkspacePreview
+            repoName={repo?.name ?? null}
+            baseBranch={repo?.baseBranch ?? null}
+            branch={form.worktreeName ?? preview.data?.generatedBranch ?? ''}
+            branchPlaceholder="Named after the work item"
+            worktreePath={form.worktreeName === null || preview.data?.branch === form.worktreeName ? (preview.data?.worktreePath ?? null) : null}
+            onChangeBranch={(name) => dispatch({ type: 'worktreeName', name })}
+            error={worktreeError}
+            inputRef={worktreeInput}
+          />
+          <StageGates gates={form.gates} onChange={(stage, gate) => dispatch({ type: 'gate', stage, gate })} />
         </View>
       </View>
     </Modal>

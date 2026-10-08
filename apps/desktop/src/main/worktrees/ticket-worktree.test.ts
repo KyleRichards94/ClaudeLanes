@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { defaultSettings, err, type Settings, type TicketAdoRef } from '@agent-lanes/contracts';
+import { defaultSettings, err, type Settings, type TicketAdoRef, type WorktreePreviewRequest } from '@agent-lanes/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GitError } from '../git/git-error';
 import type { GitRunner } from '../git/git-runner';
@@ -462,5 +462,98 @@ describe('titleFromDescription', () => {
     ['x'.repeat(200), `${'x'.repeat(119)}…`],
   ])('%j → %j', (description, title) => {
     expect(titleFromDescription(description)).toBe(title);
+  });
+});
+
+describe('previewing the workspace (AL-164)', () => {
+  const request = (subject: WorktreePreviewRequest['subject'], branch: string | null = null): WorktreePreviewRequest => ({
+    repo: repo.dir,
+    subject,
+    branch,
+  });
+
+  it('names the branch and folder as create would, and creates nothing', async () => {
+    const { worktrees } = service();
+    const before = await snapshot();
+
+    const result = await worktrees.preview(request({ kind: 'work-item', workItemId: 71273, title: 'Cutover frmJobControl to Blazor' }));
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        repo: repo.dir,
+        repoName: settingsDoc.repos[0]!.name,
+        baseBranch: 'main',
+        generatedBranch: '71273-cutover-frmjobcontrol-to',
+        branch: '71273-cutover-frmjobcontrol-to',
+        worktreePath: join(root, '71273'),
+        problem: null,
+      },
+    });
+    const none = await worktrees.preview(request({ kind: 'no-ticket', description: 'Fix the flaky login test on CI' }));
+    expect(none).toMatchObject({
+      ok: true,
+      data: { generatedBranch: 'nt-20261007-fix-the-flaky-login', worktreePath: join(root, 'nt-20261007-fix-the-flaky-login') },
+    });
+    expect(await snapshot()).toEqual(before);
+
+    // The preview matches what create then makes.
+    const created = await worktrees.create(workItem(71273, 'Cutover frmJobControl to Blazor'));
+    expect(created).toMatchObject({ ok: true, data: { record: { branch: '71273-cutover-frmjobcontrol-to', worktreePath: join(root, '71273') } } });
+  });
+
+  it('has nothing to name before a work item is picked', async () => {
+    const { worktrees } = service();
+    expect(await worktrees.preview(request(null))).toMatchObject({
+      ok: true,
+      data: { baseBranch: 'main', generatedBranch: null, branch: null, worktreePath: null, problem: null },
+    });
+  });
+
+  it('gives the reason an edited name would be refused at launch', async () => {
+    await repo.exec(['branch', 'local-only']);
+    const { worktrees } = service();
+    const first = await worktrees.create(workItem(71330, 'Asset register', { branch: 'shared-work' }));
+    expect(first.ok).toBe(true);
+    const subject = { kind: 'work-item', workItemId: 71273, title: 'Cutover' } as const;
+
+    const cases: [string, string, string][] = [
+      ['fix login', 'invalid-branch', "Branch names can't contain spaces."],
+      ['', 'invalid-branch', 'Enter a branch name.'],
+      ['feature/nul', 'invalid-branch', '"nul" is a reserved name on Windows.'],
+      ['local-only', 'branch-taken', 'A branch named "local-only" already exists.'],
+      ['Main', 'branch-taken', 'A branch named "main" already exists.'],
+      ['shared-work', 'branch-taken', 'A branch named "shared-work" already exists.'],
+    ];
+    for (const [branch, reason, message] of cases) {
+      const result = await worktrees.preview(request(subject, branch));
+      expect(result, branch).toMatchObject({ ok: true, data: { branch, problem: { reason, message } } });
+    }
+
+    expect(await worktrees.preview(request(subject, 'cutover-job-control'))).toMatchObject({
+      ok: true,
+      data: { generatedBranch: '71273-cutover', branch: 'cutover-job-control', problem: null },
+    });
+  });
+
+  it("still names the ticket and checks git's rules when git can't list branches", async () => {
+    const { worktrees } = service({
+      runner: (real) => (args, options) =>
+        args[0] === 'for-each-ref' ? Promise.reject(new GitError('COMMAND_FAILED', 'git for-each-ref failed')) : real(args, options),
+    });
+    const subject = { kind: 'work-item', workItemId: 71273, title: 'Cutover' } as const;
+    expect(await worktrees.preview(request(subject))).toMatchObject({ ok: true, data: { generatedBranch: '71273-cutover', problem: null } });
+    expect(await worktrees.preview(request(subject, 'a..b'))).toMatchObject({
+      ok: true,
+      data: { problem: { reason: 'invalid-branch', message: 'Branch names can\'t contain "..".' } },
+    });
+  });
+
+  it('refuses a repo that is not registered', async () => {
+    const { worktrees } = service();
+    expect(await worktrees.preview({ repo: join(repo.root, 'elsewhere'), subject: null, branch: null })).toMatchObject({
+      ok: false,
+      code: 'VALIDATION',
+      details: { reason: 'repo-not-registered' },
+    });
   });
 });
