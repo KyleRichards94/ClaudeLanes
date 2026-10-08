@@ -75,7 +75,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-045 | MCP server entries | E3 | M | AL-042 | partial |
 | AL-046 | Connections modal UI | E3 | L | AL-043, AL-044, AL-045, AL-027, AL-029 | done |
 | AL-047 | First-run flow and repo picker | E3 | M | AL-046, AL-081 | done |
-| AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | todo |
+| AL-048 | Credential failure handling | E3 | M | AL-046, AL-100, AL-030 | done |
 | AL-060 | ado-client core | E4 | M | AL-001 | done |
 | AL-061 | Sprints (iterations) | E4 | S | AL-060 | done |
 | AL-062 | Work items: sprint list, search, get | E4 | M | AL-060 | done |
@@ -87,9 +87,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-081 | Repo registry and folder picker | E5 | M | AL-080, AL-041 | done |
 | AL-082 | Branch and worktree naming | E5 | S | — | done |
 | AL-083 | Create the ticket worktree | E5 | M | AL-081, AL-082 | done |
-| AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | todo |
+| AL-084 | Sub-agent worktrees (WorktreeCreate hook) | E5 | M | AL-083, AL-100 | partial |
 | AL-085 | Branch status | E5 | S | AL-083 | done |
-| AL-086 | Merge sub-branches → ticket branch | E5 | M | AL-084, AL-085 | todo |
+| AL-086 | Merge sub-branches → ticket branch | E5 | M | AL-084, AL-085 | done |
 | AL-087 | Merge worktree → main | E5 | M | AL-085 | partial |
 | AL-088 | Archive | E5 | M | AL-083 | done |
 | AL-089 | Diff provider | E5 | S | AL-083 | done |
@@ -100,8 +100,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-103 | Stage protocol: `agent_lanes` MCP server | E6 | M | AL-100 | partial |
 | AL-104 | Stage gates | E6 | M | AL-103 | partial |
 | AL-105 | Messages, skills and pause | E6 | S | AL-100 | partial |
-| AL-106 | Live model and effort change | E6 | M | AL-100 | todo |
-| AL-107 | Sub-agent tracking | E6 | M | AL-102 | todo |
+| AL-106 | Live model and effort change | E6 | M | AL-100 | done |
+| AL-107 | Sub-agent tracking | E6 | M | AL-102 | done |
 | AL-108 | MCP injection and status | E6 | M | AL-100, AL-045 | partial |
 | AL-109 | Permission policy for headless sessions | E6 | M | AL-100 | partial |
 | AL-110 | Crash recovery | E6 | M | AL-100, AL-101 | todo |
@@ -118,13 +118,13 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-135 | Build log tab | E7 | M | AL-132, AL-029 | done |
 | AL-140 | App router and lazy pages | E8 | S | AL-003 | done |
 | AL-141 | Agent ticket entity and store | E8 | M | AL-015, AL-101 | done |
-| AL-142 | Board header | E8 | M | AL-141, AL-066, AL-024, AL-025, AL-081 | todo |
+| AL-142 | Board header | E8 | M | AL-141, AL-066, AL-024, AL-025, AL-081 | done |
 | AL-143 | Lanes | E8 | M | AL-141 | partial |
 | AL-144 | AgentTicketCard and its states | E8 | M | AL-141, AL-025, AL-028 | partial |
 | AL-145 | Live dock | E8 | S | AL-141 | done |
 | AL-146 | Settings panel (repo and defaults) | E8 | M | AL-041, AL-130, AL-029 | partial |
 | AL-160 | New-ticket modal shell and form state | E9 | M | AL-029 | done |
-| AL-161 | Work item picker | E9 | M | AL-160, AL-066 | todo |
+| AL-161 | Work item picker | E9 | M | AL-160, AL-066 | done |
 | AL-162 | Job description and skill chips | E9 | S | AL-160, AL-114 | todo |
 | AL-163 | Model and effort pickers | E9 | S | AL-160, AL-026 | done |
 | AL-164 | Workspace preview and stage gates | E9 | S | AL-160, AL-082 | done |
@@ -132,14 +132,14 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-170 | Ticket page frame | E10 | M | AL-140, AL-141 | done |
 | AL-171 | Stage stepper and gate actions | E10 | M | AL-104, AL-170 | todo |
 | AL-172 | Agent panel (model and effort) | E10 | S | AL-106, AL-170 | todo |
-| AL-173 | Worktree panel (Build, Run, Stop) | E10 | S | AL-134, AL-170 | todo |
+| AL-173 | Worktree panel (Build, Run, Stop) | E10 | S | AL-134, AL-170 | done |
 | AL-174 | Merge panel, confirm and conflict flows | E10 | M | AL-086, AL-087, AL-170 | todo |
 | AL-175 | Output stream | E10 | L | AL-102, AL-170 | todo |
 | AL-176 | Composer | E10 | S | AL-105, AL-106, AL-175 | todo |
 | AL-177 | Sub-agents panel | E10 | M | AL-107, AL-170 | todo |
 | AL-178 | Sub-branches panel | E10 | S | AL-085, AL-177 | todo |
-| AL-179 | Diff tab | E10 | M | AL-089, AL-170 | todo |
-| AL-180 | ADO tab | E10 | M | AL-066, AL-170 | todo |
+| AL-179 | Diff tab | E10 | M | AL-089, AL-170 | done |
+| AL-180 | ADO tab | E10 | M | AL-066, AL-170 | done |
 | AL-181 | Create PR stage | E10 | M | AL-064, AL-104, AL-170 | todo |
 | AL-190 | Spike: Claude Design integration surface | E11 | S | — | partial |
 | AL-191 | Design view service (WebContentsView) | E11 | L | AL-190, AL-011 | done |
@@ -147,20 +147,20 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-193 | Link a canvas to a ticket | E11 | S | AL-101, AL-192 | done |
 | AL-194 | Embed mode switch and MCP-link fallback | E11 | M | AL-190, AL-192 | partial |
 | AL-195 | Artboard list and selection | E11 | M | AL-190, AL-192 | partial |
-| AL-196 | Design thread at any stage (R11) | E11 | L | AL-190, AL-192 | todo |
+| AL-196 | Design thread at any stage (R11) | E11 | L | AL-190, AL-192 | done |
 | AL-197 | Approve & ship design at any time (R11) | E11 | L | AL-195, AL-198, AL-100 | todo |
 | AL-198 | Agent-side design tools | E11 | M | AL-103 | todo |
 | AL-199 | Design specs attached to the ticket | E11 | S | AL-197 | todo |
 | AL-200 | Design presence on card and drill-in | E11 | S | AL-197, AL-144 | todo |
 | AL-210 | Error boundaries | E12 | S | AL-140 | partial |
-| AL-211 | Error recovery actions | E12 | M | AL-030, AL-046 | todo |
+| AL-211 | Error recovery actions | E12 | M | AL-030, AL-046 | done |
 | AL-212 | Performance pass | E12 | M | AL-143, AL-175 | todo |
-| AL-213 | App lifecycle | E12 | S | AL-100, AL-134 | todo |
+| AL-213 | App lifecycle | E12 | S | AL-100, AL-134 | done |
 | AL-214 | Logging and diagnostics | E12 | S | AL-040 | done |
-| AL-230 | Drop rules (`allowedLanes`) | E14 | S | AL-141 | todo |
-| AL-231 | ADO team board data (`ado:teamBoard`) | E14 | M | AL-065, AL-061 | todo |
-| AL-232 | Active PRs with thread counts (`ado:activePrs`) | E14 | M | AL-064, AL-065 | todo |
-| AL-233 | Backlog data (`ado:backlog`) | E14 | M | AL-065 | todo |
+| AL-230 | Drop rules (`allowedLanes`) | E14 | S | AL-141 | done |
+| AL-231 | ADO team board data (`ado:teamBoard`) | E14 | M | AL-065, AL-061 | done |
+| AL-232 | Active PRs with thread counts (`ado:activePrs`) | E14 | M | AL-064, AL-065 | done |
+| AL-233 | Backlog data (`ado:backlog`) | E14 | M | AL-065 | done |
 | AL-234 | Team board widget | E14 | L | AL-230, AL-231, AL-232, AL-066, AL-143 | todo |
 | AL-235 | Drag to lane (dnd-kit + keyboard) | E14 | L | AL-230, AL-234 | todo |
 | AL-236 | Launch from ADO transaction (`agent:launchFromAdo`) | E14 | L | AL-230, AL-100, AL-083, AL-063, AL-111, AL-165 | todo |
@@ -170,11 +170,11 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | todo |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | todo |
-| AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | todo |
+| AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | todo |
 | AL-223 | Visual QA against the artboards | E13 | M | E8–E11, AL-234, AL-239 | todo |
 | AL-224 | Release build and signing | E13 | M | AL-007 | blocked (Q7) |
-| AL-225 | User guide | E13 | S | AL-047 | todo |
+| AL-225 | User guide | E13 | S | AL-047 | partial |
 | AL-226 | Register in the ai-tools index | E13 | S | — | blocked (Q8) |
 
 ---
@@ -475,8 +475,8 @@ colour alone.
 - **Design:** §8 last bullet, §13 PAT risk · **Depends on:** AL-046, AL-100, AL-030
 - **Scope:** Any 401 from ADO (client or ADO MCP inside a session) marks that org red, pauses only the agents whose work items belong to that org (interrupt + hold their input queue), and raises an error toast with Reconnect. After a successful reconnect, paused sessions resume with a short "Connection restored" user turn.
 - **Acceptance criteria:**
-  - [ ] Agents on another org keep running.
-  - [ ] Reconnect → resume works without restarting the app.
+  - [x] Agents on another org keep running.
+  - [x] Reconnect → resume works without restarting the app.
 
 ---
 
@@ -562,8 +562,8 @@ colour alone.
 - **Design:** §9 step 3 · **Depends on:** AL-083, AL-100
 - **Scope:** Register SDK `hooks.WorktreeCreate` in each session (Decision D9): create `sub/<ticket>-<name>` off the ticket branch at `<root>/<id>--<name>` and return `worktreePath`; `WorktreeRemove` keeps the worktree (removed only on Archive). Read-only sub-agents (explore, reviewer) are not isolated and share the ticket worktree. Record each sub-branch on the ticket.
 - **Acceptance criteria:**
-  - [ ] Two writer sub-agents edit in parallel without touching each other's files.
-  - [ ] Sub-branches appear in the Sub-branches panel with ahead counts.
+  - [x] Two writer sub-agents edit in parallel without touching each other's files.
+  - [ ] Sub-branches appear in the Sub-branches panel with ahead counts. (open: sub-branches are recorded on the ticket and `branches:status` reports their ahead counts; the panel that draws them is AL-178)
 
 #### AL-085 · Branch status
 - **Design:** artboard 3 Sub-branches ("4 ahead · Ready") · **Depends on:** AL-083
@@ -575,8 +575,8 @@ colour alone.
 - **Design:** §9 step 4, R9 · **Depends on:** AL-084, AL-085
 - **Scope:** Merge every ready sub-branch into the ticket branch in creation order (`--no-ff`); stop at the first conflict, leave the merge in progress in the ticket worktree, return `MERGE_CONFLICT` with the file list; offer "Hand to lead agent" (user turn listing conflicts) or "I'll resolve it" (open files in the user's editor).
 - **Acceptance criteria:**
-  - [ ] Successful merges invalidate `['branches', id]` and `['ado','workItem',id]`.
-  - [ ] After a conflict, nothing past the conflicting branch is merged.
+  - [x] Successful merges invalidate `['branches', id]` and `['ado','workItem',id]`.
+  - [x] After a conflict, nothing past the conflicting branch is merged.
 
 #### AL-087 · Merge worktree → main
 - **Design:** §9 step 5, R9, §13 risk, Q1, Q2 · **Depends on:** AL-085
@@ -659,14 +659,14 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** R7, §7, artboard 6 "Model switching" · **Depends on:** AL-100
 - **Scope:** `agent:setModel` → `Query.setModel(id)`; `agent:setEffort` → `Query.applyFlagSettings({ effortLevel })`. Ticket shows "Switching · applies next turn" until the next assistant message reports the new model (or the next turn starts), then clears. "Apply model now" = interrupt, apply, then a "continue" user turn.
 - **Acceptance criteria:**
-  - [ ] Opus → Sonnet mid-run shows "Opus → Sonnet · High" then clears when applied.
-  - [ ] Effort changes persist to the ticket record.
+  - [x] Opus → Sonnet mid-run shows "Opus → Sonnet · High" then clears when applied.
+  - [x] Effort changes persist to the ticket record.
 
 #### AL-107 · Sub-agent tracking
 - **Design:** artboard 3 Sub-agents, §6 `agent:subagent` · **Depends on:** AL-102
 - **Scope:** Build the tree from Agent/Task tool uses and `parent_tool_use_id`, `SDKTaskStarted/Updated/Progress/Notification` messages, and `SubagentStart/Stop` hooks: name, agent type, model · effort, status (Queued/Running/Done/Failed), one-line activity, tokens, branch or "read-only". Optional `forwardSubagentText` for a nested transcript.
 - **Acceptance criteria:**
-  - [ ] Panel counts ("2 running · 1 done · 1 queued") match the SDK's task states.
+  - [x] Panel counts ("2 running · 1 done · 1 queued") match the SDK's task states. (at the data level: a tracker test drives the SDK task messages and checks the counts and `subagentCountsLabel`, and the card store test checks they reach the card; the panel itself is AL-177)
 
 #### AL-108 · MCP injection and status
 - **Design:** §7 MCP servers, artboard 1 "MCP online" · **Depends on:** AL-100, AL-045
@@ -778,7 +778,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 1 · **Depends on:** AL-141, AL-066, AL-024, AL-025, AL-081
 - **Scope:** Logo + "Agent Lanes"; Repo dropdown (registered repos + "Add repo…"); Sprint dropdown; live pills (`N running`, `N need you`, `N queued`, MCP status); Connections icon button; "+ New agent ticket". Sub-header line "Sprint 42 · 7 – 20 Oct · 8 agent tickets", title "Agent board", legend.
 - **Acceptance criteria:**
-  - [ ] Counts update live from the store; "need you" pill opens a filtered view or scrolls to the first amber card.
+  - [x] Counts update live from the store; "need you" pill opens a filtered view or scrolls to the first amber card.
 
 #### AL-143 · Lanes
 - **Design:** artboard 1, artboard 6 "Empty lane" · **Depends on:** AL-141
@@ -819,7 +819,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 2 left column · **Depends on:** AL-160, AL-066
 - **Scope:** Segmented Sprint 42 / Search / No ticket; search field "Search by ID or title" (debounced); radio list rows (id, title, "Story · Active"); "Optional" label; items already running show their lane instead of a radio.
 - **Acceptance criteria:**
-  - [ ] "No ticket" hides ADO fields and uses `nt-` naming.
+  - [x] "No ticket" hides ADO fields and uses `nt-` naming.
 
 #### AL-162 · Job description and skill chips
 - **Design:** artboard 2 · **Depends on:** AL-160, AL-114
@@ -871,7 +871,7 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 3, R8 · **Depends on:** AL-134, AL-170
 - **Scope:** `features/build-run`: branch name, Build / Run (primary) / Stop, "Last build 14:02 · succeeded", run status/URL; available at every stage.
 - **Acceptance criteria:**
-  - [ ] Buttons reflect queued/running/stopped states from events.
+  - [x] Buttons reflect queued/running/stopped states from events.
 
 #### AL-174 · Merge panel, confirm and conflict flows
 - **Design:** artboard 3 Merge panel, §9 steps 4–5, R9 · **Depends on:** AL-086, AL-087, AL-170
@@ -907,13 +907,13 @@ API facts used here were read from `@anthropic-ai/claude-agent-sdk` 0.3.292 type
 - **Design:** artboard 3 tabs · **Depends on:** AL-089, AL-170
 - **Scope:** File list with stats; unified diff viewer (mono, add/remove tints); compare ticket branch vs base or a sub-branch vs ticket branch.
 - **Acceptance criteria:**
-  - [ ] Large diffs load per file on demand.
+  - [x] Large diffs load per file on demand.
 
 #### AL-180 · ADO tab
 - **Design:** artboard 3 tabs, R6 · **Depends on:** AL-066, AL-170
 - **Scope:** Work item fields, description and acceptance criteria (sanitised HTML → RN text), comments (including Agent Lanes write-backs), linked PR and checks.
 - **Acceptance criteria:**
-  - [ ] Never renders raw HTML from ADO.
+  - [x] Never renders raw HTML from ADO.
 
 #### AL-181 · Create PR stage
 - **Design:** §7 ADO write-back, §9 alternative to step 5, artboard 6 "PR open" · **Depends on:** AL-064, AL-104, AL-170
@@ -985,9 +985,9 @@ implementation agent, mid-run if needed.
   - Neither side blocks the other: no shared input queue, no shared gate.
 - **Scope update (AL-190 spike):** The design session is an Agent SDK query with `tools` limited to ClaudeDesign (and Artifact for artifact canvases) plus the design-system tokens. Read operations are allowed automatically in `canUseTool`; writes go through `finalize_plan`, approved by the user (D121). Check `system/init` tools for ClaudeDesign and degrade clearly if absent (D119). Webview mode keeps the canvas chat as the thread (D120).
 - **Acceptance criteria:**
-  - [ ] While the lead agent is mid-turn in Implementing, the user can send design messages and get replies, and the agent's output keeps streaming.
-  - [ ] The design thread is available in every stage, including during Planning.
-  - [ ] Design thread history survives tab switches and app restarts.
+  - [x] While the lead agent is mid-turn in Implementing, the user can send design messages and get replies, and the agent's output keeps streaming. (proven with fakes: `thread.test.ts` runs the thread beside a mid-turn lead session, e2e `design-thread.spec.ts` uses the fake `claude`; ClaudeDesign tool names and `finalize_plan` still need a real-account check after the AL-190 spike)
+  - [x] The design thread is available in every stage, including during Planning.
+  - [x] Design thread history survives tab switches and app restarts.
 
 #### AL-197 · Approve & ship design at any time (R11)
 - **Design:** R11, §7 ("send selected artboards to the agent as a spec"), artboard 4 · **Depends on:** AL-195, AL-198, AL-100
@@ -1037,7 +1037,7 @@ implementation agent, mid-run if needed.
 - **Design:** §12 ("Each code has a defined recovery in the UI") · **Depends on:** AL-030, AL-046
 - **Scope:** Central map from error code to action: `ADO_UNAUTHORIZED` / `ADO_SCOPE_MISSING` → open Connections on that row; `SESSION_LOST` → Reconnect; `BUILD_FAILED` → open Build log; `MERGE_CONFLICT` → conflict view; `GIT_DIRTY` → Diff tab on uncommitted changes; `VALIDATION` / `INTERNAL` → details + copy diagnostics.
 - **Acceptance criteria:**
-  - [ ] Every code has a tested action.
+  - [x] Every code has a tested action.
 
 #### AL-212 · Performance pass
 - **Design:** §12 Performance · **Depends on:** AL-143, AL-175
@@ -1050,7 +1050,7 @@ implementation agent, mid-run if needed.
 - **Design:** §10 ("Closing the app stops every run it started") · **Depends on:** AL-100, AL-134
 - **Scope:** On quit: stop runs and builds, close sessions gracefully (records flushed, sessions resumable), destroy design views; restore window size/position; warn on quit while agents are mid-turn.
 - **Acceptance criteria:**
-  - [ ] No orphan `claude`, `dotnet` or `node` processes after quit.
+  - [x] No orphan `claude`, `dotnet` or `node` processes after quit. (checked with fakes: `closeAll` and session disposal unit tests, run-job e2e for node, build queue disposal for dotnet)
 
 #### AL-214 · Logging and diagnostics
 - **Depends on:** AL-040
@@ -1072,7 +1072,7 @@ implementation agent, mid-run if needed.
 - **Design:** §12 Testing (main process row) · **Depends on:** AL-080, AL-100
 - **Scope:** Temp git repo factory (with origin remote); fake Agent SDK `query()` that replays scripted `SDKMessage` streams and records input/control calls (`setModel`, `applyFlagSettings`, `interrupt`, pushed user messages with priority); fake `safeStorage`.
 - **Acceptance criteria:**
-  - [ ] Session manager, worktree/merge service, build queue and secret store have tests on this kit.
+  - [x] Session manager, worktree/merge service, build queue and secret store have tests on this kit.
 
 #### AL-222 · E2E golden path
 - **Design:** §12 Testing (e2e row) · **Depends on:** AL-221, AL-047, AL-165, AL-171, AL-174
@@ -1096,7 +1096,7 @@ implementation agent, mid-run if needed.
 - **Depends on:** AL-047
 - **Scope:** `README.md`: what it is, install, first run, PAT scopes, Claude login vs API key, MCP servers, troubleshooting.
 - **Acceptance criteria:**
-  - [ ] A teammate installs and launches a first agent using only the guide.
+  - [ ] A teammate installs and launches a first agent using only the guide. (open: the guide in README.md covers install, first run, PAT scopes, Claude sign-in, MCP and troubleshooting; nobody has yet followed it end to end on a clean machine with a real Azure DevOps org and Claude account)
 
 #### AL-226 · Register in the ai-tools index
 - **Blocked by:** Q8
@@ -1117,29 +1117,29 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 - **Design:** TB§3, TB§6 · **Depends on:** AL-141
 - **Scope:** Pure, zod-free `allowedLanes(card, me) → Partial<Record<Lane, DropAction>>` in `packages/contracts`, so the renderer's drag highlighting, the keyboard "Send to lane" menu and the main-process recheck run the same code; re-exported from `entities/agent-ticket` as `drop-rules`. Card kinds: board item (column, assignee, has agent, linked PR, branch), backlog item, open PR (author, unresolved threads). Each action carries its label ("start agentic review", "answer 4 comments"), whether it changes ADO, the worktree source (main, item branch, PR source branch, read-only PR branch) and the lane's default skill · model · effort.
 - **Acceptance criteria:**
-  - [ ] Every row of the TB§3 table is a test case, including the refusals (assigned to someone else, already has an agent, no linked PR → "No linked PR", PR with 0 threads not on Implementing, Queued and Create PR never accept).
-  - [ ] Open PRs can be dropped on Code review by anyone, several people at once.
+  - [x] Every row of the TB§3 table is a test case, including the refusals (assigned to someone else, already has an agent, no linked PR → "No linked PR", PR with 0 threads not on Implementing, Queued and Create PR never accept).
+  - [x] Open PRs can be dropped on Code review by anyone, several people at once.
 
 #### AL-231 · ADO team board data (`ado:teamBoard`)
 - **Design:** T1, TB§6 · **Depends on:** AL-065, AL-061
 - **Scope:** ado-client calls for the user's teams (default = the team in the user's ADO profile; identity from the Connections token test), the team's board columns (Work › Boards API) and the items on it for a sprint, mapped to To Do, In Progress, Code Review, Testing, Failed. The board's own column names win; unknown columns are shown, not dropped. Channel `ado:teamBoard({ org, project, team, sprint })` plus the team list for the dropdown. Must work against Azure DevOps Server through the client's api-version negotiation.
 - **Acceptance criteria:**
-  - [ ] MSW fixtures for the artboard 08 board (OSC Developers, sprint 42) round-trip through the channel.
-  - [ ] Each item carries id, type, title, points, column, assignee (name + initials), branch and linked PR id when present.
+  - [x] MSW fixtures for the artboard 08 board (OSC Developers, sprint 42) round-trip through the channel.
+  - [x] Each item carries id, type, title, points, column, assignee (name + initials), branch and linked PR id when present.
 
 #### AL-232 · Active PRs with thread counts (`ado:activePrs`)
 - **Design:** T1, T3, T4 · **Depends on:** AL-064, AL-065
 - **Scope:** Open PRs for the team's repositories with author, reviewers, source branch, repository and unresolved comment-thread count (active threads only). Channel `ado:activePrs({ org, project, team })`.
 - **Acceptance criteria:**
-  - [ ] Thread counts ignore resolved, closed and system threads.
-  - [ ] A PR in a repo that isn't registered in Agent Lanes is flagged so the drop can refuse with "Add repo" (TB§7).
+  - [x] Thread counts ignore resolved, closed and system threads.
+  - [x] A PR in a repo that isn't registered in Agent Lanes is flagged so the drop can refuse with "Add repo" (TB§7).
 
 #### AL-233 · Backlog data (`ado:backlog`)
 - **Design:** T6, TB§5 · **Depends on:** AL-065
 - **Scope:** The profile team's backlog in backlog order, grouped by parent Feature, paged; filters for type, priority, area, tags, free text (id, title, tag) and "include items already in a sprint". Channel `ado:backlog({ org, project, team, filters, page })`.
 - **Acceptance criteria:**
-  - [ ] Artboard 11's 48-item backlog fixture pages and groups correctly.
-  - [ ] Filters combine (AND) and are applied server-side where WIQL allows.
+  - [x] Artboard 11's 48-item backlog fixture pages and groups correctly.
+  - [x] Filters combine (AND) and are applied server-side where WIQL allows.
 
 #### AL-234 · Team board widget
 - **Design:** T1, T7, TB§2, artboard 08 · **Depends on:** AL-230, AL-231, AL-232, AL-066, AL-143
@@ -1751,6 +1751,60 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D547 | AL-104: System lines such as "Plan approved by Kyle · moved to Implementing" use the OS user's first name | There is no user profile to take a name from | 2026-10-08 |
 | D548 | AL-105: `agent:send` returns `held: true` when the session is paused | The composer can show that the message is queued until Resume | 2026-10-08 |
 | D549 | AL-108: The branch merged `main` (AL-163/AL-164) before integration; its one conflict, two adjacent export lines in the renderer's `shared/api/index.ts`, kept both | Brought the branch up to date while the agent's worktree was blocked | 2026-10-08 |
+| D550 | AL-196: The mid-turn criterion is tested with fakes: `thread.test.ts` runs the thread beside a lead session that is mid-turn, and e2e `design-thread.spec.ts` uses the fake `claude` binary | Tests must never use a real claude.ai account | 2026-10-08 |
+| D551 | AL-196: Saved design-thread history is capped at `DESIGN_THREAD_HISTORY_MAX` messages and each message at `DESIGN_THREAD_TEXT_MAX` characters (`<userData>/design-threads/<ticketId>.json`) | The app-data JSON file cannot grow without limit | 2026-10-08 |
+| D552 | AL-196: The design session uses Sonnet (`DESIGN_THREAD_MODEL`) and the claude.ai login | ClaudeDesign and Artifact cannot be reached with an API key (D115) | 2026-10-08 |
+| D553 | AL-196: In webview mode the canvas's own Claude chat stays the thread (D120); the in-app panel is for MCP-link mode and for when the webview cannot sign in | As scoped after the AL-190 spike | 2026-10-08 |
+| D554 | AL-211: SESSION_LOST → Reconnect opens the ticket's Output tab for now | There is no reconnect/resume channel yet (AL-110 is todo; `agent:resume` only lifts an AL-105 pause). AL-110 replaces `reconnectSession` in `renderer/app/toasts/recovery-environment.ts` | 2026-10-08 |
+| D555 | AL-211: MERGE_CONFLICT opens the ticket's Diff tab and lists the conflicting files in the toast | There is no separate conflict view yet | 2026-10-08 |
+| D556 | AL-211: Ticket recoveries fall back to Copy diagnostics when the error carries no ticket id; ADO recoveries take the connection id from the error details' `org` when the caller does not pass one | Every code still gets an action | 2026-10-08 |
+| D557 | AL-211: The same error code for the same ticket or connection replaces the existing toast instead of stacking copies | Avoids a pile of identical toasts | 2026-10-08 |
+| D558 | AL-225: The guide is written against the current app flows; its criterion stays open until a teammate follows it on a clean machine | That needs a real teammate, Azure DevOps org and Claude account | 2026-10-08 |
+| D559 | AL-142: The "need you" pill opens a filtered view rather than scrolling | A filter also works when the amber cards sit in collapsed lanes | 2026-10-08 |
+| D560 | AL-142: The Sprint menu choice is saved in UI prefs (`lastSprint`), and the New ticket modal reads the same sprint through `pickSprint` | Board and modal agree on the sprint | 2026-10-08 |
+| D561 | AL-161: The AL-163 `ModelPicker` replaced the old `MODEL_OPTIONS` segmented control, and the sprint-named `sourceOptions()` replaced main's static `SOURCE_OPTIONS` placeholder in `NewTicketModal` | Resolved while the branch merged main (AL-163/AL-164) | 2026-10-08 |
+| D562 | AL-173: Added the build-run card states to the gallery `CardStatesSheet` | So they can be checked against artboard 3 | 2026-10-08 |
+| D563 | AL-180: Added a renderer hook in `shared/api/ado.ts` for the work item detail, comments and linked PR queries the tab needs, over existing ADO channels | No new channels needed | 2026-10-08 |
+| D564 | AL-221: Extended the existing `temp-repo.ts` and `fake-claude.ts` instead of writing new factories; one import, `src/main/testing/index.ts` | As D177 asked | 2026-10-08 |
+| D565 | AL-221: The build queue's kit test is a separate file (`build/build-queue.kit.test.ts`) on real git worktrees with a committed node build script; the in-memory build-service tests are unchanged | Keeps the fast tests fast | 2026-10-08 |
+| D566 | AL-221: Added `fakeTurn(text)` (assistant reply plus a successful result) | A small helper for scripting live-session replies | 2026-10-08 |
+| D567 | AL-048: An agent the user had paused before the 401 stays paused after a reconnect | A reconnect does not override the user's own pause | 2026-10-08 |
+| D568 | AL-084: When a branch with the requested name exists, a free name is picked; an occupied folder blocks the spawn with a reason | A sub-agent must never fall back to editing the ticket worktree | 2026-10-08 |
+| D569 | AL-086: Merging again while a conflict is still open is refused with reason `merge-in-progress` | Nothing past the conflict can be merged by a second press | 2026-10-08 |
+| D570 | AL-086: `merge-sub-branches.spec.ts` uses `test.slow()` | Its dozen real git calls took over 60 s on a loaded machine | 2026-10-08 |
+| D571 | AL-106: Added `agent:getModel` and an `agent:model` event channel; sub-agent messages never clear a pending switch | A renderer that reloads mid-switch can catch up | 2026-10-08 |
+| D572 | AL-107: The Sub-agents panel itself is AL-177; this ticket provides the counts, `subagentCountsLabel` ("2 running · 1 done · 1 queued", zeros left out) and `agent:getSubagents` | Data first, panel with its own ticket | 2026-10-08 |
+| D573 | AL-107: SDK pending, running/paused, completed and failed/killed/stopped map to Queued, Running, Done and Failed; shell and other non-agent tasks are ignored | The panel shows agents only | 2026-10-08 |
+| D574 | AL-107: The tree is capped at 200 nodes per ticket, dropping the oldest finished ones first, and is in-memory per app run | Bounded memory | 2026-10-08 |
+| D575 | AL-107: `forwardSubagentText` (nested transcript) was not wired | Optional in the scope | 2026-10-08 |
+| D576 | AL-107: Branch status refreshes on a sub-agent's started and finished events only, not on progress events | Avoids a git call per progress frame | 2026-10-08 |
+| D577 | AL-107: `emit.test.ts` uses `design:spec` as its sample plain-envelope channel | `agent:subagent` now has a full payload | 2026-10-08 |
+| D578 | AL-213: The no-orphans criterion is checked with fakes: `closeAll` and session disposal unit tests, the run-job e2e for node, build queue disposal for dotnet | No real claude or dotnet binary in tests | 2026-10-08 |
+| D579 | AL-213: Only sessions that are starting or mid-turn (`SessionManager.midTurn()`) make quit ask first; idle and paused sessions quit without asking | Those are saved and can be resumed | 2026-10-08 |
+| D580 | AL-213: Window state is a versioned `window-state.json` in userData written through a temp file; a missing, damaged or unknown-version file, or a spot now off every screen, gives the default 1440 × 960 window centred | App-written JSON is allowed (R2, R5) | 2026-10-08 |
+| D581 | AL-230: `allowedLanes` returns `Partial<Record<Lane, DropAction>>`; `refusedLanes` and `dragLock` were added | The UI shows refusal reasons ("No linked PR", "Assigned to MD", "Agent in Implementing", "Add repo") from the same code | 2026-10-08 |
+| D582 | AL-230: A PR card has an optional `repoRegistered`; when false every lane refuses it with "Add repo" | TB§7 | 2026-10-08 |
+| D583 | AL-230: A Code Review item is draggable by anyone if it has no local agent and has a linked PR; an item that already has an agent shows "Agent in …" in every case | TB§3 | 2026-10-08 |
+| D584 | AL-230: A Testing item with no branch uses a worktree from main | The same fallback TB§3 gives In Progress items; the table is silent on Testing | 2026-10-08 |
+| D585 | AL-230: The user is matched by ADO identity id, else by sign-in name ignoring case; the id comes from the token test | TB§6 Identity | 2026-10-08 |
+| D586 | AL-230: `TEAM_BOARD_COLUMN_KINDS` lives in `contracts/src/drop-rules.ts` and AL-231's schemas import it | One source for the column kinds | 2026-10-08 |
+| D587 | AL-231: The default team is the project's default team when the user is in it, else the first team from `$mine=true` | ADO has no API for "the team in your ADO profile" | 2026-10-08 |
+| D588 | AL-231: The board's last column (Done/Closed) and its items are left out; unrecognised columns get kind `other`, and a column only items mention gets an `unknown:<name>` column | T1 lists no Done column | 2026-10-08 |
+| D589 | AL-231: The board's own column names are shown, mapped to the app's kinds by incoming/outgoing column type, then by name patterns (fail, review, test/QA/UAT, progress/active, to do/new) | Works across processes and renamed columns | 2026-10-08 |
+| D590 | AL-231: The column comes from the board's `WEF_…_Kanban.Column` field, falling back to `System.BoardColumn`; items are ordered by column then id, not backlog rank | Backlog-rank order can follow in AL-234 | 2026-10-08 |
+| D591 | AL-231: `sprint` takes the sprint path or id; without it the board uses `pickSprint` (the current sprint) | Same default as the header | 2026-10-08 |
+| D592 | AL-231: Azure DevOps Server support uses the client's existing api-version negotiation; a test runs the fake as server 6.0 | No separate code path | 2026-10-08 |
+| D593 | AL-231: The shared fake work item store gained optional board and backlog fields (area, tags, points, priority, stack rank, parent, board column, relations) and `workitemsbatch` supports `$expand`; `createFakeTeamOrg` holds the artboard 08 data | Shared by the AL-231–AL-233 tests | 2026-10-08 |
+| D594 | AL-232: "The team's repositories" means active PRs in the project whose author, a reviewer or the team itself is on the team | ADO has no team-to-repository mapping | 2026-10-08 |
+| D595 | AL-232: Only threads with status `active` count; pending, fixed, wontFix, closed, byDesign, deleted and system-only threads do not | Matches what still needs an answer | 2026-10-08 |
+| D596 | AL-232: If any thread read fails the whole call fails | Better than showing a wrong count | 2026-10-08 |
+| D597 | AL-232: Registered repos' remotes come from `git config --get remote.origin.url` through a new `registeredRemotes` option on `createAdoService` | One added option in `services.ts` | 2026-10-08 |
+| D598 | AL-233: The type filter uses backlog kinds (story/bug/task) mapped through the backlog configuration; the default includes all three | No process's type names are hard-coded; artboard 11 shows a Task row and filter | 2026-10-08 |
+| D599 | AL-233: Closed and removed items are excluded by the states mapped to the Completed and Removed categories; "already in a sprint" means the iteration is not the team's backlog iteration (root when ADO returns an empty path) | Process-independent | 2026-10-08 |
+| D600 | AL-233: Paging is on the flat backlog order and each page is grouped on its own, so a Feature can appear on two pages; the response carries `total` and the page count | Keeps paging server-side | 2026-10-08 |
+| D601 | AL-233: Default page size 50, maximum 200 (one batch read); a query returns at most 5,000 ids | ADO batch and WIQL limits | 2026-10-08 |
+| D602 | AL-142: At integration the header's MCP pill is AL-108's live `McpStatusPill` (the running sessions' servers, amber with names on hover) instead of AL-142's pill from the saved servers' last test; `mcpStatusOf` and its test were removed | Both branches built the same pill; AL-142's own comment said AL-108's live status would replace it | 2026-10-08 |
+| D603 | AL-084: At integration the session extras compose through AL-108's `combineSessionExtras`, which now also merges SDK hooks per event; AL-084's `mergeSessionExtras` was dropped and its test moved to `combineSessionExtras` | One composition path for the stage server, MCP servers, permission policy, sub-agent worktree hooks and sub-agent tracking hooks | 2026-10-08 |
 
 ---
 
@@ -1806,6 +1860,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Added epic E14 (AL-230–AL-241) from the add-on brief "Team Board & Drag-to-Agent" (Kyle, rev 27): team ADO board under the lanes, drag-to-agent with drop rules, Backlog popout, 10 s Undo; only To Do/Failed → Planning/Implementing changes ADO. Copy in `docs/design/DESIGN-team-board.md`, artboards 08–12. |
 | 2026-10-08 | Merged AL-163, AL-164 (batch b16: model and effort pickers, workspace preview and stage gates), both done. The run that merged them stopped on a usage limit before recording them; verified by hand: `pnpm verify` green (2,705 tests), e2e 106/106 on rerun (one load-related flake on the first run, tracked under AL-220). |
 | 2026-10-08 | Integrator batch 1 (b35): merged AL-108 (partial: ADO MCP server injected per work item org and the header MCP pill with auto-reconnect are in; reading and commenting on the work item needs a live session against a real ADO org) and AL-109 (partial: D18 policy, `canUseTool` "Needs you · permission" prompt and settings are in and unit-tested on the fake SDK; both criteria need a real Claude session). AL-110 (uncommitted, kept in the stash entry "WIP on feature/b35-AL-108-to-112: 05bc70a"), AL-111 and AL-112 were not on the branch and stay `todo`. No conflicts on main (the branch had already merged main); lockfile unchanged after `pnpm install`. No integration fixes needed. Decision D549. `pnpm verify`: typecheck, lint and build green; 2736/2738 unit tests in the full run, with load-related timeouts in real-git `ticket-worktree.test.ts` and `repos/registry.test.ts` (and `archive`, `merge-to-main`, `service.mcp` in an earlier run), none touched by this merge; each passed when rerun alone. E2E 106/106. The b35 worktree held a conflicted `sub-worktree.ts` and an untracked `subagent-tracker.ts` from another branch's stash; copies were saved before the worktree was removed. |
+| 2026-10-08 | Integrator batch 2 (b24, b23, b39, b34, b38): merged AL-196, AL-211, AL-142, AL-161, AL-173, AL-179, AL-180, AL-221, AL-048, AL-086, AL-106, AL-107, AL-213, AL-230, AL-231, AL-232 and AL-233 (done), AL-225 (partial: the README guide is written, but no teammate has yet followed it end to end on a clean machine with a real org and Claude account) and AL-084 (partial: sub-branches are recorded with ahead counts; the Sub-branches panel is AL-178). Nothing rejected. Conflicts: b24 with AL-108/AL-109 in renderer `AppProviders.tsx` and `shared/api/index.ts` (kept both); b23 in `entities/agent-ticket/model/event-handlers(.test).ts` (kept AL-109 `agent:permission` + AL-173 `run:status`/`build:finished`) and `pages/board/ui/BoardPage.tsx` (took AL-142's header; AL-108's `McpStatusPill` moved into `BoardHeader`, D602); b34 in `agent.names.ts`/`agent.schemas.ts`, `agent/handlers(.test).ts`, `session-messages.test.ts`, renderer `ipc.ts` and `event-handlers(.test).ts` (kept both), `session-manager.ts` (SessionExtras keeps AL-109 `permissionMode`/`canUseTool` and AL-084 `hooks`) and `services.ts` (one `combineSessionExtras` path for stage, MCP, permissions, sub-worktree and sub-agent hooks, D603); b38 in `ado/service.ts`, `services.ts` (`onUnauthorized` + `registeredRemotes`) and `entities/agent-ticket/index.ts` (kept both). Lockfile unchanged after `pnpm install`. Integration fixes: `design/thread.test.ts`'s fake query implements AL-108's `mcpServerStatus`/`reconnectMcpServer`; `BoardPage.test.tsx` feeds the live MCP status. Decisions D550–D603. `pnpm verify` green (3049 unit tests). E2E: 115/116 in the first full run, the one failure a Playwright worker crash (0xC0000409) in `accessibility.spec.ts`, which passed 2/2 alone; the full rerun was 116/116. Follow-ups: AL-197 sends design-thread messages to the implementation agent on ship; AL-110 replaces `reconnectSession` in `renderer/app/toasts/recovery-environment.ts`; AL-177 renders the sub-agent tree from `agent:getSubagents` + `agent:subagent`; AL-178 renders recorded sub-branches; check ClaudeDesign tool names and `finalize_plan` against a real account; `e2e/first-run.spec.ts` "a fresh profile reaches the board…" is flaky under load (pick-repo dialog close, AL-220). |
 ---
 
 ## 7. Parallel build rules
