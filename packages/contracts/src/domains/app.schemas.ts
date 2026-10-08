@@ -127,6 +127,8 @@ export const ToastIntentSchema = z.discriminatedUnion('type', [
     ticketId: TicketIdSchema.optional(),
     connectionId: ConnectionIdSchema.optional(),
   }),
+  // AL-110: Reconnect resumes a lost agent session from its saved session id in the same worktree.
+  z.object({ type: z.literal('reconnectSession'), ticketId: TicketIdSchema }),
 ]);
 export type ToastIntent = z.infer<typeof ToastIntentSchema>;
 

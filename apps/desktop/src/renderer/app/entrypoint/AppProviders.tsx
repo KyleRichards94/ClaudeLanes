@@ -8,6 +8,7 @@ import {
   mcpStatusEventHandlers,
 } from '@/shared/api';
 import { permissionEventHandlers } from '@/features/resolve-permission';
+import { sessionStatusEventHandlers } from '@/features/start-queued-agent';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
 import { runningEventHub } from './EventHub';
@@ -44,6 +45,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(permissionEventHandlers(queryClient)), [queryClient]);
   // `design:thread` → the ticket's cached design thread (AL-196).
   useEffect(() => runningEventHub()?.register(designThreadEventHandlers(queryClient)), [queryClient]);
+  // `agent:status` keeps each ticket's session status current, e.g. Queued and Start now (AL-111).
+  useEffect(() => runningEventHub()?.register(sessionStatusEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,11 +1,11 @@
-import { copyDiagnostics } from '@/shared/api';
+import { copyDiagnostics, reconnectSession } from '@/shared/api';
 import { openConnections, setTicketPageTab, toast } from '@/shared/model';
 import { routes, type Route } from '@/shared/routing';
 import type { RecoveryEnvironment } from './toast-intents';
 
 /**
- * The app's side of each error recovery (AL-211): the Connections modal, the drill-in's tabs and
- * Copy diagnostics. `navigate` is the router's.
+ * The app's side of each error recovery (AL-211): the Connections modal, the drill-in's tabs,
+ * Reconnect (AL-110) and Copy diagnostics. `navigate` is the router's.
  */
 export function createRecoveryEnvironment(navigate: (route: Route) => void): RecoveryEnvironment {
   const openTicketTab = (ticketId: string, tab: Parameters<RecoveryEnvironment['openTicketTab']>[1]) => {
@@ -15,9 +15,13 @@ export function createRecoveryEnvironment(navigate: (route: Route) => void): Rec
   return {
     openConnections,
     openTicketTab,
-    // No reconnect channel yet (AL-110; `agent:resume` only lifts a pause, AL-105): the drill-in's Output
-    // is where the session's state shows; AL-110 replaces this with a resume from the saved session id.
-    reconnectSession: (ticketId) => openTicketTab(ticketId, 'output'),
+    // Resumes the lost session from its saved session id in the same worktree (agent:reconnect, AL-110);
+    // a failure is shown as a toast of its own.
+    reconnectSession: (ticketId) => {
+      void reconnectSession(ticketId).then((problem) => {
+        if (problem) toast({ id: `reconnect-failed:${ticketId}`, tone: 'error', title: `Couldn't reconnect ${ticketId}`, body: problem });
+      });
+    },
     copyDiagnostics: () => {
       void copyDiagnostics().then((result) =>
         toast(

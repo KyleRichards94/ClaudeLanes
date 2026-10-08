@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
+import { DEFAULT_MAX_CONCURRENT_AGENTS } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -11,6 +12,9 @@ import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
 import { createPermissionService, type PermissionService } from './agent/permissions';
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
+import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
+import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
+import { createBuildContext } from './agent/build-context';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
 import { readAppInfo } from './app/app-info';
@@ -117,6 +121,10 @@ export interface Services {
   readonly mcpStatus: McpStatusMonitor;
   /** Headless permission policy and the "Needs you · permission" requests of each session (AL-109). */
   readonly permissions: PermissionService;
+  /** Resumes a lost session once, then asks with the "MCP bridge lost the session" toast (AL-110). */
+  readonly recovery: SessionRecovery;
+  /** Per-repo cap on running agents and the Queued lane: every session start goes through it (AL-111). */
+  readonly launches: LaunchQueue;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -176,7 +184,11 @@ export function createServices(options: ServiceOptions): Services {
     update(patch) {
       const result = settingsStore.update(patch);
       // A larger queue size starts waiting jobs straight away.
-      if (result.ok) buildQueue.refresh();
+      if (result.ok) {
+        buildQueue.refresh();
+        // A raised agent cap starts queued launches (AL-111).
+        void launches.refresh();
+      }
       return result;
     },
   };
@@ -196,6 +208,8 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     fingerprint: createGitFingerprint(git),
     warn: (message) => log.child('build').warn(message),
+    // The ticket's live session gets the result with its next turn (AL-112); `buildContext` is created below.
+    onFinished: (result) => buildContext.onBuildFinished(result),
   });
   const runs = createRunService({
     tickets,
@@ -288,14 +302,20 @@ export function createServices(options: ServiceOptions): Services {
     // policy (AL-109), the WorktreeCreate / WorktreeRemove hooks that give writer sub-agents their own
     // worktrees (AL-084) and the SubagentStart / SubagentStop hooks of sub-agent tracking (AL-107).
     extras: (record) => sessionExtras(record),
-    onEnded: (ticketId) => {
+    onEnded: (ticketId, state, info) => {
       // A gate still waiting when its session ends closes, so nothing keeps the card amber (AL-104).
       stages.cancelGate(ticketId);
       // The ended session's servers leave the header pill (AL-108).
       void mcpStatus.refresh();
       // Permission requests the session left waiting close (AL-109).
       permissions.cancelAll(ticketId);
+      // A lost session is resumed once in the same worktree, then the user is asked (AL-110).
+      recovery.onEnded(ticketId, state, info);
+      // The ended session's slot goes to the oldest queued launch of its repo (AL-111).
+      void launches.refresh();
     },
+    // A silent session is lost only while nobody is asked anything (AL-110).
+    isWaitingOnUser: (ticketId) => stages.pendingGate(ticketId) !== null || permissions.pending(ticketId) !== null,
   });
   const transcripts = createTranscriptService({
     sessions,
@@ -331,6 +351,15 @@ export function createServices(options: ServiceOptions): Services {
     queue: repoQueue,
     log: log.child('merge'),
   });
+  const recovery = createSessionRecovery({ sessions, restart: (ticketId, onStarted) => launches.restart(ticketId, onStarted), emit: options.emit, log: log.child('agent') });
+  const launches = createLaunchQueue({
+    sessions,
+    tickets,
+    // The repo's `maxConcurrentAgents` (default 3, Q5), read at each decision.
+    maxAgents: (repo) => settings.get().repos.find((item) => item.path === repo)?.maxConcurrentAgents ?? DEFAULT_MAX_CONCURRENT_AGENTS,
+    emit: options.emit,
+    log: log.child('agent'),
+  });
   const stageExtras = stageSessionExtras({ stages, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
@@ -345,6 +374,7 @@ export function createServices(options: ServiceOptions): Services {
   const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
   const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
   late.credentialFailures = credentialFailureService;
+  const buildContext = createBuildContext({ sessions, log: log.child('agent') });
 
   return {
     appDataDir: options.appDataDir,
@@ -375,6 +405,8 @@ export function createServices(options: ServiceOptions): Services {
     skills,
     mcpStatus,
     permissions,
+    recovery,
+    launches,
     branches,
     mergeToMain,
     ticketArchive,

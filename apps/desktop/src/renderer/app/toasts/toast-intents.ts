@@ -49,6 +49,8 @@ const intentHandlers: { readonly [T in ToastIntent['type']]: (intent: IntentOf<T
   openConnections: (intent, context) => context.openConnections(intent.connectionId ? { connectionId: intent.connectionId } : {}),
   // AL-211: the error code's recovery from the central map.
   recover: (intent, context) => runRecovery(recoveryFor(intent.code, { ticketId: intent.ticketId, connectionId: intent.connectionId }), context),
+  // Reconnect: a new session resumed from the saved session id, in the same worktree (AL-110).
+  reconnectSession: (intent, context) => context.reconnectSession(intent.ticketId),
 };
 
 /** Carries out a toast button's intent: opens a page, opens Connections on a row (AL-046), or recovers from an error (AL-211). */

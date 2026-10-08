@@ -5,6 +5,8 @@ import { createClaudeLauncher } from './claude-sdk';
 import { createAgentHandlers } from './handlers';
 import { createUsageService } from './usage/usage-service';
 import { createMcpStatusMonitor } from './mcp';
+import { createLaunchQueue } from './launch-queue';
+import { createSessionRecovery } from './recovery';
 import { testPermissions } from './testing/sessions';
 import { createTranscriptService } from './output/transcript';
 import { createSessionManager, type SessionManager } from './session-manager';
@@ -27,6 +29,8 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
       permissions: testPermissions(),
       subagents,
       usage: createUsageService({ sessions, emit: recordingEmit().emit }),
+      recovery: createSessionRecovery({ sessions, emit: recordingEmit().emit }),
+      launches: createLaunchQueue({ sessions, tickets, maxAgents: () => 3, emit: recordingEmit().emit }),
     }),
     stages,
     emit,
