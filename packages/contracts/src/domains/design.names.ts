@@ -10,6 +10,7 @@ export const DESIGN_INVOKE_CHANNELS = [
   'design:unlinkCanvas', // AL-193
   'design:openCanvas', // AL-193
   'design:listArtboards', // AL-195
+  'design:shipSpec', // AL-197
 ] as const;
 export const DESIGN_EVENT_CHANNELS = [
   'design:spec',

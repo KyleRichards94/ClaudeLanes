@@ -26,6 +26,8 @@ import { createDesignArtboardReader, type DesignArtboardReader } from './design/
 import { createElectronDesignPlatform } from './design/electron-platform';
 import { createDesignSpecFiles, designSpecsRootDir } from './design/spec-store';
 import { createDesignSpecService, type DesignSpecService } from './design/specs';
+import { createArtboardSourceReader } from './design/artboard-sources';
+import { createDesignShipService, type DesignShipService } from './design/ship';
 import { createDiagnostics, type Diagnostics } from './diagnostics';
 import { createGitService, type GitService } from './git';
 import type { Emit } from './ipc/emit';
@@ -115,6 +117,8 @@ export interface Services {
   readonly pullRequests: PullRequestService;
   /** Shipped design specs in `<userData>/design-specs` (D8): the agent's get / list / ack tools and the design tab (AL-198). */
   readonly designSpecs: DesignSpecService;
+  /** Approve & ship design at any time: snapshots DesignSpec vN and hands it to the ticket's agent with `priority: 'now'` (AL-197). */
+  readonly designShip: DesignShipService;
 }
 
 export interface ServiceOptions {
@@ -258,9 +262,19 @@ export function createServices(options: ServiceOptions): Services {
   const pullRequests = createPullRequestService({ tickets, ado, connections, git: git.run, emit: options.emit, transcripts, log: log.child('pr') });
   // Open PRs from before a restart are read again from the start (AL-181).
   pullRequests.watch();
+  const designSpecFiles = createDesignSpecFiles({ rootDir: designSpecsRootDir(options.appDataDir), warn: (message) => log.child('design').warn(message) });
   const designSpecs = createDesignSpecService({
     tickets,
-    files: createDesignSpecFiles({ rootDir: designSpecsRootDir(options.appDataDir), warn: (message) => log.child('design').warn(message) }),
+    files: designSpecFiles,
+    emit: options.emit,
+    transcripts,
+    log: log.child('design'),
+  });
+  const designShip = createDesignShipService({
+    tickets,
+    files: designSpecFiles,
+    sources: createArtboardSourceReader({ claude, warn: (message) => log.child('design').warn(message) }),
+    sessions,
     emit: options.emit,
     transcripts,
     log: log.child('design'),
@@ -299,6 +313,7 @@ export function createServices(options: ServiceOptions): Services {
     reconcile,
     pullRequests,
     designSpecs,
+    designShip,
   };
 }
 
@@ -309,6 +324,7 @@ export async function disposeServices(services: Services): Promise<void> {
   await services.sessions.dispose();
   services.transcripts.dispose();
   services.pullRequests.dispose();
+  services.designShip.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();

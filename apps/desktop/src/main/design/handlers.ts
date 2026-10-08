@@ -7,7 +7,8 @@ export function createDesignHandlers({
   designView,
   designCanvases,
   designArtboards,
-}: Pick<Services, 'designView' | 'designCanvases' | 'designArtboards'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
+  designShip,
+}: Pick<Services, 'designView' | 'designCanvases' | 'designArtboards' | 'designShip'>): HandlersFor<(typeof DESIGN_INVOKE_CHANNELS)[number]> {
   return {
     'design:open': ({ ticketId, url, bounds }) => designView.open(ticketId, url, bounds),
     'design:setBounds': ({ ticketId, bounds }) => ok({ found: designView.setBounds(ticketId, bounds) }),
@@ -19,5 +20,6 @@ export function createDesignHandlers({
     'design:unlinkCanvas': ({ ticketId }) => designCanvases.unlink(ticketId),
     'design:openCanvas': ({ ticketId, bounds }) => designCanvases.open(ticketId, bounds),
     'design:listArtboards': ({ ticketId }) => designArtboards.list(ticketId),
+    'design:shipSpec': (request) => designShip.ship(request),
   };
 }

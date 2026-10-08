@@ -112,6 +112,8 @@ export const TicketDesignSpecSchema = z.object({
   usedAt: EpochMsSchema.nullable(),
   /** When the agent first fetched it with `get_design_spec` ("Agent is watching this canvas", AL-198); null or absent until then. */
   fetchedAt: EpochMsSchema.nullable().optional(),
+  /** When it was handed to the agent's session (AL-197); null or absent while held for a session that isn't running. */
+  deliveredAt: EpochMsSchema.nullable().optional(),
 });
 export type TicketDesignSpec = z.infer<typeof TicketDesignSpecSchema>;
 

@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { DesignArtboard } from '@agent-lanes/contracts';
+import { DESIGN_SPEC_NOTE_MAX, type DesignArtboard } from '@agent-lanes/contracts';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
-import { Button, Icon, Text } from '@agent-lanes/ui';
-import { useDesignArtboards } from '@/shared/api';
+import { Button, Icon, Text, TextField } from '@agent-lanes/ui';
+import { useDesignArtboards, useShipDesignSpec } from '@/shared/api';
 import { keepSelectedArtboards, toggleArtboard, useSelectedArtboards } from '@/shared/model';
 import { SideSection } from './SideSection';
 
@@ -22,7 +22,10 @@ export interface HandOffSectionProps {
  * "Hand off to agent" (artboard 4, AL-195): the canvas's artboards with names and sizes and a
  * checkbox each, read through the design session (D118). The list is read again when the tab shows,
  * when the window regains focus and on Refresh, so added and renamed artboards appear; picks of
- * artboards no longer on the canvas are dropped. Shipping the picked artboards is AL-197's.
+ * artboards no longer on the canvas are dropped.
+ *
+ * Send (Approve & ship, AL-197, R11) is enabled in every stage whenever an artboard is picked: it ships
+ * the picks and the optional note as DesignSpec vN, delivered to the lead agent straight away.
  */
 export function HandOffSection({ ticketId, canvasUrl }: HandOffSectionProps) {
   const query = useDesignArtboards(ticketId, canvasUrl);
@@ -34,7 +37,16 @@ export function HandOffSection({ ticketId, canvasUrl }: HandOffSectionProps) {
     if (artboards) keepSelectedArtboards(ticketId, artboards.map((artboard) => artboard.id));
   }, [ticketId, artboards]);
 
-  const count = artboards ? selected.filter((id) => artboards.some((artboard) => artboard.id === id)).length : 0;
+  const picked = artboards ? artboards.filter((artboard) => selected.includes(artboard.id)) : [];
+  const count = picked.length;
+  const ship = useShipDesignSpec();
+  const [note, setNote] = useState('');
+
+  const onShip = () =>
+    ship.mutate(
+      { ticketId, artboards: picked.map(({ id, name, width, height }) => ({ id, name, width, height })), ...(note.trim() ? { note: note.trim() } : {}) },
+      { onSuccess: () => setNote('') },
+    );
 
   return (
     <SideSection title="Hand off to agent" testID="design-hand-off">
@@ -88,16 +100,32 @@ export function HandOffSection({ ticketId, canvasUrl }: HandOffSectionProps) {
         </Text>
       )}
 
+      {canvasUrl && artboards && artboards.length > 0 ? (
+        <TextField label="Note to the agent" placeholder="Optional: what matters most in this design" value={note} onChangeText={setNote} maxLength={DESIGN_SPEC_NOTE_MAX} testID="ship-note" />
+      ) : null}
       <Button
         label={`Send ${count} artboard${count === 1 ? '' : 's'} to agent as spec`}
         variant="primary"
         trailingIcon="arrow-right"
         justify="between"
-        disabled
+        disabled={count === 0}
+        loading={ship.isPending}
+        onPress={onShip}
         testID="send-artboards"
       />
+      {ship.isError ? (
+        <Text variant="meta" size="sm" color={tone.danger.text} role="alert" testID="ship-error">
+          {ship.error.message}
+        </Text>
+      ) : ship.data ? (
+        <Text variant="meta" size="sm" color={tone.ok.text} role="status" testID="ship-result">
+          {ship.data.delivered
+            ? `Design v${ship.data.spec.version} approved and sent to the agent.`
+            : `Design v${ship.data.spec.version} approved. The agent gets it first when its session runs.`}
+        </Text>
+      ) : null}
       <Text variant="meta" size="sm">
-        Attaches artboard source and tokens to the lead agent&apos;s next turn.
+        Approves the picked artboards as the next design version, with their source and tokens, and hands it to the lead agent now, in any stage.
       </Text>
     </SideSection>
   );
