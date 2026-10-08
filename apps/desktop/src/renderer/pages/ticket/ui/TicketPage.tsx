@@ -95,7 +95,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       <View style={styles.panels}>
         <AgentPanel ticket={ticket} />
         <WorktreePanel ticket={ticket} />
-        <MergePanel ticket={ticket} subBranches={subBranches} />
+        <MergePanel ticket={ticket} />
       </View>
 
       <TicketTabBar ticketId={ticket.id} value={tab} idPrefix={TABS_ID} style={styles.tabs} />

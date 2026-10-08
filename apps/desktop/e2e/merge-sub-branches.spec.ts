@@ -104,3 +104,34 @@ test('merges ready sub-branches in order and stops at the first conflict (AL-086
   // No session runs, so the hand-off to the lead agent says why it could not be sent.
   expect(await invoke('git:handConflictToLead', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
+
+test('the Merge panel merges sub-branches and opens the conflict view (AL-174)', async () => {
+  test.slow(); // real git in a temporary repo, slow on a busy Windows machine
+  await page.evaluate(() => {
+    (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273';
+  });
+
+  const mergeSubs = page.getByTestId('merge-sub-branches');
+  await expect(mergeSubs).toHaveText(/Merge 3 sub-branches → 71273-cutover-job-control/);
+  await expect(mergeSubs).toBeEnabled();
+  // Nothing is on the ticket branch itself yet, so Merge worktree → main is off and says why.
+  await expect(page.getByTestId('merge-to-main')).toBeDisabled();
+  await expect(page.getByTestId('merge-disabled-reasons')).toHaveText('No commits to merge into main yet.');
+
+  await mergeSubs.click();
+  const dialog = page.getByRole('dialog', { name: 'Merge stopped on a conflict' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('sub/71273-footer → 71273-cutover-job-control')).toBeVisible();
+  await expect(dialog.getByText('Merged first: sub/71273-grid, sub/71273-header.')).toBeVisible();
+  await expect(dialog.getByTestId('conflict-files')).toHaveText('JobControl.razor');
+  await expect(dialog.getByRole('button', { name: 'Hand to lead agent' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Open in editor' })).toBeVisible();
+
+  // Closed, the stopped merge stays one press away and both merges stay off until it is resolved.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('merge-conflict-row')).toBeVisible();
+  await expect(mergeSubs).toBeDisabled();
+  await page.getByTestId('merge-conflict-row').click();
+  await expect(dialog.getByTestId('conflict-files')).toHaveText('JobControl.razor');
+});

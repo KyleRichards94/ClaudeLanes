@@ -22,6 +22,40 @@ const record = fakeTicketRecord({
   ],
 });
 
+/** One ready sub-branch for the Merge panel (AL-174). */
+const branchStatus = {
+  ticketId: '71273',
+  checkedAt: 1,
+  ticket: {
+    worktreePath: record.worktreePath,
+    present: true,
+    dirty: false,
+    changedFiles: 0,
+    conflicted: false,
+    branch: record.branch,
+    baseBranch: 'main',
+    baseRef: 'main',
+    ahead: 2,
+    behind: 0,
+  },
+  subBranches: [
+    {
+      name: 'filter',
+      branch: 'sub/71273-filter',
+      worktreePath: 'C:/src/.agent-lanes/71273-filter',
+      present: true,
+      dirty: false,
+      changedFiles: 0,
+      conflicted: false,
+      ahead: 4,
+      behind: 0,
+      finished: true,
+      ready: true,
+      mergedAt: null,
+    },
+  ],
+};
+
 function renderPage(ticketId = '71273') {
   const router = createRouter(routes.ticket(ticketId));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -49,6 +83,7 @@ describe('TicketPage', () => {
     installFakeBridge({
       'tickets:get': { ok: true, data: { record } },
       'ado:getWorkItem': { ok: true, data: adoFixtureWorkItem(71273) },
+      'branches:status': { ok: true, data: branchStatus },
     });
   });
 
@@ -96,7 +131,7 @@ describe('TicketPage', () => {
     for (const name of ['Agent', 'Worktree', 'Merge', 'Sub-agents', 'Sub-branches']) {
       expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy();
     }
-    expect(screen.getByText('Merge 1 sub-branch → 71273-cutover-frmjobcontrol-to')).toBeTruthy();
+    expect(await screen.findByText('Merge 1 sub-branch → 71273-cutover-frmjobcontrol-to')).toBeTruthy();
     expect(screen.getByText('sub/71273-filter')).toBeTruthy();
   });
 

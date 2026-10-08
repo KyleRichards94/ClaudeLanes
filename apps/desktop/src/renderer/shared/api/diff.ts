@@ -16,11 +16,15 @@ export function diffFileQueryKey(ticketId: string, against: DiffAgainst, path: s
   return [...diffQueryKey(ticketId, against), 'file', path, oldPath ?? null] as const;
 }
 
-/** The Diff tab's file list: status and line counts against the base or a sub-branch (AL-089, AL-179). */
-export function useTicketDiff(ticketId: string, against: DiffAgainst) {
+/**
+ * The Diff tab's file list: status and line counts against the base or a sub-branch (AL-089, AL-179).
+ * The Merge panel's conflict view reads the unmerged files from it only while a merge is stopped (AL-174).
+ */
+export function useTicketDiff(ticketId: string, against: DiffAgainst, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: diffQueryKey(ticketId, against),
     queryFn: async () => unwrap(await invoke('git:diff', { ticketId, against })),
+    enabled: options.enabled,
   });
 }
 
