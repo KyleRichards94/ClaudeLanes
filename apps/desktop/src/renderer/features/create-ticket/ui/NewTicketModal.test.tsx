@@ -20,7 +20,7 @@ async function renderModal(
   onLaunch: (request: NewTicketRequest) => void | Promise<void> = vi.fn(),
   replies: Parameters<typeof installFakeSettings>[1] = {},
 ) {
-  installFakeSettings(settings(), replies);
+  const main = installFakeSettings(settings(), replies);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   // The app has read the settings before anyone opens the modal.
   await client.prefetchQuery({ queryKey: ['settings'], queryFn: () => settings() });
@@ -31,7 +31,7 @@ async function renderModal(
     </QueryClientProvider>,
   );
   await screen.findByRole('dialog', { name: 'New agent ticket' });
-  return { onClose, onLaunch };
+  return { onClose, onLaunch, bridge: main.bridge };
 }
 
 /** Presses Tab until `matches` holds for the focused element (at most 30 times). */
@@ -148,6 +148,7 @@ describe('NewTicketModal work item picker (AL-161)', () => {
   const fixture = adoFixture();
   const sprintItems = fixture.workItems.slice(0, 4);
   const adoReplies = {
+    'ado:listTeams': { ok: true, data: { teams: [{ id: 'team-osc', name: 'OSC Developers' }], defaultTeamId: 'team-osc' } },
     'ado:listSprints': { ok: true, data: fixture.sprints },
     'ado:listWorkItems': { ok: true, data: sprintItems },
     'ado:searchWorkItems': { ok: true, data: fixture.workItems.filter((item) => item.id === 71400) },
@@ -157,9 +158,11 @@ describe('NewTicketModal work item picker (AL-161)', () => {
 
   it('lists the sprint as radio rows and launches with the picked work item', async () => {
     const onLaunch = vi.fn(async () => undefined);
-    await renderModal(onLaunch, adoReplies);
+    const { bridge } = await renderModal(onLaunch, adoReplies);
 
     expect(await screen.findByRole('radio', { name: 'Sprint 42' })).toBeTruthy();
+    // The board team's sprints, as the board's Sprint menu reads them.
+    expect(bridge.invoke).toHaveBeenCalledWith('ado:listSprints', { team: 'team-osc' });
     const row = await screen.findByRole('radio', { name: '#71273 Cutover frmJobControl to Blazor, Story · Active' });
     expect(screen.getByRole('radio', { name: '#71330 Asset register paging slow above 5k rows, Bug · New' })).toBeTruthy();
     expect(screen.getByText('Optional')).toBeTruthy();

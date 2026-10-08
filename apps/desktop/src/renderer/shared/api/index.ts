@@ -36,6 +36,7 @@ export {
   adoKeys,
   usePullRequest,
   useSprints,
+  useTeams,
   useWorkItem,
   useWorkItemComments,
   useWorkItemSearch,

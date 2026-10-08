@@ -7,6 +7,7 @@ import {
   ADO_FIXTURE_REPOSITORY,
   ADO_FIXTURE_SPRINT_42_PATH,
   ADO_FIXTURE_TEAM,
+  ADO_FIXTURE_TEAM_ID,
   adoFixture,
 } from '@agent-lanes/contracts/testing';
 import { setupServer } from 'msw/node';
@@ -15,6 +16,7 @@ import { createAdoClient, type AdoClient } from './client';
 import { testAdoConnection } from './connection-test';
 import { createPullRequest, getPullRequestSnapshot } from './pull-requests';
 import { listSprints, listTeams } from './sprints';
+import { listMyTeams } from './team-board';
 import { ADO_FIXTURE_PAT, createFakeAdoOrg, type FakeAdoOrg } from './testing';
 import { getWorkItem, getWorkItems, listSprintWorkItems, searchWorkItems } from './work-items';
 import { addWorkItemComment, listWorkItemComments, setWorkItemState } from './write-back';
@@ -43,6 +45,19 @@ describe('createFakeAdoOrg: reads give back the fixture', () => {
     expect(await listSprints(client, { project: ADO_FIXTURE_PROJECT, team: ADO_FIXTURE_TEAM })).toEqual({ ok: true, data: fixture.sprints });
     expect(await listSprints(client, { project: ADO_FIXTURE_PROJECT })).toEqual({ ok: true, data: fixture.sprints });
     expect(await listTeams(client, ADO_FIXTURE_PROJECT)).toMatchObject({ ok: true, data: [{ name: ADO_FIXTURE_TEAM }] });
+    expect(org.state.unhandled).toEqual([]);
+  });
+
+  it('as an on-prem server: the project-level sprints route is a 404, the team route and listMyTeams work', async () => {
+    const org = createFakeAdoOrg({ projectIterations: false });
+    const client = clientOf(org);
+    const fixture = adoFixture(org.orgUrl);
+    expect(await listSprints(client, { project: ADO_FIXTURE_PROJECT })).toMatchObject({ ok: false, details: { status: 404 } });
+    expect(await listSprints(client, { project: ADO_FIXTURE_PROJECT, team: ADO_FIXTURE_TEAM })).toEqual({ ok: true, data: fixture.sprints });
+    expect(await listMyTeams(client, ADO_FIXTURE_PROJECT)).toEqual({
+      ok: true,
+      data: { teams: [{ id: ADO_FIXTURE_TEAM_ID, name: ADO_FIXTURE_TEAM }], defaultTeamId: ADO_FIXTURE_TEAM_ID },
+    });
     expect(org.state.unhandled).toEqual([]);
   });
 

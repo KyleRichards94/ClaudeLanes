@@ -58,6 +58,12 @@ export interface FakeAdoOrgOptions {
   identity?: string;
   /** Stamps new comments and pull requests. Default the real clock. */
   now?: () => Date;
+  /**
+   * Whether the project-level `/{project}/_apis/work/teamsettings/iterations` route answers, as on
+   * Azure DevOps Services. False answers it 404, as an on-prem Azure DevOps Server does: only the
+   * team-scoped route works there. Default true.
+   */
+  projectIterations?: boolean;
 }
 
 export interface FakeAdoRequest {
@@ -167,7 +173,15 @@ export function createFakeAdoOrg(options: FakeAdoOrgOptions = {}): FakeAdoOrg {
     }),
     http.get(`${orgUrl}/:project/_apis/work/teamsettings/iterations`, ({ request, params }) => {
       if (!isProject(params['project'])) return projectNotFound(params['project']);
+      if (options.projectIterations === false) {
+        return adoError(404, 'The controller for path /_apis/work/teamsettings/iterations was not found or does not implement IController.');
+      }
       return iterations(request);
+    }),
+    // The project itself, with its default team (read by `listMyTeams` to pick the user's team).
+    http.get(`${orgUrl}/_apis/projects/:project`, ({ params }) => {
+      if (!isProject(params['project'])) return projectNotFound(params['project']);
+      return HttpResponse.json({ id: ADO_FIXTURE_PROJECT_ID, name: ADO_FIXTURE_PROJECT, defaultTeam: { id: ADO_FIXTURE_TEAM_ID, name: ADO_FIXTURE_TEAM } });
     }),
 
     // ── Work items: WIQL, batch reads, single reads and state categories (AL-062's fake) ──
