@@ -46,3 +46,24 @@ export {
 export { archivedTicketsQueryKey, useArchiveTicket, useArchivedTickets } from './api/archive';
 export { ticketBoardQueryKey, useAdoptWorktree, useIgnoreWorktree, useTicketBoard } from './api/board';
 export { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS, modelEffortLabel, stageProgressLabel } from './model/labels';
+export {
+  DROP_REFUSALS,
+  TEAM_BOARD_COLUMN_KINDS,
+  allowedLanes,
+  dragLock,
+  dropVerdict,
+  isMe,
+  refusedLanes,
+  type BacklogItemCard,
+  type BoardItemCard,
+  type DropAction,
+  type DropAdoChange,
+  type DropCard,
+  type DropMe,
+  type DropPerson,
+  type DropRefusal,
+  type DropVerdict,
+  type DropWorktreeSource,
+  type PullRequestCard,
+  type TeamBoardColumnKind,
+} from './model/drop-rules';
