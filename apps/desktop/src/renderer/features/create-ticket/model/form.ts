@@ -33,6 +33,11 @@ export interface NewTicketForm {
   readonly gates: StageGates;
   /** The worktree folder name as the user edited it; null uses the name made from the work item (AL-164). */
   readonly worktreeName: string | null;
+  /**
+   * The text the picked work item last prefilled the description with (AL-162); null when none. While
+   * the description still equals it, picking another item replaces it; once the user edits it, it stays.
+   */
+  readonly prefilled: string | null;
 }
 
 export type NewTicketAction =
@@ -40,6 +45,8 @@ export type NewTicketAction =
   | { type: 'source'; source: WorkItemSource }
   | { type: 'workItem'; workItem: PickedWorkItem | null }
   | { type: 'description'; description: string }
+  /** The picked work item's description as a quoted block (AL-162); ignored once the user wrote their own. */
+  | { type: 'prefill'; description: string }
   | { type: 'skill'; skill: string; selected: boolean }
   | { type: 'model'; model: Model }
   | { type: 'effort'; effort: Effort }
@@ -56,7 +63,14 @@ export function initialForm(defaults: AgentDefaults): NewTicketForm {
     effort: defaults.effort,
     gates: { ...defaults.stageGates },
     worktreeName: null,
+    prefilled: null,
   };
+}
+
+/** With no work item picked, an unedited prefill from the previous one is cleared. */
+function withoutStalePrefill(form: NewTicketForm): NewTicketForm {
+  if (form.workItem || form.prefilled === null || form.description !== form.prefilled) return form;
+  return { ...form, description: '', prefilled: null };
 }
 
 export function newTicketReducer(form: NewTicketForm, action: NewTicketAction): NewTicketForm {
@@ -65,11 +79,16 @@ export function newTicketReducer(form: NewTicketForm, action: NewTicketAction): 
       return initialForm(action.defaults);
     case 'source':
       // "No ticket" drops the picked item; Sprint and Search share it.
-      return { ...form, source: action.source, workItem: action.source === 'none' ? null : form.workItem };
+      return withoutStalePrefill({ ...form, source: action.source, workItem: action.source === 'none' ? null : form.workItem });
     case 'workItem':
-      return { ...form, workItem: form.source === 'none' ? null : action.workItem };
+      return withoutStalePrefill({ ...form, workItem: form.source === 'none' ? null : action.workItem });
     case 'description':
       return { ...form, description: action.description };
+    case 'prefill': {
+      const untouched = form.description.trim() === '' || form.description === form.prefilled;
+      if (!untouched || form.description === action.description) return form;
+      return { ...form, description: action.description, prefilled: action.description };
+    }
     case 'skill': {
       const has = form.skills.includes(action.skill);
       if (has === action.selected) return form;

@@ -4,9 +4,10 @@ import { useReducer, useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, SegmentedControl, Text, TextField, type TextFieldHandle } from '@agent-lanes/ui';
-import { fetchWorktreePreview, useSettings, useWorktreePreview } from '@/shared/api';
+import { fetchWorktreePreview, useRefreshSkills, useSettings, useSkills, useWorkItem, useWorktreePreview } from '@/shared/api';
 import { EFFORT_LABELS } from '@/shared/config';
 import { useUiPrefs } from '@/shared/model';
+import { workItemQuote } from '../lib/quote';
 import { useDebouncedValue } from '../lib/use-debounced-value';
 import {
   initialForm,
@@ -20,6 +21,7 @@ import {
   type WorkItemSource,
 } from '../model/form';
 import { ModelPicker } from './ModelPicker';
+import { SkillChips } from './SkillChips';
 import { StageGates } from './StageGates';
 import { WorkspacePreview } from './WorkspacePreview';
 
@@ -83,6 +85,21 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
   const liveProblem =
     form.worktreeName !== null && preview.data?.branch === form.worktreeName && preview.data.problem ? preview.data.problem.message : null;
   const worktreeError = blockedName && blockedName.name === form.worktreeName ? blockedName.message : liveProblem;
+
+  // Skills of the same repo (AL-114); undefined while settings load.
+  const skillsRepo = settings.data ? (repo?.path ?? null) : undefined;
+  const skills = useSkills(skillsRepo);
+  const refreshSkills = useRefreshSkills(skillsRepo);
+  const skillsState = skillsRepo === null ? 'no-repo' : skills.isError ? 'error' : skills.data ? 'ready' : 'loading';
+
+  // A picked work item prefills the job with its description and acceptance criteria (AL-162).
+  const pickedItem = useWorkItem(form.workItem?.id);
+  const prefill = pickedItem.data && pickedItem.data.id === form.workItem?.id ? workItemQuote(pickedItem.data) : '';
+  const [appliedPrefill, setAppliedPrefill] = useState('');
+  if (prefill && prefill !== appliedPrefill) {
+    setAppliedPrefill(prefill);
+    dispatch({ type: 'prefill', description: prefill });
+  }
 
   // Errors show after the first Launch, then follow the form as it is fixed.
   const shown = Object.keys(errors).length > 0 ? validateForm(form) : {};
@@ -196,6 +213,14 @@ function OpenNewTicketModal({ onClose, onLaunch }: Omit<NewTicketModalProps, 'vi
             rows={5}
             error={shown.description}
             testID="job-description"
+          />
+          <SkillChips
+            skills={skills.data?.skills}
+            selected={form.skills}
+            state={skillsState}
+            onToggle={(skill, selected) => dispatch({ type: 'skill', skill, selected })}
+            onRefresh={() => refreshSkills.mutate()}
+            refreshing={refreshSkills.isPending}
           />
         </View>
         <View aria-hidden style={styles.divider} />
