@@ -644,3 +644,40 @@ describe('previewing the workspace (AL-164)', () => {
     });
   });
 });
+
+describe('pull request worktrees (AL-238)', () => {
+  it('two reviews of one PR at once get their own read-only worktrees, beside the author answering its comments', async () => {
+    await repo.exec(['switch', '--quiet', '-c', 'users/ty/71298-invoice-matching']);
+    await repo.write('src/invoices.cs', 'class Invoices {}\n');
+    const commit = await repo.commit('Invoice matching');
+    await repo.exec(['push', '--quiet', 'origin', 'users/ty/71298-invoice-matching']);
+    await repo.exec(['switch', '--quiet', 'main']);
+    await repo.exec(['branch', '--quiet', '-D', 'users/ty/71298-invoice-matching']);
+
+    const { worktrees } = service();
+    const review = (n: number) =>
+      worktrees.create({
+        repo: repo.dir,
+        subject: { kind: 'pull-request', pullRequestId: 10598, title: `!10598 Supplier invoice matching rules (${n})`, purpose: 'review' },
+        checkout: { branch: 'users/ty/71298-invoice-matching', detached: true },
+        baseBranch: 'main',
+      });
+    const [first, second] = await Promise.all([review(1), review(2)]);
+    const answer = await worktrees.create({
+      repo: repo.dir,
+      subject: { kind: 'pull-request', pullRequestId: 10598, title: '!10598 Supplier invoice matching rules', purpose: 'answer' },
+      checkout: { branch: 'users/ty/71298-invoice-matching' },
+      baseBranch: 'main',
+    });
+
+    expect([first, second, answer].map((result) => (result.ok ? result.data.record.id : result.message)).toSorted()).toEqual(['pr-10598', 'pr-10598-review', 'pr-10598-review-2']);
+    const paths = [first, second].map((result) => (result.ok ? result.data.record.worktreePath : ''));
+    expect(new Set(paths).size).toBe(2);
+    for (const path of paths) expect(await worktreeOf(path)).toMatchObject({ detached: true, head: commit });
+    expect(await worktreeOf(join(root, 'pr-10598'))).toMatchObject({ branch: 'users/ty/71298-invoice-matching', head: commit });
+    // A second agent answering the same PR's comments is refused: one per PR.
+    await expect(
+      worktrees.create({ repo: repo.dir, subject: { kind: 'pull-request', pullRequestId: 10598, title: 'x', purpose: 'answer' }, checkout: { branch: 'users/ty/71298-invoice-matching' } }),
+    ).resolves.toMatchObject({ ok: false, details: { reason: 'ticket-exists' } });
+  });
+});

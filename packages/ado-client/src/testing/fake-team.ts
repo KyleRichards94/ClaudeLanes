@@ -113,7 +113,9 @@ export interface FakeThread {
   id: number;
   status?: string;
   isDeleted?: boolean;
-  comments: Array<{ commentType: string; isDeleted?: boolean; content?: string }>;
+  /** Where a code comment points (AL-238); absent on a thread about the whole PR. */
+  threadContext?: { filePath: string; rightFileStart?: { line: number; offset: number } };
+  comments: Array<{ commentType: string; isDeleted?: boolean; content?: string; author?: { displayName: string } }>;
 }
 
 export interface FakeTeamPullRequest {
@@ -132,7 +134,14 @@ export interface FakeTeamPullRequest {
 
 const text = (content = 'Please rename this.') => ({ commentType: 'text', content });
 const system = () => ({ commentType: 'system', content: 'Tom Young voted 5' });
-const activeThreads = (count: number, from: number): FakeThread[] => Array.from({ length: count }, (_, i) => ({ id: from + i, status: 'active', comments: [text()] }));
+/** Open threads on a file and line, as reviewers leave them (AL-238 lists each); the sixth is on the whole PR. */
+const activeThreads = (count: number, from: number): FakeThread[] =>
+  Array.from({ length: count }, (_, i) => ({
+    id: from + i,
+    status: 'active',
+    ...(i === 5 ? {} : { threadContext: { filePath: i % 2 === 0 ? '/src/Jobs/JobNotes.razor' : '/src/Jobs/JobNotesEditor.cs', rightFileStart: { line: 10 + i * 7, offset: 1 } } }),
+    comments: [{ ...text(`Please rename this (${from + i}).`), author: { displayName: 'Tom Young' } }],
+  }));
 
 /** Open pull requests: the two on artboard 08, one in an unregistered repo, one outside the team, and two closed ones. */
 export function artboard08PullRequests(): FakeTeamPullRequest[] {
