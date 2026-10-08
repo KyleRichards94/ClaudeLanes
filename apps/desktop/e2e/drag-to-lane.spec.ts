@@ -37,6 +37,14 @@ const STAGE_LANES = ['queued', 'planning', 'implementing', 'code-review', 'qa', 
 /** dnd-kit's live region, where drags are announced. */
 const announcement = () => page.locator('[id^="DndLiveRegion"]');
 
+/**
+ * dnd-kit's keyboard sensor starts listening for arrows on the next task after Space (a 0 ms timer).
+ * A person never presses that fast; a test can, so it waits one task too (timers run in order).
+ */
+async function sensorListening(): Promise<void> {
+  await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+}
+
 async function center(locator: Locator): Promise<{ x: number; y: number }> {
   const box = await locator.boundingBox();
   if (!box) throw new Error('not visible');
@@ -121,8 +129,10 @@ test('the keyboard picks a card up with Space, moves between the lanes that take
   const card = page.getByTestId('team-pr-10571');
   await card.focus();
   await page.keyboard.press('Space');
+  await sensorListening();
   await expect(announcement()).toContainText('Picked up !10571. Implementing and Code review take it.');
   await expect(page.getByTestId('lane-code-review-drop-hint')).toBeVisible();
+  await expect(page.getByTestId('lane-implementing-drop-hint')).toBeVisible();
 
   await page.keyboard.press('ArrowRight');
   await expect(announcement()).toHaveText('Over Implementing: answer 6 comments');
