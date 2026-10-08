@@ -173,6 +173,28 @@ describe('Approve & ship design (AL-197)', () => {
     await expect(files.read(record.repo, '71273', 1)).resolves.toMatchObject({ canvasUrl: null, artboards: [{ source: null }, { source: null }] });
   });
 
+  it('ships an earlier version again as the newest version, delivered like a new ship (AL-199)', async () => {
+    const { tickets, files, sources, fake, sessions, appendSystem, ship } = await setup();
+    await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
+    await fake.calls[0]!.sentCount(1);
+    await ship.ship({ ticketId: '71273', artboards: ARTBOARDS, note: 'First take' });
+    await ship.ship({ ticketId: '71273', artboards: [ARTBOARDS[0]!] });
+    vi.mocked(sources.read).mockClear();
+
+    await expect(ship.reship('71273', 1)).resolves.toMatchObject({ ok: true, data: { delivered: true, spec: { version: 3, artboardCount: 2 } } });
+    const record = (await tickets.get('71273'))!;
+    expect(record.design.specs.map((spec) => spec.version)).toEqual([1, 2, 3]);
+    await expect(files.read(record.repo, '71273', 3)).resolves.toMatchObject({ version: 3, supersedes: 2, reshipOf: 1, note: 'First take', artboards: [{ source: '<source of JobControl.html>' }, {}] });
+    // The snapshot is reused as it was: the canvas is not read again.
+    expect(sources.read).not.toHaveBeenCalled();
+    expect(appendSystem).toHaveBeenLastCalledWith('71273', 'Design v3 approved by Kyle · 2 artboards · v1 shipped again');
+    await fake.calls[0]!.sentCount(4);
+    expect(text(fake.calls[0]!.sent[3]!)).toContain('Design v3 supersedes v2');
+
+    await expect(ship.reship('71273', 9)).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+    await sessions.dispose();
+  });
+
   it('words the Output line and the hand-off message', () => {
     expect(shipLine(fakeSpec(2))).toBe('Design v2 approved by Kyle · 2 artboards');
     expect(shipLine({ ...fakeSpec(1), artboards: [fakeSpec(1).artboards[0]!] })).toBe('Design v1 approved by Kyle · 1 artboard');

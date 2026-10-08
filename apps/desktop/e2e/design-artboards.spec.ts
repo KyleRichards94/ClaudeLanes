@@ -111,3 +111,22 @@ test('says when the Claude login has no Claude Design access', async () => {
   await page.getByRole('button', { name: 'Refresh artboards' }).click();
   await expect(page.getByTestId('artboards-unavailable')).toContainText("Claude Design isn't available for this Claude login");
 });
+
+test('keeps the shipped design in Attached to this ticket after a restart (AL-199)', async () => {
+  await app.close();
+  app = await electron.launch({
+    args: [join(__dirname, '..')],
+    env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir, AGENT_LANES_DESIGN_TEST_ORIGIN: site.origin, ...fakeClaudeEnv(stateFile) },
+  });
+  page = await app.firstWindow();
+  await expect(page.getByText('Agent board')).toBeVisible();
+  await page.evaluate(() => {
+    (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273/design';
+  });
+  const attached = page.getByTestId('design-attached');
+  await expect(attached.getByText('Design v1 · 2 artboards')).toBeVisible();
+  await expect(page.getByTestId('design-spec-v1-status')).toHaveText('Sent');
+
+  await attached.getByRole('button', { name: /Design v1/ }).click();
+  await expect(page.getByTestId('design-spec-v1-details')).toContainText('Keep the filter panel narrow');
+});
