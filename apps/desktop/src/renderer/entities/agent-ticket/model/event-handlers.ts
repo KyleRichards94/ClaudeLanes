@@ -10,8 +10,7 @@ import { agentTickets, type AgentTicketStore } from './store';
  * `set_stage` call moves the card, and a waiting gate turns it amber, in the next frame. Only channels
  * whose payloads carry something the store uses are handled; the tickets that add fields to the other
  * ticket events add a line here calling the matching store action: `agent:status` → `setNeedsYou` for
- * permissions (AL-109), `agent:subagent` → `setSubAgentCounts`
- * (AL-107), `run:status` → `setRun` (AL-133), the build result → `setLastBuild` (AL-132), and the pull
+ * permissions (AL-109), `run:status` → `setRun` (AL-133), the build result → `setLastBuild` (AL-132), and the pull
  * request → `setPullRequest` (AL-181).
  */
 export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHandlers {
@@ -36,6 +35,8 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       // No pending change (applied, or switched back): the switching pill clears.
       store.requestModelChange(event.ticketId, event.pending ?? { model: event.model, effort: event.effort }, event.at);
     },
+    // AL-107: the card's "N sub-agents" follows the SDK's task states.
+    'agent:subagent': (event) => store.setSubAgentCounts(event.ticketId, event.counts),
     'build:queued': (event) => store.applyBuildJob(event),
   };
 }

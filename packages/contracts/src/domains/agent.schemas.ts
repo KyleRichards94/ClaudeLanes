@@ -276,6 +276,90 @@ export type SetEffortRequest = z.infer<typeof SetEffortRequestSchema>;
 /** The user turn "Apply model now" sends after interrupting, so the agent carries on with the new model. */
 export const APPLY_MODEL_NOW_MESSAGE = 'Continue where you left off.';
 
+// ── Sub-agent tracking (AL-107, artboard 3 Sub-agents, design §6 `agent:subagent`) ────────────────
+
+/** Longest description or activity line sent for a sub-agent (the panel shows one line). */
+export const SUBAGENT_TEXT_LIMIT = 300;
+
+/** Sub-agent states on the panel's pills (artboard 3): Queued / Running / Done / Failed. */
+export const SUBAGENT_STATUSES = ['queued', 'running', 'done', 'failed'] as const;
+export const SubagentStatusSchema = z.enum(SUBAGENT_STATUSES);
+export type SubagentStatus = z.infer<typeof SubagentStatusSchema>;
+
+/** How many sub-agents are in each state ("2 running · 1 done · 1 queued"). */
+export const SubagentCountsSchema = z.object({
+  queued: z.int().nonnegative(),
+  running: z.int().nonnegative(),
+  done: z.int().nonnegative(),
+  failed: z.int().nonnegative(),
+});
+export type SubagentCounts = z.infer<typeof SubagentCountsSchema>;
+
+/**
+ * One sub-agent in the ticket's tree, built from the lead agent's Agent/Task tool uses
+ * (`parent_tool_use_id` nests them), the SDK's task_started / task_updated / task_progress /
+ * task_notification messages and the SubagentStart / SubagentStop hooks.
+ */
+export const SubagentNodeSchema = z.object({
+  /** The Agent/Task tool use that spawned it (or the SDK task id for a task with no tool use seen). */
+  id: z.string().min(1).max(200),
+  /** The SDK task id once the task started; null while queued. */
+  taskId: z.string().max(200).nullable(),
+  /** The sub-agent that spawned this one; null for one the lead agent spawned. */
+  parentId: z.string().max(200).nullable(),
+  /** "explore", "razor-writer": the agent type, else the tool use's name. */
+  name: z.string().min(1).max(200),
+  agentType: z.string().max(200).nullable(),
+  /** What it was asked to do ("Mapped 4 child modals…" while running comes in `activity`). */
+  description: z.string().max(SUBAGENT_TEXT_LIMIT),
+  /** The model it runs on when known; null when it inherits the lead agent's. */
+  model: ModelSchema.nullable(),
+  effort: EffortSchema.nullable(),
+  status: SubagentStatusSchema,
+  /** The one-line activity: the latest progress summary, or its result when finished. */
+  activity: z.string().max(SUBAGENT_TEXT_LIMIT).nullable(),
+  /** Tokens it has used, when the SDK reported them. */
+  tokens: z.int().nonnegative().nullable(),
+  /** Its sub-branch (AL-084) for a writer; null for one that has none (read-only, or not created yet). */
+  branch: z.string().max(255).nullable(),
+  /** A read-only agent type (explore, reviewer) that shares the ticket worktree. */
+  readOnly: z.boolean(),
+  startedAt: z.int().nonnegative(),
+  endedAt: z.int().nonnegative().nullable(),
+});
+export type SubagentNode = z.infer<typeof SubagentNodeSchema>;
+
+/** Most sub-agents kept per ticket; the oldest finished ones are dropped first. */
+export const SUBAGENT_TREE_LIMIT = 200;
+
+/** `agent:getSubagents`: the ticket's tree, for a drill-in opened mid-run. */
+export const AgentSubagentsSchema = z.object({
+  ticketId: TicketIdSchema,
+  /** The lead agent's tokens this app run ("212k tokens"). */
+  leadTokens: z.int().nonnegative(),
+  /** Oldest first. */
+  nodes: z.array(SubagentNodeSchema).max(SUBAGENT_TREE_LIMIT),
+  counts: SubagentCountsSchema,
+});
+export type AgentSubagents = z.infer<typeof AgentSubagentsSchema>;
+
+/** The Sub-agents panel heading's counts: "2 running · 1 done · 1 queued" (zeros left out). */
+export function subagentCountsLabel(counts: SubagentCounts): string {
+  const parts = (['running', 'done', 'queued', 'failed'] as const).filter((status) => counts[status] > 0).map((status) => `${counts[status]} ${status}`);
+  return parts.length > 0 ? parts.join(' · ') : 'none yet';
+}
+
+/**
+ * `agent:subagent` (AL-107): a sub-agent was spawned or started (`started`), progressed (`updated`) or
+ * finished (`finished`); carries the node as it is now and the ticket's counts.
+ */
+export const AgentSubagentEventSchema = TicketEventEnvelopeSchema.extend({
+  change: z.enum(['started', 'updated', 'finished']),
+  node: SubagentNodeSchema,
+  counts: SubagentCountsSchema,
+});
+export type AgentSubagentEvent = z.infer<typeof AgentSubagentEventSchema>;
+
 export const agentInvokeContracts = {
   'agent:getStatus': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   'agent:getTranscript': { request: AgentTicketRequestSchema, response: AgentTranscriptSchema },
@@ -289,6 +373,8 @@ export const agentInvokeContracts = {
   'agent:applyModelNow': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
   /** For a renderer that reloads while a switch is pending. */
   'agent:getModel': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
+  /** The ticket's sub-agent tree and counts, for a drill-in opened mid-run (AL-107). */
+  'agent:getSubagents': { request: AgentTicketRequestSchema, response: AgentSubagentsSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */
@@ -319,9 +405,6 @@ export const AgentStageEventSchema = TicketEventEnvelopeSchema.extend({
 });
 export type AgentStageEvent = z.infer<typeof AgentStageEventSchema>;
 
-/** `agent:subagent`: a sub-agent started, progressed or finished (AL-107). */
-export const AgentSubagentEventSchema = TicketEventEnvelopeSchema.extend({});
-export type AgentSubagentEvent = z.infer<typeof AgentSubagentEventSchema>;
 
 /**
  * `agent:gate` (AL-104): a stage gate started waiting for the user (the card turns amber with
