@@ -13,8 +13,14 @@ function setup() {
 }
 
 describe('agent ticket event handlers', () => {
-  it('handles the batched agent:output channel, agent:stage, agent:gate and build:queued', () => {
-    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued']);
+  it('handles the batched agent:output channel, agent:stage, agent:gate, build:queued and pr:status', () => {
+    expect(Object.keys(agentTicketEventHandlers).sort()).toEqual(['agent:gate', 'agent:output', 'agent:stage', 'build:queued', 'pr:status']);
+  });
+
+  it("shows the Create PR stage's pull request and its checks from pr:status (AL-181)", () => {
+    const { store, handlers } = setup();
+    handlers['pr:status']?.({ ticketId: '71273', at: 5, pullRequestId: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 }, webUrl: 'https://dev.azure.com/contoso/p/_git/r/pullrequest/10612' });
+    expect(selectTicket(store.getState(), '71273')?.pullRequest).toEqual({ id: 10612, status: 'active', checks: { passed: 3, total: 4, pending: 1 } });
   });
 
   it('a waiting gate makes the card need the user (amber) until it is decided (AL-104)', () => {

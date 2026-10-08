@@ -104,7 +104,11 @@ export function cardView(ticket: AgentTicket): CardView {
       ...base,
       state: 'merged',
       border: 'muted',
-      activity: { text: `Merged into ${ticket.baseBranch} · ${clockTime(ticket.stageEnteredAt)}`, tone: 'ok' },
+      // An abandoned PR also ends in Done (AL-181), but nothing was merged.
+      activity:
+        pr?.status === 'abandoned'
+          ? { text: formatPullRequestActivity({ id: pr.id, status: pr.status }), tone: 'neutral' }
+          : { text: `Merged into ${ticket.baseBranch} · ${clockTime(ticket.stageEnteredAt)}`, tone: 'ok' },
       progress: 1,
       subAgentsLine: '—',
       footer: null,

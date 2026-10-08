@@ -31,6 +31,8 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       else store.resolveGate(event.ticketId);
     },
     'build:queued': (event) => store.applyBuildJob(event),
+    // The Create PR stage's pull request (AL-181): "PR !10612 · 3 / 4 checks" on the card.
+    'pr:status': (event) => store.setPullRequest(event.ticketId, { id: event.pullRequestId, status: event.status, checks: event.checks }),
   };
 }
 

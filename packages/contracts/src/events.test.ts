@@ -21,6 +21,7 @@ describe('event contracts', () => {
         'run:status',
         'toast',
         'app:window', // AL-066
+        'pr:status', // AL-181
       ].sort(),
     );
   });

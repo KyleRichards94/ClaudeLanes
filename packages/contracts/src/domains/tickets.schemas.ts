@@ -4,6 +4,7 @@ import { TicketIdSchema } from '../events';
 import { EffortSchema, LaneSchema, ModelSchema } from '../vocabulary';
 import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
+import { TicketPullRequestSchema } from './pr.schemas';
 import { StageGatesSchema } from './settings.schemas';
 import type { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './tickets.names';
 
@@ -164,6 +165,8 @@ export const TicketRecordSchema = z
     lastBuild: TicketLastBuildSchema.nullable(),
     lastRun: TicketLastRunSchema.nullable(),
     design: TicketDesignSchema,
+    /** The PR the Create PR stage opened (AL-181); absent or null before one. Optional, so older records still read. */
+    pullRequest: TicketPullRequestSchema.nullable().optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })
