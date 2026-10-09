@@ -15,6 +15,9 @@ import type { SessionManager } from '../session-manager';
  * - The lead agent's tokens are the main loop's `usage`, which is per turn, summed over turns.
  * - Each sub-agent's tokens come from its assistant messages (`parent_tool_use_id` set), one usage
  *   per API message id, since a message streamed in parts repeats its usage.
+ * - The turn in progress (AL-257): the lead agent's assistant messages add to `turnTokens` as they
+ *   arrive, once per API message, so the usage strip moves during a turn; the result folds them in.
+ * - A compaction (`compact_boundary`) counts and triggers a fresh context measure.
  * - After each turn the context window is read with `getContextUsage()`.
  *
  * Every change is pushed as `agent:usage`; `agent:getUsage` backfills a reloaded renderer.
@@ -49,6 +52,8 @@ interface TicketUsage {
   usage: AgentUsage;
   /** Sub-agent tool use id → API message id → tokens. */
   subagents: Map<string, Map<string, number>>;
+  /** The lead agent's API message ids counted in the turn in progress. */
+  turnMessages: Map<string, number>;
 }
 
 const count = (value: number | null | undefined): number => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : 0);
@@ -81,7 +86,7 @@ export function createUsageService(options: UsageServiceOptions): UsageService {
   function entry(ticketId: string): TicketUsage {
     let found = tickets.get(ticketId);
     if (!found) {
-      found = { usage: emptyAgentUsage(ticketId), subagents: new Map() };
+      found = { usage: emptyAgentUsage(ticketId), subagents: new Map(), turnMessages: new Map() };
       tickets.set(ticketId, found);
     }
     return found;
@@ -114,6 +119,23 @@ export function createUsageService(options: UsageServiceOptions): UsageService {
   }
 
   function handle(ticketId: string, message: SDKMessage): void {
+    if (message.type === 'system' && message.subtype === 'compact_boundary') {
+      const ticket = entry(ticketId);
+      publish(ticketId, ticket, { compactions: ticket.usage.compactions + 1 });
+      void measureContext(ticketId);
+      return;
+    }
+    if (message.type === 'assistant' && message.parent_tool_use_id === null) {
+      // The turn so far: each API message's usage once (a message streamed in parts repeats it).
+      const tokens = usageTokens(message.message.usage as UsageNumbers | undefined);
+      if (tokens === 0) return;
+      const ticket = entry(ticketId);
+      const id = message.message.id ?? message.uuid;
+      if (ticket.turnMessages.get(id) === tokens) return;
+      ticket.turnMessages.set(id, tokens);
+      publish(ticketId, ticket, { turnTokens: [...ticket.turnMessages.values()].reduce((sum, value) => sum + value, 0) });
+      return;
+    }
     if (message.type === 'assistant' && message.parent_tool_use_id) {
       const tokens = usageTokens(message.message.usage as UsageNumbers | undefined);
       if (tokens === 0) return;
@@ -128,12 +150,14 @@ export function createUsageService(options: UsageServiceOptions): UsageService {
     const totals = modelUsageTotals(message.modelUsage as Record<string, ModelUsageNumbers> | undefined);
     const reported = Number.isFinite(message.total_cost_usd) ? Math.max(0, message.total_cost_usd) : 0;
     const cost = reported > 0 || totals ? reported : ticket.usage.costUsd;
+    ticket.turnMessages.clear();
     publish(ticketId, ticket, {
       ...(totals ?? {}),
       costUsd: cost,
       leadTokens: ticket.usage.leadTokens + usageTokens(message.usage as UsageNumbers | undefined),
       subagents: subagentList(ticket),
       turns: ticket.usage.turns + 1,
+      turnTokens: 0,
     });
     void measureContext(ticketId);
   }

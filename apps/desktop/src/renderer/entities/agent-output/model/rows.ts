@@ -27,6 +27,8 @@ export type OutputRow =
       readonly priority: 'now' | 'next' | null;
       readonly messageId: string | null;
     }
+  /** The context was compacted (AL-257): "Context compacted · auto · 160k → 40k tokens". */
+  | { readonly type: 'compact'; readonly key: string; readonly at: number; readonly trigger: 'auto' | 'manual'; readonly preTokens: number; readonly postTokens: number | null }
   /** A turn that ended well (AL-251): "Turn ended · 1m 12s · $0.42"; `live` while it is the newest row ("waiting for you"). */
   | { readonly type: 'turn-end'; readonly key: string; readonly at: number; readonly durationMs: number; readonly costUsd: number; readonly live: boolean }
   | {
@@ -37,6 +39,10 @@ export type OutputRow =
       readonly detail: string;
       readonly stats: string | null;
       readonly isError: boolean;
+      /** The expanded row (AL-256): the call's full input, an Edit's before and after, and what the tool returned. */
+      readonly input: string | null;
+      readonly edit: { readonly before: string; readonly after: string } | null;
+      readonly output: string | null;
     }
   | { readonly type: 'prose'; readonly key: string; readonly text: string }
   | { readonly type: 'streaming'; readonly key: string; readonly text: string; readonly live: boolean }
@@ -71,6 +77,9 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
           // A replacement without stats keeps what the result already said.
           stats: item.stats ?? (previous?.type === 'tool' ? previous.stats : null),
           isError: previous?.type === 'tool' ? previous.isError : false,
+          input: item.input ?? null,
+          edit: item.edit ?? null,
+          output: previous?.type === 'tool' ? previous.output : null,
         };
         if (index === undefined) {
           toolRows.set(item.rowId, rows.length);
@@ -82,7 +91,9 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
         const index = toolRows.get(item.rowId);
         const row = index === undefined ? undefined : rows[index];
         if (index === undefined || row?.type !== 'tool') break;
-        rows[index] = { ...row, stats: item.stats ?? row.stats, isError: row.isError || item.isError };
+        // A Spawn row collects each sub-agent's result; other rows have one.
+        const output = row.output && row.tool === 'spawn' ? `${row.output}\n\n${item.output ?? ''}` : (item.output ?? row.output);
+        rows[index] = { ...row, stats: item.stats ?? row.stats, isError: row.isError || item.isError, output: output?.trim() ? output : null };
         break;
       }
       case 'text-delta': {
@@ -106,6 +117,9 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
       }
       case 'user':
         rows.push({ type: 'user', key: `u${seq}`, at, text: item.text, source: item.source, priority: item.priority, messageId: item.messageId });
+        break;
+      case 'compact':
+        rows.push({ type: 'compact', key: `c${seq}`, at, trigger: item.trigger, preTokens: item.preTokens, postTokens: item.postTokens });
         break;
       case 'result':
         if (item.isError) rows.push({ type: 'failed', key: `r${seq}`, text: `Turn ended early · ${item.subtype.replaceAll('_', ' ')}` });
@@ -160,6 +174,13 @@ export function formatTurnDuration(ms: number): string {
 export function turnEndLabel(row: Extract<OutputRow, { type: 'turn-end' }>): string {
   const cost = row.costUsd > 0 && row.costUsd < 0.01 ? '<$0.01' : `$${row.costUsd.toFixed(2)}`;
   return `Turn ended · ${formatTurnDuration(row.durationMs)} · ${cost}${row.live ? ' · waiting for you' : ''}`;
+}
+
+/** "Context compacted · auto · 160k → 40k tokens" (AL-257). */
+export function compactLabel(row: Pick<Extract<OutputRow, { type: 'compact' }>, 'trigger' | 'preTokens' | 'postTokens'>): string {
+  const short = (tokens: number) => (tokens < 1_000 ? String(tokens) : tokens < 999_500 ? `${Math.round(tokens / 1_000)}k` : `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`);
+  const change = row.postTokens === null ? `from ${short(row.preTokens)} tokens` : `${short(row.preTokens)} → ${short(row.postTokens)} tokens`;
+  return `Context compacted · ${row.trigger === 'manual' ? 'by you' : 'auto'} · ${change}`;
 }
 
 /** The caption over a user bubble: "You · 14:02", "Skill · 14:02", "Launched · 14:02", "Handed over · 14:02". */

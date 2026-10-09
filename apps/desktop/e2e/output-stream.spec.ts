@@ -122,3 +122,31 @@ test('keeps scrolling smoothly through 10,000 events, drawing only the rows in v
   await expect(page.getByText('Output line 10002:', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Jump to latest' })).toHaveCount(0);
 });
+
+test('opens a tool row on its command and output (AL-256)', async () => {
+  await app.evaluate(({ BrowserWindow }) => {
+    const frame = BrowserWindow.getAllWindows()[0]?.webContents.mainFrame;
+    const lead = { parentToolUseId: null };
+    frame?.send('agent:output', {
+      ticketId: '71273',
+      at: Date.now(),
+      seq: 20_001,
+      item: { kind: 'tool', rowId: 'x1', toolUseIds: ['x1'], tool: 'bash', label: 'Bash', detail: 'dotnet test OnSite.Tests', stats: null, input: 'dotnet test OnSite.Tests --filter JobGrid', edit: null, ...lead },
+    });
+    frame?.send('agent:output', {
+      ticketId: '71273',
+      at: Date.now(),
+      seq: 20_002,
+      item: { kind: 'tool-result', rowId: 'x1', toolUseId: 'x1', isError: false, summary: 'Passed!', stats: null, output: 'Passed! - Failed: 0, Passed: 12', ...lead },
+    });
+  });
+  // The earlier test left the view scrolled up: the new rows are below the virtual window until it follows again.
+  const jump = page.getByTestId('output-jump-latest');
+  if (await jump.isVisible()) await jump.click();
+  const toggle = page.getByRole('button', { name: 'Bash dotnet test OnSite.Tests' });
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.getByTestId('output-tool-body')).toContainText('Passed: 12');
+  await toggle.press('Enter');
+  await expect(page.getByTestId('output-tool-body')).toHaveCount(0);
+});

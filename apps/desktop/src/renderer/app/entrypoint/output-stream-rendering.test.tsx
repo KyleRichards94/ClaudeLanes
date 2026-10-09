@@ -13,6 +13,9 @@ import { startEventHub, stopEventHub } from './EventHub';
  * `e2e/output-stream.spec.ts`.
  */
 
+// Counts commits, not wall time: under a full parallel run it has taken over the default 5 s (AL-220).
+vi.setConfig({ testTimeout: 30_000 });
+
 let bridge: FakeBridge;
 let commits = 0;
 const onRender: ProfilerOnRenderCallback = (_id, phase) => {

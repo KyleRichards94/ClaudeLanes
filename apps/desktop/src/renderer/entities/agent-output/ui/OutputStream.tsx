@@ -99,7 +99,7 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream' 
     const row = rows[index]!;
     drawn.push(
       <View key={row.key} onLayout={(event) => onRowLayout(row.key, event.nativeEvent.layout.height)}>
-        <OutputRowView row={row} />
+        <OutputRowView row={row} ticketId={ticketId} />
       </View>,
     );
   }

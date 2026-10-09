@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import type { AgentSessionState } from '@agent-lanes/contracts';
 import { space } from '@agent-lanes/tokens';
 import { Button, Modal, Text } from '@agent-lanes/ui';
-import { useSessionStatus, useStopSession } from '@/shared/api';
+import { useCompactSession, useSessionStatus, useStopSession } from '@/shared/api';
 import { toast } from '@/shared/model';
 import { ActionMenu, type ActionMenuItem } from '@/shared/ui';
 
@@ -18,6 +18,7 @@ export interface AgentMenuProps {
 const LIVE: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused', 'queued']);
 
 export const END_SESSION_KEY = 'end-session';
+export const COMPACT_KEY = 'compact';
 
 /**
  * The ticket's Agent ▾ menu (AL-253): End session, which closes the Claude Code process and keeps the
@@ -27,11 +28,21 @@ export const END_SESSION_KEY = 'end-session';
 export function AgentMenu({ ticketId, extraItems = [], onExtraSelect, testID = 'agent-menu' }: AgentMenuProps) {
   const status = useSessionStatus(ticketId);
   const stop = useStopSession(ticketId);
+  const compact = useCompactSession(ticketId);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const live = status.data !== undefined && LIVE.has(status.data.state);
+  const canCompact = status.data?.state === 'idle' || status.data?.state === 'running';
 
   const items: ActionMenuItem[] = [
     ...extraItems,
+    {
+      key: COMPACT_KEY,
+      label: 'Compact context',
+      detail: canCompact ? 'Folds the conversation so far into a summary, freeing the context window.' : 'Needs a running or idle session.',
+      icon: 'compact',
+      disabled: !canCompact,
+      section: 'Session',
+    },
     {
       key: END_SESSION_KEY,
       label: 'End session',
@@ -45,6 +56,7 @@ export function AgentMenu({ ticketId, extraItems = [], onExtraSelect, testID = '
 
   const onSelect = (key: string) => {
     if (key === END_SESSION_KEY) setConfirmEnd(true);
+    else if (key === COMPACT_KEY) compact.mutate(undefined, { onError: (error) => toast({ id: `compact:${ticketId}`, tone: 'error', title: "Couldn't compact the context", body: error.message }) });
     else onExtraSelect?.(key);
   };
 

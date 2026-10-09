@@ -1,7 +1,8 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeOutputEvent, installFakeBridge } from '@/shared/testing';
+import { resetExpandedRows } from '../model/expanded';
 import { createAgentOutputStore, type AgentOutputStore } from '../model/store';
 import { OutputStream } from './OutputStream';
 
@@ -113,5 +114,124 @@ describe('OutputStream (AL-175)', () => {
     act(() => store.receive([textEvent(1, 'copy me')]));
     const text = screen.getByText('copy me');
     expect(getComputedStyle(text).userSelect).not.toBe('none');
+  });
+});
+
+describe('Markdown in the output (AL-255)', () => {
+  const sample = [
+    '## What changed',
+    'One test fails: `JobGridTests.FiltersByDateRange` expects the end date to be *inclusive*.',
+    '- `JobFilterState.To` is compared with < instead of <=',
+    '- the old grid had the same bug',
+    '```diff',
+    '- .Where(j => j.Due < filter.To)',
+    '+ .Where(j => j.Due <= filter.To)',
+    '```',
+    'See [the cutover notes](https://example.invalid/notes).',
+  ].join('\n');
+
+  it('draws headings, lists, a coloured code fence with Copy and a link, without raw markdown characters', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([textEvent(1, sample)]));
+    const prose = screen.getByTestId('output-prose');
+    expect(within(prose).getByRole('heading', { name: 'What changed' })).toBeTruthy();
+    expect(within(prose).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(prose).getByTestId('md-code').textContent).toContain('+ .Where(j => j.Due <= filter.To)');
+    expect(within(prose).getByRole('button', { name: 'Copy code' })).toBeTruthy();
+    expect(within(prose).getByRole('link', { name: 'the cutover notes' })).toBeTruthy();
+    expect(within(prose).getByRole('button', { name: 'Copy message' })).toBeTruthy();
+    expect(prose.textContent).not.toContain('## ');
+    expect(prose.textContent).not.toContain('```');
+    expect(prose.textContent).not.toContain('](');
+    expect(prose.textContent).not.toContain('*inclusive*');
+  });
+
+  it('copies a message as plain text and opens links in the browser', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([textEvent(1, 'Keep **this** and [notes](https://example.invalid/n)')]));
+    fireEvent.click(screen.getByRole('button', { name: 'Copy message' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('Keep this and notes'));
+    fireEvent.click(screen.getByRole('link', { name: 'notes' }));
+    expect(open).toHaveBeenCalledWith('https://example.invalid/n', '_blank', 'noopener');
+    open.mockRestore();
+  });
+
+  it('renders the streaming line as markdown too, with the caret after the last block', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([itemEvent(1, { kind: 'text-delta', streamId: 'live', text: 'Fixing it:\n```ts\nconst a = 1;', ...lead })]));
+    const live = screen.getByTestId('output-streaming');
+    expect(within(live).getByTestId('md-code').textContent).toContain('const a = 1;▍');
+  });
+});
+
+describe('expandable tool rows (AL-256)', () => {
+  const toolItem = (overrides: Partial<Extract<AgentOutputItem, { kind: 'tool' }>>): AgentOutputItem => ({
+    kind: 'tool',
+    rowId: 'b1',
+    toolUseIds: ['b1'],
+    tool: 'bash',
+    label: 'Bash',
+    detail: 'dotnet test OnSite.Tests',
+    stats: null,
+    input: 'dotnet test OnSite.Tests --filter JobGrid\n# Run the grid tests',
+    edit: null,
+    ...lead,
+    ...overrides,
+  });
+  const resultItem = (overrides: Partial<Extract<AgentOutputItem, { kind: 'tool-result' }>>): AgentOutputItem => ({
+    kind: 'tool-result',
+    rowId: 'b1',
+    toolUseId: 'b1',
+    isError: false,
+    summary: 'Passed!',
+    stats: null,
+    output: 'Passed! - Failed: 0, Passed: 12',
+    ...lead,
+    ...overrides,
+  });
+
+  beforeEach(() => resetExpandedRows());
+
+  it('opens a Bash row on click to its command and output, and closes it again', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([itemEvent(1, toolItem({})), itemEvent(2, resultItem({}))]));
+    expect(screen.queryByTestId('output-tool-body')).toBeNull();
+    const toggle = screen.getByRole('button', { name: 'Bash dotnet test OnSite.Tests' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    const body = screen.getByTestId('output-tool-body');
+    expect(body.textContent).toContain('# Run the grid tests');
+    expect(body.textContent).toContain('Passed: 12');
+    expect(within(body).getByRole('button', { name: 'Copy output' })).toBeTruthy();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId('output-tool-body')).toBeNull();
+  });
+
+  it('shows an Edit as a red and green diff', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() =>
+      store.receive([
+        itemEvent(1, toolItem({ rowId: 'e1', toolUseIds: ['e1'], tool: 'edit', label: 'Edit', detail: 'JobFilterState.cs', stats: '+1 −1', input: null, edit: { before: 'if (a < b)', after: 'if (a <= b)' } })),
+      ]),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit JobFilterState.cs' }));
+    const diff = screen.getByTestId('output-tool-diff');
+    expect(diff.textContent).toContain('− if (a < b)');
+    expect(diff.textContent).toContain('+ if (a <= b)');
+  });
+
+  it('shows a failed call’s reason while closed and keeps a row open across re-renders', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([itemEvent(1, toolItem({})), itemEvent(2, resultItem({ isError: true, summary: 'Failed', output: 'Failed! JobGridTests.FiltersByDateRange\n  expected inclusive' }))]));
+    expect(screen.getByTestId('output-tool-error').textContent).toContain('FiltersByDateRange');
+    fireEvent.click(screen.getByRole('button', { name: 'Bash dotnet test OnSite.Tests' }));
+    expect(screen.queryByTestId('output-tool-error')).toBeNull();
+    expect(screen.getByTestId('output-tool-body').textContent).toContain('expected inclusive');
+    act(() => store.receive([textEvent(3, 'next')]));
+    expect(screen.getByTestId('output-tool-body')).toBeTruthy();
   });
 });

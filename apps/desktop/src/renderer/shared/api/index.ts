@@ -51,7 +51,7 @@ export { teamBoardKeys, useActivePrs, useBacklog, useBacklogTotal, useTeamBoard 
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';
-export { reconnectSession, useInterruptTurn, useReconnectSession, useStopSession } from './agent-session';
+export { reconnectSession, useCompactSession, useInterruptTurn, useReconnectSession, useStopSession } from './agent-session';
 export { createDesignSpecEventHandlers, designSpecQueryKey, useDesignSpec, useReshipDesignSpec, useShipDesignSpec } from './design-specs';
 export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';

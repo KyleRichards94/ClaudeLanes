@@ -176,9 +176,9 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | done |
 | AL-253 | Stop turn and End session | E15 | S | AL-250 | done |
 | AL-254 | Ticket view bug fixes from the audit | E15 | M | AL-250 | done |
-| AL-255 | Markdown in the output | E15 | M | — | todo |
-| AL-256 | Expandable tool calls | E15 | M | — | todo |
-| AL-257 | Usage strip and compaction | E15 | M | AL-250 | todo |
+| AL-255 | Markdown in the output | E15 | M | — | done |
+| AL-256 | Expandable tool calls | E15 | M | — | done |
+| AL-257 | Usage strip and compaction | E15 | M | AL-250 | done |
 | AL-258 | Plan limits | E15 | M | — | todo |
 | AL-259 | Composer parity | E15 | L | AL-250 | todo |
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | todo |
@@ -1273,24 +1273,24 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Output · **Depends on:** —
 - **Scope:** Prose rows render headings, ordered and bullet lists, italics, links (open in the browser via `app:openExternal` or the existing link route), block quotes, tables and fenced code with syntax highlighting (C#, VB, TS/JS, JSON, XML/Razor, PowerShell, bash, diff) and a Copy button. Copy on each assistant message. Streaming rows render markdown incrementally without flicker. No `dangerouslySetInnerHTML`; parse to RN elements.
 - **Acceptance criteria:**
-  - [ ] The audit's sample message (headings, list, diff fence, link) renders without raw markdown characters.
-  - [ ] Parser unit tests; a perf check that 8 streaming tickets keep AL-212's frame budget.
+  - [x] The audit's sample message (headings, list, diff fence, link) renders without raw markdown characters.
+  - [x] Parser unit tests; a perf check that 8 streaming tickets keep AL-212's frame budget.
 
 #### AL-256 · Expandable tool calls
 - **Design:** UXA Output · **Depends on:** —
 - **Scope:** Main keeps each tool call's full input (clipped at 20,000 chars) and its result text (clipped) in the transcript. A tool row toggles open (click, Enter, Space) to show the input (command, file path, pattern), the output, and for Edit/Write/MultiEdit an inline diff from the input's old/new strings. Failed calls show the error text collapsed to two lines. Open state survives virtualised re-renders.
 - **Acceptance criteria:**
-  - [ ] Bash shows command and output; Edit shows a red/green diff; a failed call shows its reason.
-  - [ ] Keyboard and screen-reader operable (expanded state announced).
-  - [ ] Normaliser and row tests; `output-stream.spec.ts` expands a row.
+  - [x] Bash shows command and output; Edit shows a red/green diff; a failed call shows its reason.
+  - [x] Keyboard and screen-reader operable (expanded state announced).
+  - [x] Normaliser and row tests; `output-stream.spec.ts` expands a row.
 
 #### AL-257 · Usage strip and compaction
 - **Design:** UXA Usage and limits · **Depends on:** AL-250
 - **Scope:** A usage strip in the header band: context bar (amber from 70%, red from 90%), session tokens and cost. Tokens update during a turn from stream usage, not only at the result. Main reads `compact_boundary` system messages and writes "Context compacted at N%" to the output; the Agent ▾ menu gets Compact (sends `/compact`). Hover shows the input/output/cache breakdown.
 - **Acceptance criteria:**
-  - [ ] The strip moves during a turn and matches the result's totals at its end.
-  - [ ] A compaction shows its line; Compact from the menu triggers one (fake SDK).
-  - [ ] Usage-service unit tests; renderer tests for the thresholds.
+  - [x] The strip moves during a turn and matches the result's totals at its end.
+  - [x] A compaction shows its line; Compact from the menu triggers one (fake SDK).
+  - [x] Usage-service unit tests; renderer tests for the thresholds.
 
 #### AL-258 · Plan limits
 - **Design:** UXA Usage and limits; Kyle 2026-10-09 (85% threshold) · **Depends on:** —
@@ -2136,6 +2136,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D764 | AL-253: `agent:interrupt` (Stop turn, Esc on the page) reuses the session manager's interrupt without pausing; `agent:stop` (End session, behind a confirm in the Agent ▾ menu) takes a queued launch out of the queue or closes the live session with SESSION_ENDED_BY_USER_MESSAGE on its status. `features/agent-menu` is exempt from Steiger's insignificant-slice rule: later tickets add items to it | The composer had Pause only | 2026-10-09 |
 | D765 | AL-254: MSBuild's summary lines ("Build FAILED.", "N Error(s)") are `info`, not `error`, so the Build log's count matches the Worktree panel's diagnostics; the log scrolls sideways (content as wide as its longest line) instead of ellipsising; the stepper is one horizontally scrolling row; the gate box shows the `set_stage` summary (now on the ticket's gate in the store); Merge → main is held while the agent is mid-turn; Run is off with "No run command" when the repo has none; the sub-branches button says "Merge N sub-branches" with the target under it; the ADO tab's field grid keeps only what the header chip lacks (project, iteration); ligatures are off app-wide; a skill sent while paused counts as held | The audit's bugs table | 2026-10-09 |
 | D766 | Not reproduced: the Diff tab's "Includes uncommitted changes" with no listed file. The diff already runs against the working tree and adds untracked files; the audit's case came from the e2e fake and could not be traced to a file. Left open under AL-220 | No failing case to fix | 2026-10-09 |
+| D767 | AL-255: the agent's prose is read by a small Markdown reader of our own (`entities/agent-output/model/markdown.ts`: headings, lists with one level of nesting, fences, quotes, tables, rules; bold, italic, code, links) and drawn as React Native text and views, never HTML; fenced code is coloured by a per-language line tokeniser (`highlight.ts`: C#, VB, TypeScript, JSON, XML/Razor, PowerShell, shell, SQL, CSS, YAML, Python, diff). The streaming line is read the same way, with an unterminated fence kept open. Copy on each code block and on each message (on hover) | A Markdown library would bring HTML rendering and a large bundle; the subset Claude writes is small | 2026-10-09 |
+| D768 | AL-256: tool items carry the call's full input (the command and its description, a sub-agent's prompt, or the input as JSON), an Edit or Write's before and after, and the result's text (a Bash call's stdout and stderr when structured); all optional on the contract so older buffers still read. Open rows are kept in a store per ticket and row key, so they survive virtualisation and leaving the ticket; the diff is a line LCS of the Edit's old and new strings | The audit's expand-a-tool-call gap | 2026-10-09 |
+| D769 | AL-257: the usage strip in the header band shows the context bar (amber from 70%, red from 90%), tokens and cost, which supersedes AL-113's tooltip-only cost. Tokens move during a turn from the lead agent's assistant messages (`turnTokens`, once per API message), and the result folds them in. A `compact_boundary` system message becomes a `compact` output line and triggers a context measure; Compact in the Agent menu sends `/compact` as the next turn, which Claude Code runs as its slash command | The audit's usage gaps; the SDK already reports all three | 2026-10-09 |
+| D770 | The 10,000-event output load test counts commits, not wall time; its timeout is 30 s because a full parallel run tipped it over 5 s (AL-220) | It failed once under verify with the Markdown rows | 2026-10-09 |
 
 ---
 
@@ -2205,6 +2209,8 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | Ticket view UX audit (Claude Doc, 97 screenshots on the e2e fakes): E15 with 17 tickets, AL-250–AL-266, milestone M7 (D760). |
 | 2026-10-09 | AL-250–AL-253 built on main: output-first layout with the rail, user messages and turn ends in the output, state-aware status pill with Reconnect, Stop turn / Esc and End session. New `shared/ui/action-menu` and `features/agent-menu`. |
 | 2026-10-09 | AL-254: the audit's bug fixes (log error counts, sideways log scrolling, one-row stepper, gate summary, Merge → main mid-turn, Run without a command, merge labels, ADO tab duplicates, ligatures, held skills, inherited model and same-worktree sub-agent rows, unmeasured context). |
+| 2026-10-09 | AL-255 and AL-256: Markdown with syntax colouring and Copy in the output; expandable tool rows with the full input, an inline Edit diff, the tool's output and a failed call's reason. |
+| 2026-10-09 | AL-257: usage strip with the context bar, live tokens and cost; compaction lines in the output and Compact in the Agent menu. |
 ---
 
 ## 7. Parallel build rules

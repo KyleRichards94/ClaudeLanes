@@ -30,6 +30,11 @@ export function useInterruptTurn(ticketId: string) {
   });
 }
 
+/** Compact (AL-257): asks the live session to compact its context as its next turn. */
+export function useCompactSession(ticketId: string) {
+  return useMutation({ mutationFn: async () => unwrap(await invoke('agent:compact', { ticketId })) });
+}
+
 /** End session (AL-253): closes the session and its `claude` process; the worktree and branch stay. */
 export function useStopSession(ticketId: string) {
   const queryClient = useQueryClient();

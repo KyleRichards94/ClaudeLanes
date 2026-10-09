@@ -108,7 +108,18 @@ describe('proseSpans and statSpans', () => {
 });
 
 describe('output windowing', () => {
-  const rows = Array.from({ length: 10_000 }, (_, index) => ({ type: 'tool' as const, key: `t${index}`, tool: 'read' as const, label: 'Read', detail: `file ${index}`, stats: null, isError: false }));
+  const rows = Array.from({ length: 10_000 }, (_, index) => ({
+    type: 'tool' as const,
+    key: `t${index}`,
+    tool: 'read' as const,
+    label: 'Read',
+    detail: `file ${index}`,
+    stats: null,
+    isError: false,
+    input: null,
+    edit: null,
+    output: null,
+  }));
 
   it('keeps each row at its measured height once drawn, its estimate before', () => {
     const height = estimateRowHeight(rows[0]!);
