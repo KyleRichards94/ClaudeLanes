@@ -71,6 +71,62 @@ describe('detectCommands', () => {
     });
   });
 
+  describe("Visual Studio's start-up project", () => {
+    const solution = sln([
+      [CSHARP, 'DatabuildGateway.WinExe', 'DatabuildGateway\\WinExe\\DatabuildGateway.WinExe.csproj'],
+      [CSHARP, 'OnSiteCompanion.Core', 'OnSiteCompanion\\Core\\OnSiteCompanion.Core.csproj'],
+      [CSHARP, 'OnSiteCompanion.WinExe', 'OnsiteCompanion\\WinExe\\OnSiteCompanion.WinExe.csproj'],
+      [CSHARP, 'Importer.WinExe', 'Importer\\WinExe\\Importer.WinExe.csproj'],
+    ]);
+    const repo = {
+      'OnSite Companion Solution.sln': solution,
+      'DatabuildGateway/WinExe/DatabuildGateway.WinExe.csproj': winExe,
+      'OnSiteCompanion/Core/OnSiteCompanion.Core.csproj': library,
+      'OnsiteCompanion/WinExe/OnSiteCompanion.WinExe.csproj': winExe,
+      'Importer/WinExe/Importer.WinExe.csproj': winExe,
+    };
+    /** A `.suo`'s bytes around the SolutionConfiguration stream, as Visual Studio 2026 writes them. */
+    const suo = (guid: string) =>
+      Buffer.concat([Buffer.alloc(301, 0xfe), Buffer.from('StartupProject=', 'utf16le'), Buffer.from([8, 0, 0x26, 0, 0, 0]), Buffer.from(`{${guid}};`, 'utf16le'), Buffer.alloc(64)]);
+    const IMPORTER = '00000003-0000-0000-0000-000000000000';
+
+    it('without one, runs the project named like the solution', async () => {
+      await files(repo);
+      await expect(detectCommands(dir)).resolves.toMatchObject({
+        build: 'dotnet build "OnSite Companion Solution.sln" -c Debug',
+        run: 'dotnet run --project OnsiteCompanion/WinExe/OnSiteCompanion.WinExe.csproj',
+      });
+    });
+
+    it('runs the start-up project saved in the newest .vs/<solution>/v<N>/.suo', async () => {
+      await files(repo);
+      await mkdir(join(dir, '.vs', 'OnSite Companion Solution', 'v17'), { recursive: true });
+      await mkdir(join(dir, '.vs', 'OnSite Companion Solution', 'v18'), { recursive: true });
+      await writeFile(join(dir, '.vs', 'OnSite Companion Solution', 'v17', '.suo'), suo('00000000-0000-0000-0000-000000000000'));
+      await writeFile(join(dir, '.vs', 'OnSite Companion Solution', 'v18', '.suo'), suo(IMPORTER.toLowerCase()));
+      await expect(detectCommands(dir)).resolves.toMatchObject({ run: 'dotnet run --project Importer/WinExe/Importer.WinExe.csproj', runKind: 'desktop' });
+    });
+
+    it("reads it from the main checkout when detecting in a ticket's worktree", async () => {
+      await files(repo);
+      const checkout = join(dir, '..', `${dir.split(/[\\/]/).pop()}-checkout`);
+      await mkdir(join(checkout, '.vs', 'OnSite Companion Solution', 'v18'), { recursive: true });
+      try {
+        await writeFile(join(checkout, '.vs', 'OnSite Companion Solution', 'v18', '.suo'), suo(IMPORTER));
+        await expect(detectCommands(dir, { checkout })).resolves.toMatchObject({ run: 'dotnet run --project Importer/WinExe/Importer.WinExe.csproj' });
+      } finally {
+        await rm(checkout, { recursive: true, force: true });
+      }
+    });
+
+    it('ignores a start-up project dotnet cannot run', async () => {
+      await files(repo);
+      await mkdir(join(dir, '.vs', 'OnSite Companion Solution', 'v18'), { recursive: true });
+      await writeFile(join(dir, '.vs', 'OnSite Companion Solution', 'v18', '.suo'), suo('00000001-0000-0000-0000-000000000000'));
+      await expect(detectCommands(dir)).resolves.toMatchObject({ run: 'dotnet run --project OnsiteCompanion/WinExe/OnSiteCompanion.WinExe.csproj' });
+    });
+  });
+
   it('runs a web project before a desktop or console one, and skips projects outside the repo', async () => {
     await files({
       'App.sln': sln([

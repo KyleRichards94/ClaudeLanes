@@ -5,6 +5,7 @@ import { commandLine, pathArg } from './command-line';
 import { classifyProject, rankRunProjects, type ProjectInfo } from './dotnet-project';
 import { nodeCommands, packageManagerFromField, packageManagerFromLockfiles } from './node-package';
 import { isProjectFile, isSolutionFile, parseSolution, type SolutionProject } from './solution';
+import { readVsStartupProjectId } from './vs-startup';
 
 /** Larger solution, project or package.json files are skipped rather than read. */
 export const MAX_DETECT_FILE_BYTES = 4 * 1024 * 1024;
@@ -119,8 +120,16 @@ function compareSolutions(a: ParsedSolution, b: ParsedSolution): number {
   );
 }
 
+export interface DetectOptions {
+  /**
+   * The repo's main checkout, where Visual Studio keeps its per-user `.vs` folder (git-ignored, so
+   * missing from ticket worktrees). Defaults to `dir`.
+   */
+  checkout?: string;
+}
+
 /** `dotnet build <solution> -c Debug` and the solution's runnable project. `paths` are relative to `dir`. */
-async function fromSolutions(dir: string, paths: readonly string[]): Promise<DetectedCommands | null> {
+async function fromSolutions(dir: string, paths: readonly string[], checkout: string): Promise<DetectedCommands | null> {
   const parsed = await mapLimit(paths, READ_CONCURRENCY, async (path): Promise<ParsedSolution | null> => {
     const text = await readText(join(dir, path));
     return text === null ? null : { path, projects: parseSolution(path, text) };
@@ -135,7 +144,10 @@ async function fromSolutions(dir: string, paths: readonly string[]): Promise<Det
     const inRepo = solution.projects
       .map((project) => ({ ...project, path: posix.join(folder, project.path) }))
       .filter((project) => project.path !== '..' && !project.path.startsWith('../'));
-    const ranked = rankRunProjects(await classifyProjects(dir, inRepo));
+    const ranked = rankRunProjects(await classifyProjects(dir, inRepo), {
+      startupId: await readVsStartupProjectId(checkout, solution.path),
+      solutionName: posix.basename(solution.path).replace(/.[^.]+$/, ''),
+    });
     return { toolchain: 'dotnet', manifest: solution.path, packageManager: null, build, ...dotnetRun(ranked) };
   }
   return null;
@@ -200,16 +212,18 @@ async function nestedSolutions(dir: string, folders: readonly string[]): Promise
  * (`dotnet build <sln> -c Debug` / `dotnet run --project <proj>`), a project file at the root, the
  * root package.json's `build` and `start` (or `dev`) scripts with the repo's package manager, then
  * a solution one folder down. Null when none of them gives a command, or the folder cannot be read.
+ * A solution runs Visual Studio's saved start-up project when `options.checkout` has one.
  *
  * Reads only files; runs nothing. `dir` is a repo's main checkout or a ticket worktree.
  */
-export async function detectCommands(dir: string): Promise<DetectedCommands | null> {
+export async function detectCommands(dir: string, options: DetectOptions = {}): Promise<DetectedCommands | null> {
   const root = await listFolder(dir);
   if (!root) return null;
+  const checkout = options.checkout ?? dir;
   return (
-    (await fromSolutions(dir, root.files.filter(isSolutionFile))) ??
+    (await fromSolutions(dir, root.files.filter(isSolutionFile), checkout)) ??
     (await fromProjectFiles(dir, root.files.filter(isProjectFile))) ??
     (await fromPackageJson(dir, root.files)) ??
-    (await fromSolutions(dir, await nestedSolutions(dir, root.folders)))
+    (await fromSolutions(dir, await nestedSolutions(dir, root.folders), checkout))
   );
 }

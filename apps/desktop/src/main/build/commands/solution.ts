@@ -11,6 +11,8 @@ export interface SolutionProject {
   name: string;
   /** Path relative to the solution's folder, forward slashes, normalised (may start with `../`). */
   path: string;
+  /** The project's id in a classic `.sln` (upper-case GUID, no braces); Visual Studio's start-up setting names it. */
+  id?: string;
 }
 
 function hasExtension(path: string, extensions: readonly string[]): boolean {
@@ -40,15 +42,15 @@ function projectPath(raw: string): string | null {
 /** Solution folders are listed as projects with this type GUID; they are not built. */
 const SOLUTION_FOLDER_TYPE = '2150E333-8FDC-42A3-9474-1A3956D46DE8';
 /** `Project("{type}") = "Name", "Path\To\Name.csproj", "{guid}"` */
-const SLN_PROJECT = /^[ \t]*Project\("\{([0-9A-Fa-f-]+)\}"\)[ \t]*=[ \t]*"([^"]*)"[ \t]*,[ \t]*"([^"]*)"/gm;
+const SLN_PROJECT = /^[ \t]*Project\("\{([0-9A-Fa-f-]+)\}"\)[ \t]*=[ \t]*"([^"]*)"[ \t]*,[ \t]*"([^"]*)"(?:[ \t]*,[ \t]*"\{([0-9A-Fa-f-]+)\}")?/gm;
 
 /** Projects in a classic `.sln`, in the order the solution lists them. */
 export function parseSln(text: string): SolutionProject[] {
   const projects: SolutionProject[] = [];
-  for (const [, type = '', name = '', rawPath = ''] of text.matchAll(SLN_PROJECT)) {
+  for (const [, type = '', name = '', rawPath = '', id] of text.matchAll(SLN_PROJECT)) {
     if (type.toUpperCase() === SOLUTION_FOLDER_TYPE) continue;
     const path = projectPath(rawPath);
-    if (path) projects.push({ name, path });
+    if (path) projects.push(id ? { name, path, id: id.toUpperCase() } : { name, path });
   }
   return projects;
 }

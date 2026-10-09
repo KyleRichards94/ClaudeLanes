@@ -83,16 +83,39 @@ export function classifyProject(name: string, rawXml: string): ProjectInfo {
 /** Web apps first (they are what a repo usually "runs"), then desktop apps, then console apps. */
 const KIND_RANK: Record<NonNullable<ProjectInfo['kind']>, number> = { web: 0, desktop: 1, console: 2 };
 
+/** `OnSite Companion Solution` → `onsitecompanion`: letters and digits, without a trailing "solution". */
+function solutionStem(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/solution$/, '');
+}
+
+export interface RankRunOptions {
+  /** Visual Studio's start-up project for the solution (its `.sln` id), from the `.suo`. */
+  startupId?: string | null;
+  /** The solution's file name without extension. */
+  solutionName?: string;
+}
+
 /**
- * The projects `dotnet run` can start, best first: runnable, SDK-style and not a test project; web
- * before desktop before console, then in the order given (solution order). Visual Studio's
- * start-up project lives in its per-user `.suo`, so it cannot be read; the repo's run override
- * (AL-146) covers a solution whose app is not the first such project.
+ * The projects `dotnet run` can start, best first: runnable, SDK-style and not a test project.
+ * Visual Studio's saved start-up project leads; then projects whose first name part matches the
+ * solution's name (`OnSiteCompanion.WinExe` in `OnSite Companion Solution.sln`); then web before
+ * desktop before console, then in the order given (solution order). The repo's run override
+ * (AL-146) still wins over all of this.
  */
-export function rankRunProjects<T extends { info: ProjectInfo }>(projects: readonly T[]): T[] {
-  const runnable = projects.filter(({ info }) => info.kind !== null && info.sdkStyle && !info.test);
+export function rankRunProjects<T extends { info: ProjectInfo; name: string; id?: string }>(projects: readonly T[], options: RankRunOptions = {}): T[] {
+  const startupId = options.startupId?.toUpperCase();
+  const stem = options.solutionName ? solutionStem(options.solutionName) : '';
+  const runnable = (project: T) => project.info.kind !== null && project.info.sdkStyle;
+  const startup = startupId ? projects.find((project) => project.id === startupId && runnable(project)) : undefined;
+  const named = (project: T) => (stem !== '' && solutionStem(project.name.split('.')[0] ?? '') === stem ? 0 : 1);
   // Array.prototype.sort is stable, so solution order holds within a kind.
-  return runnable.sort((a, b) => rank(a.info) - rank(b.info));
+  const ranked = projects
+    .filter((project) => project !== startup && runnable(project) && !project.info.test)
+    .sort((a, b) => named(a) - named(b) || rank(a.info) - rank(b.info));
+  return startup ? [startup, ...ranked] : ranked;
 }
 
 function rank(info: ProjectInfo): number {
