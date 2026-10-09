@@ -45,7 +45,7 @@ describe('createBuildCommands', () => {
         run: { command: onsite.run, origin: 'detected' },
       },
     });
-    expect(detect).toHaveBeenCalledWith('C:\\src\\OnSite');
+    expect(detect).toHaveBeenCalledWith('C:\\src\\OnSite', { checkout: 'C:\\src\\OnSite' });
   });
 
   it("applies the repo's overrides from settings", async () => {
@@ -64,7 +64,8 @@ describe('createBuildCommands', () => {
     const detect = vi.fn(async () => null);
     const commands = createBuildCommands({ settings: settingsWith(repo()), platform: 'win32', detect });
     await commands.forRepo('C:\\src\\OnSite', { dir: 'C:\\src\\.agent-lanes\\AL-1' });
-    expect(detect).toHaveBeenCalledWith('C:\\src\\.agent-lanes\\AL-1');
+    // Visual Studio's start-up project is still read from the main checkout's `.vs`.
+    expect(detect).toHaveBeenCalledWith('C:\\src\\.agent-lanes\\AL-1', { checkout: 'C:\\src\\OnSite' });
   });
 
   it('refuses a path that is not a registered repo', async () => {

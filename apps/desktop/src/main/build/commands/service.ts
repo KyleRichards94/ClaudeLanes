@@ -1,7 +1,7 @@
 import { err, ok, resolveRepoCommands, type DetectedCommands, type RepoCommands, type Result } from '@agent-lanes/contracts';
 import { isSameRepoPath } from '../../repos/repo-paths';
 import type { SettingsService } from '../../settings/service';
-import { detectCommands } from './detect';
+import { detectCommands, type DetectOptions } from './detect';
 
 /**
  * A repo's build and run commands (AL-130, design §10): detected from its files on every call (cheap,
@@ -10,7 +10,7 @@ import { detectCommands } from './detect';
  */
 export interface BuildCommands {
   /** Detects commands in a folder: a repo's main checkout or a ticket's worktree. */
-  detect(dir: string): Promise<DetectedCommands | null>;
+  detect(dir: string, options?: DetectOptions): Promise<DetectedCommands | null>;
   /**
    * The commands for a registered repo: its overrides, else what is detected in `dir` (the repo's
    * main checkout unless a ticket's worktree is given, which may be on a branch that changed them).
@@ -24,7 +24,7 @@ export interface BuildCommandsOptions {
   /** Decides whether repo paths compare without case; defaults to this machine's. */
   platform?: NodeJS.Platform;
   /** The file-based detector unless a test passes another. */
-  detect?: (dir: string) => Promise<DetectedCommands | null>;
+  detect?: (dir: string, options?: DetectOptions) => Promise<DetectedCommands | null>;
 }
 
 export function createBuildCommands({ settings, platform = process.platform, detect = detectCommands }: BuildCommandsOptions): BuildCommands {
@@ -34,7 +34,8 @@ export function createBuildCommands({ settings, platform = process.platform, det
     async forRepo(repoPath, options = {}) {
       const repo = settings.get().repos.find((candidate) => isSameRepoPath(candidate.path, repoPath, platform));
       if (!repo) return err('VALIDATION', 'No registered repo has that path.');
-      return ok(resolveRepoCommands(repo, await detect(options.dir ?? repo.path)));
+      // Visual Studio's start-up project is read from the main checkout's `.vs`, which worktrees lack.
+      return ok(resolveRepoCommands(repo, await detect(options.dir ?? repo.path, { checkout: repo.path })));
     },
   };
 }
