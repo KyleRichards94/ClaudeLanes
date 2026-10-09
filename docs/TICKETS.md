@@ -30,6 +30,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M3 Ship** | Build/run per worktree, both merges, diff, ADO tab, PR stage, archive | E7, AL-084–AL-090, AL-112, AL-173, AL-174, AL-178–AL-181 | Two tickets build and run side by side; sub-branches merge; a PR is created with checks on the card |
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
 | **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
+| **M7 Ticket view parity** | The ticket drill-in works like Claude Code: your messages, expandable tool calls, usage and plan limits, Stop, Assign new agent, a second agent | E15 (AL-250–AL-266) | Assign a new agent to a lost session and hand over; a reviewer runs beside it |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -170,6 +171,23 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
 | AL-242 | Board picker for the team board | E14 | M | AL-234 | todo |
+| AL-250 | Output-first ticket layout | E15 | L | — | todo |
+| AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | todo |
+| AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | todo |
+| AL-253 | Stop turn and End session | E15 | S | AL-250 | todo |
+| AL-254 | Ticket view bug fixes from the audit | E15 | M | AL-250 | todo |
+| AL-255 | Markdown in the output | E15 | M | — | todo |
+| AL-256 | Expandable tool calls | E15 | M | — | todo |
+| AL-257 | Usage strip and compaction | E15 | M | AL-250 | todo |
+| AL-258 | Plan limits | E15 | M | — | todo |
+| AL-259 | Composer parity | E15 | L | AL-250 | todo |
+| AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | todo |
+| AL-261 | Sub-agent transcripts | E15 | M | AL-256 | todo |
+| AL-262 | Thinking blocks | E15 | S | AL-255 | todo |
+| AL-263 | Assign new agent | E15 | L | AL-253 | todo |
+| AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
+| AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
+| AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1206,6 +1224,147 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
   - [ ] The team board shows the chosen board's columns, and the choice survives a restart.
   - [ ] Switching team falls back to that team's first board when the saved one is not there.
 
+
+---
+
+### E15 — Ticket view parity with Claude Code (UX audit, 2026-10-09)
+
+Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb-a069-4a39-b7c0-65475dcda872), cited as UXA. Evidence was 97 screenshots of the built app on the e2e fakes and a code inventory. Kyle's decisions on 2026-10-09: "hand over" is the default for Assign new agent; a ticket may run a second agent; queued launches wait above 85% of the 5-hour window; Enter sends; the layout (AL-250) goes first.
+
+#### AL-250 · Output-first ticket layout
+- **Design:** UXA Layout (the mock-up), §6 artboard 3 superseded where they differ · **Depends on:** —
+- **Scope:** One header band (← Board, id, title, session status, usage, Agent ▾ menu); the stepper on one band under it; the tab panel fills the window height with the composer pinned to its bottom; Worktree, Merge, Agents (was Sub-agents + the Agent panel's lead card) and Sub-branches move to a 400 px right rail that stacks under the tabs below 1200 px. Model and effort move out of the Agent panel (into the composer in AL-259; the Agents card shows them). Permission prompt and gate box keep working in their current spots until AL-260 moves the prompt.
+- **Acceptance criteria:**
+  - [ ] At 1440×900 the output stream starts within 260 px of the top and the composer is visible without scrolling the page.
+  - [ ] At 1100×800 the output shows at least 360 px of rows; the rail stacks under the tab panel.
+  - [ ] Every control from the old panels is still reachable (Build, Run, Stop, Merge sub-branches, Merge → main, conflict View, model, effort, gate toggles).
+  - [ ] Unit tests for the layout breakpoints; e2e `ticket-layout.spec.ts` checks the two sizes above.
+
+#### AL-251 · Your messages and turn ends in the output
+- **Design:** UXA Output · **Depends on:** AL-250
+- **Scope:** Main records each user message (launch prompt, composer sends, skill-chip runs, design ships, gate replies) as a new `user` output event with its text, priority and time; the renderer shows it as a right-aligned bubble. A successful `result` renders an end-of-turn line: "Turn ended · 1m 12s · $0.42 · waiting for you" (duration, cost, turns from the result). History read back from a saved session keeps the user messages.
+- **Acceptance criteria:**
+  - [ ] Launch prompt, a composer message and a skill run each appear once, in order, as your bubbles.
+  - [ ] Each successful turn ends with the line above; a failed turn keeps "Turn ended early".
+  - [ ] Normaliser unit tests; renderer row tests; `output-stream.spec.ts` extended.
+
+#### AL-252 · Session status pill and Reconnect
+- **Design:** UXA At a glance (Status), §12 · **Depends on:** AL-250
+- **Scope:** The pill shows the session state (starting, running, idle, paused, queued, lost, stopped) in matching tones, a short id (`cc-<first 8>`; the full id in the tooltip and a copy action), elapsed time and tokens. Lost and stopped show the reason message and a Reconnect button (`agent:reconnect`); the composer's "reconnect" note gets the same button.
+- **Acceptance criteria:**
+  - [ ] Each state renders its own tone and label (unit test per state).
+  - [ ] Reconnect from the pill resumes a lost session (e2e with the fake killing its process).
+
+#### AL-253 · Stop turn and End session
+- **Design:** UXA Agent control · **Depends on:** AL-250
+- **Scope:** New channels `agent:interrupt` (stops the current turn, session stays live; held messages are not delivered) and `agent:stop` (ends the session, keeps worktree and branch; the ticket shows "Session ended" with Assign new agent once AL-263 lands). Composer gets a Stop button while a turn runs; Esc in the ticket page interrupts. The Agent ▾ menu gets End session with a confirm.
+- **Acceptance criteria:**
+  - [ ] Stop and Esc end the running turn within one tool boundary; the session accepts the next message.
+  - [ ] End session stops the `claude` process and leaves the worktree untouched.
+  - [ ] Handler and session-manager unit tests; `agent.spec.ts` covers both.
+
+#### AL-254 · Ticket view bug fixes from the audit
+- **Design:** UXA Bugs · **Depends on:** AL-250
+- **Scope:** Every row of the audit's bugs table: no truncated effort pills or Build/Stop labels at 1100; stepper doesn't wrap with a dangling connector; Merge sub-branches label hidden at 0 and not clipped; Merge → main disabled mid-turn and before QA unless the user overrides in the modal; Run disabled with "No run command" when none exists; build-log error count matches the panel (summary lines not counted); build-log lines wrap or scroll; Diff lists uncommitted files when it says it includes them; gate box shows the `set_stage` summary; Request changes form full width with a label; writer sub-agent with no branch says "same worktree"; inherited model shown as "inherits"; Pause holds skill runs; no ligatures in prose; ticket metadata shown once (the meta chip), not three times.
+- **Acceptance criteria:**
+  - [ ] One unit test per fix; screenshots at 1100×800 and 1440×900 show no truncation (`ticket-layout.spec.ts`).
+
+#### AL-255 · Markdown in the output
+- **Design:** UXA Output · **Depends on:** —
+- **Scope:** Prose rows render headings, ordered and bullet lists, italics, links (open in the browser via `app:openExternal` or the existing link route), block quotes, tables and fenced code with syntax highlighting (C#, VB, TS/JS, JSON, XML/Razor, PowerShell, bash, diff) and a Copy button. Copy on each assistant message. Streaming rows render markdown incrementally without flicker. No `dangerouslySetInnerHTML`; parse to RN elements.
+- **Acceptance criteria:**
+  - [ ] The audit's sample message (headings, list, diff fence, link) renders without raw markdown characters.
+  - [ ] Parser unit tests; a perf check that 8 streaming tickets keep AL-212's frame budget.
+
+#### AL-256 · Expandable tool calls
+- **Design:** UXA Output · **Depends on:** —
+- **Scope:** Main keeps each tool call's full input (clipped at 20,000 chars) and its result text (clipped) in the transcript. A tool row toggles open (click, Enter, Space) to show the input (command, file path, pattern), the output, and for Edit/Write/MultiEdit an inline diff from the input's old/new strings. Failed calls show the error text collapsed to two lines. Open state survives virtualised re-renders.
+- **Acceptance criteria:**
+  - [ ] Bash shows command and output; Edit shows a red/green diff; a failed call shows its reason.
+  - [ ] Keyboard and screen-reader operable (expanded state announced).
+  - [ ] Normaliser and row tests; `output-stream.spec.ts` expands a row.
+
+#### AL-257 · Usage strip and compaction
+- **Design:** UXA Usage and limits · **Depends on:** AL-250
+- **Scope:** A usage strip in the header band: context bar (amber from 70%, red from 90%), session tokens and cost. Tokens update during a turn from stream usage, not only at the result. Main reads `compact_boundary` system messages and writes "Context compacted at N%" to the output; the Agent ▾ menu gets Compact (sends `/compact`). Hover shows the input/output/cache breakdown.
+- **Acceptance criteria:**
+  - [ ] The strip moves during a turn and matches the result's totals at its end.
+  - [ ] A compaction shows its line; Compact from the menu triggers one (fake SDK).
+  - [ ] Usage-service unit tests; renderer tests for the thresholds.
+
+#### AL-258 · Plan limits
+- **Design:** UXA Usage and limits; Kyle 2026-10-09 (85% threshold) · **Depends on:** —
+- **Scope:** Main reads `rate_limit_event` from every session into one plan-limits store (5-hour and weekly utilisation, reset times, status) and emits `agent:planLimits`; on start it seeds from the experimental `usage()` call when available, tolerating its absence. App header shows a compact meter with reset times. `allowed_warning` raises a warning toast once per window; `rejected` marks affected agents "Waiting for limit reset · resets 15:20" instead of failing, and resumes them at the reset. The launch queue holds new launches while 5-hour use is above 85% (setting, default 85, shown in the queued note). API-key sign-ins hide the meter.
+- **Acceptance criteria:**
+  - [ ] Meter shows both windows with reset times from fake events.
+  - [ ] A `rejected` event parks the agent and it resumes after the reset (fake clock).
+  - [ ] A launch above 85% queues with the reason; it starts when use drops or on Start now.
+  - [ ] Store, queue and toast unit tests.
+
+#### AL-259 · Composer parity
+- **Design:** UXA Composer; Kyle 2026-10-09 (Enter sends) · **Depends on:** AL-250
+- **Scope:** Enter sends, Shift+Enter adds a line. Typing `/` opens a menu of the repo's skills (`skills:list`) and the session's commands (`supportedCommands()`), filtered as you type. `@` opens a file picker over the worktree (git ls-files, fuzzy). Paste or drop images and files (sent as SDK image / document content; size limits with clear errors). Up-arrow recalls earlier messages for this ticket; drafts are kept per ticket in UI prefs. Model and effort pickers move into the composer footer. Skill chips, action buttons and the Steer now toggle get distinct styles (chips mono, actions buttons, toggle a real switch). Pause holds skill runs like other messages.
+- **Acceptance criteria:**
+  - [ ] Each behaviour above has a unit test; `composer.spec.ts` covers Enter, `/`, `@` and a pasted image.
+
+#### AL-260 · Permission prompts at the waiting row
+- **Design:** UXA Composer and permission prompts · **Depends on:** AL-256
+- **Scope:** The prompt renders inside the output at the tool row that waits, with the full input (scrollable, not clipped); a compact copy stays at the top while the stream is scrolled away from it. New answers: Deny with a reason (the text goes back to the agent as the denial message) and Always allow a pattern for this repo (e.g. `Bash(dotnet build:*)`), saved in the repo's settings and applied by the permission policy.
+- **Acceptance criteria:**
+  - [ ] The waiting row is marked and holds the prompt; the board card keeps its own prompt.
+  - [ ] A deny reason reaches the agent; an allowed pattern skips the prompt next time (fake SDK).
+  - [ ] Permission-service unit tests; `permissions.spec.ts` extended.
+
+#### AL-261 · Sub-agent transcripts
+- **Design:** UXA Output, Agent control · **Depends on:** AL-256
+- **Scope:** Events with a `parentToolUseId` render nested under their Task row (collapsed by default, showing the sub-agent's latest activity), with their own tool rows and text. Sub-agent cards show tokens (from task progress) and a Stop button (`stopTask`, new `agent:stopSubagent` channel); clicking a card scrolls the output to its Task row.
+- **Acceptance criteria:**
+  - [ ] Two parallel sub-agents' rows nest under the right Task rows.
+  - [ ] Stop ends one sub-agent and the lead continues.
+  - [ ] Row-building and handler unit tests; `subagents.spec.ts`.
+
+#### AL-262 · Thinking blocks
+- **Design:** UXA Output · **Depends on:** AL-255
+- **Scope:** Main keeps `thinking` blocks and thinking deltas (clipped like text) as a `thinking` output kind; the renderer shows "Thinking…" collapsed, expandable, in muted text. A setting hides them entirely.
+- **Acceptance criteria:**
+  - [ ] Thinking appears collapsed and expands; the setting hides it.
+  - [ ] Normaliser and row unit tests.
+
+#### AL-263 · Assign new agent
+- **Design:** UXA Agent control; Kyle 2026-10-09 (hand over is the default) · **Depends on:** AL-253
+- **Scope:** "Assign new agent" in the Agent ▾ menu and the rail's Agents card (and on a lost or ended session). A dialog picks model, effort, skills, the stage to restart from, and Hand over (default) or Start fresh. It ends the current session (AL-253), then launches a new session in the same worktree and branch. Hand over sends a brief built in main: the ticket, the plan summary, the stage history, the diff stat against base, the last N assistant messages and open gates. The ticket record keeps a list of past sessions; the output shows a divider "New agent · Sonnet · High · handed over".
+- **Acceptance criteria:**
+  - [ ] Assigning from a running, lost and ended session each produce a live new session in the same worktree.
+  - [ ] Hand over's first turn includes the brief; Start fresh's doesn't.
+  - [ ] Past sessions' output stays readable above the divider.
+  - [ ] Unit tests for the brief and the record; `assign-agent.spec.ts`.
+
+#### AL-264 · Agent menu: permission mode, stage, archive
+- **Design:** UXA Agent control · **Depends on:** AL-253
+- **Scope:** The Agent ▾ menu: per-ticket permission mode (Auto / Accept edits / Ask, overriding the global default, applied live with `setPermissionMode`); Move to stage (any stage; the agent is told at its next turn as a system note); Archive (ends the session, then `tickets:archive`, then back to the board).
+- **Acceptance criteria:**
+  - [ ] A ticket's mode overrides the global one and survives a restart.
+  - [ ] Moving the stage updates the card and stepper and the agent's next turn mentions it.
+  - [ ] Archive from the menu leaves no running process.
+  - [ ] Unit tests; `agent.spec.ts` extended.
+
+#### AL-265 · Rewind and fork
+- **Design:** UXA Agent control · **Depends on:** AL-251
+- **Scope:** Launch sessions with file checkpointing on. Each of your messages gets Rewind to here (calls `rewindFiles(userMessageId)`, restoring the worktree to that point, confirm first, shows the files it restores) and Fork from here (`forkSession` at that message, opening it through Assign new agent's flow with Start from fork). Rewind refuses with a reason when the worktree has commits after that point that are pushed.
+- **Acceptance criteria:**
+  - [ ] Rewind restores edited files and the output marks the rewind.
+  - [ ] Fork starts a new session whose history ends at that message.
+  - [ ] Unit tests on the fake SDK; `rewind.spec.ts`.
+
+#### AL-266 · Second agent on a ticket
+- **Design:** UXA Decisions; Kyle 2026-10-09 · **Depends on:** AL-263
+- **Scope:** "Add agent" on the rail's Agents card starts a second session on the ticket (e.g. a reviewer): role (Reviewer read-only, or Helper on its own `sub/<ticket>-<name>` sub-branch), model, effort, skills, a prompt. The ticket record keeps both sessions; the output and composer get an agent switcher (Lead / Reviewer); permissions, usage and stop apply per agent. A read-only agent's write tools are denied by policy. Counts against the repo's concurrency limit.
+- **Acceptance criteria:**
+  - [ ] A reviewer runs beside the lead with its own output and composer; it cannot write in the worktree.
+  - [ ] A helper's commits land on its sub-branch and show in Sub-branches.
+  - [ ] Stopping one agent leaves the other running.
+  - [ ] Unit tests; `second-agent.spec.ts`.
+
 ---
 ## 4. Decisions
 
@@ -1970,6 +2129,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | D757 | Work item type and state colours come from the server (`ado:workItemColors`, cached 30 min) and show as a type edge/bar and a state dot with words, on team board and agent cards; token colours are the fallback | Kyle asked for the ADO colours on the board | 2026-10-09 |
 | D758 | The header is sticky; once scrolled past the agent lanes, a solid (not glass) strip pinned under the header shows lane counts and card chips, animates in 220 ms ease-out, and takes drops (pointer drops matched against live target positions; auto-scroll off while it shows) | Kyle asked for a sticky header and a collapsed agent board; glass made the strip unreadable over the team board | 2026-10-09 |
 | D759 | A solution's detected run command is Visual Studio's saved start-up project (`StartupProject=` in `.vs/<solution>/v<N>/.suo`, newest version first, read from the repo's main checkout because worktrees have no `.vs`) when `dotnet run` can start it; without one, a project whose first name part matches the solution's name (`OnSiteCompanion.WinExe` in `OnSite Companion Solution.sln`) leads, then web, desktop, console in solution order. Reverses the AL-130 note that the `.suo` cannot be read | Kyle's OnSite Companion repo detected `DatabuildGateway.WinExe` (the first desktop project) instead of the app Visual Studio starts | 2026-10-09 |
+| D760 | E15 added from the ticket view UX audit (AL-250–AL-266). Assign new agent hands over by default; a ticket may run a second agent (AL-266); queued launches wait above 85% of the 5-hour plan window; the composer sends on Enter; the layout (AL-250) is built first | Kyle's answers to the audit's open questions | 2026-10-09 |
 
 ---
 
@@ -2036,6 +2196,7 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 | 2026-10-08 | Parallel build complete: every buildable ticket merged (97 done, 39 partial; AL-224 and AL-226 wait on Kyle). Final check on `main`: `pnpm verify` green (3,437 tests), e2e 164/165 with the one failure (repos.spec "picking a non-git folder") passing on rerun; load-related e2e flakes stay open under AL-220. Added AL-242 (Board picker) from Kyle's request; recorded the on-prem decisions. |
 | 2026-10-09 | Merged board polish from Kyle's first real use: stage comments off by default, QA-only agent comments, auto permission mode, ADO type/state colours, sticky header and collapsed agent board strip; ADO failures now log the server's reason. `pnpm verify` green (3,513 tests), e2e 169/169 on the branch. Open: confirm auto mode in a real session (API-key sign-in), Enter on a strip cell right after an Escape-cancelled drag. |
 | 2026-10-09 | Run command detection follows Visual Studio's start-up project, else the project named like the solution (D759); OnSite Companion now detects `OnSiteCompanion.WinExe`. On-prem fixes: team backlog iteration path (TF51011). |
+| 2026-10-09 | Ticket view UX audit (Claude Doc, 97 screenshots on the e2e fakes): E15 with 17 tickets, AL-250–AL-266, milestone M7 (D760). |
 ---
 
 ## 7. Parallel build rules
