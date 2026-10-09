@@ -1,6 +1,6 @@
 import type { BacklogPage } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
-import { backlogQuery, getBacklog } from './backlog';
+import { backlogIterationPath, backlogQuery, getBacklog, wiqlIterationPath } from './backlog';
 import { createAdoClient } from './client';
 import { artboard11Backlog, createFakeTeamOrg, FAKE_TEAM_PROJECT, FEATURES, OSC_AREA, OSC_DEVELOPERS, type FakeTeamOrgOptions } from './testing/fake-team';
 
@@ -175,5 +175,54 @@ describe('backlogQuery (AL-233)', () => {
 
   it('includes items in sprints with UNDER the backlog iteration', () => {
     expect(backlogQuery(setup, { includeInSprint: true })).toContain("[System.IterationPath] UNDER 'O''Brien'");
+  });
+});
+
+describe('backlog iteration path on Azure DevOps Server', () => {
+  const B = '\\';
+  const node = (...segments: string[]) => B + segments.join(B);
+  const tree = {
+    identifier: 'root-guid',
+    name: 'Development',
+    path: node('Development', 'Iteration'),
+    children: [
+      {
+        identifier: 'liink-guid',
+        name: 'Team Liink',
+        path: node('Development', 'Iteration', 'Team Liink'),
+        children: [{ identifier: 's19', name: 'Sprint 19', path: node('Development', 'Iteration', 'Team Liink', 'Sprint 19') }],
+      },
+    ],
+  };
+  const stub = (answer: unknown, seen: string[] = []) =>
+    ({
+      orgUrl: 'http://devops:8090/CompanionSystems',
+      get: async (path: string) => {
+        seen.push(path);
+        return answer === null ? { ok: false, code: 'INTERNAL', message: 'down' } : { ok: true, data: answer };
+      },
+    }) as unknown as Parameters<typeof backlogIterationPath>[0];
+
+  it('looks up a backlog iteration the team settings gave without a path (TF51011 otherwise)', async () => {
+    const seen: string[] = [];
+    const path = await backlogIterationPath(stub(tree, seen), 'Development', { id: 'LIINK-GUID', name: 'Team Liink' }, {});
+    expect(path).toBe(`Development${B}Team Liink`);
+    expect(seen[0]).toContain('/Development/_apis/wit/classificationnodes/iterations');
+  });
+
+  it('keeps a path the team settings gave, and names the project root by the project', async () => {
+    expect(await backlogIterationPath(stub(tree), 'Development', { id: 'x', name: 'Team Liink', path: node('Development', 'Team Liink') }, {})).toBe(
+      `Development${B}Team Liink`,
+    );
+    expect(await backlogIterationPath(stub(tree), 'Development', { id: 'root-guid', name: 'Development', path: '' }, {})).toBe('Development');
+  });
+
+  it('falls back to project and name when the tree cannot be read', async () => {
+    expect(await backlogIterationPath(stub(null), 'Development', { id: 'liink-guid', name: 'Team Liink' }, {})).toBe(`Development${B}Team Liink`);
+  });
+
+  it('turns node paths into WIQL iteration paths', () => {
+    expect(wiqlIterationPath(node('Development', 'Iteration', 'Team Liink', 'Sprint 19'))).toBe(['Development', 'Team Liink', 'Sprint 19'].join(B));
+    expect(wiqlIterationPath(node('Development', 'Iteration'))).toBe('Development');
   });
 });
