@@ -27,7 +27,7 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
       }
     },
     'agent:gate': (event) => {
-      if (event.state === 'waiting') store.openGate(event.ticketId, event.stage, event.at);
+      if (event.state === 'waiting') store.openGate(event.ticketId, event.stage, event.at, event.summary);
       else store.resolveGate(event.ticketId);
     },
     // AL-106: what the session runs with, and the change that applies from its next turn.

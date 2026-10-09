@@ -131,7 +131,8 @@ describe('TicketPage', () => {
     for (const name of ['Worktree', 'Merge', 'Agents', 'Sub-branches']) {
       expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy();
     }
-    expect(await screen.findByText('Merge 1 sub-branch → 71273-cutover-frmjobcontrol-to')).toBeTruthy();
+    expect(await screen.findByText('Merge 1 sub-branch')).toBeTruthy();
+    expect(screen.getByTestId('merge-sub-branches-target').textContent).toBe('→ 71273-cutover-frmjobcontrol-to');
     expect(screen.getByText('sub/71273-filter')).toBeTruthy();
   });
 

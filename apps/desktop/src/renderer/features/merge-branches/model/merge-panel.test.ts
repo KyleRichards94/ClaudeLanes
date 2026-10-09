@@ -50,7 +50,7 @@ function status(fields: Partial<BranchStatus['ticket']> = {}, subBranches: SubBr
 describe('mergePanel (AL-174)', () => {
   it('reads "Merge 3 sub-branches → <ticket branch>" and "Merge worktree → main", both on, when ready', () => {
     expect(mergePanel(ticket, status())).toEqual({
-      subBranches: { label: 'Merge 3 sub-branches → 71273-cutover-job-control', disabledReason: null },
+      subBranches: { label: 'Merge 3 sub-branches', disabledReason: null },
       toMain: { label: 'Merge worktree → main', disabledReason: null },
       conflicted: false,
       readyCount: 3,
@@ -66,7 +66,7 @@ describe('mergePanel (AL-174)', () => {
   it('turns Merge sub-branches off when nothing is ready, saying why', () => {
     expect(mergePanel(ticket, status({}, [])).subBranches.disabledReason).toBe('No sub-branches yet.');
     expect(mergePanel(ticket, status({}, [sub('grid', { ready: false, finished: false })])).subBranches).toEqual({
-      label: 'Merge 1 sub-branch → 71273-cutover-job-control',
+      label: 'Merge 1 sub-branch',
       disabledReason: '1 sub-agent still runs.',
     });
     expect(mergePanel(ticket, status({}, [sub('grid', { mergedAt: 5, ahead: 0 })])).subBranches.disabledReason).toBe('Every sub-branch is merged.');
@@ -78,8 +78,15 @@ describe('mergePanel (AL-174)', () => {
 
   it('counts only the ready sub-branches when some are', () => {
     const view = mergePanel(ticket, status({}, [sub('grid'), sub('tests', { ready: false, finished: false })]));
-    expect(view.subBranches.label).toBe('Merge 1 sub-branch → 71273-cutover-job-control');
+    expect(view.subBranches.label).toBe('Merge 1 sub-branch');
     expect(view.subBranches.disabledReason).toBeNull();
+  });
+
+  it('holds Merge worktree → main while the agent is mid-turn, and labels an empty sub-branch list plainly (AL-254)', () => {
+    const busy = mergePanel(ticket, status({}, [sub('grid')]), { agentBusy: true });
+    expect(busy.toMain.disabledReason).toBe('The agent is mid-turn. Wait for it to finish, or stop it first.');
+    expect(busy.subBranches.disabledReason).toBeNull();
+    expect(mergePanel(ticket, status({}, [])).subBranches.label).toBe('Merge sub-branches');
   });
 
   it('turns Merge worktree → main off when the ticket branch has nothing new', () => {

@@ -50,7 +50,8 @@ describe('agent ticket event handlers', () => {
 
     handlers['agent:gate']?.(fakeGateEvent('71273', 3_000));
     const waiting = selectTicket(store.getState(), '71273');
-    expect(waiting?.gate).toEqual({ stage: 'planning', openedAt: 3_000 });
+    // The agent's summary rides along for the gate box (AL-254).
+    expect(waiting?.gate).toEqual({ stage: 'planning', openedAt: 3_000, summary: 'Plan ready' });
     expect(waiting && ticketNeedsYou(waiting)).toBe(true);
     expect(waiting?.needsYou).toEqual([{ kind: 'approval', stage: 'planning', since: 3_000 }]);
     expect(selectLaneNeedsYouCount(store.getState(), 'planning')).toBe(1);

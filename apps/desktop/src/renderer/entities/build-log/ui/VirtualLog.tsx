@@ -61,6 +61,7 @@ export function VirtualLog({ rows, follow, onFollowChange, markedRow = null, onV
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewport, setViewport] = useState(FALLBACK_VIEWPORT);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const contentHeight = rows.length * LOG_ROW_HEIGHT;
   const tailTop = Math.max(contentHeight - viewport, 0);
   // While following, the view sits at the tail whatever the last scroll event said.
@@ -97,6 +98,10 @@ export function VirtualLog({ rows, follow, onFollowChange, markedRow = null, onV
     const height = event.nativeEvent.layout.height;
     if (height > 0) setViewport(height);
   };
+  const onWidthLayout = (event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    if (width > 0) setViewportWidth(width);
+  };
 
   const { start, end } = visibleRange(rows.length, top, viewport);
   const drawn: ReactNode[] = [];
@@ -104,20 +109,35 @@ export function VirtualLog({ rows, follow, onFollowChange, markedRow = null, onV
     const row = rows[index]!;
     drawn.push(<LogLine key={row.id} row={row} index={index} marked={index === markedRow} />);
   }
+  // Long lines scroll sideways instead of ending in an ellipsis (AL-254): the content is as wide as the longest line.
+  const contentWidth = Math.max(viewportWidth, logContentWidth(rows));
 
   return (
-    <ScrollView
-      ref={scrollRef}
-      testID={testID}
-      aria-label="Build log lines"
-      style={[styles.scroll, style]}
-      onScroll={onScroll}
-      onLayout={onLayout}
-      scrollEventThrottle={16}
-    >
-      <View style={[styles.content, { height: contentHeight }]}>{drawn}</View>
+    <ScrollView horizontal style={[styles.scroll, style]} contentContainerStyle={styles.across} showsHorizontalScrollIndicator onLayout={onWidthLayout}>
+      <ScrollView
+        ref={scrollRef}
+        testID={testID}
+        aria-label="Build log lines"
+        style={[styles.scroll, { width: contentWidth }]}
+        onScroll={onScroll}
+        onLayout={onLayout}
+        scrollEventThrottle={16}
+      >
+        <View style={[styles.content, { height: contentHeight, width: contentWidth }]}>{drawn}</View>
+      </ScrollView>
     </ScrollView>
   );
+}
+
+/** Mono glyph width at the log's 12 px, with the row's side padding. */
+const LOG_CHAR_PX = 7.3;
+const LOG_ROW_PADDING = 2 * space.lg;
+
+/** The width the longest line needs, so the horizontal scroll reaches its end. */
+export function logContentWidth(rows: readonly BuildLogRow[]): number {
+  let longest = 0;
+  for (const row of rows) if (row.text.length > longest) longest = row.text.length;
+  return Math.ceil(longest * LOG_CHAR_PX) + LOG_ROW_PADDING;
 }
 
 function LogLine({ row, index, marked }: { row: BuildLogRow; index: number; marked: boolean }) {
@@ -136,6 +156,11 @@ function LogLine({ row, index, marked }: { row: BuildLogRow; index: number; mark
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
+  },
+  // The sideways scroller's content: the vertical log, as tall as the panel.
+  across: {
+    flexGrow: 1,
+    alignItems: 'stretch',
   },
   content: {
     position: 'relative',

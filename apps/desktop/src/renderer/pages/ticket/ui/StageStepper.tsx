@@ -1,5 +1,5 @@
 import type { Gate, Stage, StageGates } from '@agent-lanes/contracts';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, Text } from '@agent-lanes/ui';
 import type { ReactNode } from 'react';
@@ -29,7 +29,8 @@ export interface StageStepperProps {
 export function StageStepper({ steps, progress, gates, onGateChange, waitingStage = null, gateActions }: StageStepperProps) {
   return (
     <View style={styles.stepper}>
-      <View style={styles.row} role="list" aria-label="Stages" testID="stage-stepper">
+      {/* One row that scrolls sideways when narrow, so no step wraps under a dangling rule (AL-254). */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.row} role="list" aria-label="Stages" testID="stage-stepper">
         {steps.map((step, index) => (
           <View key={step.stage} style={styles.item}>
             {index > 0 ? <View style={styles.rule} aria-hidden /> : null}
@@ -44,7 +45,7 @@ export function StageStepper({ steps, progress, gates, onGateChange, waitingStag
             ) : null}
           </View>
         ))}
-      </View>
+      </ScrollView>
       {gateActions}
     </View>
   );
@@ -114,13 +115,15 @@ function StepPill({ step, number, progress, waiting }: { step: StageStep; number
 const styles = StyleSheet.create({
   stepper: {
     gap: space.md,
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
+  },
+  scroll: {
+    flexGrow: 0,
   },
   row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    rowGap: space.sm,
+    paddingVertical: 2,
   },
   item: {
     flexDirection: 'row',

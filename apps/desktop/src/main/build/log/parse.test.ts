@@ -121,7 +121,8 @@ describe('createDiagnosticCollector', () => {
     expect(collector.counts()).toEqual({ errors: 3, warnings: 1 });
     expect(collector.firstError()).toMatchObject({ code: 'CS0246', file: 'C:\\w\\A.cs' });
     expect(collector.diagnostics().map((item) => item.code)).toEqual(['CS0246', 'CS0103', 'CS1002', 'CS0168']);
-    expect(levels).toEqual(['info', 'error', 'error', 'warning', 'error', 'info', 'error', 'info', 'warning', 'error', 'error', 'error', 'info', 'error']);
+    // "Build FAILED." and "3 Error(s)" are summary lines, not errors of their own: the log's error count matches the panel's (AL-254).
+    expect(levels).toEqual(['info', 'error', 'error', 'warning', 'error', 'info', 'info', 'info', 'warning', 'error', 'error', 'error', 'info', 'info']);
   });
 
   it('reads eslint stylish blocks by their file line', () => {

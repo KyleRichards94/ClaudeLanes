@@ -102,7 +102,12 @@ export function parseDiagnosticLine(rawLine: string): BuildDiagnostic | null {
 }
 
 /** Lines that read as errors or warnings without being a diagnostic the parser knows (`npm ERR!`, `Build FAILED.`). */
-const ERROR_LINE = /^\s*(?:npm ERR!|ERR!|error\b|fatal\b|Build FAILED\b|ELIFECYCLE\b)|\berror\(s\)|\bERR_[A-Z_]+\b/i;
+/**
+ * Lines that are errors without being a diagnostic. MSBuild's summary lines ("Build FAILED.",
+ * "3 Error(s)") are not: each error already has its own diagnostic line, and counting the summary
+ * too made the log's count disagree with the Worktree panel's (AL-254).
+ */
+const ERROR_LINE = /^\s*(?:npm ERR!|ERR!|error\b|fatal\b|ELIFECYCLE\b)|\bERR_[A-Z_]+\b/i;
 const WARNING_LINE = /^\s*(?:npm WARN|warn(?:ing)?\b)/i;
 
 export interface LineReading {
@@ -174,7 +179,7 @@ export function createDiagnosticCollector(): DiagnosticCollector {
       }
 
       if (ESLINT_STYLISH_FILE.test(line.trim()) && !/^\s/.test(line)) stylishFile = line.trim();
-      if (ERROR_LINE.test(line) && !/\b0 error\(s\)/i.test(line)) return { level: 'error', diagnostic: null };
+      if (ERROR_LINE.test(line)) return { level: 'error', diagnostic: null };
       if (WARNING_LINE.test(line)) return { level: 'warning', diagnostic: null };
       return { level: 'info', diagnostic: null };
     },

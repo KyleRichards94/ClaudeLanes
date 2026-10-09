@@ -63,6 +63,8 @@ describe('session usage formatting (AL-113)', () => {
 
   it('puts the cost and context in the tooltip text', () => {
     expect(sessionUsageDetails(usage)).toBe('Cost about <$0.01 · 1 turn');
+    // An unmeasured window is left out rather than read as "0% of 0" (AL-254).
+    expect(sessionUsageDetails({ ...usage, context: { usedTokens: 0, maxTokens: 0, percentage: 0 } })).toBe('Cost about <$0.01 · 1 turn');
     expect(sessionUsageDetails(emptyAgentUsage('x'))).toBeNull();
   });
 });

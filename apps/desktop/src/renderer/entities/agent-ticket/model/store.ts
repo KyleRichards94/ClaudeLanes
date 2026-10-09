@@ -65,8 +65,8 @@ export interface AgentTicketStore extends Pick<StoreApi<AgentTicketsState>, 'get
   /** A frame's batch of `agent:output` events, across tickets, in one commit. */
   recordOutput(events: readonly { readonly ticketId: string; readonly at: number }[]): void;
 
-  /** A stage gate waits for the user (AL-104). */
-  openGate(ticketId: string, stage: Stage, at: number): void;
+  /** A stage gate waits for the user (AL-104), with the agent's summary of what to approve (AL-254). */
+  openGate(ticketId: string, stage: Stage, at: number, summary?: string | null): void;
   /** The waiting gate was approved, sent back or switched off (AL-104, AL-171). */
   resolveGate(ticketId: string): void;
   /** The ticket's stage gates after a toggle on the drill-in (`agent:setGate`, AL-171). */
@@ -200,7 +200,7 @@ export function createAgentTicketStore(): AgentTicketStore {
       });
     },
 
-    openGate: (ticketId, stage, at) => update(ticketId, (ticket) => withGateOpened(ticket, stage, at)),
+    openGate: (ticketId, stage, at, summary = null) => update(ticketId, (ticket) => withGateOpened(ticket, stage, at, summary)),
     resolveGate: (ticketId) => update(ticketId, withGateResolved),
     setGates: (ticketId, gates) => update(ticketId, (ticket) => withGates(ticket, gates)),
     setNeedsYou: (ticketId, reason) => update(ticketId, (ticket) => withNeedsYou(ticket, reason)),

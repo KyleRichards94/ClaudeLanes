@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { minTarget, radius, space, tone } from '@agent-lanes/tokens';
+import { color, minTarget, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Text } from '@agent-lanes/ui';
 import { agentTickets, useMergeSubBranches, type AgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
-import { useBranchStatus } from '@/shared/api';
+import { useBranchStatus, useSessionStatus } from '@/shared/api';
 import { showErrorRecovery, toast } from '@/shared/model';
 import { mergeErrorInfo, type MergeErrorInfo } from '../model/conflict';
 import { mergePanel, type BranchStatusState, type MergePanel } from '../model/merge-panel';
@@ -29,6 +29,7 @@ function plural(count: number, one: string, many = `${one}s`): string {
  */
 export function MergeControls({ ticket, store = agentTickets }: MergeControlsProps) {
   const status = useBranchStatus(ticket.id);
+  const session = useSessionStatus(ticket.id);
   const mergeSubs = useMergeSubBranches(store);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [conflict, setConflict] = useState<MergeErrorInfo | null>(null);
@@ -36,7 +37,8 @@ export function MergeControls({ ticket, store = agentTickets }: MergeControlsPro
 
   const state: BranchStatusState =
     status.data !== undefined ? { status: 'success', data: status.data } : status.isError ? { status: 'error' } : { status: 'pending' };
-  const view = mergePanel(ticket, state);
+  // Merge → main waits while the agent is in a turn (AL-254).
+  const view = mergePanel(ticket, state, { agentBusy: session.data?.state === 'running' || session.data?.state === 'starting' });
 
   const onMergeSubs = () =>
     mergeSubs.mutate(
@@ -67,6 +69,7 @@ export function MergeControls({ ticket, store = agentTickets }: MergeControlsPro
     <>
       <MergeControlsView
         view={view}
+        target={ticket.branch}
         merging={mergeSubs.isPending}
         onMergeSubBranches={onMergeSubs}
         onMergeToMain={() => setConfirmOpen(true)}
@@ -80,6 +83,8 @@ export function MergeControls({ ticket, store = agentTickets }: MergeControlsPro
 
 export interface MergeControlsViewProps {
   view: MergePanel;
+  /** The branch sub-branches merge into, shown under the button (AL-254). */
+  target?: string;
   /** Merge sub-branches is in flight. */
   merging?: boolean;
   onMergeSubBranches(): void;
@@ -88,7 +93,7 @@ export interface MergeControlsViewProps {
 }
 
 /** The two merge buttons, the reason they are off and the conflict row, with no actions behind them (also the gallery's samples). */
-export function MergeControlsView({ view, merging = false, onMergeSubBranches, onMergeToMain, onViewConflict }: MergeControlsViewProps) {
+export function MergeControlsView({ view, target, merging = false, onMergeSubBranches, onMergeToMain, onViewConflict }: MergeControlsViewProps) {
   // The reason a button is off, said once under both when they share it (a dirty worktree).
   const reasons = [...new Set([view.subBranches.disabledReason, view.toMain.disabledReason].filter((reason): reason is string => reason !== null))];
   return (
@@ -102,6 +107,11 @@ export function MergeControlsView({ view, merging = false, onMergeSubBranches, o
         onPress={onMergeSubBranches}
         testID="merge-sub-branches"
       />
+      {target && view.readyCount > 0 ? (
+        <Text variant="mono" size="xs" color={color.muted} numberOfLines={1} selectable testID="merge-sub-branches-target">
+          {`→ ${target}`}
+        </Text>
+      ) : null}
       <Button
         label={view.toMain.label}
         variant="strong"

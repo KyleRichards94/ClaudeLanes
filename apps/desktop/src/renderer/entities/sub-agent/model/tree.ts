@@ -52,9 +52,9 @@ export interface SubAgentRow {
   statusLabel: string;
   /** Its latest activity or result, else what it was asked; "Starts at the Code review stage" while it waits for one. */
   line: string;
-  /** "Sonnet · High": its own model and effort, else the lead agent's it inherits. */
+  /** "Sonnet · High": its own model and effort; "Inherits Opus · XHigh" when it runs with the lead agent's (AL-254). */
   modelLine: string;
-  /** Its sub-branch, "read-only" for one that shares the ticket worktree, "—" when it has none yet. */
+  /** Its sub-branch; "read-only" for one that only reads the ticket worktree; "same worktree" for a writer without a branch; "—" while queued. */
   branchLine: string;
 }
 
@@ -76,8 +76,10 @@ export function subAgentRow(node: SubagentNode, lead: { stage: Lane; model: Mode
     status: node.status,
     statusLabel: SUB_AGENT_STATUS_LABELS[node.status],
     line,
-    modelLine: `${MODEL_LABELS[node.model ?? lead.model]} · ${EFFORT_LABELS[node.effort ?? lead.effort]}`,
-    branchLine: node.branch ?? (node.readOnly && node.status !== 'queued' ? 'read-only' : '—'),
+    modelLine: node.model
+      ? `${MODEL_LABELS[node.model]} · ${EFFORT_LABELS[node.effort ?? lead.effort]}`
+      : `Inherits ${MODEL_LABELS[lead.model]} · ${EFFORT_LABELS[node.effort ?? lead.effort]}`,
+    branchLine: node.branch ?? (node.status === 'queued' ? '—' : node.readOnly ? 'read-only' : 'same worktree'),
   };
 }
 

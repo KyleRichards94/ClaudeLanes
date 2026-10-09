@@ -23,6 +23,13 @@ describe('Build / Run / Stop state (AL-173)', () => {
     });
   });
 
+  it('turns Run off and says so when the repo has no run command (AL-254)', () => {
+    expect(buildRunControls(idle, { runCommand: false })).toMatchObject({ run: { disabled: true, loading: false }, runLine: 'No run command' });
+    expect(buildRunControls(idle, { runCommand: true }).run.disabled).toBe(false);
+    // While a run is active the line reports the run, whatever the command list says.
+    expect(buildRunControls(slice({ run: { state: 'running', url: 'http://localhost:5080/', startedAt: 1 } }), { runCommand: false }).runLine).toBe('Running · http://localhost:5080/');
+  });
+
   it('shows the last build', () => {
     const last = { outcome: 'succeeded', startedAt: at1402 - 60_000, finishedAt: at1402, errors: 0, warnings: 2 } as const;
     expect(buildRunControls(slice({ build: { last } })).buildLine).toBe('Last build 14:02 · succeeded');

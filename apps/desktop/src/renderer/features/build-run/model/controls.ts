@@ -23,10 +23,18 @@ export interface BuildRunControls {
 
 const ACTIVE_RUN = new Set<AgentTicket['run']['state']>(['building', 'starting', 'running', 'stopping']);
 
-export function buildRunControls(ticket: Pick<AgentTicket, 'build' | 'run'>): BuildRunControls {
+export interface BuildRunOptions {
+  /** False when the repo has no run command, detected or set (AL-254): Run is off and says so. Undefined while unknown. */
+  runCommand?: boolean;
+}
+
+export const NO_RUN_COMMAND_LINE = 'No run command';
+
+export function buildRunControls(ticket: Pick<AgentTicket, 'build' | 'run'>, options: BuildRunOptions = {}): BuildRunControls {
   const { job, last } = ticket.build;
   const run = ticket.run;
   const runActive = ACTIVE_RUN.has(run.state);
+  const noRunCommand = options.runCommand === false && !runActive;
   const buildJob = job?.kind === 'build' ? job : null;
   const runJob = job?.kind === 'run' ? job : null;
 
@@ -53,11 +61,13 @@ export function buildRunControls(ticket: Pick<AgentTicket, 'build' | 'run'>): Bu
             ? 'Stopping…'
             : run.state === 'failed'
               ? 'Run failed'
-              : 'Not running';
+              : noRunCommand
+                ? NO_RUN_COMMAND_LINE
+                : 'Not running';
 
   return {
     build: { disabled: job !== null || runActive, loading: buildJob !== null },
-    run: { disabled: runActive || job !== null, loading: runJob !== null || run.state === 'building' || run.state === 'starting' },
+    run: { disabled: runActive || job !== null || noRunCommand, loading: runJob !== null || run.state === 'building' || run.state === 'starting' },
     stop: { target: runActive ? 'run' : job ? 'job' : null, loading: run.state === 'stopping' },
     buildLine,
     runLine,

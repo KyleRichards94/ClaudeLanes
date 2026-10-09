@@ -229,11 +229,11 @@ function dropReason(reasons: readonly NeedsYouReason[], kind: NeedsYouReason['ki
 }
 
 /** A gate waits for the user (`agent:gate`, AL-104): the card turns amber with "Needs you · approve …". */
-export function withGateOpened(ticket: AgentTicket, stage: Stage, at: number): AgentTicket {
+export function withGateOpened(ticket: AgentTicket, stage: Stage, at: number, summary: string | null = null): AgentTicket {
   if (ticket.gate?.stage === stage) return ticket;
   return {
     ...ticket,
-    gate: { stage, openedAt: at },
+    gate: { stage, openedAt: at, summary },
     needsYou: putReason(ticket.needsYou, { kind: 'approval', stage, since: at }),
   };
 }

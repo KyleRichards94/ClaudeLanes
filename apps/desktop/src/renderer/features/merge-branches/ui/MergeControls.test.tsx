@@ -84,7 +84,8 @@ describe('MergeControls (AL-174)', () => {
   it('shows both merges ready, labelled as on artboard 3', async () => {
     setup({ 'branches:status': { ok: true, data: branchStatus() } });
     await waitFor(() => expect(subButton().getAttribute('aria-disabled')).toBeNull());
-    expect(subButton().textContent).toContain('Merge 3 sub-branches → 71273-cutover-job-control');
+    expect(subButton().textContent).toContain('Merge 3 sub-branches');
+    expect(screen.getByTestId('merge-sub-branches-target').textContent).toBe('→ 71273-cutover-job-control');
     expect(mainButton().textContent).toContain('Merge worktree → main');
     expect(mainButton().getAttribute('aria-disabled')).toBeNull();
     expect(screen.queryByTestId('merge-disabled-reasons')).toBeNull();

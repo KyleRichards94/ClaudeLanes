@@ -50,7 +50,8 @@ export function sessionUsageDetails(usage: AgentUsage, sessionId?: string): stri
   const idLine = sessionId && shortSessionId(sessionId) !== sessionId ? [`Session ${sessionId}`] : [];
   if (usage.turns === 0 && usage.context === null) return idLine[0] ?? null;
   const parts = [...idLine, `Cost about ${formatCostUsd(usage.costUsd)}`];
-  if (usage.context) parts.push(`Context ${Math.round(usage.context.percentage)}% of ${formatTokenCount(usage.context.maxTokens).replace(/ tokens$/, '')}`);
+  // A window of 0 is an unmeasured one, not "0% of 0" (AL-254).
+  if (usage.context && usage.context.maxTokens > 0) parts.push(`Context ${Math.round(usage.context.percentage)}% of ${formatTokenCount(usage.context.maxTokens).replace(/ tokens$/, '')}`);
   parts.push(`${usage.turns} turn${usage.turns === 1 ? '' : 's'}`);
   return parts.join(' · ');
 }

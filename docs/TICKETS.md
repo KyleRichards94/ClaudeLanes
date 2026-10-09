@@ -175,7 +175,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | done |
 | AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | done |
 | AL-253 | Stop turn and End session | E15 | S | AL-250 | done |
-| AL-254 | Ticket view bug fixes from the audit | E15 | M | AL-250 | todo |
+| AL-254 | Ticket view bug fixes from the audit | E15 | M | AL-250 | done |
 | AL-255 | Markdown in the output | E15 | M | — | todo |
 | AL-256 | Expandable tool calls | E15 | M | — | todo |
 | AL-257 | Usage strip and compaction | E15 | M | AL-250 | todo |
@@ -1267,7 +1267,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Bugs · **Depends on:** AL-250
 - **Scope:** Every row of the audit's bugs table: no truncated effort pills or Build/Stop labels at 1100; stepper doesn't wrap with a dangling connector; Merge sub-branches label hidden at 0 and not clipped; Merge → main disabled mid-turn and before QA unless the user overrides in the modal; Run disabled with "No run command" when none exists; build-log error count matches the panel (summary lines not counted); build-log lines wrap or scroll; Diff lists uncommitted files when it says it includes them; gate box shows the `set_stage` summary; Request changes form full width with a label; writer sub-agent with no branch says "same worktree"; inherited model shown as "inherits"; Pause holds skill runs; no ligatures in prose; ticket metadata shown once (the meta chip), not three times.
 - **Acceptance criteria:**
-  - [ ] One unit test per fix; screenshots at 1100×800 and 1440×900 show no truncation (`ticket-layout.spec.ts`).
+  - [x] One unit test per fix; screenshots at 1100×800 and 1440×900 show no truncation (`ticket-layout.spec.ts`).
 
 #### AL-255 · Markdown in the output
 - **Design:** UXA Output · **Depends on:** —
@@ -2134,6 +2134,8 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D762 | AL-251: the session manager stamps a uuid on every user turn it pushes and tells listeners what it sent (`sent`: text, priority, source); the transcript shows `composer`, `skill`, `launch` and `hand-over` sources as user items and leaves `app` turns (continue, apply-model-now, recovered) out, also when they are read back from a saved session. The launch echoes the job description, not the whole first turn | The Output tab shows the user's side of the conversation without the app's plumbing | 2026-10-09 |
 | D763 | AL-252: the status pill shows a UUID session id's first group with the full id in the tooltip; one tone and word per session state; Reconnect on the pill for lost and ended sessions | The raw 36-character id and an always-green pill hid the state | 2026-10-09 |
 | D764 | AL-253: `agent:interrupt` (Stop turn, Esc on the page) reuses the session manager's interrupt without pausing; `agent:stop` (End session, behind a confirm in the Agent ▾ menu) takes a queued launch out of the queue or closes the live session with SESSION_ENDED_BY_USER_MESSAGE on its status. `features/agent-menu` is exempt from Steiger's insignificant-slice rule: later tickets add items to it | The composer had Pause only | 2026-10-09 |
+| D765 | AL-254: MSBuild's summary lines ("Build FAILED.", "N Error(s)") are `info`, not `error`, so the Build log's count matches the Worktree panel's diagnostics; the log scrolls sideways (content as wide as its longest line) instead of ellipsising; the stepper is one horizontally scrolling row; the gate box shows the `set_stage` summary (now on the ticket's gate in the store); Merge → main is held while the agent is mid-turn; Run is off with "No run command" when the repo has none; the sub-branches button says "Merge N sub-branches" with the target under it; the ADO tab's field grid keeps only what the header chip lacks (project, iteration); ligatures are off app-wide; a skill sent while paused counts as held | The audit's bugs table | 2026-10-09 |
+| D766 | Not reproduced: the Diff tab's "Includes uncommitted changes" with no listed file. The diff already runs against the working tree and adds untracked files; the audit's case came from the e2e fake and could not be traced to a file. Left open under AL-220 | No failing case to fix | 2026-10-09 |
 
 ---
 
@@ -2202,6 +2204,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | Run command detection follows Visual Studio's start-up project, else the project named like the solution (D759); OnSite Companion now detects `OnSiteCompanion.WinExe`. On-prem fixes: team backlog iteration path (TF51011). |
 | 2026-10-09 | Ticket view UX audit (Claude Doc, 97 screenshots on the e2e fakes): E15 with 17 tickets, AL-250–AL-266, milestone M7 (D760). |
 | 2026-10-09 | AL-250–AL-253 built on main: output-first layout with the rail, user messages and turn ends in the output, state-aware status pill with Reconnect, Stop turn / Esc and End session. New `shared/ui/action-menu` and `features/agent-menu`. |
+| 2026-10-09 | AL-254: the audit's bug fixes (log error counts, sideways log scrolling, one-row stepper, gate summary, Merge → main mid-turn, Run without a command, merge labels, ADO tab duplicates, ligatures, held skills, inherited model and same-worktree sub-agent rows, unmeasured context). |
 ---
 
 ## 7. Parallel build rules

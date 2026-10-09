@@ -59,10 +59,9 @@ describe('AdoTab (AL-180)', () => {
   it('shows the work item fields, description and acceptance criteria', async () => {
     setup();
     const fields = await screen.findByTestId('ado-fields');
-    expect(within(fields).getByText('User Story')).toBeTruthy();
-    expect(within(fields).getByText('Active')).toBeTruthy();
-    expect(within(fields).getByText('Sprint 42')).toBeTruthy();
+    // Type, state, sprint and assignee are on the header band's chip; the tab adds what it lacks (AL-254).
     expect(within(fields).getByText(ADO_FIXTURE_PROJECT)).toBeTruthy();
+    expect(within(fields).queryByText('Sprint 42')).toBeNull();
     expect(screen.getByTestId('ado-description').textContent).toContain('Cut over.');
     const criteria = screen.getByTestId('ado-acceptance-criteria');
     expect(within(criteria).getByText('Grid filters work as in WinForms.')).toBeTruthy();

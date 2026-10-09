@@ -58,6 +58,12 @@ function WaitingGate({ ticketId, placement, store, style, gate }: Required<Omit<
           </Text>
         </View>
       ) : null}
+      {/* What the agent asked to have approved, as it said it in `set_stage` (AL-254). */}
+      {gate.summary ? (
+        <Text variant="body" size="sm" selectable testID={`${prefix}-summary`}>
+          {gate.summary}
+        </Text>
+      ) : null}
       {noteOpen ? (
         <View style={styles.note}>
           <TextField
@@ -103,6 +109,8 @@ function WaitingGate({ ticketId, placement, store, style, gate }: Required<Omit<
 
 const styles = StyleSheet.create({
   box: {
+    // Full width under the stepper, so the Request changes box is not a narrow column (AL-254).
+    alignSelf: 'stretch',
     gap: space.sm,
     padding: space.md,
     borderRadius: radius.control,

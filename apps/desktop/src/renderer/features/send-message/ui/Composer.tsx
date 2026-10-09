@@ -68,7 +68,8 @@ export function Composer({ ticketId, skills, switching, style }: ComposerProps) 
       onSend={onSend}
       onPauseResume={() => (controls.paused ? resume.mutate() : pause.mutate())}
       onStop={() => interrupt.mutate()}
-      onRunSkill={(skill) => runSkill.mutate(skill)}
+      // A skill sent while paused waits for Resume like any message (AL-254).
+      onRunSkill={(skill) => runSkill.mutate(skill, { onSuccess: ({ held: wasHeld }) => wasHeld && setHeld((count) => count + 1) })}
       onApplyModel={() => applyModel.mutate({ ticketId })}
       pending={{
         send: send.isPending,
