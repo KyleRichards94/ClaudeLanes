@@ -96,10 +96,12 @@ describe('agent IPC handlers', () => {
       ok: true,
       data: {
         ticketId: '71273',
-        lastSeq: 2,
+        lastSeq: 3,
         events: [
-          { ticketId: '71273', at: 1_000, seq: 1, item: { kind: 'text', text: 'Reading the form first.' } },
-          { ticketId: '71273', at: 1_000, seq: 2, item: { kind: 'result', isError: false } },
+          // The launch's job shows as the user's first message (AL-251).
+          { ticketId: '71273', at: 1_000, seq: 1, item: { kind: 'user', text: 'Cut it over', source: 'launch' } },
+          { ticketId: '71273', at: 1_000, seq: 2, item: { kind: 'text', text: 'Reading the form first.' } },
+          { ticketId: '71273', at: 1_000, seq: 3, item: { kind: 'result', isError: false } },
         ],
       },
     });

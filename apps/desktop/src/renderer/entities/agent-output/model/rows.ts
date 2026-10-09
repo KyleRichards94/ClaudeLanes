@@ -1,4 +1,4 @@
-import type { AgentOutputEvent, OutputToolKind } from '@agent-lanes/contracts';
+import type { AgentOutputEvent, OutputToolKind, UserMessageSource } from '@agent-lanes/contracts';
 
 /**
  * What the drill-in's Output tab draws (AL-175, artboard 3 Output): the lead agent's output events
@@ -17,6 +17,18 @@ import type { AgentOutputEvent, OutputToolKind } from '@agent-lanes/contracts';
  */
 export type OutputRow =
   | { readonly type: 'system'; readonly key: string; readonly at: number; readonly text: string }
+  /** What the user sent (AL-251): a composer message, a `/skill`, the launch job or a hand-over brief. */
+  | {
+      readonly type: 'user';
+      readonly key: string;
+      readonly at: number;
+      readonly text: string;
+      readonly source: UserMessageSource;
+      readonly priority: 'now' | 'next' | null;
+      readonly messageId: string | null;
+    }
+  /** A turn that ended well (AL-251): "Turn ended · 1m 12s · $0.42"; `live` while it is the newest row ("waiting for you"). */
+  | { readonly type: 'turn-end'; readonly key: string; readonly at: number; readonly durationMs: number; readonly costUsd: number; readonly live: boolean }
   | {
       readonly type: 'tool';
       readonly key: string;
@@ -39,6 +51,7 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
   const rows: Mutable<OutputRow>[] = [];
   const toolRows = new Map<string, number>();
   const streams = new Map<string, number>();
+  let costSoFar = 0;
 
   for (const { seq, at, item } of events) {
     if (item.parentToolUseId !== null) continue;
@@ -91,8 +104,17 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
         streams.delete(item.streamId);
         break;
       }
+      case 'user':
+        rows.push({ type: 'user', key: `u${seq}`, at, text: item.text, source: item.source, priority: item.priority, messageId: item.messageId });
+        break;
       case 'result':
         if (item.isError) rows.push({ type: 'failed', key: `r${seq}`, text: `Turn ended early · ${item.subtype.replaceAll('_', ' ')}` });
+        else {
+          // The result's cost is the session's running total; the turn's own cost is the change since the last one.
+          const costUsd = Math.max(0, item.costUsd - costSoFar);
+          costSoFar = Math.max(costSoFar, item.costUsd);
+          rows.push({ type: 'turn-end', key: `r${seq}`, at, durationMs: item.durationMs, costUsd, live: false });
+        }
         break;
     }
   }
@@ -100,6 +122,8 @@ export function outputRows(events: readonly AgentOutputEvent[]): OutputRow[] {
   // Only the newest row can still be streaming; an older unfinished stream (an interrupted turn) reads as prose.
   const last = rows.at(-1);
   if (last?.type === 'streaming') rows[rows.length - 1] = { ...last, live: true };
+  // The newest turn end is the one the agent is waiting after.
+  if (last?.type === 'turn-end') rows[rows.length - 1] = { ...last, live: true };
   return rows.filter((row) => row.type !== 'prose' || row.text.trim() !== '');
 }
 
@@ -121,6 +145,28 @@ export function proseSpans(text: string): ProseSpan[] {
     else spans.push({ text: part, style: 'plain' });
   }
   return spans;
+}
+
+/** "1m 12s", "48s", "2h 05m" for the turn-end line. */
+export function formatTurnDuration(ms: number): string {
+  const seconds = Math.max(0, Math.round(ms / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+}
+
+/** "Turn ended · 1m 12s · $0.42", with " · waiting for you" while it is the newest row. */
+export function turnEndLabel(row: Extract<OutputRow, { type: 'turn-end' }>): string {
+  const cost = row.costUsd > 0 && row.costUsd < 0.01 ? '<$0.01' : `$${row.costUsd.toFixed(2)}`;
+  return `Turn ended · ${formatTurnDuration(row.durationMs)} · ${cost}${row.live ? ' · waiting for you' : ''}`;
+}
+
+/** The caption over a user bubble: "You · 14:02", "Skill · 14:02", "Launched · 14:02", "Handed over · 14:02". */
+export function userCaption(row: Pick<Extract<OutputRow, { type: 'user' }>, 'source' | 'at' | 'priority'>): string {
+  const who = row.source === 'skill' ? 'Skill' : row.source === 'launch' ? 'Launched' : row.source === 'hand-over' ? 'Handed over' : 'You';
+  const when = row.at > 0 ? ` · ${outputClock(row.at)}` : '';
+  return `${who}${when}${row.priority === 'now' ? ' · steered now' : ''}`;
 }
 
 /** Local wall-clock time, "13:58". */

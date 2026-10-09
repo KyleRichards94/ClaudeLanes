@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { CanUseTool, McpServerConfig, McpServerStatus, Options, PermissionMode, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import {
   APPLY_MODEL_NOW_MESSAGE,
@@ -13,6 +14,7 @@ import {
   type ModelEffort,
   type Result,
   type TicketRecord,
+  type UserMessageSource,
 } from '@agent-lanes/contracts';
 import { CLAUDE_CONNECTION_ID, type ConnectionsService } from '../connections';
 import type { Emit } from '../ipc/emit';
@@ -72,8 +74,8 @@ export interface SessionManager {
    * take it from their extras. Resolves the tickets whose session could not switch (it keeps its mode).
    */
   setPermissionMode(mode: PermissionMode): Promise<string[]>;
-  /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. */
-  stop(ticketId: string): Promise<Result<boolean>>;
+  /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. `reason` is shown as the stopped status's message (AL-253). */
+  stop(ticketId: string, options?: { reason?: string }): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
   /** Tickets whose agent is starting or in a turn (not idle or paused): quitting now would cut them off (AL-213). */
   midTurn(): string[];
@@ -97,6 +99,9 @@ export interface SessionStartRequest {
   jobDescription?: string;
   /** The work item the launch picked (AL-161); null or absent for a "No ticket" ticket. */
   workItem?: SessionWorkItem | null;
+  /** How the Output tab shows the first turn (AL-251): the launch's job by default; a hand-over brief for a new agent (AL-263). */
+  firstTurnSource?: UserMessageSource;
+  firstTurnEcho?: string;
 }
 
 export interface SessionResumeOptions {
@@ -113,10 +118,28 @@ export interface SessionMessageInput {
   priority?: 'now' | 'next';
   /** False: added to the transcript and sent with the next turn, without starting one (D11, AL-112). */
   shouldQuery?: boolean;
+  /** Who wrote it (AL-251): the Output tab shows the user's own messages and leaves the app's turns out. Default `app`. */
+  source?: UserMessageSource;
+  /** What the Output tab shows for it when it differs from the text sent (the launch shows the job, not the whole first turn). */
+  echo?: string;
 }
 
-/** A session message, with the worktree the session runs in and whether it resumed a saved session. */
-export type SessionMessageListener = (event: { ticketId: string; cwd: string; resumed: boolean; message: SDKMessage }) => void;
+/** What the app sent the session (AL-251): the Output tab draws the user's own messages from this. */
+export interface SentMessage {
+  /** The message's uuid, what rewind and fork take (AL-265). */
+  messageId: string;
+  text: string;
+  priority: 'now' | 'next';
+  source: UserMessageSource;
+  /** The session is paused: the message waits for Resume (AL-105). */
+  held: boolean;
+}
+
+/**
+ * A session message, with the worktree the session runs in and whether it resumed a saved session.
+ * `sent` is set for a user message the app itself pushed to the session, as it was pushed.
+ */
+export type SessionMessageListener = (event: { ticketId: string; cwd: string; resumed: boolean; message: SDKMessage; sent?: SentMessage }) => void;
 
 /** What a session gets from the rest of E6: AL-103's `agent_lanes` server, AL-108's MCP servers, … */
 export interface SessionExtras {
@@ -235,14 +258,26 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
   };
 }
 
-/** A user turn as the SDK's input stream takes it. */
-export function userMessage(input: SessionMessageInput): SDKUserMessage {
+/** A user turn as the SDK's input stream takes it, with a uuid so it can be rewound to or forked from (AL-265). */
+export function userMessage(input: SessionMessageInput, uuid: string = randomUUID()): SDKUserMessage {
   return {
     type: 'user',
     message: { role: 'user', content: input.text },
     parent_tool_use_id: null,
     priority: input.priority ?? 'next',
+    uuid: uuid as SDKUserMessage['uuid'],
     ...(input.shouldQuery === false ? { shouldQuery: false } : {}),
+  };
+}
+
+/** What listeners are told about a pushed message (AL-251). */
+export function sentMessage(message: SDKUserMessage, input: SessionMessageInput, held = false): SentMessage {
+  return {
+    messageId: String(message.uuid),
+    text: input.echo ?? input.text,
+    priority: input.priority ?? 'next',
+    source: input.source ?? 'app',
+    held,
   };
 }
 
@@ -330,6 +365,24 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     emitModel(session);
   }
 
+  /** Pushes a user turn to the session's input and tells listeners what was sent (AL-251). */
+  function push(session: Session, input: SessionMessageInput): SDKUserMessage {
+    const message = userMessage(input);
+    session.input.push(message);
+    notify(session, message, sentMessage(message, input));
+    return message;
+  }
+
+  function notify(session: Session, message: SDKMessage, sent?: SentMessage): void {
+    for (const listener of listeners) {
+      try {
+        listener({ ticketId: session.ticketId, cwd: session.cwd, resumed: session.resumed, message, ...(sent ? { sent } : {}) });
+      } catch (error) {
+        log?.warn(`A session message listener failed for ticket ${session.ticketId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
   function handle(session: Session, message: SDKMessage): void {
     notePendingApplied(session, message);
     session.lastActivityAt = now();
@@ -338,13 +391,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     } else if (message.type === 'result' && !session.paused) {
       setState(session, 'idle');
     }
-    for (const listener of listeners) {
-      try {
-        listener({ ticketId: session.ticketId, cwd: session.cwd, resumed: session.resumed, message });
-      } catch (error) {
-        log?.warn(`A session message listener failed for ticket ${session.ticketId}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
+    notify(session, message);
   }
 
   async function run(session: Session, query: ClaudeQuery): Promise<void> {
@@ -451,18 +498,19 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     }
 
     if (!resuming) {
-      session.input.push(
-        userMessage({
-          text: buildFirstTurn({
-            ticketId,
-            title: record.title,
-            jobDescription: job,
-            workItem: request.workItem ?? null,
-            skills: record.skills,
-            appendix: extras.firstTurnAppendix ?? [],
-          }),
+      // The first turn shows in the Output tab as the job the user gave, not the whole prompt (AL-251).
+      push(session, {
+        text: buildFirstTurn({
+          ticketId,
+          title: record.title,
+          jobDescription: job,
+          workItem: request.workItem ?? null,
+          skills: record.skills,
+          appendix: extras.firstTurnAppendix ?? [],
         }),
-      );
+        source: request.firstTurnSource ?? 'launch',
+        echo: request.firstTurnEcho ?? job,
+      });
     }
 
     let query: ClaudeQuery;
@@ -499,13 +547,13 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     return state;
   }
 
-  async function stopSession(session: Session): Promise<void> {
+  async function stopSession(session: Session, reason: string | null = null): Promise<void> {
     session.stopping = true;
     session.input.close();
     session.abort.abort();
     session.query?.close();
     await session.done;
-    setState(session, 'stopped');
+    setState(session, 'stopped', reason);
   }
 
   return {
@@ -517,10 +565,13 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       const session = found.data;
       if (!message.text.trim()) return err('VALIDATION', 'The message is empty.');
       if (session.paused) {
-        session.held.push(userMessage(message));
+        const held = userMessage(message);
+        session.held.push(held);
+        // Shown at once, marked held; it reaches the agent on Resume.
+        notify(session, held, sentMessage(held, message, true));
         return ok({ held: true });
       }
-      session.input.push(userMessage(message));
+      push(session, message);
       if (session.state === 'idle' && message.shouldQuery !== false) setState(session, 'running');
       return ok({ held: false });
     },
@@ -621,7 +672,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       }
       // The interrupted turn is over: the continue turn is the next one, with the new model and effort.
       session.turnBoundary = true;
-      session.input.push(userMessage({ text: APPLY_MODEL_NOW_MESSAGE }));
+      push(session, { text: APPLY_MODEL_NOW_MESSAGE });
       setState(session, 'running');
       return ok(modelStateOf(session));
     },
@@ -634,10 +685,10 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       return ok({ ticketId, model: record.model, effort: record.effort, pending: null });
     },
 
-    async stop(ticketId) {
+    async stop(ticketId, stopOptions = {}) {
       const session = sessions.get(ticketId);
       if (!session || !LIVE_STATES.has(session.state)) return ok(false);
-      await stopSession(session);
+      await stopSession(session, stopOptions.reason ?? null);
       log?.info(`Stopped the agent session of ticket ${ticketId}`);
       return ok(true);
     },
@@ -689,7 +740,7 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
 
     async dispose() {
       disposing = true;
-      await Promise.all([...sessions.values()].filter((session) => LIVE_STATES.has(session.state)).map(stopSession));
+      await Promise.all([...sessions.values()].filter((session) => LIVE_STATES.has(session.state)).map((session) => stopSession(session)));
     },
   };
 }

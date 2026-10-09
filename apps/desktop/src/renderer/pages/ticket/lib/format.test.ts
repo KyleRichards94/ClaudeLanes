@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyAgentUsage, formatTokenCount } from '@agent-lanes/contracts';
-import { folderName, formatClock, formatDuration, sessionPillLabel, sessionUsageDetails, sprintName } from './format';
+import { folderName, formatClock, formatDuration, sessionPillLabel, sessionUsageDetails, shortSessionId, sprintName } from './format';
 import { sessionStartedAt, stageSteps } from './stage-steps';
 
 describe('drill-in formatting', () => {
@@ -53,6 +53,10 @@ describe('session usage formatting (AL-113)', () => {
   it('adds the tokens to the session pill once there are any', () => {
     expect(sessionPillLabel('cc-71273', 0, 72 * 60_000, usage)).toBe('Session cc-71273 · 1h 12m · 412k tokens');
     expect(sessionPillLabel('cc-71273', null, 0, { totalTokens: 0 })).toBe('Session cc-71273');
+    // A UUID session id shows its first group; the whole id goes in the tooltip (AL-252).
+    expect(sessionPillLabel('9ad804aa-34ce-429e-8743-dcfb8cad787a', null, 0)).toBe('Session 9ad804aa');
+    expect(shortSessionId('cc-71273')).toBe('cc-71273');
+    expect(sessionUsageDetails(usage, '9ad804aa-34ce-429e-8743-dcfb8cad787a')).toMatch(/^Session 9ad804aa-34ce-429e-8743-dcfb8cad787a · Cost about/);
     expect(formatTokenCount(1_250_000)).toBe('1.3M tokens');
     expect(formatTokenCount(999_700)).toBe('1M tokens');
   });

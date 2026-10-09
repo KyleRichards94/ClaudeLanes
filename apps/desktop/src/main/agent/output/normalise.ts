@@ -18,6 +18,8 @@ export interface OutputNormaliserOptions {
   /** The ticket worktree; file paths inside it are shown relative to it. */
   cwd: string;
   platform?: NodeJS.Platform;
+  /** User turns the app sends on its own ("Continue where you left off."), which the Output tab leaves out (AL-251). */
+  hiddenUserTexts?: ReadonlySet<string>;
 }
 
 /** The in-process stage server's tools (AL-103) are app plumbing: the stage line comes from the app, not a tool row. */
@@ -281,10 +283,32 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
     return items;
   }
 
+  /**
+   * A user message that is text, not tool results (AL-251): what the user sent, read back from a
+   * saved session after a restart. Live, the session manager reports its own pushes as `sent`
+   * (`transcript.ts`), so this is for history. The app's own turns are left out.
+   */
+  function userItems(message: Extract<SDKMessage, { type: 'user' }>): AgentOutputItem[] {
+    if (message.parent_tool_use_id !== null || message.isSynthetic) return [];
+    const text = resultText(message.message.content).trim();
+    if (!text || options.hiddenUserTexts?.has(text)) return [];
+    return [
+      {
+        kind: 'user',
+        messageId: typeof message.uuid === 'string' ? message.uuid : null,
+        text: clip(text, OUTPUT_TEXT_LIMIT),
+        priority: message.priority === 'now' || message.priority === 'next' ? message.priority : null,
+        source: text.startsWith('/') && !text.includes('\n') ? 'skill' : 'composer',
+        parentToolUseId: null,
+      },
+    ];
+  }
+
   function toolResultItems(message: Extract<SDKMessage, { type: 'user' }>): AgentOutputItem[] {
     const content = message.message.content;
-    if (!Array.isArray(content)) return [];
+    if (!Array.isArray(content)) return userItems(message);
     const results = (content as unknown as Block[]).filter((block) => block.type === 'tool_result');
+    if (results.length === 0) return userItems(message);
     const items: AgentOutputItem[] = [];
     for (const block of results) {
       const toolUseId = String(block['tool_use_id']);

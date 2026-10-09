@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View, type KeyDownEvent, type StyleProp, type Vi
 import { color, minTarget, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text, TextField } from '@agent-lanes/ui';
 import { useApplyModelNow } from '@/entities/agent-ticket';
-import { useSessionStatus } from '@/shared/api';
+import { useInterruptTurn, useSessionStatus } from '@/shared/api';
 import { AGENT_MESSAGE_LIMIT, usePauseResume, useRunSkill, useSendMessage } from '../api/composer';
 import { composerControls, isSendShortcut, type ComposerControls } from '../model/composer';
 
@@ -30,6 +30,7 @@ export function Composer({ ticketId, skills, switching, style }: ComposerProps) 
   const send = useSendMessage(ticketId);
   const runSkill = useRunSkill(ticketId);
   const { pause, resume } = usePauseResume(ticketId);
+  const interrupt = useInterruptTurn(ticketId);
   const applyModel = useApplyModelNow();
   const [text, setText] = useState('');
   const [steerNow, setSteerNow] = useState(false);
@@ -54,7 +55,7 @@ export function Composer({ ticketId, skills, switching, style }: ComposerProps) 
     );
   };
 
-  const failed = [send, runSkill, pause, resume, applyModel].find((call) => call.isError)?.error;
+  const failed = [send, runSkill, pause, resume, applyModel, interrupt].find((call) => call.isError)?.error;
 
   return (
     <ComposerView
@@ -66,11 +67,13 @@ export function Composer({ ticketId, skills, switching, style }: ComposerProps) 
       onSteerNowChange={setSteerNow}
       onSend={onSend}
       onPauseResume={() => (controls.paused ? resume.mutate() : pause.mutate())}
+      onStop={() => interrupt.mutate()}
       onRunSkill={(skill) => runSkill.mutate(skill)}
       onApplyModel={() => applyModel.mutate({ ticketId })}
       pending={{
         send: send.isPending,
         pause: pause.isPending || resume.isPending,
+        stop: interrupt.isPending,
         skill: runSkill.isPending,
         applyModel: applyModel.isPending,
       }}
@@ -89,10 +92,12 @@ export interface ComposerViewProps {
   onSteerNowChange(on: boolean): void;
   onSend(): void;
   onPauseResume(): void;
+  /** Stop turn (AL-253): ends the running turn; the session stays live. */
+  onStop?(): void;
   onRunSkill(skill: string): void;
   onApplyModel(): void;
   /** Calls in flight, so a second press does nothing before the first one returns. */
-  pending?: { send?: boolean; pause?: boolean; skill?: boolean; applyModel?: boolean };
+  pending?: { send?: boolean; pause?: boolean; stop?: boolean; skill?: boolean; applyModel?: boolean };
   /** Why the last call failed; shown in place of the note. */
   error?: string | null;
   style?: StyleProp<ViewStyle>;
@@ -108,6 +113,7 @@ export function ComposerView({
   onSteerNowChange,
   onSend,
   onPauseResume,
+  onStop,
   onRunSkill,
   onApplyModel,
   pending = {},
@@ -166,6 +172,9 @@ export function ComposerView({
             testID="composer-input"
           />
         </View>
+        {controls.stop.visible ? (
+          <Button label="Stop" icon="stop" variant="danger" onPress={() => onStop?.()} loading={pending.stop} testID="composer-stop" />
+        ) : null}
         <Button
           label={controls.pause.label}
           icon={controls.pause.icon}

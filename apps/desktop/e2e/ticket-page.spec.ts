@@ -38,7 +38,7 @@ async function setContentWidth(width: number) {
   }, width);
 }
 
-test('lays out the drill-in at 1440 wide with the sub-agent column on the right', async () => {
+test('lays out the drill-in at 1440 wide with the rail on the right', async () => {
   await setContentWidth(1440);
   await page.evaluate(() => {
     (globalThis as unknown as { location: { hash: string } }).location.hash = '#/ticket/71273';
@@ -58,14 +58,14 @@ test('lays out the drill-in at 1440 wide with the sub-agent column on the right'
   const side = await page.getByTestId('ticket-side-column').boundingBox();
   expect(output).not.toBeNull();
   expect(side).not.toBeNull();
-  // Side by side: the column starts right of the output card, level with its top.
+  // Side by side: the rail starts right of the output card and no lower than it (AL-250).
   expect(side!.x).toBeGreaterThan(output!.x + output!.width);
-  expect(Math.abs(side!.y - output!.y)).toBeLessThan(2);
-  // The 400 px column ends at the page's 24 px margin, as on artboard 3.
+  expect(side!.y).toBeLessThanOrEqual(output!.y + 1);
+  // The 400 px rail, as on artboard 3.
   expect(Math.round(side!.width)).toBe(400);
 });
 
-test('stacks the sub-agent column under the output below 1200 wide', async () => {
+test('stacks the rail under the output below 1200 wide', async () => {
   await setContentWidth(1100);
   await expect(page.getByTestId('ticket-body-stacked')).toBeVisible();
 

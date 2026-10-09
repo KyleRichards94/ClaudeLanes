@@ -1,6 +1,6 @@
 import type { Services } from '../services';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { skillCommand } from '@agent-lanes/contracts';
+import { SESSION_ENDED_BY_USER_MESSAGE, skillCommand } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createClaudeLauncher } from './claude-sdk';
@@ -100,7 +100,7 @@ describe('messages mid-run (AL-105)', () => {
     await handleInvoke('agent:send', { ticketId: '71273', text: skillCommand('code-review') }, handlers['agent:send']);
     await call.sentCount(2);
     // A plain string turn, not marked synthetic: Claude Code dispatches it as the slash command.
-    expect(call.sent[1]).toEqual({ type: 'user', message: { role: 'user', content: '/code-review' }, parent_tool_use_id: null, priority: 'next' });
+    expect(call.sent[1]).toEqual({ type: 'user', message: { role: 'user', content: '/code-review' }, parent_tool_use_id: null, priority: 'next', uuid: expect.any(String) });
     await sessions.dispose();
   });
 
@@ -171,5 +171,29 @@ describe('skill command (AL-105)', () => {
     expect(skillCommand('anthropic-skills:commit')).toBe('/anthropic-skills:commit');
     expect(() => skillCommand('rm -rf /')).toThrow();
     expect(() => skillCommand('')).toThrow();
+  });
+});
+
+describe('Stop turn and End session (AL-253)', () => {
+  it('agent:interrupt ends the running turn and keeps the session live', async () => {
+    const { call, handlers, sessions } = await setup();
+    const result = await handleInvoke('agent:interrupt', { ticketId: '71273' }, handlers['agent:interrupt']);
+    expect(result).toMatchObject({ ok: true, data: { ticketId: '71273', state: 'running' } });
+    expect(call.interrupts).toBe(1);
+    // Not paused: the next message goes straight to the session.
+    await handleInvoke('agent:send', { ticketId: '71273', text: 'carry on' }, handlers['agent:send']);
+    await call.sentCount(2);
+    expect(call.inputs().at(-1)).toMatchObject({ text: 'carry on' });
+    await sessions.dispose();
+  });
+
+  it('agent:stop closes the session with the reason on its status, and says when none was live', async () => {
+    const { call, handlers, sessions, events } = await setup();
+    const stopped = await handleInvoke('agent:stop', { ticketId: '71273' }, handlers['agent:stop']);
+    expect(stopped).toMatchObject({ ok: true, data: { stopped: true, status: { state: 'stopped', message: SESSION_ENDED_BY_USER_MESSAGE } } });
+    expect(call.closed).toBe(true);
+    expect(events.of('agent:status', '71273').at(-1)).toMatchObject({ state: 'stopped', message: SESSION_ENDED_BY_USER_MESSAGE });
+    await expect(handleInvoke('agent:stop', { ticketId: '71273' }, handlers['agent:stop'])).resolves.toMatchObject({ ok: true, data: { stopped: false, status: { state: 'stopped' } } });
+    expect(sessions.status('71273').state).toBe('stopped');
   });
 });

@@ -121,14 +121,14 @@ describe('TicketPage', () => {
     expect(screen.queryByRole('link', { name: 'Open in Azure DevOps' })).toBeNull();
   });
 
-  it('shows the stepper, the three panels and the side column', async () => {
+  it('shows the stepper, the rail cards and the sub-branches', async () => {
     renderPage();
     await screen.findByTestId('ticket-title');
 
     expect(screen.getByLabelText('Planning, done, 12m')).toBeTruthy();
     expect(screen.getByLabelText('Implementing, current stage')).toBeTruthy();
     expect(screen.getByLabelText('Create PR, upcoming')).toBeTruthy();
-    for (const name of ['Agent', 'Worktree', 'Merge', 'Sub-agents', 'Sub-branches']) {
+    for (const name of ['Worktree', 'Merge', 'Agents', 'Sub-branches']) {
       expect(screen.getByRole('heading', { name, level: 2 })).toBeTruthy();
     }
     expect(await screen.findByText('Merge 1 sub-branch → 71273-cutover-frmjobcontrol-to')).toBeTruthy();
@@ -150,7 +150,7 @@ describe('TicketPage', () => {
     expect(selectRoute(router.getState())).toEqual(routes.ticketDesign('71273'));
   });
 
-  it('puts the side column beside the output at 1440 wide and under it below 1200', async () => {
+  it('puts the rail beside the output at 1440 wide and under it below 1200', async () => {
     setWindowWidth(1440);
     renderPage();
     await screen.findByTestId('ticket-title');

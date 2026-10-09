@@ -10,6 +10,12 @@ describe('composerControls (AL-176)', () => {
     expect(composerControls({ state: 'none', switching: false, held: 0 }).pause.disabled).toBe(true);
   });
 
+  it('shows Stop only while a turn runs (AL-253)', () => {
+    expect(composerControls({ state: 'running', switching: false, held: 0 }).stop.visible).toBe(true);
+    expect(composerControls({ state: 'idle', switching: false, held: 0 }).stop.visible).toBe(false);
+    expect(composerControls({ state: 'paused', switching: false, held: 0 }).stop.visible).toBe(false);
+  });
+
   it('says how many messages wait for Resume', () => {
     expect(composerControls({ state: 'paused', switching: false, held: 0 }).note).toBe('Paused · messages you send now are delivered on Resume');
     expect(composerControls({ state: 'paused', switching: false, held: 1 }).note).toBe('Paused · 1 message queued, delivered on Resume');

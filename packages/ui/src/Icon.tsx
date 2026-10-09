@@ -2,10 +2,27 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 // One module per glyph keeps the bundle to the icons below instead of the whole lucide set.
+import Archive from 'lucide-react-native/icons/archive';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowRight from 'lucide-react-native/icons/arrow-right';
 import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
+import AtSign from 'lucide-react-native/icons/at-sign';
+import Bot from 'lucide-react-native/icons/bot';
+import Brain from 'lucide-react-native/icons/brain';
 import Check from 'lucide-react-native/icons/check';
+import Copy from 'lucide-react-native/icons/copy';
+import Eye from 'lucide-react-native/icons/eye';
+import EyeOff from 'lucide-react-native/icons/eye-off';
+import File from 'lucide-react-native/icons/file';
+import GitFork from 'lucide-react-native/icons/git-fork';
+import Paperclip from 'lucide-react-native/icons/paperclip';
+import Power from 'lucide-react-native/icons/power';
+import RotateCcw from 'lucide-react-native/icons/rotate-ccw';
+import Send from 'lucide-react-native/icons/send';
+import SlidersHorizontal from 'lucide-react-native/icons/sliders-horizontal';
+import SquarePen from 'lucide-react-native/icons/square-pen';
+import UserPlus from 'lucide-react-native/icons/user-plus';
+import Zap from 'lucide-react-native/icons/zap';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
@@ -69,6 +86,24 @@ const glyphs = {
   /** The team board's drag handle and Backlog button (AL-234, artboard 08). */
   grip: { component: GripVertical },
   backlog: { component: List },
+  /** The ticket's agent controls (E15): end a session, rewind, fork, assign an agent, compact, thinking, archive. */
+  power: { component: Power },
+  rewind: { component: RotateCcw },
+  fork: { component: GitFork },
+  copy: { component: Copy },
+  thinking: { component: Brain },
+  archive: { component: Archive },
+  send: { component: Send },
+  attach: { component: Paperclip },
+  'add-agent': { component: UserPlus },
+  agent: { component: Bot },
+  permissions: { component: SlidersHorizontal },
+  file: { component: File },
+  compact: { component: Zap },
+  mention: { component: AtSign },
+  show: { component: Eye },
+  hide: { component: EyeOff },
+  edit: { component: SquarePen },
 } as const satisfies Record<string, Glyph>;
 
 export type IconName = keyof typeof glyphs;

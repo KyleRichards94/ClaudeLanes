@@ -9,6 +9,8 @@ export interface ComposerControls {
   paused: boolean;
   /** The pause button: Pause while the agent works, Resume while paused. */
   pause: { label: 'Pause' | 'Resume'; icon: 'pause' | 'play'; disabled: boolean };
+  /** Stop turn (AL-253): ends the running turn at its next tool boundary; shown only while a turn runs. */
+  stop: { visible: boolean };
   /** "Apply model now": only while a model or effort change waits for the next turn. */
   applyModel: { disabled: boolean };
   /** Skill chips send `/skill-name`, like Send. */
@@ -34,6 +36,7 @@ export function composerControls({ state, switching, held }: ComposerInput): Com
     live,
     paused,
     pause: paused ? { label: 'Resume', icon: 'play', disabled: false } : { label: 'Pause', icon: 'pause', disabled: !live || state === 'starting' },
+    stop: { visible: state === 'running' },
     applyModel: { disabled: !live || paused || !switching },
     skillsDisabled: !live,
     note: composerNote(state, held),

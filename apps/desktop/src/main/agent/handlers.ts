@@ -1,4 +1,4 @@
-import { err, ok, type AGENT_INVOKE_CHANNELS } from '@agent-lanes/contracts';
+import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS } from '@agent-lanes/contracts';
 import type { HandlersFor } from '../ipc/handle-invoke';
 import type { Services } from '../services';
 
@@ -26,7 +26,9 @@ export function createAgentHandlers({
     },
     'agent:setGate': ({ ticketId, stage, gate }) => stages.setGate(ticketId, stage, gate),
     'agent:getGate': ({ ticketId }) => ok({ gate: stages.pendingGate(ticketId) }),
-    'agent:send': ({ ticketId, text, priority }) => sessions.send(ticketId, { text, priority: priority ?? 'next' }),
+    // A `/skill` on its own line is a skill chip or a typed command; anything else the user wrote (AL-251).
+    'agent:send': ({ ticketId, text, priority }) =>
+      sessions.send(ticketId, { text, priority: priority ?? 'next', source: /^\/\S+(?:\s[^\n]*)?$/.test(text.trim()) ? 'skill' : 'composer' }),
     'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
     'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
     'agent:getUsage': ({ ticketId }) => ok(usage.get(ticketId)),
@@ -42,5 +44,17 @@ export function createAgentHandlers({
     'agent:startNow': ({ ticketId }) => launches.startNow(ticketId),
     'agent:launchFromAdo': (request) => adoLauncher.launch(request),
     'agent:undoLaunch': ({ undoId }) => launchUndo.undo(undoId),
+    // Stop turn (AL-253): like Pause's interrupt, without holding later messages.
+    'agent:interrupt': async ({ ticketId }) => {
+      const interrupted = await sessions.interrupt(ticketId);
+      return interrupted.ok ? ok(launches.status(ticketId)) : interrupted;
+    },
+    // End session (AL-253): a queued launch is taken out of the queue; a live session is closed.
+    'agent:stop': async ({ ticketId }) => {
+      const dequeued = launches.cancel(ticketId);
+      const stopped = await sessions.stop(ticketId, { reason: SESSION_ENDED_BY_USER_MESSAGE });
+      if (!stopped.ok) return stopped;
+      return ok({ stopped: stopped.data || dequeued, status: launches.status(ticketId) });
+    },
   };
 }

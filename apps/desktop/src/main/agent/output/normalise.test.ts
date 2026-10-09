@@ -227,3 +227,21 @@ describe('output normalisation helpers', () => {
     expect(firstLine('x'.repeat(600))).toHaveLength(500);
   });
 });
+
+describe("the user's own messages read back from a saved session (AL-251)", () => {
+  function user(content: unknown, extra: Record<string, unknown> = {}): SDKMessage {
+    return { type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, uuid: nextUuid(), ...ids, ...extra } as unknown as SDKMessage;
+  }
+
+  it("shows a text message as the user's, a /skill line as a skill, and leaves the app's own turns out", () => {
+    const normaliser = createOutputNormaliser({ cwd: WORKTREE, hiddenUserTexts: new Set(['Continue where you left off.']) });
+    const typed = normaliser.normalise(user('Carry on with the grid', { priority: 'now' }));
+    expect(typed).toEqual([{ kind: 'user', messageId: expect.any(String), text: 'Carry on with the grid', priority: 'now', source: 'composer', parentToolUseId: null }]);
+    expect(normaliser.normalise(user([{ type: 'text', text: '/code-review' }]))).toMatchObject([{ kind: 'user', text: '/code-review', source: 'skill', priority: null }]);
+    expect(normaliser.normalise(user('Continue where you left off.'))).toEqual([]);
+    expect(normaliser.normalise(user('build result', { isSynthetic: true }))).toEqual([]);
+    expect(normaliser.normalise(user('   '))).toEqual([]);
+    // A sub-agent's prompt belongs to its tree, not the Output tab.
+    expect(normaliser.normalise(user('Explore the forms', { parent_tool_use_id: 'toolu_spawn' }))).toEqual([]);
+  });
+});
