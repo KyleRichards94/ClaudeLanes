@@ -187,6 +187,7 @@ describe('SettingsPanel', () => {
       'defaults.stageGates': 'Default stage gates',
       'defaults.skills': 'Default skills',
       buildQueueSize: 'Builds at once',
+      launchHoldPercent: 'Hold new launches above this share of the 5-hour plan window (%)', // AL-258
       adoStateTransitions: 'Move work items to the next state in Azure DevOps',
       agentPermissions: 'Agent permissions', // AL-109
       dropDefaults: null, // The Drops tab (AL-240) has its own tests below.

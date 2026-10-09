@@ -5,7 +5,7 @@ import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { agentTickets, useAgentTicketCount, type AgentTicketStore } from '@/entities/agent-ticket';
 import { useAddRepo, useRepos, useTeams } from '@/shared/api';
 import { openConnections, openNewTicket, toast, useBoardSprint, useBoardSprints, useBoardTeam, useUiPrefs } from '@/shared/model';
-import { HeaderMenu, type HeaderMenuItem } from '@/shared/ui';
+import { HeaderMenu, PlanLimitsPill, type HeaderMenuItem } from '@/shared/ui';
 import { sprintRangeLabel } from '../model/header';
 import { McpStatusPill } from './McpStatusPill';
 
@@ -62,6 +62,8 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         <Pill tone="neutral" size="md" label={`${queued} queued`} testID="board-count-queued" />
         {/* MCP servers of the running sessions, amber with the failing names on hover (AL-108). */}
         <McpStatusPill />
+        {/* The plan's 5-hour and 7-day windows, once a session reported them (AL-258). */}
+        <PlanLimitsPill />
       </View>
       {/* Artboard 1's Connections icon button (AL-046). */}
       <Button label="Connections" icon="link" iconOnly onPress={() => openConnections()} testID="open-connections" />

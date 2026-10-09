@@ -14,7 +14,7 @@ import { QueuedNotice } from '@/features/start-queued-agent';
 import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useTicketRecord, useWorkItem } from '@/shared/api';
 import { toast, useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
-import { ErrorBoundary, PanelErrorBoundary, TicketTabBar } from '@/shared/ui';
+import { ErrorBoundary, PanelErrorBoundary, PlanLimitsPill, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
 import { CreatePullRequestPanel } from './CreatePullRequestPanel';
 import { AdoTab } from './AdoTab';
@@ -110,6 +110,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         }}
         trailing={
           <>
+            <PlanLimitsPill testID="ticket-plan-limits" />
             <UsageStrip usage={usage} />
             <AgentMenu ticketId={ticket.id} />
           </>

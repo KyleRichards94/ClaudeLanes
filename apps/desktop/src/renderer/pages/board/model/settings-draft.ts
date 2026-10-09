@@ -18,6 +18,7 @@ import {
   type SettingsPatch,
   type Stage,
   type StageGates,
+  launchHoldPercentOf,
 } from '@agent-lanes/contracts';
 
 /**
@@ -43,6 +44,8 @@ export interface SettingsDraft {
   /** Skill names separated by commas or spaces, with or without the leading slash. */
   skills: string;
   buildQueueSize: string;
+  /** The 5-hour share above which launches wait (AL-258), as text. */
+  launchHoldPercent: string;
   adoStateTransitions: boolean;
   /** Edited repos by path. */
   repos: Readonly<Record<string, RepoDraft>>;
@@ -70,7 +73,7 @@ export interface PermissionsDraft {
 
 export type PermissionSwitch = Exclude<keyof PermissionsDraft, 'bashAllow' | 'mode'>;
 
-export type GlobalTextField = 'skills' | 'buildQueueSize';
+export type GlobalTextField = 'skills' | 'buildQueueSize' | 'launchHoldPercent';
 export type RepoTextField = Exclude<keyof RepoDraft, 'adoWriteBack'>;
 
 export type DraftAction =
@@ -106,6 +109,7 @@ export function draftFromSettings(settings: Settings): SettingsDraft {
     stageGates: { ...settings.defaults.stageGates },
     skills: settings.defaults.skills.map((skill) => `/${skill}`).join(' '),
     buildQueueSize: String(settings.buildQueueSize),
+    launchHoldPercent: String(launchHoldPercentOf(settings)),
     adoStateTransitions: settings.adoStateTransitions,
     repos: {},
     permissions: permissionsDraft(agentPermissionPolicy(settings)),
@@ -198,6 +202,7 @@ export function validateDraft(draft: SettingsDraft, repos: readonly RepoSettings
   if (wholeNumber(draft.buildQueueSize, 1, BUILD_QUEUE_SIZE_LIMIT) === null) {
     errors['buildQueueSize'] = `Enter a whole number from 1 to ${BUILD_QUEUE_SIZE_LIMIT}.`;
   }
+  if (wholeNumber(draft.launchHoldPercent, 0, 100) === null) errors['launchHoldPercent'] = 'Enter a whole number from 0 to 100.';
   const badSkill = parseSkills(draft.skills).find((name) => !SKILL_NAME.test(name));
   if (badSkill) errors['skills'] = `"${badSkill}" is not a skill name. Use names like /code-review.`;
   for (const kind of DROP_KINDS) {
@@ -275,6 +280,8 @@ export function draftToPatch(draft: SettingsDraft, settings: Settings): Settings
 
   const buildQueueSize = Number(draft.buildQueueSize.trim());
   if (buildQueueSize !== settings.buildQueueSize) patch.buildQueueSize = buildQueueSize;
+  const launchHoldPercent = Number(draft.launchHoldPercent.trim());
+  if (launchHoldPercent !== launchHoldPercentOf(settings)) patch.launchHoldPercent = launchHoldPercent;
   if (draft.adoStateTransitions !== settings.adoStateTransitions) patch.adoStateTransitions = draft.adoStateTransitions;
   const policy: AgentPermissions = {
     mode: draft.permissions.mode,
