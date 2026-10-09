@@ -68,6 +68,8 @@ export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputR
       return <ToolRow row={row} ticketId={ticketId} waiting={waiting} />;
     case 'prose':
       return <ProseRow text={row.text} />;
+    case 'thinking':
+      return <ThinkingRow row={row} ticketId={ticketId} />;
     case 'streaming':
       return row.live ? (
         <View style={styles.row} testID="output-streaming">
@@ -89,6 +91,34 @@ function ProseRow({ text }: { text: string }) {
         <CopyButton text={markdownPlainText(text)} label="Copy message" testID="output-copy-message" />
       </View>
     </Pressable>
+  );
+}
+
+/** The agent's reasoning (AL-262): one muted "Thinking…" line that opens on its text. */
+function ThinkingRow({ row, ticketId }: { row: Extract<OutputRow, { type: 'thinking' }>; ticketId: string }) {
+  const expanded = useRowExpanded(ticketId, row.key);
+  return (
+    <View style={styles.row} testID="output-thinking">
+      <Pressable
+        role="button"
+        aria-expanded={expanded}
+        aria-label={row.live ? 'Thinking' : 'Thought'}
+        onPress={() => toggleRowExpanded(ticketId, row.key)}
+        style={styles.thinkingHead}
+        testID="output-thinking-toggle"
+      >
+        <Icon name="thinking" size={14} color={color.muted} />
+        <Text variant="meta" size="sm" color={color.muted}>
+          {row.live ? 'Thinking…' : 'Thought'}
+        </Text>
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={color.muted} />
+      </Pressable>
+      {expanded ? (
+        <Text variant="body" size="sm" color={color.muted} selectable style={styles.thinkingText} testID="output-thinking-text">
+          {row.text}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -283,6 +313,18 @@ const styles = StyleSheet.create({
   },
   messageCopyHidden: {
     opacity: 0,
+  },
+  thinkingHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: space.sm,
+    paddingVertical: space.xs,
+  },
+  thinkingText: {
+    fontStyle: 'italic',
+    paddingLeft: space.lg + space.sm,
+    paddingBottom: space.xs,
   },
   tool: {
     borderRadius: radius.chip + 2,

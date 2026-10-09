@@ -29,6 +29,9 @@ export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH, expand
     case 'turn-end':
     case 'compact':
       return 18 + OUTPUT_ROW_GAP;
+    case 'thinking':
+      // Collapsed to one line (AL-262); measured once opened.
+      return 24 + OUTPUT_ROW_GAP;
     case 'user': {
       const perLine = Math.max(Math.floor((width * 0.8) / CHAR_PX), 20);
       const lines = row.text.split('\n').reduce((sum, line) => sum + Math.max(Math.ceil(line.length / perLine), 1), 0);

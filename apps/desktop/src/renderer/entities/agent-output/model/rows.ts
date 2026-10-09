@@ -49,6 +49,8 @@ export type OutputRow =
       readonly subagents: readonly SubagentLane[];
     }
   | { readonly type: 'prose'; readonly key: string; readonly text: string }
+  /** The agent's reasoning (AL-262), collapsed to "Thinking…" while it streams and "Thought" after. */
+  | { readonly type: 'thinking'; readonly key: string; readonly text: string; readonly live: boolean }
   | { readonly type: 'streaming'; readonly key: string; readonly text: string; readonly live: boolean }
   | { readonly type: 'failed'; readonly key: string; readonly text: string };
 
@@ -176,6 +178,27 @@ function fold(lane: Lane, seq: number, at: number, item: AgentOutputEvent['item'
       streams.delete(item.streamId);
       break;
     }
+    case 'thinking-delta': {
+      const id = `think:${item.streamId}`;
+      const index = streams.get(id);
+      const row = index === undefined ? undefined : rows[index];
+      if (row?.type === 'thinking') rows[index!] = { ...row, text: row.text + item.text };
+      else {
+        streams.set(id, rows.length);
+        rows.push({ type: 'thinking', key: `${prefix}k${item.streamId}`, text: item.text, live: true });
+      }
+      break;
+    }
+    case 'thinking': {
+      const id = `think:${item.streamId}`;
+      const index = streams.get(id);
+      const row = { type: 'thinking' as const, key: `${prefix}k${item.streamId}`, text: item.text, live: false };
+      // The finished block takes its streamed row's place.
+      if (index !== undefined && rows[index]?.type === 'thinking') rows[index] = row;
+      else rows.push(row);
+      streams.delete(id);
+      break;
+    }
     case 'user':
       rows.push({ type: 'user', key: `${prefix}u${seq}`, at, text: item.text, source: item.source, priority: item.priority, messageId: item.messageId });
       break;
@@ -202,7 +225,21 @@ function finishLane(lane: Lane): OutputRow[] {
   if (last?.type === 'streaming') rows[rows.length - 1] = { ...last, live: true };
   // The newest turn end is the one the agent is waiting after.
   if (last?.type === 'turn-end') rows[rows.length - 1] = { ...last, live: true };
+  // Only the newest thinking can still be in progress (AL-262).
+  for (let index = 0; index < rows.length - 1; index++) {
+    const row = rows[index]!;
+    if (row.type === 'thinking' && row.live) rows[index] = { ...row, live: false };
+  }
   return rows.filter((row) => row.type !== 'prose' || row.text.trim() !== '');
+}
+
+/** The rows without the agent's thinking (AL-262), in every lane. */
+export function withoutThinking(rows: readonly OutputRow[]): OutputRow[] {
+  return rows.flatMap((row) => {
+    if (row.type === 'thinking') return [];
+    if (row.type === 'tool' && row.subagents.length > 0) return [{ ...row, subagents: row.subagents.map((sub) => ({ ...sub, rows: withoutThinking(sub.rows) })) }];
+    return [row];
+  });
 }
 
 /** The newest thing a sub-agent did, in one line. */

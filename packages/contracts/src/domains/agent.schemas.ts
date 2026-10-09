@@ -71,9 +71,21 @@ const OutputItemBase = z.object({
  * - `user`: what the user sent: a composer message, a skill command, the launch job or a hand-over
  *   brief (AL-251); the app's own turns ("Continue where you left off.") are not shown;
  * - `result`: a turn ended: usage, cost and duration;
- * - `compact`: the context was compacted (AL-257), by the agent or the user, from `preTokens` to `postTokens`.
+ * - `compact`: the context was compacted (AL-257), by the agent or the user, from `preTokens` to `postTokens`;
+ * - `thinking-delta` / `thinking` (AL-262): the agent's reasoning as it streams and once the block is
+ *   finished, clipped like text; the renderer shows it collapsed, or not at all.
  */
 export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
+  OutputItemBase.extend({
+    kind: z.literal('thinking-delta'),
+    streamId: z.string().max(200),
+    text: z.string().max(OUTPUT_TEXT_LIMIT),
+  }),
+  OutputItemBase.extend({
+    kind: z.literal('thinking'),
+    streamId: z.string().max(200),
+    text: z.string().max(OUTPUT_TEXT_LIMIT),
+  }),
   OutputItemBase.extend({
     kind: z.literal('text-delta'),
     /** The API message id the text streams into. */

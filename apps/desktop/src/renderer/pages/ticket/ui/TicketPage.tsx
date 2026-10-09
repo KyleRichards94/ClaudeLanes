@@ -14,7 +14,7 @@ import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt, usePendingPermission } from '@/features/resolve-permission';
 import { QueuedNotice } from '@/features/start-queued-agent';
 import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useStopSubagent, useTicketRecord, useWorkItem } from '@/shared/api';
-import { setTicketPageTab, toast, useTicketPageTab, type TicketPageTab } from '@/shared/model';
+import { setTicketPageTab, toast, useShowThinking, useTicketPageTab, useUiPrefs, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, PlanLimitsPill, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
@@ -38,6 +38,7 @@ export const RAIL_WIDTH = 400;
 export const STACKED_PANEL_MIN_HEIGHT = 480;
 const STACKED_PANEL_CHROME = 200;
 const TABS_ID = 'ticket-tabs';
+const SHOW_THINKING_KEY = 'show-thinking';
 
 /**
  * Route `ticket/:id`, the ticket drill-in (AL-250, artboard 3 reshaped for an output-first page): a
@@ -93,6 +94,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const setGate = useSetGate();
   const { navigate } = useNavigation();
   const [removing, setRemoving] = useState(false);
+  const showThinking = useShowThinking();
   // A sub-agent card opens its output in the stream, or stops it (AL-261).
   const stopSubagent = useStopSubagent(ticket.id);
   const subAgentActions = {
@@ -134,9 +136,13 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             <UsageStrip usage={usage} />
             <AgentMenu
               ticketId={ticket.id}
-              extraItems={[{ key: REMOVE_TICKET_KEY, label: 'Remove from board…', detail: 'Ends the agent and removes the worktree; the branch stays.', icon: 'archive', danger: true, section: 'Ticket' }]}
+              extraItems={[
+                { key: SHOW_THINKING_KEY, label: 'Show thinking', detail: "The agent's reasoning, collapsed in the output.", icon: 'thinking', selected: showThinking, section: 'Output' },
+                { key: REMOVE_TICKET_KEY, label: 'Remove from board…', detail: 'Ends the agent and removes the worktree; the branch stays.', icon: 'archive', danger: true, section: 'Ticket' },
+              ]}
               onExtraSelect={(key) => {
                 if (key === REMOVE_TICKET_KEY) setRemoving(true);
+                else if (key === SHOW_THINKING_KEY) useUiPrefs.getState().setShowThinking(!showThinking);
               }}
             />
             <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
@@ -185,6 +191,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
                 waitingToolUseId={waitingToolUseId}
                 renderWaitingRow={(row) => <PermissionPrompt ticketId={ticket.id} variant="inline" toolUseIds={row.toolUseIds} testID={`permission-${ticket.id}-inline`} />}
                 onWaitingRow={setWaitingRow}
+                showThinking={showThinking}
               />
             </PanelErrorBoundary>
             {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}

@@ -272,3 +272,24 @@ describe('full inputs and outputs for the expanded row (AL-256)', () => {
     expect(plain).toMatchObject({ kind: 'tool-result', output: 'The file has been updated.' });
   });
 });
+
+describe('thinking blocks (AL-262)', () => {
+  it('keeps thinking deltas and the finished block as thinking items, and leaves a redacted block out', () => {
+    const normaliser = createOutputNormaliser({ cwd: WORKTREE });
+    const items = [
+      streamEvent({ type: 'message_start', message: { id: 'msg_10' } }),
+      streamEvent({ type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } }),
+      streamEvent({ type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'The grid filters ' } }),
+      streamEvent({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig' } }),
+      assistant('msg_10', { type: 'thinking', thinking: 'The grid filters live in JobFilterState.', signature: 'sig' }),
+      assistant('msg_10', { type: 'redacted_thinking', data: 'opaque' }),
+      assistant('msg_10', { type: 'text', text: 'Wiring them now.' }),
+    ].flatMap((message) => normaliser.normalise(message));
+
+    expect(items).toEqual([
+      { kind: 'thinking-delta', streamId: 'msg_10', text: 'The grid filters ', parentToolUseId: null },
+      { kind: 'thinking', streamId: 'msg_10', text: 'The grid filters live in JobFilterState.', parentToolUseId: null },
+      { kind: 'text', streamId: 'msg_10', text: 'Wiring them now.', parentToolUseId: null },
+    ]);
+  });
+});

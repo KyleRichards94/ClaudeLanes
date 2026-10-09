@@ -8,7 +8,7 @@ const prefs: UiPrefs = {
   lastSprint: 'sprint-42',
   lastTeam: 'team-osc',
   collapsedLanes: ['qa', 'done'],
-  embedModeByTicket: { '71273': 'mcp-link' }, composerDrafts: {},
+  embedModeByTicket: { '71273': 'mcp-link' }, composerDrafts: {}, showThinking: true,
 };
 
 describe('createUiPrefsStorage', () => {

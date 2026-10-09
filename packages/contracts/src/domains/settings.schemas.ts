@@ -109,6 +109,8 @@ export const UiPrefsSchema = z.object({
    * defaulted: a `settings:update` patch of one UI pref must not reset the drafts.
    */
   composerDrafts: z.record(z.string().min(1), z.string().max(20_000)).optional(),
+  /** Whether the output shows the agent's thinking, collapsed (AL-262); unset means shown. */
+  showThinking: z.boolean().optional(),
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
@@ -223,7 +225,7 @@ export function defaultAgentDefaults(): AgentDefaults {
 
 /** Done starts collapsed into its vertical strip (artboard 1). */
 export function defaultUiPrefs(): UiPrefs {
-  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {}, composerDrafts: {} };
+  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {}, composerDrafts: {}, showThinking: true };
 }
 
 /** Fresh profile: no repos yet (AL-047 asks for one). */

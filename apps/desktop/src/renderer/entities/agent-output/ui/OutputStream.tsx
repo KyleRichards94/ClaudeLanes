@@ -14,7 +14,7 @@ import { space } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentOutput } from '../model/hooks';
 import { expandRow } from '../model/expanded';
-import { findToolUse, outputRows, type OutputRow } from '../model/rows';
+import { findToolUse, outputRows, withoutThinking, type OutputRow } from '../model/rows';
 import { clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
 import type { AgentOutputStore } from '../model/store';
 import { rowOffsets, windowFor } from '../model/virtual';
@@ -35,6 +35,8 @@ export interface OutputStreamProps {
   renderWaitingRow?: (row: Extract<OutputRow, { type: 'tool' }>) => ReactNode;
   /** Told whenever the waiting row's state changes, so the page can keep a compact prompt at the top while it is scrolled away. */
   onWaitingRow?: (state: WaitingRowState) => void;
+  /** Whether the agent's thinking rows are drawn (AL-262); on by default. */
+  showThinking?: boolean;
 }
 
 /** Viewport assumed before the first layout (and in tests, where layout never comes). */
@@ -55,9 +57,10 @@ const PAD_Y = space.lg;
  *   scrolling back to the end (or the button) follows again.
  * - Rows are in normal flow inside one scroll view, so text can be selected across rows and copied.
  */
-export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow }: OutputStreamProps) {
+export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true }: OutputStreamProps) {
   const events = useAgentOutput(ticketId, store);
-  const rows = outputRows(events);
+  const allRows = outputRows(events);
+  const rows = showThinking ? allRows : withoutThinking(allRows);
   const scrollRef = useRef<ScrollViewInstance>(null);
   // Heights of rows drawn so far, by row key; a new map on each change so the offsets follow it.
   const [measured, setMeasured] = useState<ReadonlyMap<string, number>>(() => new Map());

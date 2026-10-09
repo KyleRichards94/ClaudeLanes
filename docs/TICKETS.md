@@ -183,7 +183,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-259 | Composer parity | E15 | L | AL-250 | done |
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | done |
 | AL-261 | Sub-agent transcripts | E15 | M | AL-256 | done |
-| AL-262 | Thinking blocks | E15 | S | AL-255 | todo |
+| AL-262 | Thinking blocks | E15 | S | AL-255 | done |
 | AL-263 | Assign new agent | E15 | L | AL-253 | todo |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
 | AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
@@ -1327,8 +1327,8 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Output · **Depends on:** AL-255
 - **Scope:** Main keeps `thinking` blocks and thinking deltas (clipped like text) as a `thinking` output kind; the renderer shows "Thinking…" collapsed, expandable, in muted text. A setting hides them entirely.
 - **Acceptance criteria:**
-  - [ ] Thinking appears collapsed and expands; the setting hides it.
-  - [ ] Normaliser and row unit tests.
+  - [x] Thinking appears collapsed and expands; the setting hides it.
+  - [x] Normaliser and row unit tests.
 
 #### AL-263 · Assign new agent
 - **Design:** UXA Agent control; Kyle 2026-10-09 (hand over is the default) · **Depends on:** AL-253
@@ -2153,6 +2153,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D781 | AL-261: a sub-agent card shows its tokens (from task_progress / task_notification), a Stop button while it runs (`agent:stopSubagent` → the SDK's `stopTask`; a stopped task reads as Failed, the SDK's four task states being kept), and clicking the card switches to Output and scrolls to its Spawn row, opening it (`requestOutputScroll`, kept per ticket until the stream has the row) | The same card is the only place the sub-agent is named; Claude Code's own UI stops tasks from their row | 2026-10-09 |
 | D782 | AL-261: the fake `claude` gained `spawn` (an Agent tool use, the SDK task messages and child steps with `parent_tool_use_id`; `holdUntilStopped` waits for `stop_task`) and `bash` (a tool use and result with no prompt) steps; `subagents.spec.ts` drives them | No e2e path exercised sub-agents before | 2026-10-09 |
 | D783 | AL-260 and AL-261 are one commit: AL-261's edits landed on the same files (OutputStream, TicketPage, rows, the fake claude) before AL-260's e2e re-run finished, and splitting them by hand was not worth the risk | Keep commits honest about what was verified together | 2026-10-09 |
+| D784 | AL-262: thinking is kept as `thinking-delta` / `thinking` output items (clipped like text, redacted blocks left out) and drawn as one muted "Thinking…" / "Thought" line that opens on its text, in the lead's and sub-agents' lanes alike. The switch is a UI pref (`ui.showThinking`, shown by default) toggled from the ticket's Agent menu ("Show thinking"), not a Settings field | It is a per-user viewing choice like the collapsed lanes, and the Agent menu is where the user already is when reading output | 2026-10-09 |
 
 ---
 
@@ -2229,6 +2230,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | Board asks from Kyle: a "Done" pill on finished review cards (session state on the ticket store), and Remove from board (card menu and Agent menu, over tickets:archive with the unmerged-work second confirm). |
 | 2026-10-09 | AL-260: permission prompts at the waiting row — inline prompt with the full input, compact copy at the top while scrolled away, Deny with a reason the agent reads, Always allow saving `Bash(<prefix>:*)` / tool-name rules on the repo (Settings: Allowed without asking), fake claude `ask` step and permissions.spec.ts. |
 | 2026-10-09 | AL-261: sub-agent transcripts — rows nest under their Spawn row (latest line when closed), cards show tokens and Stop (`agent:stopSubagent` / `stopTask`), a card click scrolls the output to its row; fake claude `spawn` and `bash` steps; subagents.spec.ts. |
+| 2026-10-09 | AL-262: thinking blocks — `thinking` output items from the SDK's thinking blocks and deltas, collapsed muted rows in the stream, and a Show thinking switch in the Agent menu (UI pref). |
 ---
 
 ## 7. Parallel build rules

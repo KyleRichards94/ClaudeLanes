@@ -18,13 +18,15 @@ export interface UiPrefsState extends UiPrefs {
   setEmbedMode(ticketId: string, mode: EmbedMode): void;
   /** Keeps a ticket's unsent composer text (AL-259); an empty draft is dropped. */
   setComposerDraft(ticketId: string, draft: string): void;
+  /** Shows or hides the agent's thinking in the output (AL-262). */
+  setShowThinking(show: boolean): void;
 }
 
 /** The embed mode of a ticket that has never been switched (AL-194). */
 export const DEFAULT_EMBED_MODE: EmbedMode = 'webview';
 
-function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts }: UiPrefsState): UiPrefs {
-  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts };
+function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking }: UiPrefsState): UiPrefs {
+  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking };
 }
 
 /** Builds a UI prefs store over the given storage; the app uses `useUiPrefs`, tests make their own. */
@@ -59,6 +61,7 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
             else next[ticketId] = draft;
             return { composerDrafts: next };
           }),
+        setShowThinking: (showThinking) => set({ showThinking }),
       }),
       {
         name: 'ui-prefs',
@@ -72,6 +75,11 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
 }
 
 export type UiPrefsStore = ReturnType<typeof createUiPrefsStore>;
+
+/** Whether the output draws the agent's thinking (AL-262); shown until switched off. */
+export function useShowThinking(): boolean {
+  return useUiPrefs((state) => state.showThinking ?? true);
+}
 
 export const useUiPrefs: UiPrefsStore = createUiPrefsStore(createUiPrefsStorage());
 

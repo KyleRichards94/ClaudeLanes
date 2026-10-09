@@ -110,3 +110,16 @@ describe('UI prefs store', () => {
     expect(store.getState().collapsedLanes).toEqual(['done']);
   });
 });
+
+describe('show thinking (AL-262)', () => {
+  it('starts shown and saves the switch with the other UI prefs', async () => {
+    const main = installFakeSettings();
+    const store = newStore();
+    await hydrateUiPrefs(store);
+    expect(store.getState().showThinking).toBe(true);
+
+    store.getState().setShowThinking(false);
+    expect(store.getState().showThinking).toBe(false);
+    await vi.waitFor(() => expect(main.settings.ui).toMatchObject({ showThinking: false }));
+  });
+});

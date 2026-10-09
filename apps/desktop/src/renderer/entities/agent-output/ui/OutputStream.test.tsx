@@ -323,3 +323,32 @@ describe('sub-agent transcripts (AL-261)', () => {
     expect(screen.getByTestId('output-jump-latest')).toBeTruthy();
   });
 });
+
+describe('thinking blocks (AL-262)', () => {
+  beforeEach(() => resetExpandedRows());
+
+  it('shows "Thought" collapsed, opens it on its text, and hides it when showThinking is off', () => {
+    const { rerender } = render(<OutputStream ticketId="71273" store={store} />);
+    act(() =>
+      store.receive([
+        itemEvent(1, { kind: 'thinking-delta', streamId: 'm1', text: 'The grid filters live in JobFilterState.', ...lead }),
+        itemEvent(2, { kind: 'text', streamId: 'm2', text: 'Wiring them now.', ...lead }),
+      ]),
+    );
+    expect(screen.getByTestId('output-thinking').textContent).toContain('Thought');
+    expect(screen.queryByTestId('output-thinking-text')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('output-thinking-toggle'));
+    expect(screen.getByTestId('output-thinking-text').textContent).toBe('The grid filters live in JobFilterState.');
+
+    rerender(<OutputStream ticketId="71273" store={store} showThinking={false} />);
+    expect(screen.queryByTestId('output-thinking')).toBeNull();
+    expect(screen.getByText('Wiring them now.')).toBeTruthy();
+  });
+
+  it('says "Thinking…" while the newest row still streams', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([itemEvent(1, { kind: 'thinking-delta', streamId: 'm1', text: 'Reading the form', ...lead })]));
+    expect(screen.getByTestId('output-thinking').textContent).toContain('Thinking…');
+  });
+});

@@ -150,3 +150,31 @@ test('opens a tool row on its command and output (AL-256)', async () => {
   await toggle.press('Enter');
   await expect(page.getByTestId('output-tool-body')).toHaveCount(0);
 });
+
+test('shows thinking collapsed, opens it, and hides it from the Agent menu (AL-262)', async () => {
+  await app.evaluate(({ BrowserWindow }) => {
+    const frame = BrowserWindow.getAllWindows()[0]?.webContents.mainFrame;
+    frame?.send('agent:output', {
+      ticketId: '71273',
+      at: Date.now(),
+      seq: 20_003,
+      item: { kind: 'thinking', streamId: 'think_1', text: 'The grid filters live in JobFilterState.', parentToolUseId: null },
+    });
+  });
+  const jump = page.getByTestId('output-jump-latest');
+  if (await jump.isVisible()) await jump.click();
+  const toggle = page.getByTestId('output-thinking-toggle');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveText('Thought');
+  await expect(page.getByTestId('output-thinking-text')).toHaveCount(0);
+  await toggle.click();
+  await expect(page.getByTestId('output-thinking-text')).toHaveText('The grid filters live in JobFilterState.');
+
+  // The Agent menu's Show thinking switch hides every thinking row, and brings it back.
+  await page.getByTestId('agent-menu').click();
+  await page.getByRole('menuitem', { name: 'Show thinking, selected' }).click();
+  await expect(page.getByTestId('output-thinking')).toHaveCount(0);
+  await page.getByTestId('agent-menu').click();
+  await page.getByRole('menuitem', { name: 'Show thinking' }).click();
+  await expect(page.getByTestId('output-thinking')).toBeVisible();
+});

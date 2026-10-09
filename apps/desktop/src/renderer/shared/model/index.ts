@@ -5,6 +5,7 @@ export {
   useComposerDraft,
   useEmbedMode,
   useLaneCollapsed,
+  useShowThinking,
   useUiPrefs,
   type UiPrefsState,
   type UiPrefsStore,

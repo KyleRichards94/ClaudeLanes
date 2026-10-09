@@ -1,7 +1,7 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { fakeOutputEvent } from '@/shared/testing';
-import { findToolUse, outputRows, proseSpans, statSpans, turnEndLabel, userCaption, type OutputRow } from './rows';
+import { findToolUse, outputRows, proseSpans, statSpans, turnEndLabel, userCaption, withoutThinking, type OutputRow } from './rows';
 import { estimateRowHeight, rowOffsets, windowFor } from './virtual';
 
 let seq = 0;
@@ -211,5 +211,21 @@ describe('sub-agent lanes (AL-261)', () => {
     expect(findToolUse(rows, 'c')).toEqual({ index: 0, expandKeys: ['tspawn_1', 'a/tspawn_2'] });
     expect(findToolUse(rows, 'a')).toEqual({ index: 0, expandKeys: ['tspawn_1'] });
     expect(findToolUse(rows, 'ghost')).toBeNull();
+  });
+});
+
+describe('thinking rows (AL-262)', () => {
+  it('streams thinking into one collapsed row, finishes it in place, and can be hidden', () => {
+    const rows = outputRows([
+      event({ kind: 'thinking-delta', streamId: 'msg_1', text: 'The grid ', ...lead }),
+      event({ kind: 'thinking-delta', streamId: 'msg_1', text: 'filters…', ...lead }),
+      event({ kind: 'thinking', streamId: 'msg_1', text: 'The grid filters live in JobFilterState.', ...lead }),
+      event({ kind: 'text', streamId: 'msg_1', text: 'Wiring them now.', ...lead }),
+      event({ kind: 'thinking-delta', streamId: 'msg_2', text: 'Next…', ...lead }),
+    ]);
+    expect(rows.map((row) => row.type)).toEqual(['thinking', 'prose', 'thinking']);
+    expect(rows[0]).toMatchObject({ key: 'kmsg_1', text: 'The grid filters live in JobFilterState.', live: false });
+    expect(rows[2]).toMatchObject({ text: 'Next…', live: true });
+    expect(withoutThinking(rows).map((row) => row.type)).toEqual(['prose']);
   });
 });

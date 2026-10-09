@@ -329,6 +329,9 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
     for (const block of (message.message.content ?? []) as unknown as Block[]) {
       if (block.type === 'text' && typeof block['text'] === 'string' && block['text'].trim() !== '') {
         items.push({ kind: 'text', streamId: messageId, text: clip(block['text'], OUTPUT_TEXT_LIMIT), parentToolUseId });
+      } else if (block.type === 'thinking' && typeof block['thinking'] === 'string' && block['thinking'].trim() !== '') {
+        // The agent's reasoning (AL-262); a redacted block has no text and is left out.
+        items.push({ kind: 'thinking', streamId: messageId, text: clip(block['thinking'], OUTPUT_TEXT_LIMIT), parentToolUseId });
       } else if (block.type === 'tool_use') {
         const row = toolRow(block, messageId, parentToolUseId);
         if (row) items.push(row);
@@ -397,6 +400,9 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
           }
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta' && event.delta.text) {
             return [{ kind: 'text-delta', streamId: streaming.get(key) ?? message.uuid, text: clip(event.delta.text, OUTPUT_TEXT_LIMIT), parentToolUseId: message.parent_tool_use_id }];
+          }
+          if (event.type === 'content_block_delta' && event.delta.type === 'thinking_delta' && event.delta.thinking) {
+            return [{ kind: 'thinking-delta', streamId: streaming.get(key) ?? message.uuid, text: clip(event.delta.thinking, OUTPUT_TEXT_LIMIT), parentToolUseId: message.parent_tool_use_id }];
           }
           return [];
         }
