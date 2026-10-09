@@ -34,7 +34,19 @@ export interface RepoDraft {
   buildCommand: string;
   runCommand: string;
   maxConcurrentAgents: string;
+  /** Tool calls allowed without asking (AL-260), one rule per line: `Bash(dotnet build:*)`, `WebFetch`. */
+  permissionRules: string;
   adoWriteBack: boolean;
+}
+
+/** A rule as Claude Code spells them: `Bash(<prefix>:*)`, a tool name, or an MCP tool name. */
+const PERMISSION_RULE = /^(Bash\(.{1,190}:\*\)|[\w-]{1,100}|mcp__[\w-]+__[\w-]+)$/;
+
+export function parsePermissionRules(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
 export interface SettingsDraft {
@@ -98,6 +110,7 @@ export function repoDraft(repo: RepoSettings): RepoDraft {
     buildCommand: repo.buildCommand ?? '',
     runCommand: repo.runCommand ?? '',
     maxConcurrentAgents: String(repo.maxConcurrentAgents),
+    permissionRules: (repo.permissionRules ?? []).join('\n'),
     adoWriteBack: repoAdoWriteBack(repo),
   };
 }
@@ -226,6 +239,10 @@ export function validateDraft(draft: SettingsDraft, repos: readonly RepoSettings
     if (wholeNumber(values.maxConcurrentAgents, 1, MAX_CONCURRENT_AGENTS_LIMIT) === null) {
       errors[repoErrorKey(repo, 'maxConcurrentAgents')] = `Enter a whole number from 1 to ${MAX_CONCURRENT_AGENTS_LIMIT}.`;
     }
+    const rules = parsePermissionRules(values.permissionRules);
+    const badRule = rules.find((rule) => !PERMISSION_RULE.test(rule) || /[;&|`$<>]/.test(rule));
+    if (badRule) errors[repoErrorKey(repo, 'permissionRules')] = `"${badRule}" is not a rule. Use Bash(dotnet build:*) or a tool name such as WebFetch.`;
+    else if (rules.length > 200) errors[repoErrorKey(repo, 'permissionRules')] = 'Enter at most 200 rules.';
   }
   return errors;
 }
@@ -246,6 +263,8 @@ function savedRepo(repo: RepoSettings, values: RepoDraft): RepoSettings {
   };
   // Written only when switched, so a repo that never had the field keeps it unset (off).
   if (values.adoWriteBack !== repoAdoWriteBack(repo)) next.adoWriteBack = values.adoWriteBack;
+  const rules = parsePermissionRules(values.permissionRules);
+  if (!sameList(rules, repo.permissionRules ?? [])) next.permissionRules = rules;
   return next;
 }
 
@@ -257,6 +276,7 @@ function sameRepo(a: RepoSettings, b: RepoSettings): boolean {
     a.buildCommand === b.buildCommand &&
     a.runCommand === b.runCommand &&
     a.maxConcurrentAgents === b.maxConcurrentAgents &&
+    sameList(a.permissionRules ?? [], b.permissionRules ?? []) &&
     repoAdoWriteBack(a) === repoAdoWriteBack(b)
   );
 }

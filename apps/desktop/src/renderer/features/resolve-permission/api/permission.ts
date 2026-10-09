@@ -16,12 +16,21 @@ export function usePendingPermission(ticketId: string) {
   });
 }
 
-/** Allow once / Allow for this ticket / Deny. */
+export interface ResolvePermissionInput {
+  requestId: string;
+  decision: PermissionDecision;
+  /** Deny with a reason the agent reads (AL-260). */
+  reason?: string;
+  /** Always allow: the rule to save on the repo (AL-260); the request's suggestion when left out. */
+  rule?: string;
+}
+
+/** Allow once / Allow for this ticket / Always allow / Deny. */
 export function useResolvePermission(ticketId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ requestId, decision }: { requestId: string; decision: PermissionDecision }) =>
-      unwrap(await invoke('agent:resolvePermission', { ticketId, requestId, decision })),
+    mutationFn: async ({ requestId, decision, reason, rule }: ResolvePermissionInput) =>
+      unwrap(await invoke('agent:resolvePermission', { ticketId, requestId, decision, ...(reason ? { reason } : {}), ...(rule ? { rule } : {}) })),
     // Answered elsewhere or its turn ended: read what waits now.
     onSuccess: ({ resolved }) => {
       if (!resolved) void queryClient.invalidateQueries({ queryKey: permissionQueryKey(ticketId) });

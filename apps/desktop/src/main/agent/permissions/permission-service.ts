@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { CanUseTool, HookCallback, PermissionMode, PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import {
+  OUTPUT_TEXT_LIMIT,
   PERMISSION_TEXT_LIMIT,
   agentPermissionMode,
   agentPermissionPolicy,
@@ -19,6 +20,7 @@ import type { TranscriptService } from '../output/transcript';
 import type { SessionExtras } from '../session-manager';
 import { firstName } from '../stages/stage-service';
 import { allowedBashPrefixes, bashAllowRules, bashCommandAllowed, workItemCommentBody, workItemCommentVerdict, type WorkItemCommentVerdict } from './policy';
+import { normaliseRule, ruleAllows, suggestedRule } from './rules';
 
 /**
  * Permissions of headless sessions (AL-109, design §4, Q9, Decision D18). A ticket's session runs in
@@ -39,8 +41,11 @@ export interface PermissionService {
   sessionExtras(record: TicketRecord): Promise<SessionExtras>;
   /** The session's `canUseTool` for one ticket. */
   canUseTool(ticketId: string): CanUseTool;
-  /** The user's answer (`agent:resolvePermission`); false when that request no longer waits. */
-  resolve(ticketId: string, requestId: string, decision: PermissionDecision): boolean;
+  /**
+   * The user's answer (`agent:resolvePermission`); false when that request no longer waits. A deny
+   * carries the user's reason to the agent; `allow-pattern` saves a rule on the ticket's repo (AL-260).
+   */
+  resolve(ticketId: string, requestId: string, decision: PermissionDecision, options?: { reason?: string; rule?: string }): boolean;
   /** The ticket's oldest waiting request (`agent:getPermission`). */
   pending(ticketId: string): PermissionRequest | null;
   /** The session ended: every request it left waiting is cancelled. */
@@ -48,7 +53,8 @@ export interface PermissionService {
 }
 
 export interface PermissionServiceOptions {
-  settings: Pick<SettingsService, 'get'>;
+  /** `update` saves "Always allow" rules on the repo (AL-260); without it they last the session. */
+  settings: Pick<SettingsService, 'get'> & Partial<Pick<SettingsService, 'update'>>;
   /** The ticket as it is now (its stage), for the work item comment gate. */
   tickets?: Pick<TicketRecordStore, 'get'>;
   buildCommands: Pick<BuildCommands, 'forRepo'>;
@@ -69,6 +75,8 @@ interface Waiting {
   request: PermissionRequest;
   /** What "Allow for this ticket" remembers. */
   rule: string;
+  toolName: string;
+  input: Record<string, unknown>;
   suggestions: PermissionUpdate[];
   settle: (result: PermissionResult) => void;
 }
@@ -119,6 +127,8 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
   const waiting = new Map<string, Waiting[]>();
   const allowedForTicket = new Map<string, Set<string>>();
   const bashPrefixes = new Map<string, string[]>();
+  /** Each ticket's repo path, from `sessionExtras`, for the repo's saved rules (AL-260). */
+  const repoByTicket = new Map<string, string>();
 
   const oldest = (ticketId: string): PermissionRequest | null => waiting.get(ticketId)?.[0]?.request ?? null;
 
@@ -140,11 +150,16 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       title: clip(context.title ?? `Claude wants to use ${context.displayName ?? label}`),
       detail: toolDetail(input, context.blockedPath),
       openedAt: now(),
+      toolUseId: typeof context.toolUseID === 'string' ? context.toolUseID : null,
+      input: fullInput(toolName, input),
+      suggestedRule: suggestedRule(toolName, input),
     };
     return new Promise<PermissionResult>((resolve) => {
       const entry: Waiting = {
         request,
         rule: ruleFor(toolName, input),
+        toolName,
+        input,
         // "Allow for this ticket" is remembered by the session only, never in a settings file in the worktree.
         suggestions: (context.suggestions ?? []).map((update) => ({ ...update, destination: 'session' }) as PermissionUpdate),
         settle: resolve,
@@ -192,6 +207,39 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
     };
   }
 
+  /** The ticket's repo and its saved rules, from the settings. */
+  function repoRulesFor(ticketId: string): { repo: string | null; rules: string[] } {
+    const repo = repoByTicket.get(ticketId) ?? null;
+    const entry = repo === null ? undefined : options.settings.get().repos.find((candidate) => candidate.path === repo);
+    return { repo, rules: entry?.permissionRules ?? [] };
+  }
+
+  /** The whole input for the prompt (AL-260): the command, or the input as JSON. */
+  function fullInput(toolName: string, input: Record<string, unknown>): string | null {
+    const long = (text: string) => (text.length > OUTPUT_TEXT_LIMIT ? `${text.slice(0, OUTPUT_TEXT_LIMIT - 1)}…` : text);
+    if (toolName === 'Bash' && typeof input['command'] === 'string') {
+      // The command with its description, as the output row shows it.
+      const description = typeof input['description'] === 'string' && input['description'].trim() ? `\n# ${input['description'].trim()}` : '';
+      return long(`${input['command']}${description}`);
+    }
+    if (Object.keys(input).length === 0) return null;
+    try {
+      return long(JSON.stringify(input, null, 2));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Saves an "Always allow" rule on the ticket's repo (AL-260). */
+  function saveRepoRule(ticketId: string, rule: string): void {
+    const { repo } = repoRulesFor(ticketId);
+    if (repo === null || !options.settings.update) return;
+    const repos = options.settings.get().repos.map((entry) => (entry.path === repo && !(entry.permissionRules ?? []).includes(rule) ? { ...entry, permissionRules: [...(entry.permissionRules ?? []), rule] } : entry));
+    const saved = options.settings.update({ repos });
+    if (!saved.ok) log?.warn(`Could not save the permission rule ${rule} for ${repo}: ${saved.message}`);
+    else log?.info(`Saved the permission rule ${rule} for ${repo}`);
+  }
+
   function canUseTool(ticketId: string): CanUseTool {
     return async (toolName, input, context) => {
       // Only a call that posts a work item comment waits for the ticket; every other answer starts at once.
@@ -203,6 +251,11 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
         return { behavior: 'allow', updatedInput: input };
       }
       if (allowedForTicket.get(ticketId)?.has(ruleFor(toolName, input))) return { behavior: 'allow', updatedInput: input };
+      // Rules the repo remembers from "Always allow" (AL-260).
+      if (repoRulesFor(ticketId).rules.some((rule) => ruleAllows(rule, toolName, input))) {
+        options.transcripts?.appendSystem(ticketId, `Allowed ${toolLabel(toolName)} by the repo's rule`);
+        return { behavior: 'allow', updatedInput: input };
+      }
       return ask(ticketId, toolName, input, context);
     };
   }
@@ -214,6 +267,7 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       if (commands && !commands.ok) log?.warn(`No build or test commands for ticket ${record.id}: ${commands.message}`);
       const prefixes = allowedBashPrefixes(policy, commands?.ok ? commands.data : null);
       bashPrefixes.set(record.id, prefixes);
+      repoByTicket.set(record.id, record.repo);
       return {
         permissionMode: sdkPermissionMode(agentPermissionMode(policy)),
         allowedTools: bashAllowRules(prefixes),
@@ -224,14 +278,16 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
 
     canUseTool,
 
-    resolve(ticketId, requestId, decision) {
+    resolve(ticketId, requestId, decision, resolveOptions = {}) {
       const entry = waiting.get(ticketId)?.find((candidate) => candidate.request.requestId === requestId);
       if (!entry) return false;
       const who = userName();
       const what = `${entry.request.tool}${entry.request.detail ? ` · ${entry.request.detail}` : ''}`;
       if (decision === 'deny') {
-        options.transcripts?.appendSystem(ticketId, `${who} denied ${what}`);
-        finish(ticketId, entry, 'denied', { behavior: 'deny', message: PERMISSION_DENIED_MESSAGE });
+        const reason = resolveOptions.reason?.trim();
+        options.transcripts?.appendSystem(ticketId, reason ? `${who} denied ${what} · ${reason}` : `${who} denied ${what}`);
+        // The reason goes to the agent with the denial (AL-260), so it can act on it.
+        finish(ticketId, entry, 'denied', { behavior: 'deny', message: reason ? `${PERMISSION_DENIED_MESSAGE} The user said: ${reason}` : PERMISSION_DENIED_MESSAGE });
         return true;
       }
       if (decision === 'allow-ticket') {
@@ -239,7 +295,16 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
         rules.add(entry.rule);
         allowedForTicket.set(ticketId, rules);
       }
-      options.transcripts?.appendSystem(ticketId, `${who} allowed ${what} ${decision === 'allow-ticket' ? 'for this ticket' : 'once'}`);
+      const pattern = decision === 'allow-pattern' ? normaliseRule(resolveOptions.rule ?? entry.request.suggestedRule ?? '') : null;
+      if (pattern) {
+        saveRepoRule(ticketId, pattern);
+        // Other waiting calls the rule covers go through too.
+        for (const other of [...(waiting.get(ticketId) ?? [])]) {
+          if (other !== entry && ruleAllows(pattern, other.toolName, other.input)) finish(ticketId, other, 'allowed', { behavior: 'allow' });
+        }
+      }
+      const how = decision === 'allow-ticket' ? 'for this ticket' : decision === 'allow-pattern' ? `always (${pattern ?? 'no rule saved'})` : 'once';
+      options.transcripts?.appendSystem(ticketId, `${who} allowed ${what} ${how}`);
       finish(ticketId, entry, 'allowed', {
         behavior: 'allow',
         ...(decision === 'allow-ticket' && entry.suggestions.length > 0 ? { updatedPermissions: entry.suggestions } : {}),

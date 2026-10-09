@@ -199,6 +199,7 @@ describe('SettingsPanel', () => {
       'repo.buildCommand': 'Build command',
       'repo.runCommand': 'Run command',
       'repo.maxConcurrentAgents': 'Agents at once',
+      'repo.permissionRules': 'Allowed without asking', // AL-260
       'repo.adoWriteBack': 'Post a comment to the work item on each stage change',
     };
     const stored = [

@@ -25,6 +25,15 @@ export function toggleRowExpanded(ticketId: string, rowKey: string): void {
   });
 }
 
+/** Opens a row (AL-261: a Spawn row a sub-agent card points at); already-open rows stay open. */
+export function expandRow(ticketId: string, rowKey: string): void {
+  useExpandedRows.setState(({ byTicket }) => {
+    const current = byTicket[ticketId] ?? new Set<string>();
+    if (current.has(rowKey)) return {};
+    return { byTicket: { ...byTicket, [ticketId]: new Set([...current, rowKey]) } };
+  });
+}
+
 export function isRowExpanded(ticketId: string, rowKey: string): boolean {
   return useExpandedRows.getState().byTicket[ticketId]?.has(rowKey) ?? false;
 }

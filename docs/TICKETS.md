@@ -181,8 +181,8 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-257 | Usage strip and compaction | E15 | M | AL-250 | done |
 | AL-258 | Plan limits | E15 | M | — | done |
 | AL-259 | Composer parity | E15 | L | AL-250 | done |
-| AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | todo |
-| AL-261 | Sub-agent transcripts | E15 | M | AL-256 | todo |
+| AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | done |
+| AL-261 | Sub-agent transcripts | E15 | M | AL-256 | done |
 | AL-262 | Thinking blocks | E15 | S | AL-255 | todo |
 | AL-263 | Assign new agent | E15 | L | AL-253 | todo |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
@@ -1311,17 +1311,17 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Composer and permission prompts · **Depends on:** AL-256
 - **Scope:** The prompt renders inside the output at the tool row that waits, with the full input (scrollable, not clipped); a compact copy stays at the top while the stream is scrolled away from it. New answers: Deny with a reason (the text goes back to the agent as the denial message) and Always allow a pattern for this repo (e.g. `Bash(dotnet build:*)`), saved in the repo's settings and applied by the permission policy.
 - **Acceptance criteria:**
-  - [ ] The waiting row is marked and holds the prompt; the board card keeps its own prompt.
-  - [ ] A deny reason reaches the agent; an allowed pattern skips the prompt next time (fake SDK).
-  - [ ] Permission-service unit tests; `permissions.spec.ts` extended.
+  - [x] The waiting row is marked and holds the prompt; the board card keeps its own prompt.
+  - [x] A deny reason reaches the agent; an allowed pattern skips the prompt next time (fake SDK).
+  - [x] Permission-service unit tests; `permissions.spec.ts` extended.
 
 #### AL-261 · Sub-agent transcripts
 - **Design:** UXA Output, Agent control · **Depends on:** AL-256
 - **Scope:** Events with a `parentToolUseId` render nested under their Task row (collapsed by default, showing the sub-agent's latest activity), with their own tool rows and text. Sub-agent cards show tokens (from task progress) and a Stop button (`stopTask`, new `agent:stopSubagent` channel); clicking a card scrolls the output to its Task row.
 - **Acceptance criteria:**
-  - [ ] Two parallel sub-agents' rows nest under the right Task rows.
-  - [ ] Stop ends one sub-agent and the lead continues.
-  - [ ] Row-building and handler unit tests; `subagents.spec.ts`.
+  - [x] Two parallel sub-agents' rows nest under the right Task rows.
+  - [x] Stop ends one sub-agent and the lead continues.
+  - [x] Row-building and handler unit tests; `subagents.spec.ts`.
 
 #### AL-262 · Thinking blocks
 - **Design:** UXA Output · **Depends on:** AL-255
@@ -2145,6 +2145,14 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D773 | Paste and drop are DOM listeners on the composer's node (`lib/files.web.ts`); the OS picker is a hidden input. React Native has no paste or drop events, and the app is web-only in Electron | No RN primitive for either | 2026-10-09 |
 | D774 | Kyle (2026-10-09): a PR review or "No ticket" card shows a green "Done" pill in its top-right corner once its agent finished: the session is idle or ended after producing output, with nothing waiting on the user. The ticket store now carries the session state from `agent:status`. Cards with a work item keep ADO's state there | The PR-comment actioner cards had an empty corner and no sign the agent was finished | 2026-10-09 |
 | D775 | Kyle (2026-10-09): tickets can be removed from the agent board — a chevron menu in the card's corner and "Remove from board…" in the ticket page's Agent menu open a confirm that ends the session, then calls `tickets:archive`; unmerged work is named and asked about again (`discardUnmerged`); merged branches can be deleted too. This is design §9 step 6's Archive, which had no UI (AL-264's Archive item is this) | Finished and abandoned tickets had no way off the board | 2026-10-09 |
+| D776 | AL-260: repo permission rules are kept in the repo's settings as `permissionRules`, in Claude Code's own spelling (`Bash(dotnet build:*)`, `WebFetch`, `mcp__server__tool`), and checked by `canUseTool` before any request reaches the user. "Always allow" offers a Bash command's first word plus its sub-command for git, dotnet, npm, pnpm, docker, gh and the like; a command with shell operators gets no suggestion and never matches a prefix rule. Settings shows them as "Allowed without asking", one per line | One spelling users already know from Claude Code; a chained command cannot be summarised safely by a prefix | 2026-10-09 |
+| D777 | AL-260: a deny reason travels in the SDK's single denial message as "… The user said: <reason>" and is written to the output as "Kyle denied Bash · <command> · <reason>" | The SDK's deny result carries one message string; the agent reads it as the tool result | 2026-10-09 |
+| D778 | AL-260: the drill-in finds the waiting tool row by the SDK's `toolUseID` and draws the prompt inside the stream under that row (inline, full input scrollable). While the row is scrolled out of view a one-line compact copy with the answers sits at the top; when the row is not drawn at all (request before the row, another tab) the old banner shows there. The board card keeps its banner | The prompt belongs with the call it is about; the compact copy keeps it reachable without hunting for the row | 2026-10-09 |
+| D779 | AL-260: `permissions.spec.ts` is new (the ticket said "extended", but no such spec existed) and the fake `claude` gained an `ask` step that sends a `can_use_tool` control request and records the answer in its log | The real app had no e2e path for a permission prompt before this | 2026-10-09 |
+| D780 | AL-261: sub-agent output folds into its own lane keyed by the Agent/Task tool use that spawned it and hangs under that Spawn row (`subagents` on the row, keys prefixed with the sub-agent's id); nested spawns nest again. Closed, the Spawn row lists each sub-agent's latest line; open, it draws their rows. A lane whose Spawn row never arrived stays hidden, as before | The transcript already tagged sub-agent events with `parentToolUseId`; nesting them under the Spawn row keeps one stream instead of a second tree | 2026-10-09 |
+| D781 | AL-261: a sub-agent card shows its tokens (from task_progress / task_notification), a Stop button while it runs (`agent:stopSubagent` → the SDK's `stopTask`; a stopped task reads as Failed, the SDK's four task states being kept), and clicking the card switches to Output and scrolls to its Spawn row, opening it (`requestOutputScroll`, kept per ticket until the stream has the row) | The same card is the only place the sub-agent is named; Claude Code's own UI stops tasks from their row | 2026-10-09 |
+| D782 | AL-261: the fake `claude` gained `spawn` (an Agent tool use, the SDK task messages and child steps with `parent_tool_use_id`; `holdUntilStopped` waits for `stop_task`) and `bash` (a tool use and result with no prompt) steps; `subagents.spec.ts` drives them | No e2e path exercised sub-agents before | 2026-10-09 |
+| D783 | AL-260 and AL-261 are one commit: AL-261's edits landed on the same files (OutputStream, TicketPage, rows, the fake claude) before AL-260's e2e re-run finished, and splitting them by hand was not worth the risk | Keep commits honest about what was verified together | 2026-10-09 |
 
 ---
 
@@ -2219,6 +2227,8 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | AL-258: plan limits from rate-limit events — header meter, warning toast, parked agents that resume at the reset, launches held above 85% of the 5-hour window (Settings). |
 | 2026-10-09 | AL-259: composer parity — Enter sends, / and @ completions, attachments, history, drafts, model and effort in the footer, distinct action styles. |
 | 2026-10-09 | Board asks from Kyle: a "Done" pill on finished review cards (session state on the ticket store), and Remove from board (card menu and Agent menu, over tickets:archive with the unmerged-work second confirm). |
+| 2026-10-09 | AL-260: permission prompts at the waiting row — inline prompt with the full input, compact copy at the top while scrolled away, Deny with a reason the agent reads, Always allow saving `Bash(<prefix>:*)` / tool-name rules on the repo (Settings: Allowed without asking), fake claude `ask` step and permissions.spec.ts. |
+| 2026-10-09 | AL-261: sub-agent transcripts — rows nest under their Spawn row (latest line when closed), cards show tokens and Stop (`agent:stopSubagent` / `stopTask`), a card click scrolls the output to its row; fake claude `spawn` and `bash` steps; subagents.spec.ts. |
 ---
 
 ## 7. Parallel build rules

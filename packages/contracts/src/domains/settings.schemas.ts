@@ -59,6 +59,11 @@ export const RepoSettingsSchema = z.object({
    * (`repoAdoWriteBack`).
    */
   adoWriteBack: z.boolean().optional(),
+  /**
+   * Tool calls this repo's agents may make without asking (AL-260), in Claude Code's own spelling:
+   * `Bash(dotnet build:*)`, `WebFetch`. Added by "Always allow" on a prompt; edited in Settings.
+   */
+  permissionRules: z.array(z.string().min(1).max(200)).max(200).optional(),
 });
 export type RepoSettings = z.infer<typeof RepoSettingsSchema>;
 

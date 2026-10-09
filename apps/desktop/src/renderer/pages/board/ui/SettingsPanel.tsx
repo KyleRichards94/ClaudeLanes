@@ -375,6 +375,15 @@ function RepoFields({ repo, draft, errors, dispatch, onForget }: SectionProps & 
         help="More launches in this repo wait in Queued."
         testID="settings-repo-max-agents"
       />
+      <TextField
+        variant="multiline"
+        label="Allowed without asking"
+        {...text('permissionRules')}
+        rows={3}
+        placeholder={'Bash(dotnet build:*)\nWebFetch'}
+        help="One rule per line, as Claude Code spells them. Always allow on a permission prompt adds one here."
+        testID="settings-repo-permission-rules"
+      />
       <Switch
         label="Post a comment to the work item on each stage change"
         value={values.adoWriteBack}

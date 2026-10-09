@@ -259,6 +259,7 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
             toolUseIds: [...row.toolUseIds],
             tool: 'spawn',
             label: 'Spawn',
+            names: [...row.names],
             detail: clip(row.names.join(' · ')),
             stats: formatCount(row.toolUseIds.length, 'sub-agent'),
             input: clipText(row.prompts.join('\n\n')),

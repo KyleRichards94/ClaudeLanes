@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,10 +13,15 @@ import {
 import { space } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentOutput } from '../model/hooks';
-import { outputRows } from '../model/rows';
+import { expandRow } from '../model/expanded';
+import { findToolUse, outputRows, type OutputRow } from '../model/rows';
+import { clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
 import type { AgentOutputStore } from '../model/store';
 import { rowOffsets, windowFor } from '../model/virtual';
 import { OutputRowView } from './OutputRowView';
+
+/** Where the tool row a permission request waits on is (AL-260): not drawn yet, in view, or scrolled away. */
+export type WaitingRowState = 'absent' | 'visible' | 'hidden';
 
 export interface OutputStreamProps {
   ticketId: string;
@@ -24,6 +29,12 @@ export interface OutputStreamProps {
   store?: AgentOutputStore;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** The tool use a permission request waits on (AL-260): its row is marked and gets `renderWaitingRow` under it. */
+  waitingToolUseId?: string | null;
+  /** What to draw under the waiting row: the permission prompt. */
+  renderWaitingRow?: (row: Extract<OutputRow, { type: 'tool' }>) => ReactNode;
+  /** Told whenever the waiting row's state changes, so the page can keep a compact prompt at the top while it is scrolled away. */
+  onWaitingRow?: (state: WaitingRowState) => void;
 }
 
 /** Viewport assumed before the first layout (and in tests, where layout never comes). */
@@ -44,7 +55,7 @@ const PAD_Y = space.lg;
  *   scrolling back to the end (or the button) follows again.
  * - Rows are in normal flow inside one scroll view, so text can be selected across rows and copied.
  */
-export function OutputStream({ ticketId, store, style, testID = 'output-stream' }: OutputStreamProps) {
+export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow }: OutputStreamProps) {
   const events = useAgentOutput(ticketId, store);
   const rows = outputRows(events);
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -65,6 +76,35 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream' 
   useLayoutEffect(() => {
     if (follow) scrollRef.current?.scrollToEnd({ animated: false });
   }, [follow, tailTop]);
+
+  // A sub-agent card asked for its Spawn row (AL-261): open it and scroll there once the stream has it.
+  const scrollRequest = useOutputScrollRequest(ticketId);
+  useLayoutEffect(() => {
+    if (scrollRequest === null) return;
+    const target = findToolUse(rows, scrollRequest);
+    if (!target) return;
+    for (const key of target.expandKeys) expandRow(ticketId, key);
+    clearOutputScroll(ticketId);
+    const y = Math.max((offsets[target.index] ?? 0) + PAD_Y - space.md, 0);
+    // After this layout pass the view stops following the newest output and moves to the row.
+    queueMicrotask(() => {
+      setFollow(false);
+      setScrollTop(y);
+      scrollRef.current?.scrollTo({ y, animated: true });
+    });
+  }, [scrollRequest, ticketId, rows, offsets]);
+
+  // The row a permission request waits on (AL-260), and whether it is in view.
+  const waitingIndex = waitingToolUseId === null ? -1 : rows.findIndex((row) => row.type === 'tool' && row.toolUseIds.includes(waitingToolUseId));
+  const waitingState: WaitingRowState =
+    waitingIndex === -1
+      ? 'absent'
+      : (offsets[waitingIndex] ?? 0) < top - PAD_Y + viewport.height && (offsets[waitingIndex + 1] ?? 0) > top - PAD_Y
+        ? 'visible'
+        : 'hidden';
+  useEffect(() => {
+    onWaitingRow?.(waitingState);
+  }, [onWaitingRow, waitingState]);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
@@ -97,9 +137,11 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream' 
   const drawn: ReactNode[] = [];
   for (let index = start; index < end; index++) {
     const row = rows[index]!;
+    const waiting = index === waitingIndex;
     drawn.push(
       <View key={row.key} onLayout={(event) => onRowLayout(row.key, event.nativeEvent.layout.height)}>
-        <OutputRowView row={row} ticketId={ticketId} />
+        <OutputRowView row={row} ticketId={ticketId} waiting={waiting} />
+        {waiting && row.type === 'tool' ? renderWaitingRow?.(row) : null}
       </View>,
     );
   }

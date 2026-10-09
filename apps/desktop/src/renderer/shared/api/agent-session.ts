@@ -30,6 +30,11 @@ export function useInterruptTurn(ticketId: string) {
   });
 }
 
+/** Stop one sub-agent (AL-261); the lead agent's turn goes on. */
+export function useStopSubagent(ticketId: string) {
+  return useMutation({ mutationFn: async (nodeId: string) => unwrap(await invoke('agent:stopSubagent', { ticketId, nodeId })) });
+}
+
 /** Compact (AL-257): asks the live session to compact its context as its next turn. */
 export function useCompactSession(ticketId: string) {
   return useMutation({ mutationFn: async () => unwrap(await invoke('agent:compact', { ticketId })) });

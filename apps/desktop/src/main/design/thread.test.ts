@@ -54,6 +54,7 @@ function interactiveClaude(respond: Responder, tools: string[] = ['ClaudeDesign'
         call.closed = true;
       },
       interrupt: async () => undefined,
+      stopTask: async () => undefined,
       setModel: async () => undefined,
       setPermissionMode: async () => undefined,
       applyFlagSettings: async () => undefined,

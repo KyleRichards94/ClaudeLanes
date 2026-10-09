@@ -54,6 +54,8 @@ export interface FakeClaudeCall {
   sentCount(count: number): Promise<void>;
   /** Calls to `interrupt()`. */
   interrupts: number;
+  /** Task ids passed to `stopTask()` (AL-261). */
+  stoppedTasks: string[];
   /** Arguments of each `setModel()` call. */
   models: Array<string | undefined>;
   /** Arguments of each `setPermissionMode()` call. */
@@ -86,6 +88,7 @@ export interface FakeClaudeInput {
 export type FakeClaudeEntry =
   | ({ kind: 'input' } & FakeClaudeInput)
   | { kind: 'interrupt' }
+  | { kind: 'stopTask'; taskId: string }
   | { kind: 'setModel'; model: string | undefined }
   | { kind: 'setPermissionMode'; mode: string }
   | { kind: 'applyFlagSettings'; settings: Record<string, unknown> }
@@ -144,6 +147,7 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
         return call.sent.length >= count ? Promise.resolve() : new Promise((resolve) => sentWaiters.push({ count, resolve }));
       },
       interrupts: 0,
+      stoppedTasks: [],
       models: [],
       permissionModes: [],
       flagSettings: [],
@@ -216,6 +220,10 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
         call.interrupts += 1;
         call.log.push({ kind: 'interrupt' });
         return undefined;
+      },
+      stopTask: async (taskId: string) => {
+        call.stoppedTasks.push(taskId);
+        call.log.push({ kind: 'stopTask', taskId });
       },
       setModel: async (model?: string) => {
         call.models.push(model);

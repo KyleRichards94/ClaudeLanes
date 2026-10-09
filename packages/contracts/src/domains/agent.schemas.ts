@@ -90,6 +90,8 @@ export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
     rowId: z.string().max(200),
     /** The tool uses shown on this row (several for a Spawn row). */
     toolUseIds: z.array(z.string().max(200)).min(1).max(64),
+    /** A Spawn row's sub-agent names, in `toolUseIds` order (AL-261). */
+    names: z.array(z.string().max(200)).max(64).optional(),
     tool: OutputToolKindSchema,
     /** The row's tag: Read, Edit, Write, Bash, Grep, Glob, Spawn, MCP or the tool's own name. */
     label: z.string().min(1).max(100),
@@ -351,10 +353,17 @@ export const PermissionRequestSchema = z.object({
   /** The command, path or URL in mono; null when the tool has none. */
   detail: z.string().max(PERMISSION_TEXT_LIMIT).nullable(),
   openedAt: z.int().nonnegative(),
+  /** The tool use the request is for (AL-260), so the prompt can sit at its row; null when the SDK gave none. */
+  toolUseId: z.string().max(200).nullable().optional(),
+  /** The call's whole input (the full command, or the input as JSON), clipped; null when `detail` says it all. */
+  input: z.string().max(OUTPUT_TEXT_LIMIT).nullable().optional(),
+  /** What "Always allow" would save for this repo: `Bash(dotnet build:*)`, `WebFetch`; null when the call has no safe pattern. */
+  suggestedRule: z.string().max(200).nullable().optional(),
 });
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 
-export const PERMISSION_DECISIONS = ['allow-once', 'allow-ticket', 'deny'] as const;
+/** `allow-pattern` (AL-260) saves `rule` (or the suggested one) on the repo and allows the call. */
+export const PERMISSION_DECISIONS = ['allow-once', 'allow-ticket', 'allow-pattern', 'deny'] as const;
 export const PermissionDecisionSchema = z.enum(PERMISSION_DECISIONS);
 export type PermissionDecision = z.infer<typeof PermissionDecisionSchema>;
 
@@ -363,6 +372,10 @@ export const ResolvePermissionRequestSchema = z.strictObject({
   ticketId: TicketIdSchema,
   requestId: PermissionRequestSchema.shape.requestId,
   decision: PermissionDecisionSchema,
+  /** Deny with a reason (AL-260): sent to the agent with the denial. */
+  reason: z.string().trim().max(2000).optional(),
+  /** Always allow (AL-260): the rule to save; the request's suggestion when left out. */
+  rule: z.string().trim().max(200).optional(),
 });
 export type ResolvePermissionRequest = z.infer<typeof ResolvePermissionRequestSchema>;
 
@@ -461,6 +474,12 @@ export type SubagentNode = z.infer<typeof SubagentNodeSchema>;
 /** Most sub-agents kept per ticket; the oldest finished ones are dropped first. */
 export const SUBAGENT_TREE_LIMIT = 200;
 
+/** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
+export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
+export type StopSubagentRequest = z.infer<typeof StopSubagentRequestSchema>;
+/** `stopped` is false when the sub-agent had already finished or never started a task. */
+export const StopSubagentResponseSchema = z.object({ stopped: z.boolean() });
+
 /** `agent:getSubagents`: the ticket's tree, for a drill-in opened mid-run. */
 export const AgentSubagentsSchema = z.object({
   ticketId: TicketIdSchema,
@@ -504,6 +523,7 @@ export const agentInvokeContracts = {
   'agent:getModel': { request: AgentTicketRequestSchema, response: AgentModelStateSchema },
   /** The ticket's sub-agent tree and counts, for a drill-in opened mid-run (AL-107). */
   'agent:getSubagents': { request: AgentTicketRequestSchema, response: AgentSubagentsSchema },
+  'agent:stopSubagent': { request: StopSubagentRequestSchema, response: StopSubagentResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

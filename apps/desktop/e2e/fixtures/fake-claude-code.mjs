@@ -20,6 +20,15 @@
 //       and waits for its result (a gated `set_stage` waits for the user's decision);
 //   { "commit": { "file": "relative path", "content": "…", "message": "…" } }
 //       writes the file in the session's working directory (the worktree) and commits it;
+//   { "ask": { "tool": "Bash", "input": { "command": "…" } } }
+//       asks the SDK's canUseTool for permission (AL-260) the way the CLI does, waits for the answer
+//       and records it in the log's `tools` as { tool, ask: { behavior, message? } };
+//   { "bash": { "command": "…", "output": "…", "isError"?: false } }
+//       a Bash tool use and its result, without asking for permission;
+//   { "spawn": { "name": "explore", "description": "…", "steps": [step, …], "tokens": 1200, "holdUntilStopped"?: false } }
+//       a sub-agent (AL-261): an Agent tool use, the SDK's task_started / task_progress /
+//       task_notification messages, and its own steps with parent_tool_use_id set; with
+//       holdUntilStopped it waits for the SDK's stop_task request and ends as stopped;
 //   { "text": "…" }  what the agent says at the end of the turn ("OK" when no step says anything).
 //
 // Tool calls and commits show in the transcript as tool_use / tool_result messages.
@@ -116,15 +125,23 @@ function assistant(content, model, usage, extra = {}) {
   });
 }
 
-function toolResult(toolUseId, text, isError) {
+function toolResult(toolUseId, text, isError, parent = null) {
   send({
     type: 'user',
     message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseId, content: [{ type: 'text', text }], ...(isError ? { is_error: true } : {}) }] },
-    parent_tool_use_id: null,
+    parent_tool_use_id: parent,
     uuid: randomUUID(),
     session_id: sessionId,
   });
 }
+
+/** An SDK system message (task_started, task_progress, task_notification). */
+function system(fields) {
+  send({ type: 'system', ...fields, uuid: randomUUID(), session_id: sessionId });
+}
+
+// Sub-agents held until the SDK's stop_task request arrives (AL-261), by task id.
+const stopWaiters = new Map();
 
 /** The scripted turn for this prompt, when this is a ticket session and the state has a `lead` script. */
 function scriptedTurn(prompt) {
@@ -145,15 +162,36 @@ function git(...args) {
 }
 
 /** Runs a scripted turn's steps; returns what the agent says at the end, if a step says it. */
-async function runSteps(steps, model, usage) {
+async function runSteps(steps, model, usage, parent = null) {
   let said = null;
+  const from = parent ? { parent_tool_use_id: parent } : {};
   for (const step of steps) {
     if (step.tool) {
       const toolUseId = `toolu_${randomUUID()}`;
-      assistant([{ type: 'tool_use', id: toolUseId, name: `mcp__agent_lanes__${step.tool}`, input: step.input ?? {} }], model, usage);
+      assistant([{ type: 'tool_use', id: toolUseId, name: `mcp__agent_lanes__${step.tool}`, input: step.input ?? {} }], model, usage, from);
       const { text, isError } = await callServerTool('agent_lanes', step.tool, step.input);
       record.tools.push({ tool: step.tool, text, isError });
-      toolResult(toolUseId, text, isError);
+      toolResult(toolUseId, text, isError, parent);
+    } else if (step.bash) {
+      const toolUseId = `toolu_${randomUUID()}`;
+      assistant([{ type: 'tool_use', id: toolUseId, name: 'Bash', input: { command: step.bash.command } }], model, usage, from);
+      toolResult(toolUseId, step.bash.output ?? '', step.bash.isError === true, parent);
+    } else if (step.spawn) {
+      const { name, description = '', steps: childSteps = [], tokens = 0, holdUntilStopped = false } = step.spawn;
+      const toolUseId = `toolu_${randomUUID()}`;
+      const taskId = `task_${randomUUID()}`;
+      assistant([{ type: 'tool_use', id: toolUseId, name: 'Agent', input: { subagent_type: name, description, prompt: description } }], model, usage, from);
+      system({ subtype: 'task_started', task_id: taskId, tool_use_id: toolUseId, description, task_type: 'local_agent', subagent_type: name, is_backgrounded: holdUntilStopped });
+      const summary = (await runSteps(childSteps, model, usage, toolUseId)) ?? 'Done';
+      system({ subtype: 'task_progress', task_id: taskId, tool_use_id: toolUseId, description, subagent_type: name, usage: { total_tokens: tokens }, summary });
+      let status = 'completed';
+      if (holdUntilStopped) {
+        await new Promise((resolve) => stopWaiters.set(taskId, resolve));
+        status = 'stopped';
+      }
+      system({ subtype: 'task_notification', task_id: taskId, tool_use_id: toolUseId, status, summary, usage: { total_tokens: tokens } });
+      record.tools.push({ tool: 'Agent', name, status });
+      toolResult(toolUseId, summary, status !== 'completed', parent);
     } else if (step.commit) {
       const { file, content, message } = step.commit;
       const toolUseId = `toolu_${randomUUID()}`;
@@ -164,7 +202,23 @@ async function runSteps(steps, model, usage) {
       git('add', '--', file);
       git('commit', '--quiet', '-m', message);
       toolResult(toolUseId, `[${git('rev-parse', '--abbrev-ref', 'HEAD').trim()}] ${message}`, false);
+    } else if (step.ask) {
+      const toolUseId = `toolu_${randomUUID()}`;
+      const { tool, input } = step.ask;
+      assistant([{ type: 'tool_use', id: toolUseId, name: tool, input: input ?? {} }], model, usage);
+      const answer = await controlRequest({
+        subtype: 'can_use_tool',
+        tool_name: tool,
+        input: input ?? {},
+        tool_use_id: toolUseId,
+        title: `Claude wants to use ${tool}`,
+        permission_suggestions: [],
+      });
+      record.tools.push({ tool, ask: { behavior: answer?.behavior ?? null, ...(answer?.message ? { message: answer.message } : {}) } });
+      toolResult(toolUseId, answer?.behavior === 'allow' ? 'done' : (answer?.message ?? 'denied'), answer?.behavior !== 'allow');
     } else if (step.text !== undefined) {
+      // A sub-agent says its text as it goes; the lead agent's closes the turn.
+      if (parent) assistant([{ type: 'text', text: step.text }], model, usage, from);
       said = step.text;
     }
   }
@@ -228,6 +282,8 @@ lines.on('line', (line) => {
   const message = JSON.parse(line);
   if (message.type === 'control_request') {
     if (message.request?.subtype === 'initialize') sdkMcpServers = message.request.sdkMcpServers ?? [];
+    // Stop a held sub-agent (AL-261).
+    if (message.request?.subtype === 'stop_task') stopWaiters.get(message.request.task_id)?.();
     const response =
       message.request?.subtype === 'initialize'
         ? { commands: state.commands ?? [], agents: [], output_style: 'default', available_output_styles: ['default'], models: [], account: account() }

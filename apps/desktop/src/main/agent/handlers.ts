@@ -42,13 +42,22 @@ export function createAgentHandlers({
     'agent:getUsage': ({ ticketId }) => ok(usage.get(ticketId)),
     'agent:getPlanLimits': () => ok(planLimits.get()),
     'agent:getMcpStatus': () => ok(mcpStatus.summary()),
-    'agent:resolvePermission': ({ ticketId, requestId, decision }) => ok({ resolved: permissions.resolve(ticketId, requestId, decision) }),
+    'agent:resolvePermission': ({ ticketId, requestId, decision, reason, rule }) =>
+      ok({ resolved: permissions.resolve(ticketId, requestId, decision, { ...(reason ? { reason } : {}), ...(rule ? { rule } : {}) }) }),
     'agent:getPermission': ({ ticketId }) => ok({ request: permissions.pending(ticketId) }),
     'agent:setModel': ({ ticketId, model }) => sessions.setModel(ticketId, model),
     'agent:setEffort': ({ ticketId, effort }) => sessions.setEffort(ticketId, effort),
     'agent:applyModelNow': ({ ticketId }) => sessions.applyModelNow(ticketId),
     'agent:getModel': ({ ticketId }) => sessions.modelState(ticketId),
     'agent:getSubagents': ({ ticketId }) => ok(subagents.get(ticketId)),
+    // Stop one sub-agent (AL-261): its SDK task is stopped; the lead agent's turn goes on.
+    'agent:stopSubagent': async ({ ticketId, nodeId }) => {
+      const node = subagents.get(ticketId).nodes.find((entry) => entry.id === nodeId);
+      if (!node) return err('VALIDATION', `Ticket ${ticketId} has no sub-agent ${nodeId}.`);
+      if (!node.taskId || node.status === 'done' || node.status === 'failed') return ok({ stopped: false });
+      const stopped = await sessions.stopTask(ticketId, node.taskId);
+      return stopped.ok ? ok({ stopped: true }) : stopped;
+    },
     'agent:reconnect': ({ ticketId }) => recovery.reconnect(ticketId),
     'agent:startNow': ({ ticketId }) => launches.startNow(ticketId),
     'agent:launchFromAdo': (request) => adoLauncher.launch(request),

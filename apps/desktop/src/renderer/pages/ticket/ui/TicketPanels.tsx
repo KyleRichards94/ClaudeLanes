@@ -4,7 +4,7 @@ import { subagentCountsLabel, type TicketSubBranch } from '@agent-lanes/contract
 import { color, space } from '@agent-lanes/tokens';
 import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
-import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents } from '@/entities/sub-agent';
+import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents, type SubAgentActions } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
 import { MergeControls } from '@/features/merge-branches';
 import { useBranchStatus } from '@/shared/api';
@@ -76,7 +76,7 @@ export function MergePanel({ ticket }: { ticket: AgentTicket }) {
  * `agent:getSubagents` and kept current by `agent:subagent`; until it loads, the counts come from the
  * card's. The lead agent's tokens come from the live session usage (AL-113) when it has them.
  */
-export function AgentsPanel({ ticket, leadTokens, footer }: { ticket: AgentTicket; leadTokens?: number; footer?: ReactNode }) {
+export function AgentsPanel({ ticket, leadTokens, footer, actions }: { ticket: AgentTicket; leadTokens?: number; footer?: ReactNode; actions?: SubAgentActions }) {
   const subAgents = useSubAgents(ticket.id);
   const counts = subAgents.data?.counts ?? ticket.subAgents;
   const tree = subAgentTree(subAgents.data?.nodes ?? []);
@@ -96,7 +96,7 @@ export function AgentsPanel({ ticket, leadTokens, footer }: { ticket: AgentTicke
     >
       <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={leadTokens && leadTokens > 0 ? leadTokens : (subAgents.data?.leadTokens ?? null)} />
       {tree.length > 0 ? (
-        <SubAgentList items={tree} lead={lead} />
+        <SubAgentList items={tree} lead={lead} actions={actions} />
       ) : subAgents.isError ? (
         <Text variant="meta">{"Couldn't load the sub-agents."}</Text>
       ) : null}

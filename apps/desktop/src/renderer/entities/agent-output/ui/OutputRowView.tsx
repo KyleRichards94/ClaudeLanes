@@ -13,7 +13,7 @@ import { CopyButton, Markdown, markdownPlainText } from './Markdown';
  * chip, mono detail and stats, a paragraph of prose with bold names, or the line being written with
  * its caret. Text is selectable, so output can be copied.
  */
-export function OutputRowView({ row, ticketId }: { row: OutputRow; ticketId: string }) {
+export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputRow; ticketId: string; waiting?: boolean }) {
   switch (row.type) {
     case 'system':
       return (
@@ -65,7 +65,7 @@ export function OutputRowView({ row, ticketId }: { row: OutputRow; ticketId: str
         </View>
       );
     case 'tool':
-      return <ToolRow row={row} ticketId={ticketId} />;
+      return <ToolRow row={row} ticketId={ticketId} waiting={waiting} />;
     case 'prose':
       return <ProseRow text={row.text} />;
     case 'streaming':
@@ -100,15 +100,17 @@ const ERROR_PREVIEW_LINES = 2;
  * it on the call's full input, an Edit's inline diff and what the tool returned. A failed call shows
  * the first lines of its reason even while closed. Open rows are remembered per ticket.
  */
-function ToolRow({ row, ticketId }: { row: Extract<OutputRow, { type: 'tool' }>; ticketId: string }) {
+function ToolRow({ row, ticketId, waiting }: { row: Extract<OutputRow, { type: 'tool' }>; ticketId: string; waiting: boolean }) {
   const spawn = row.tool === 'spawn';
-  const chipTone = row.isError ? tone.danger : spawn ? tone.claude : tone.ado;
+  // A call waiting on the user's permission (AL-260) is amber until it is answered.
+  const chipTone = waiting ? tone.attention : row.isError ? tone.danger : spawn ? tone.claude : tone.ado;
   const expanded = useRowExpanded(ticketId, row.key);
-  const hasBody = row.input !== null || row.edit !== null || row.output !== null;
+  const lanes = row.subagents.filter((sub) => sub.rows.length > 0);
+  const hasBody = row.input !== null || row.edit !== null || row.output !== null || lanes.length > 0;
   const toggle = () => toggleRowExpanded(ticketId, row.key);
   return (
-    <View style={styles.row} testID="output-tool">
-      <View style={[styles.tool, spawn && styles.toolSpawn, row.isError && styles.toolError, expanded && styles.toolOpen]}>
+    <View style={styles.row} testID={waiting ? 'output-tool-waiting' : 'output-tool'}>
+      <View style={[styles.tool, spawn && styles.toolSpawn, row.isError && styles.toolError, expanded && styles.toolOpen, waiting && styles.toolWaiting]}>
         <Pressable
           role="button"
           aria-expanded={expanded}
@@ -123,6 +125,11 @@ function ToolRow({ row, ticketId }: { row: Extract<OutputRow, { type: 'tool' }>;
               {row.label}
             </Text>
           </View>
+          {waiting ? (
+            <Text variant="meta" size="xs" color={tone.attention.text} style={styles.waitingLabel}>
+              Needs you
+            </Text>
+          ) : null}
           <Text variant="mono" selectable numberOfLines={1} style={styles.detail}>
             {row.detail}
             {row.stats ? '  ' : null}
@@ -130,22 +137,45 @@ function ToolRow({ row, ticketId }: { row: Extract<OutputRow, { type: 'tool' }>;
           </Text>
           {hasBody ? <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color={color.muted} /> : null}
         </Pressable>
+        {/* Closed, a Spawn row shows what each sub-agent did last (AL-261). */}
+        {spawn && !expanded && lanes.length > 0 ? (
+          <View style={styles.spawnLatest} testID="output-spawn-latest">
+            {lanes.map((sub) => (
+              <Text key={sub.toolUseId} variant="mono" size="xs" color={color.muted} numberOfLines={1}>
+                {`${sub.name} · ${sub.latest ?? ''}`}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {row.isError && row.output && !expanded ? (
           <Text variant="mono" size="xs" color={tone.danger.text} numberOfLines={ERROR_PREVIEW_LINES} selectable style={styles.toolErrorPreview} testID="output-tool-error">
             {row.output}
           </Text>
         ) : null}
-        {expanded ? <ToolBody row={row} /> : null}
+        {expanded ? <ToolBody row={row} ticketId={ticketId} /> : null}
       </View>
     </View>
   );
 }
 
-function ToolBody({ row }: { row: Extract<OutputRow, { type: 'tool' }> }) {
+function ToolBody({ row, ticketId }: { row: Extract<OutputRow, { type: 'tool' }>; ticketId: string }) {
   return (
     <View style={styles.toolBody} testID="output-tool-body">
       {row.input !== null ? <ToolSection title="Input" text={row.input} /> : null}
       {row.edit ? <EditDiff before={row.edit.before} after={row.edit.after} /> : null}
+      {/* Each sub-agent's own rows, nested under the Spawn row (AL-261). */}
+      {row.subagents
+        .filter((sub) => sub.rows.length > 0)
+        .map((sub) => (
+          <View key={sub.toolUseId} style={styles.subagentLane} role="group" aria-label={`${sub.name} output`} testID={`output-subagent-${sub.toolUseId}`}>
+            <Text variant="meta" size="xs" color={tone.claude.text}>
+              {sub.name}
+            </Text>
+            {sub.rows.map((nested) => (
+              <OutputRowView key={nested.key} row={nested} ticketId={ticketId} />
+            ))}
+          </View>
+        ))}
       {row.output !== null ? <ToolSection title={row.isError ? 'Error' : 'Output'} text={row.output} danger={row.isError} /> : null}
     </View>
   );
@@ -271,9 +301,27 @@ const styles = StyleSheet.create({
   toolOpen: {
     borderColor: tone.ado.band,
   },
+  toolWaiting: {
+    borderColor: tone.attention.border,
+    backgroundColor: tone.attention.band,
+  },
+  waitingLabel: {
+    flexShrink: 0,
+  },
   toolErrorPreview: {
     paddingHorizontal: space.md,
     paddingBottom: space.sm,
+  },
+  spawnLatest: {
+    gap: 2,
+    paddingHorizontal: space.md,
+    paddingBottom: space.sm,
+  },
+  subagentLane: {
+    gap: space.xs,
+    paddingLeft: space.md,
+    borderLeftWidth: 2,
+    borderLeftColor: tone.claude.band,
   },
   toolBody: {
     gap: space.sm,

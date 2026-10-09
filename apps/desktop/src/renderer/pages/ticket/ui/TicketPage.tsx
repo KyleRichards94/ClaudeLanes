@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View, useWindowDimensions, type KeyDownEvent } 
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
-import { OutputStream } from '@/entities/agent-output';
+import { OutputStream, requestOutputScroll, type WaitingRowState } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
@@ -11,10 +11,10 @@ import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
 import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
-import { PermissionPrompt } from '@/features/resolve-permission';
+import { PermissionPrompt, usePendingPermission } from '@/features/resolve-permission';
 import { QueuedNotice } from '@/features/start-queued-agent';
-import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useTicketRecord, useWorkItem } from '@/shared/api';
-import { toast, useTicketPageTab, type TicketPageTab } from '@/shared/model';
+import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useStopSubagent, useTicketRecord, useWorkItem } from '@/shared/api';
+import { setTicketPageTab, toast, useTicketPageTab, type TicketPageTab } from '@/shared/model';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, PlanLimitsPill, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
@@ -77,6 +77,11 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const { width, height } = useWindowDimensions();
   const wide = width >= SIDE_COLUMN_BREAKPOINT;
   const tab = useTicketPageTab(ticket.id);
+  // The permission prompt sits at the tool row that waits (AL-260); a compact copy stays at the top while that row is scrolled away.
+  const pendingPermission = usePendingPermission(ticket.id);
+  const waitingToolUseId = pendingPermission.data?.request?.toolUseId ?? null;
+  const [waitingRow, setWaitingRow] = useState<WaitingRowState>('absent');
+  const promptAtRow = tab === 'output' && waitingRow !== 'absent';
   const workItem = useWorkItem(ticket.ado?.workItemId);
   const now = useNow(60_000);
   const history = record?.stageHistory ?? [{ stage: ticket.stage, at: ticket.stageEnteredAt }];
@@ -88,6 +93,17 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const setGate = useSetGate();
   const { navigate } = useNavigation();
   const [removing, setRemoving] = useState(false);
+  // A sub-agent card opens its output in the stream, or stops it (AL-261).
+  const stopSubagent = useStopSubagent(ticket.id);
+  const subAgentActions = {
+    onSelect: (node: { id: string }) => {
+      setTicketPageTab(ticket.id, 'output');
+      requestOutputScroll(ticket.id, node.id);
+    },
+    onStop: (node: { id: string; name: string }) =>
+      stopSubagent.mutate(node.id, { onError: (error) => toast({ id: `stop-subagent:${node.id}`, tone: 'error', title: `Couldn't stop ${node.name}`, body: error.message }) }),
+    stoppingId: stopSubagent.isPending ? (stopSubagent.variables ?? null) : null,
+  };
 
   // Esc stops the running turn, as in Claude Code (AL-253); a menu or modal that is open takes Esc first.
   const onKeyDown = (event: KeyDownEvent) => {
@@ -146,8 +162,8 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             {`The gate couldn't be changed: ${setGate.error.message}`}
           </Text>
         ) : null}
-        {/* A tool call outside the permission policy waits for the user (AL-109). */}
-        <PermissionPrompt ticketId={ticket.id} />
+        {/* A tool call outside the permission policy waits for the user (AL-109); at its output row when that row is drawn (AL-260). */}
+        {promptAtRow && waitingRow === 'visible' ? null : <PermissionPrompt ticketId={ticket.id} variant={promptAtRow ? 'compact' : 'banner'} />}
         {/* Waiting for a free slot in its repo, with Start now (AL-111). */}
         <QueuedNotice ticketId={ticket.id} />
       </View>
@@ -162,7 +178,14 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         ) : tab === 'output' ? (
           <>
             <PanelErrorBoundary panel="output" ticketId={ticket.id}>
-              <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
+              <OutputStream
+                ticketId={ticket.id}
+                style={styles.output}
+                testID="ticket-tab-output"
+                waitingToolUseId={waitingToolUseId}
+                renderWaitingRow={(row) => <PermissionPrompt ticketId={ticket.id} variant="inline" toolUseIds={row.toolUseIds} testID={`permission-${ticket.id}-inline`} />}
+                onWaitingRow={setWaitingRow}
+              />
             </PanelErrorBoundary>
             {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}
             <Composer
@@ -196,7 +219,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       {ticket.stage === 'create-pr' || ticket.pullRequest || record?.pullRequest ? <CreatePullRequestPanel ticket={ticket} saved={record?.pullRequest} /> : null}
       <WorktreePanel ticket={ticket} />
       <MergePanel ticket={ticket} />
-      <AgentsPanel ticket={ticket} leadTokens={usage?.leadTokens} />
+      <AgentsPanel actions={subAgentActions} ticket={ticket} leadTokens={usage?.leadTokens} />
       <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
     </View>
   );

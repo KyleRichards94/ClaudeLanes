@@ -1,7 +1,7 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { fakeOutputEvent } from '@/shared/testing';
-import { outputRows, proseSpans, statSpans, turnEndLabel, userCaption, type OutputRow } from './rows';
+import { findToolUse, outputRows, proseSpans, statSpans, turnEndLabel, userCaption, type OutputRow } from './rows';
 import { estimateRowHeight, rowOffsets, windowFor } from './virtual';
 
 let seq = 0;
@@ -111,6 +111,7 @@ describe('output windowing', () => {
   const rows = Array.from({ length: 10_000 }, (_, index) => ({
     type: 'tool' as const,
     key: `t${index}`,
+    toolUseIds: [`t${index}`],
     tool: 'read' as const,
     label: 'Read',
     detail: `file ${index}`,
@@ -119,6 +120,7 @@ describe('output windowing', () => {
     input: null,
     edit: null,
     output: null,
+    subagents: [],
   }));
 
   it('keeps each row at its measured height once drawn, its estimate before', () => {
@@ -166,5 +168,48 @@ describe("the user's messages and turn ends (AL-251)", () => {
     expect(userCaption({ source: 'skill', at, priority: 'now' })).toBe('Skill · 14:02 · steered now');
     expect(userCaption({ source: 'composer', at: 0, priority: null })).toBe('You');
     expect(estimateRowHeight(rows[0]!)).toBeGreaterThan(estimateRowHeight(rows[1]!));
+  });
+});
+
+describe('sub-agent lanes (AL-261)', () => {
+  type ToolRow = Extract<OutputRow, { type: 'tool' }>;
+
+  it("nests two parallel sub-agents' rows under the right Spawn rows, with each one's latest line", () => {
+    const rows = outputRows([
+      event(tool('spawn_1', { tool: 'spawn', label: 'Spawn', toolUseIds: ['a'], names: ['explore'], detail: 'explore', stats: '1 sub-agent' })),
+      event(tool('spawn_2', { tool: 'spawn', label: 'Spawn', toolUseIds: ['b'], names: ['writer'], detail: 'writer', stats: '1 sub-agent' })),
+      event(tool('a_read', { parentToolUseId: 'a', detail: 'README.md' })),
+      event(tool('b_edit', { parentToolUseId: 'b', tool: 'edit', label: 'Edit', detail: 'JobGrid.razor', stats: '+40 −0' })),
+      event({ kind: 'text', streamId: 'a_msg', text: 'Found 4 forms', parentToolUseId: 'a' }),
+      event({ kind: 'tool-result', rowId: 'b_edit', toolUseId: 'b_edit', isError: false, summary: '', stats: null, parentToolUseId: 'b' }),
+      event({ kind: 'text-delta', streamId: 'b_msg', text: 'Wiring the grid', parentToolUseId: 'b' }),
+    ]);
+    expect(rows.map((row) => row.type)).toEqual(['tool', 'tool']);
+    const [first, second] = rows as ToolRow[];
+    expect(first!.subagents).toHaveLength(1);
+    expect(first!.subagents[0]).toMatchObject({ toolUseId: 'a', name: 'explore', latest: 'Found 4 forms' });
+    expect(first!.subagents[0]!.rows.map((row) => row.type)).toEqual(['tool', 'prose']);
+    // Nested row keys carry the sub-agent's id, so open rows are remembered per lane.
+    expect(first!.subagents[0]!.rows[0]).toMatchObject({ key: 'a/ta_read', detail: 'README.md' });
+    expect(second!.subagents[0]).toMatchObject({ toolUseId: 'b', name: 'writer', latest: 'Wiring the grid' });
+    expect(second!.subagents[0]!.rows.map((row) => row.type)).toEqual(['tool', 'streaming']);
+    expect(second!.subagents[0]!.rows[1]).toMatchObject({ live: true });
+  });
+
+  it('nests a sub-agent spawned by a sub-agent, and finds the top-level row for any tool use', () => {
+    const rows = outputRows([
+      event(tool('spawn_1', { tool: 'spawn', label: 'Spawn', toolUseIds: ['a'], names: ['explore'], detail: 'explore', stats: '1 sub-agent' })),
+      event(tool('spawn_2', { tool: 'spawn', label: 'Spawn', toolUseIds: ['c'], names: ['helper'], detail: 'helper', stats: '1 sub-agent', parentToolUseId: 'a' })),
+      event(tool('c_read', { parentToolUseId: 'c', detail: 'Program.cs' })),
+      // A lane whose Spawn row never arrived is left out.
+      event(tool('lone', { parentToolUseId: 'ghost' })),
+    ]);
+    expect(rows).toHaveLength(1);
+    const lane = (rows[0] as ToolRow).subagents[0]!;
+    expect(lane.rows[0]).toMatchObject({ type: 'tool', tool: 'spawn' });
+    expect((lane.rows[0] as ToolRow).subagents[0]).toMatchObject({ toolUseId: 'c', name: 'helper', latest: 'Read Program.cs' });
+    expect(findToolUse(rows, 'c')).toEqual({ index: 0, expandKeys: ['tspawn_1', 'a/tspawn_2'] });
+    expect(findToolUse(rows, 'a')).toEqual({ index: 0, expandKeys: ['tspawn_1'] });
+    expect(findToolUse(rows, 'ghost')).toBeNull();
   });
 });

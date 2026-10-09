@@ -118,3 +118,19 @@ describe('settings draft', () => {
     expect(validateDraft(draft, settings().repos)['bashAllow']).toContain('chains or redirects');
   });
 });
+
+describe('repo permission rules (AL-260)', () => {
+  it('reads one rule per line, saves them only when changed, and refuses a chained or malformed one', () => {
+    const draft = apply({ type: 'repoText', repo: osc, field: 'permissionRules', value: ' Bash(dotnet build:*)\n\nWebFetch \n' });
+    expect(validateDraft(draft, settings().repos)).toEqual({});
+    expect(draftToPatch(draft, settings())).toEqual({ repos: [{ ...osc, permissionRules: ['Bash(dotnet build:*)', 'WebFetch'] }, lanes] });
+
+    const same = apply({ type: 'repoText', repo: lanes, field: 'permissionRules', value: '' });
+    expect(draftToPatch(same, settings())).toEqual({});
+
+    const bad = apply({ type: 'repoText', repo: osc, field: 'permissionRules', value: 'Bash(rm -rf:*) && echo' });
+    expect(validateDraft(bad, settings().repos)).toEqual({
+      [repoErrorKey(osc, 'permissionRules')]: '"Bash(rm -rf:*) && echo" is not a rule. Use Bash(dotnet build:*) or a tool name such as WebFetch.',
+    });
+  });
+});

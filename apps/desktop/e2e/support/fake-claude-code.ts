@@ -34,6 +34,12 @@ export type FakeAgentStep =
   | { tool: 'set_stage' | 'report_activity' | 'get_design_spec' | 'list_design_specs' | 'ack_design_spec'; input: Record<string, unknown> }
   /** Writes a file in the worktree and commits it. */
   | { commit: { file: string; content: string; message: string } }
+  /** Asks canUseTool for permission and records the answer in the log's `tools` (AL-260). */
+  | { ask: { tool: string; input?: Record<string, unknown> } }
+  /** A Bash tool use and its result, without a permission prompt. */
+  | { bash: { command: string; output?: string; isError?: boolean } }
+  /** A sub-agent (AL-261): an Agent tool use, the SDK task messages and its own steps; `holdUntilStopped` waits for Stop. */
+  | { spawn: { name: string; description?: string; steps?: FakeAgentStep[]; tokens?: number; holdUntilStopped?: boolean } }
   /** What the agent says at the end of the turn. */
   | { text: string };
 

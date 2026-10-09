@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeOutputEvent, installFakeBridge } from '@/shared/testing';
 import { resetExpandedRows } from '../model/expanded';
+import { requestOutputScroll, resetOutputScrollRequests } from '../model/scroll-request';
 import { createAgentOutputStore, type AgentOutputStore } from '../model/store';
 import { OutputStream } from './OutputStream';
 
@@ -35,6 +36,7 @@ let store: AgentOutputStore;
 
 beforeEach(() => {
   installFakeBridge();
+  resetOutputScrollRequests();
   store = createAgentOutputStore(20_000);
 });
 
@@ -233,5 +235,91 @@ describe('expandable tool rows (AL-256)', () => {
     expect(screen.getByTestId('output-tool-body').textContent).toContain('expected inclusive');
     act(() => store.receive([textEvent(3, 'next')]));
     expect(screen.getByTestId('output-tool-body')).toBeTruthy();
+  });
+});
+
+describe('OutputStream with a permission request waiting (AL-260)', () => {
+  it('marks the waiting tool row, draws the prompt under it and reports when it is in view', () => {
+    const onWaitingRow = vi.fn();
+    render(
+      <OutputStream
+        ticketId="71273"
+        store={store}
+        waitingToolUseId="toolu_build"
+        renderWaitingRow={(row) => <div data-testid="waiting-prompt">{row.detail}</div>}
+        onWaitingRow={onWaitingRow}
+      />,
+    );
+    expect(onWaitingRow).toHaveBeenLastCalledWith('absent');
+
+    act(() =>
+      store.receive([
+        itemEvent(1, { kind: 'tool', rowId: 'toolu_read', toolUseIds: ['toolu_read'], tool: 'read', label: 'Read', detail: 'README.md', stats: null, ...lead }),
+        itemEvent(2, { kind: 'tool', rowId: 'toolu_build', toolUseIds: ['toolu_build'], tool: 'bash', label: 'Bash', detail: 'dotnet build OnSite.sln', stats: null, ...lead }),
+      ]),
+    );
+    const waiting = screen.getByTestId('output-tool-waiting');
+    expect(waiting.textContent).toContain('Needs you');
+    expect(waiting.textContent).toContain('dotnet build OnSite.sln');
+    expect(screen.getByTestId('output-tool').textContent).toContain('README.md');
+    // The prompt sits in the same measured block as its row.
+    expect(waiting.parentElement?.contains(screen.getByTestId('waiting-prompt'))).toBe(true);
+    expect(screen.getByTestId('waiting-prompt').textContent).toBe('dotnet build OnSite.sln');
+    expect(onWaitingRow).toHaveBeenLastCalledWith('visible');
+  });
+});
+
+describe('sub-agent transcripts (AL-261)', () => {
+  beforeEach(() => resetExpandedRows());
+  const spawn = (seq: number) =>
+    itemEvent(seq, {
+      kind: 'tool',
+      rowId: 'spawn_1',
+      toolUseIds: ['toolu_a'],
+      names: ['explore'],
+      tool: 'spawn',
+      label: 'Spawn',
+      detail: 'explore',
+      stats: '1 sub-agent',
+      input: 'explore: map the forms',
+      edit: null,
+      ...lead,
+    });
+  const subRows = (seq: number) => [
+    itemEvent(seq, { kind: 'tool', rowId: 'toolu_r', toolUseIds: ['toolu_r'], tool: 'read', label: 'Read', detail: 'README.md', stats: null, parentToolUseId: 'toolu_a' }),
+    itemEvent(seq + 1, { kind: 'text', streamId: 'm_a', text: 'Found **4** forms', parentToolUseId: 'toolu_a' }),
+  ];
+
+  it("shows a sub-agent's latest line on the closed Spawn row, and its own rows under it once opened", () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([spawn(1), ...subRows(2)]));
+
+    expect(screen.getByTestId('output-spawn-latest').textContent).toBe('explore · Found **4** forms');
+    expect(screen.queryByTestId('output-subagent-toolu_a')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('output-tool-toggle'));
+    const lane = screen.getByTestId('output-subagent-toolu_a');
+    expect(within(lane).getByTestId('output-tool').textContent).toContain('README.md');
+    expect(within(lane).getByText('4')).toBeTruthy();
+    expect(screen.queryByTestId('output-spawn-latest')).toBeNull();
+  });
+
+  it('opens and scrolls to the Spawn row a sub-agent card asked for', async () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() =>
+      store.receive([
+        ...Array.from({ length: 300 }, (_, index) => textEvent(index + 1)),
+        spawn(301),
+        ...subRows(302),
+        ...Array.from({ length: 300 }, (_, index) => textEvent(400 + index)),
+      ]),
+    );
+    expect(screen.queryByTestId('output-tool-body')).toBeNull();
+
+    await act(async () => requestOutputScroll('71273', 'toolu_a'));
+    expect(screen.getByTestId('output-tool-body')).toBeTruthy();
+    expect(screen.getByTestId('output-subagent-toolu_a')).toBeTruthy();
+    // The stream stopped following the newest output to show the row.
+    expect(screen.getByTestId('output-jump-latest')).toBeTruthy();
   });
 });

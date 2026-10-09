@@ -1,3 +1,4 @@
+import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 import type { Services } from '../services';
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
@@ -39,6 +40,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),
     stages,
+    subagents,
     emit,
   };
 }
@@ -153,5 +155,34 @@ describe('agent gate IPC handlers (AL-104)', () => {
     await expect(moving).resolves.toMatchObject({ ok: true, data: { changed: true, gate: { outcome: 'approved', by: null } } });
     expect((await tickets.get('71273'))?.gates.planning).toBe('auto');
     await expect(handleInvoke('agent:setGate', { ticketId: '71273', stage: 'done', gate: 'auto' }, handlers['agent:setGate'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+  });
+});
+
+describe('agent:stopSubagent (AL-261)', () => {
+  const system = (fields: Record<string, unknown>) => ({ type: 'system', uuid: `u_${String(fields['task_id'])}_${String(fields['subtype'])}`, session_id: 'session-a', ...fields }) as unknown as SDKMessage;
+
+  it("stops a running sub-agent's task, says so when it already finished, and refuses an unknown one", async () => {
+    const fake = createFakeClaude({
+      live: true,
+      messages: [
+        fakeInit('session-a'),
+        system({ subtype: 'task_started', task_id: 'task_1', tool_use_id: 'toolu_a', description: 'Map the forms', task_type: 'local_agent', subagent_type: 'explore' }),
+        system({ subtype: 'task_started', task_id: 'task_2', tool_use_id: 'toolu_b', description: 'Write the grid', task_type: 'local_agent', subagent_type: 'writer' }),
+        system({ subtype: 'task_notification', task_id: 'task_2', tool_use_id: 'toolu_b', status: 'completed', summary: 'Wrote JobGrid.razor', usage: { total_tokens: 800 } }),
+      ],
+    });
+    const claude = createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query });
+    const tickets = await memoryTickets({ id: '71273' });
+    const sessions = createSessionManager({ claude, connections: fakeClaudeConnections(), tickets, emit: recordingEmit().emit });
+    const { handlers, subagents } = handlersFor(sessions, tickets);
+    await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
+    await eventually(() => subagents.get('71273').nodes.length === 2 && subagents.get('71273').nodes[1]?.status === 'done');
+
+    await expect(handleInvoke('agent:stopSubagent', { ticketId: '71273', nodeId: 'toolu_a' }, handlers['agent:stopSubagent'])).resolves.toEqual({ ok: true, data: { stopped: true } });
+    expect(fake.calls[0]!.stoppedTasks).toEqual(['task_1']);
+    await expect(handleInvoke('agent:stopSubagent', { ticketId: '71273', nodeId: 'toolu_b' }, handlers['agent:stopSubagent'])).resolves.toEqual({ ok: true, data: { stopped: false } });
+    await expect(handleInvoke('agent:stopSubagent', { ticketId: '71273', nodeId: 'nope' }, handlers['agent:stopSubagent'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+    expect(fake.calls[0]!.stoppedTasks).toEqual(['task_1']);
+    await sessions.dispose();
   });
 });

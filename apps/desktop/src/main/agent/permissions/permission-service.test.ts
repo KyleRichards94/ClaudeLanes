@@ -1,12 +1,13 @@
 import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk';
-import { AgentPermissionEventSchema, defaultAgentPermissions, defaultSettings, type RepoCommands } from '@agent-lanes/contracts';
+import { join } from 'node:path';
+import { AgentPermissionEventSchema, defaultAgentPermissions, defaultSettings, ok, type RepoCommands, type Settings, type SettingsPatch } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { createClaudeLauncher } from '../claude-sdk';
 import { createTranscriptService } from '../output/transcript';
 import { combineSessionExtras } from '../session-extras';
 import { createSessionManager } from '../session-manager';
 import { createFakeClaude, fakeInit } from '../testing/fake-claude';
-import { fakeClaudeConnections, memoryTickets, recordingEmit, testPermissions } from '../testing/sessions';
+import { SESSION_TEST_BASE, fakeClaudeConnections, memoryTickets, recordingEmit, testPermissions } from '../testing/sessions';
 import { PERMISSION_CANCELLED_MESSAGE, PERMISSION_DENIED_MESSAGE, createPermissionService, sdkPermissionMode } from './permission-service';
 
 const dotnet: RepoCommands = {
@@ -20,7 +21,22 @@ function context(signal = new AbortController().signal, extra: Partial<Parameter
   return { signal, toolUseID: 'toolu_1', ...extra } as Parameters<CanUseTool>[2];
 }
 
-async function startSession(options: { commands?: RepoCommands } = {}) {
+/** Settings whose repo is the test ticket's, with `update` recording what "Always allow" saves (AL-260). */
+function savingSettings() {
+  let saved: Settings = {
+    ...defaultSettings(),
+    repos: [{ path: join(SESSION_TEST_BASE, 'onsite-companion'), name: 'onsite-companion', baseBranch: 'main', worktreeRoot: join(SESSION_TEST_BASE, '.agent-lanes'), buildCommand: null, runCommand: null, maxConcurrentAgents: 3 }],
+  };
+  return {
+    get: () => saved,
+    update: (patch: SettingsPatch) => {
+      saved = { ...saved, ...(patch.repos ? { repos: patch.repos } : {}) };
+      return ok(saved);
+    },
+  };
+}
+
+async function startSession(options: { commands?: RepoCommands; settings?: ReturnType<typeof savingSettings> } = {}) {
   const tickets = await memoryTickets({ id: '71273' });
   const events = recordingEmit();
   const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
@@ -33,7 +49,7 @@ async function startSession(options: { commands?: RepoCommands } = {}) {
   });
   const transcripts = createTranscriptService({ sessions, tickets, emit: events.emit });
   const permissions = createPermissionService({
-    settings: { get: () => defaultSettings() },
+    settings: options.settings ?? { get: () => defaultSettings() },
     buildCommands: { forRepo: async () => ({ ok: true, data: options.commands ?? dotnet }) },
     emit: events.emit,
     transcripts,
@@ -233,5 +249,63 @@ describe('work item comments: only QA failure reports and answers', () => {
       hook('mcp__azure-devops__wit_update_work_item', { id: 71273, updates: [{ op: 'add', path: '/fields/System.History', value: 'Moved to QA' }] }),
     ).resolves.toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } });
     await expect(hook('mcp__azure-devops__wit_get_work_item', { id: 71273 })).resolves.toEqual({});
+  });
+});
+
+describe('permission prompts at the waiting row (AL-260)', () => {
+  it('names the tool use, carries the whole input and a suggested rule, and sends a deny reason to the agent', async () => {
+    const { call, permissions, transcripts, events, sessions } = await startSession();
+    const answer = call.options.canUseTool!('Bash', { command: 'dotnet publish OnSite.sln -c Release' }, context(undefined, { toolUseID: 'toolu_publish' }));
+
+    const [waiting] = events.of('agent:permission', '71273');
+    expect(AgentPermissionEventSchema.parse({ ...waiting, at: 1 }).request).toMatchObject({
+      toolUseId: 'toolu_publish',
+      input: 'dotnet publish OnSite.sln -c Release',
+      suggestedRule: 'Bash(dotnet publish:*)',
+    });
+
+    expect(permissions.resolve('71273', 'request-1', 'deny', { reason: 'Use the cached build output' })).toBe(true);
+    await expect(answer).resolves.toEqual({ behavior: 'deny', message: `${PERMISSION_DENIED_MESSAGE} The user said: Use the cached build output` });
+    const output = (await transcripts.get('71273')).events.map((event) => event.item);
+    expect(output).toContainEqual(expect.objectContaining({ kind: 'system', text: 'Kyle denied Bash · dotnet publish OnSite.sln -c Release · Use the cached build output' }));
+    await sessions.dispose();
+  });
+
+  it("Always allow saves the rule on the ticket's repo; calls it covers skip the prompt, others still ask", async () => {
+    const settings = savingSettings();
+    const { call, permissions, transcripts, events, sessions } = await startSession({ settings });
+    const canUseTool = call.options.canUseTool!;
+
+    const first = canUseTool('Bash', { command: 'dotnet publish OnSite.sln' }, context(undefined, { toolUseID: 'toolu_1' }));
+    const second = canUseTool('Bash', { command: 'dotnet publish OnSite.sln -c Release' }, context(undefined, { toolUseID: 'toolu_2' }));
+    expect(events.of('agent:permission', '71273').filter((event) => event['state'] === 'waiting')).toHaveLength(2);
+    expect(permissions.pending('71273')?.suggestedRule).toBe('Bash(dotnet publish:*)');
+
+    // The suggested rule is saved, and the second waiting call it covers goes through with the first.
+    expect(permissions.resolve('71273', 'request-1', 'allow-pattern')).toBe(true);
+    await expect(first).resolves.toMatchObject({ behavior: 'allow' });
+    await expect(second).resolves.toMatchObject({ behavior: 'allow' });
+    expect(settings.get().repos[0]?.permissionRules).toEqual(['Bash(dotnet publish:*)']);
+    expect(permissions.pending('71273')).toBeNull();
+
+    // From now on the rule answers without a prompt; a command it does not cover still asks.
+    await expect(canUseTool('Bash', { command: 'dotnet publish Other.sln' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    const other = canUseTool('Bash', { command: 'dotnet nuget push x.nupkg' }, context());
+    expect(permissions.pending('71273')?.requestId).toBe('request-3');
+    // A rule the user typed is saved as given; an unsafe one is not saved but the call is still allowed.
+    expect(permissions.resolve('71273', 'request-3', 'allow-pattern', { rule: 'Bash(dotnet nuget:*)' })).toBe(true);
+    await expect(other).resolves.toMatchObject({ behavior: 'allow' });
+    expect(settings.get().repos[0]?.permissionRules).toEqual(['Bash(dotnet publish:*)', 'Bash(dotnet nuget:*)']);
+    const unsafe = canUseTool('Bash', { command: 'rm -rf build && dotnet publish' }, context());
+    expect(permissions.pending('71273')?.suggestedRule).toBeNull();
+    permissions.resolve('71273', 'request-4', 'allow-pattern');
+    await expect(unsafe).resolves.toMatchObject({ behavior: 'allow' });
+    expect(settings.get().repos[0]?.permissionRules).toHaveLength(2);
+
+    const lines = (await transcripts.get('71273')).events.flatMap((event) => (event.item.kind === 'system' ? [event.item.text] : []));
+    expect(lines).toContain('Kyle allowed Bash · dotnet publish OnSite.sln always (Bash(dotnet publish:*))');
+    expect(lines).toContain("Allowed Bash by the repo's rule");
+    expect(lines).toContain('Kyle allowed Bash · rm -rf build && dotnet publish always (no rule saved)');
+    await sessions.dispose();
   });
 });

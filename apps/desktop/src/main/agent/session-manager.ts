@@ -58,6 +58,8 @@ export interface SessionManager {
   resume(ticketId: string, options?: SessionResumeOptions): Result<AgentSessionStatus>;
   /** Stops the current turn; the session stays open for the next message. */
   interrupt(ticketId: string): Promise<Result<void>>;
+  /** Stops one sub-agent's task (AL-261); the lead agent's turn goes on. */
+  stopTask(ticketId: string, taskId: string): Promise<Result<void>>;
   /**
    * Saves the model on the ticket and, when its session is live, switches the session to it (D10).
    * The change is pending (`agent:model`) until the next assistant message reports the new model or
@@ -633,6 +635,17 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
         return ok(undefined);
       } catch (error) {
         return err('INTERNAL', `The agent could not be interrupted: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    async stopTask(ticketId, taskId) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      try {
+        await found.data.query?.stopTask(taskId);
+        return ok(undefined);
+      } catch (error) {
+        return err('INTERNAL', `The sub-agent could not be stopped: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
 

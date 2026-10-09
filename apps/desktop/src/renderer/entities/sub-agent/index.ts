@@ -8,4 +8,4 @@ export {
   type SubAgentRow,
   type SubAgentTreeNode,
 } from './model/tree';
-export { LeadAgentCard, SubAgentList, SubAgentNode, type LeadAgent } from './ui/SubAgentNode';
+export { LeadAgentCard, SubAgentList, SubAgentNode, type LeadAgent, type SubAgentActions } from './ui/SubAgentNode';

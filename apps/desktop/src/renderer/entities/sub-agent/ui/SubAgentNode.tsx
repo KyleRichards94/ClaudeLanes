@@ -1,7 +1,7 @@
-import type { Effort, Lane, Model, SubagentStatus } from '@agent-lanes/contracts';
-import { StyleSheet, View } from 'react-native';
+import type { Effort, Lane, Model, SubagentNode as SubagentNodeData, SubagentStatus } from '@agent-lanes/contracts';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space } from '@agent-lanes/tokens';
-import { Pill, Text, type PillTone } from '@agent-lanes/ui';
+import { Button, Pill, Text, type PillTone } from '@agent-lanes/ui';
 import { modelEffortLabel } from '@/shared/config';
 import { subAgentRow, tokensLabel, type SubAgentTreeNode } from '../model/tree';
 
@@ -16,6 +16,14 @@ export interface LeadAgent {
   stage: Lane;
   model: Model;
   effort: Effort;
+}
+
+/** What a sub-agent card can do (AL-261): show its output in the stream, and stop it while it runs. */
+export interface SubAgentActions {
+  onSelect?: (node: SubagentNodeData) => void;
+  onStop?: (node: SubagentNodeData) => void;
+  /** The node whose Stop is in flight. */
+  stoppingId?: string | null;
 }
 
 /**
@@ -49,16 +57,36 @@ export function LeadAgentCard({ lead, role, tokens }: { lead: LeadAgent; role: s
  * ("Starts at the Code review stage" while it waits for that stage), model · effort and its branch or
  * "read-only". The ones it spawned hang under it.
  */
-export function SubAgentNode({ item, lead }: { item: SubAgentTreeNode; lead: LeadAgent }) {
+export function SubAgentNode({ item, lead, actions }: { item: SubAgentTreeNode; lead: LeadAgent; actions?: SubAgentActions }) {
   const row = subAgentRow(item.node, lead);
+  const { node } = item;
+  const canStop = Boolean(actions?.onStop) && node.taskId !== null && (node.status === 'running' || node.status === 'queued');
   return (
     <View role="listitem" style={styles.item}>
-      <View style={styles.card} testID={`sub-agent-${item.node.id}`} aria-label={`${row.name}, ${row.statusLabel}`}>
+      <Pressable
+        role={actions?.onSelect ? 'button' : undefined}
+        aria-label={`${row.name}, ${row.statusLabel}`}
+        disabled={!actions?.onSelect}
+        onPress={actions?.onSelect ? () => actions.onSelect?.(node) : undefined}
+        style={styles.card}
+        testID={`sub-agent-${node.id}`}
+      >
         <View style={styles.header}>
           <Text variant="title" numberOfLines={1} style={styles.flexText}>
             {row.name}
           </Text>
           <Pill label={row.statusLabel} tone={STATUS_TONES[row.status]} dot />
+          {canStop ? (
+            <Button
+              size="sm"
+              variant="danger"
+              label="Stop"
+              icon="stop"
+              loading={actions?.stoppingId === node.id}
+              onPress={() => actions?.onStop?.(node)}
+              testID={`sub-agent-${node.id}-stop`}
+            />
+          ) : null}
         </View>
         {row.line ? (
           <Text variant="body" size="sm" numberOfLines={2} testID={`sub-agent-${item.node.id}-line`}>
@@ -69,22 +97,27 @@ export function SubAgentNode({ item, lead }: { item: SubAgentTreeNode; lead: Lea
           <Text variant="meta" numberOfLines={1} style={styles.flexText}>
             {row.modelLine}
           </Text>
+          {node.tokens !== null && node.tokens > 0 ? (
+            <Text variant="mono" size="xs" color={color.muted} numberOfLines={1} testID={`sub-agent-${node.id}-tokens`}>
+              {tokensLabel(node.tokens)}
+            </Text>
+          ) : null}
           <Text variant="mono" size="xs" color={color.muted} numberOfLines={1} selectable style={styles.branch}>
             {row.branchLine}
           </Text>
         </View>
-      </View>
-      {item.children.length > 0 ? <SubAgentList items={item.children} lead={lead} nested /> : null}
+      </Pressable>
+      {item.children.length > 0 ? <SubAgentList items={item.children} lead={lead} actions={actions} nested /> : null}
     </View>
   );
 }
 
 /** Sub-agents under the lead agent (or under another sub-agent), on a line that ties them to it. */
-export function SubAgentList({ items, lead, nested = false }: { items: readonly SubAgentTreeNode[]; lead: LeadAgent; nested?: boolean }) {
+export function SubAgentList({ items, lead, actions, nested = false }: { items: readonly SubAgentTreeNode[]; lead: LeadAgent; actions?: SubAgentActions; nested?: boolean }) {
   return (
     <View role="list" style={[styles.list, nested && styles.nested]}>
       {items.map((item) => (
-        <SubAgentNode key={item.node.id} item={item} lead={lead} />
+        <SubAgentNode key={item.node.id} item={item} lead={lead} actions={actions} />
       ))}
     </View>
   );
