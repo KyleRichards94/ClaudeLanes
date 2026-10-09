@@ -13,9 +13,10 @@ import { ErrorBoundary } from '@/shared/ui';
 import { subBranchRows } from '../lib/sub-branch-rows';
 
 /**
- * The drill-in's panels (artboard 3): model and effort switching (AL-172), Build / Run / Stop
- * (AL-173), the merges (AL-174), the sub-agent tree (AL-177) and sub-branch status (AL-178). Each panel has its own error
- * boundary, so one failing panel leaves the rest of the page working (design §12).
+ * The drill-in's rail cards (AL-250, artboard 3 reshaped): Build / Run / Stop (AL-173), the merges
+ * (AL-174), the agents (the lead agent with its model and effort switchers, AL-172, and the sub-agent
+ * tree, AL-177) and sub-branch status (AL-178). Each card has its own error boundary, so one failing
+ * card leaves the rest of the page working (design §12).
  */
 
 interface PanelProps {
@@ -43,24 +44,14 @@ export function Panel({ title, aside, children, testID, style }: PanelProps) {
   );
 }
 
-/** Model on a track and effort as pills; a change shows "Switching · next turn" until it applies (AL-172). */
-export function AgentPanel({ ticket }: { ticket: AgentTicket }) {
-  return (
-    <Panel title="Agent" testID="agent-panel" style={styles.flexPanel}>
-      <ModelEffortControls ticket={ticket} />
-    </Panel>
-  );
-}
-
 /** Branch name, Build / Run / Stop and their status (AL-173, features/build-run). */
 export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
   return (
     <Panel
       title="Worktree"
       testID="worktree-panel"
-      style={styles.flexPanel}
       aside={
-        <Text variant="mono" color={color.claudeText} numberOfLines={1} selectable style={styles.branch}>
+        <Text variant="mono" size="xs" color={color.claudeText} numberOfLines={1} selectable style={styles.branch}>
           {ticket.branch}
         </Text>
       }
@@ -73,19 +64,20 @@ export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
 /** Merge sub-branches and Merge worktree → main, with the confirm and conflict flows (AL-174, features/merge-branches). */
 export function MergePanel({ ticket }: { ticket: AgentTicket }) {
   return (
-    <Panel title="Merge" testID="merge-panel" style={styles.flexPanel}>
+    <Panel title="Merge" testID="merge-panel">
       <MergeControls ticket={ticket} />
     </Panel>
   );
 }
 
 /**
- * The lead agent and the sub-agent tree with each one's status, line, model · effort and branch
- * (AL-177, entities/sub-agent). The tree is read with `agent:getSubagents` and kept current by
- * `agent:subagent`; until it loads, the counts come from the card's. The lead agent's tokens come from
- * the live session usage (AL-113) when it has them, else from the tree.
+ * The Agents card (AL-250): the lead agent with its model and effort switchers (AL-172; a change
+ * shows "Switching · next turn" until it applies) and the sub-agent tree with each one's status,
+ * line, model · effort and branch (AL-177, entities/sub-agent). The tree is read with
+ * `agent:getSubagents` and kept current by `agent:subagent`; until it loads, the counts come from the
+ * card's. The lead agent's tokens come from the live session usage (AL-113) when it has them.
  */
-export function SubAgentsPanel({ ticket, leadTokens }: { ticket: AgentTicket; leadTokens?: number }) {
+export function AgentsPanel({ ticket, leadTokens, footer }: { ticket: AgentTicket; leadTokens?: number; footer?: ReactNode }) {
   const subAgents = useSubAgents(ticket.id);
   const counts = subAgents.data?.counts ?? ticket.subAgents;
   const tree = subAgentTree(subAgents.data?.nodes ?? []);
@@ -95,7 +87,7 @@ export function SubAgentsPanel({ ticket, leadTokens }: { ticket: AgentTicket; le
 
   return (
     <Panel
-      title="Sub-agents"
+      title="Agents"
       testID="sub-agents-panel"
       aside={
         <Text variant="meta" testID="sub-agents-counts">
@@ -104,11 +96,13 @@ export function SubAgentsPanel({ ticket, leadTokens }: { ticket: AgentTicket; le
       }
     >
       <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={leadTokens && leadTokens > 0 ? leadTokens : (subAgents.data?.leadTokens ?? null)} />
+      <ModelEffortControls ticket={ticket} />
       {tree.length > 0 ? (
         <SubAgentList items={tree} lead={lead} />
       ) : subAgents.isError ? (
         <Text variant="meta">{"Couldn't load the sub-agents."}</Text>
       ) : null}
+      {footer}
     </Panel>
   );
 }
@@ -155,16 +149,12 @@ const styles = StyleSheet.create({
     gap: space.md,
     padding: space.lg,
   },
-  flexPanel: {
-    flexGrow: 1,
-    flexBasis: 280,
-  },
   panelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
-    marginBottom: space.sm,
+    marginBottom: space.xs,
   },
   branch: {
     flexShrink: 1,

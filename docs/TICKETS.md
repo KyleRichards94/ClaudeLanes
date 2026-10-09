@@ -171,10 +171,10 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
 | AL-242 | Board picker for the team board | E14 | M | AL-234 | todo |
-| AL-250 | Output-first ticket layout | E15 | L | — | todo |
-| AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | todo |
-| AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | todo |
-| AL-253 | Stop turn and End session | E15 | S | AL-250 | todo |
+| AL-250 | Output-first ticket layout | E15 | L | — | done |
+| AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | done |
+| AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | done |
+| AL-253 | Stop turn and End session | E15 | S | AL-250 | done |
 | AL-254 | Ticket view bug fixes from the audit | E15 | M | AL-250 | todo |
 | AL-255 | Markdown in the output | E15 | M | — | todo |
 | AL-256 | Expandable tool calls | E15 | M | — | todo |
@@ -1235,33 +1235,33 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Layout (the mock-up), §6 artboard 3 superseded where they differ · **Depends on:** —
 - **Scope:** One header band (← Board, id, title, session status, usage, Agent ▾ menu); the stepper on one band under it; the tab panel fills the window height with the composer pinned to its bottom; Worktree, Merge, Agents (was Sub-agents + the Agent panel's lead card) and Sub-branches move to a 400 px right rail that stacks under the tabs below 1200 px. Model and effort move out of the Agent panel (into the composer in AL-259; the Agents card shows them). Permission prompt and gate box keep working in their current spots until AL-260 moves the prompt.
 - **Acceptance criteria:**
-  - [ ] At 1440×900 the output stream starts within 260 px of the top and the composer is visible without scrolling the page.
-  - [ ] At 1100×800 the output shows at least 360 px of rows; the rail stacks under the tab panel.
-  - [ ] Every control from the old panels is still reachable (Build, Run, Stop, Merge sub-branches, Merge → main, conflict View, model, effort, gate toggles).
-  - [ ] Unit tests for the layout breakpoints; e2e `ticket-layout.spec.ts` checks the two sizes above.
+  - [x] At 1440×900 the output stream starts within 260 px of the top and the composer is visible without scrolling the page.
+  - [x] At 1100×800 the output shows at least 360 px of rows; the rail stacks under the tab panel.
+  - [x] Every control from the old panels is still reachable (Build, Run, Stop, Merge sub-branches, Merge → main, conflict View, model, effort, gate toggles).
+  - [x] Unit tests for the layout breakpoints; e2e `ticket-layout.spec.ts` checks the two sizes above.
 
 #### AL-251 · Your messages and turn ends in the output
 - **Design:** UXA Output · **Depends on:** AL-250
 - **Scope:** Main records each user message (launch prompt, composer sends, skill-chip runs, design ships, gate replies) as a new `user` output event with its text, priority and time; the renderer shows it as a right-aligned bubble. A successful `result` renders an end-of-turn line: "Turn ended · 1m 12s · $0.42 · waiting for you" (duration, cost, turns from the result). History read back from a saved session keeps the user messages.
 - **Acceptance criteria:**
-  - [ ] Launch prompt, a composer message and a skill run each appear once, in order, as your bubbles.
-  - [ ] Each successful turn ends with the line above; a failed turn keeps "Turn ended early".
-  - [ ] Normaliser unit tests; renderer row tests; `output-stream.spec.ts` extended.
+  - [x] Launch prompt, a composer message and a skill run each appear once, in order, as your bubbles.
+  - [x] Each successful turn ends with the line above; a failed turn keeps "Turn ended early".
+  - [x] Normaliser unit tests; renderer row tests; `output-stream.spec.ts` extended.
 
 #### AL-252 · Session status pill and Reconnect
 - **Design:** UXA At a glance (Status), §12 · **Depends on:** AL-250
 - **Scope:** The pill shows the session state (starting, running, idle, paused, queued, lost, stopped) in matching tones, a short id (`cc-<first 8>`; the full id in the tooltip and a copy action), elapsed time and tokens. Lost and stopped show the reason message and a Reconnect button (`agent:reconnect`); the composer's "reconnect" note gets the same button.
 - **Acceptance criteria:**
-  - [ ] Each state renders its own tone and label (unit test per state).
-  - [ ] Reconnect from the pill resumes a lost session (e2e with the fake killing its process).
+  - [x] Each state renders its own tone and label (unit test per state).
+  - [x] Reconnect from the pill resumes a lost session (e2e with the fake killing its process).
 
 #### AL-253 · Stop turn and End session
 - **Design:** UXA Agent control · **Depends on:** AL-250
 - **Scope:** New channels `agent:interrupt` (stops the current turn, session stays live; held messages are not delivered) and `agent:stop` (ends the session, keeps worktree and branch; the ticket shows "Session ended" with Assign new agent once AL-263 lands). Composer gets a Stop button while a turn runs; Esc in the ticket page interrupts. The Agent ▾ menu gets End session with a confirm.
 - **Acceptance criteria:**
-  - [ ] Stop and Esc end the running turn within one tool boundary; the session accepts the next message.
-  - [ ] End session stops the `claude` process and leaves the worktree untouched.
-  - [ ] Handler and session-manager unit tests; `agent.spec.ts` covers both.
+  - [x] Stop and Esc end the running turn within one tool boundary; the session accepts the next message.
+  - [x] End session stops the `claude` process and leaves the worktree untouched.
+  - [x] Handler and session-manager unit tests; `agent.spec.ts` covers both.
 
 #### AL-254 · Ticket view bug fixes from the audit
 - **Design:** UXA Bugs · **Depends on:** AL-250
@@ -2130,6 +2130,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D758 | The header is sticky; once scrolled past the agent lanes, a solid (not glass) strip pinned under the header shows lane counts and card chips, animates in 220 ms ease-out, and takes drops (pointer drops matched against live target positions; auto-scroll off while it shows) | Kyle asked for a sticky header and a collapsed agent board; glass made the strip unreadable over the team board | 2026-10-09 |
 | D759 | A solution's detected run command is Visual Studio's saved start-up project (`StartupProject=` in `.vs/<solution>/v<N>/.suo`, newest version first, read from the repo's main checkout because worktrees have no `.vs`) when `dotnet run` can start it; without one, a project whose first name part matches the solution's name (`OnSiteCompanion.WinExe` in `OnSite Companion Solution.sln`) leads, then web, desktop, console in solution order. Reverses the AL-130 note that the `.suo` cannot be read | Kyle's OnSite Companion repo detected `DatabuildGateway.WinExe` (the first desktop project) instead of the app Visual Studio starts | 2026-10-09 |
 | D760 | E15 added from the ticket view UX audit (AL-250–AL-266). Assign new agent hands over by default; a ticket may run a second agent (AL-266); queued launches wait above 85% of the 5-hour plan window; the composer sends on Enter; the layout (AL-250) is built first | Kyle's answers to the audit's open questions | 2026-10-09 |
+| D761 | AL-250: the drill-in is a flex column that fills the window on wide screens (header band, stepper band, then the tab panel beside a 400 px rail that scrolls on its own); below 1200 px the whole page scrolls and the tab panel takes a fixed basis (`max(480, window − 200)`) rather than `flex: 1`, which a 0% basis would collapse inside the scrolling page. Diff and ADO tabs scroll inside the panel | An output-first page needs the transcript to own the window height | 2026-10-09 |
+| D762 | AL-251: the session manager stamps a uuid on every user turn it pushes and tells listeners what it sent (`sent`: text, priority, source); the transcript shows `composer`, `skill`, `launch` and `hand-over` sources as user items and leaves `app` turns (continue, apply-model-now, recovered) out, also when they are read back from a saved session. The launch echoes the job description, not the whole first turn | The Output tab shows the user's side of the conversation without the app's plumbing | 2026-10-09 |
+| D763 | AL-252: the status pill shows a UUID session id's first group with the full id in the tooltip; one tone and word per session state; Reconnect on the pill for lost and ended sessions | The raw 36-character id and an always-green pill hid the state | 2026-10-09 |
+| D764 | AL-253: `agent:interrupt` (Stop turn, Esc on the page) reuses the session manager's interrupt without pausing; `agent:stop` (End session, behind a confirm in the Agent ▾ menu) takes a queued launch out of the queue or closes the live session with SESSION_ENDED_BY_USER_MESSAGE on its status. `features/agent-menu` is exempt from Steiger's insignificant-slice rule: later tickets add items to it | The composer had Pause only | 2026-10-09 |
 
 ---
 
@@ -2197,6 +2201,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | Merged board polish from Kyle's first real use: stage comments off by default, QA-only agent comments, auto permission mode, ADO type/state colours, sticky header and collapsed agent board strip; ADO failures now log the server's reason. `pnpm verify` green (3,513 tests), e2e 169/169 on the branch. Open: confirm auto mode in a real session (API-key sign-in), Enter on a strip cell right after an Escape-cancelled drag. |
 | 2026-10-09 | Run command detection follows Visual Studio's start-up project, else the project named like the solution (D759); OnSite Companion now detects `OnSiteCompanion.WinExe`. On-prem fixes: team backlog iteration path (TF51011). |
 | 2026-10-09 | Ticket view UX audit (Claude Doc, 97 screenshots on the e2e fakes): E15 with 17 tickets, AL-250–AL-266, milestone M7 (D760). |
+| 2026-10-09 | AL-250–AL-253 built on main: output-first layout with the rail, user messages and turn ends in the output, state-aware status pill with Reconnect, Stop turn / Esc and End session. New `shared/ui/action-menu` and `features/agent-menu`. |
 ---
 
 ## 7. Parallel build rules

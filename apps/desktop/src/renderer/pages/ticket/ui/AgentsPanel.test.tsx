@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { ticketFromRecord } from '@/entities/agent-ticket';
 import { subAgentEventHandlers } from '@/entities/sub-agent';
 import { fakeTicketRecord, installFakeBridge } from '@/shared/testing';
-import { SubAgentsPanel } from './TicketPanels';
+import { AgentsPanel } from './TicketPanels';
 
 function node(fields: Partial<SubagentNode> & { id: string }): SubagentNode {
   return {
@@ -46,13 +46,13 @@ function renderPanel(stage: 'implementing' | 'code-review' = 'implementing') {
   const ticket = ticketFromRecord(fakeTicketRecord({ id: '71273', stage, model: 'opus', effort: 'xhigh' }));
   render(
     <QueryClientProvider client={client}>
-      <SubAgentsPanel ticket={ticket} />
+      <AgentsPanel ticket={ticket} />
     </QueryClientProvider>,
   );
   return { client };
 }
 
-describe('SubAgentsPanel (AL-177)', () => {
+describe('AgentsPanel (AL-177)', () => {
   it('shows the lead agent, the counts and each sub-agent as on artboard 3', async () => {
     renderPanel();
     expect(await screen.findByText('2 running · 1 done · 1 queued')).toBeTruthy();
@@ -119,7 +119,7 @@ describe('SubAgentsPanel (AL-177)', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <SubAgentsPanel ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} />
+        <AgentsPanel ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} />
       </QueryClientProvider>,
     );
     await waitFor(() => expect(screen.getByText(/working alone/)).toBeTruthy());

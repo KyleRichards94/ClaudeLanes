@@ -21,7 +21,16 @@ function fakeSessions() {
     get listening() {
       return listener !== undefined;
     },
+    get listener() {
+      return listener;
+    },
   };
+}
+
+function listenerOf(sessions: ReturnType<typeof fakeSessions>): SessionMessageListener {
+  const found = sessions.listener;
+  if (!found) throw new Error('No listener subscribed');
+  return found;
 }
 
 let n = 0;
@@ -168,5 +177,22 @@ describe('transcript history after a restart (AL-102)', () => {
     expect(sessions.listening).toBe(true);
     transcripts.dispose();
     expect(sessions.listening).toBe(false);
+  });
+});
+
+describe('what the app sent the session (AL-251)', () => {
+  it("shows the user's sent messages as user items and leaves the app's own turns out", async () => {
+    const { sessions, emitted } = await setup();
+    const message = { type: 'user', message: { role: 'user', content: 'full first turn' }, parent_tool_use_id: null, uuid: 'u1', session_id: 's' } as unknown as SDKMessage;
+    const send = (sent: NonNullable<Parameters<SessionMessageListener>[0]['sent']>) =>
+      listenerOf(sessions)({ ticketId: '71273', cwd: CWD, resumed: false, message, sent });
+    send({ messageId: 'u1', text: 'Cut it over', priority: 'next', source: 'launch', held: false });
+    send({ messageId: 'u2', text: 'Continue where you left off.', priority: 'next', source: 'app', held: false });
+    send({ messageId: 'u3', text: '/code-review', priority: 'now', source: 'skill', held: true });
+
+    expect(emitted().map((event) => event.item)).toEqual([
+      { kind: 'user', messageId: 'u1', text: 'Cut it over', priority: 'next', source: 'launch', parentToolUseId: null },
+      { kind: 'user', messageId: 'u3', text: '/code-review', priority: 'now', source: 'skill', parentToolUseId: null },
+    ]);
   });
 });

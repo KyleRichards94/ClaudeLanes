@@ -1,7 +1,7 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { fakeOutputEvent } from '@/shared/testing';
-import { outputRows, proseSpans, statSpans } from './rows';
+import { outputRows, proseSpans, statSpans, turnEndLabel, userCaption, type OutputRow } from './rows';
 import { estimateRowHeight, rowOffsets, windowFor } from './virtual';
 
 let seq = 0;
@@ -66,7 +66,7 @@ describe('outputRows (AL-175)', () => {
     expect(rows).toEqual([expect.objectContaining({ type: 'tool', isError: true, stats: '3 errors · 2 warnings' })]);
   });
 
-  it("leaves sub-agents' output to the sub-agents tree and draws failed turns only", () => {
+  it("leaves sub-agents' output to the sub-agents tree and draws turn ends and failed turns", () => {
     const usage = { inputTokens: 1, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
     const rows = outputRows([
       event({ kind: 'text', streamId: 'msg_s', text: 'From razor-writer', parentToolUseId: 'toolu_spawn' }),
@@ -74,7 +74,10 @@ describe('outputRows (AL-175)', () => {
       event({ kind: 'result', subtype: 'error_max_turns', isError: true, durationMs: 1, numTurns: 1, costUsd: 0, usage, ...lead }),
       event({ kind: 'text', streamId: 'msg_e', text: '   ', ...lead }),
     ]);
-    expect(rows).toEqual([expect.objectContaining({ type: 'failed', text: 'Turn ended early · error max turns' })]);
+    expect(rows).toEqual([
+      expect.objectContaining({ type: 'turn-end', durationMs: 1, costUsd: 0, live: false }),
+      expect.objectContaining({ type: 'failed', text: 'Turn ended early · error max turns' }),
+    ]);
   });
 });
 
@@ -124,5 +127,33 @@ describe('output windowing', () => {
       expect(offsets[end] ?? total).toBeGreaterThanOrEqual(Math.min(top + 600, total));
     }
     expect(windowFor(offsets, 0, 0, 600)).toEqual({ start: 0, end: 0 });
+  });
+});
+
+describe("the user's messages and turn ends (AL-251)", () => {
+  const usage = { inputTokens: 1, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+  const at = new Date(2026, 9, 9, 14, 2).getTime();
+
+  it('draws a user row per message and a turn-end row per successful result, the newest one live', () => {
+    const rows = outputRows([
+      event({ kind: 'user', messageId: 'u1', text: 'Cut it over', priority: 'next', source: 'launch', ...lead }, at),
+      event({ kind: 'result', subtype: 'success', isError: false, durationMs: 72_000, numTurns: 1, costUsd: 0.42, usage, ...lead }, at),
+      event({ kind: 'user', messageId: 'u2', text: '/code-review', priority: 'now', source: 'skill', ...lead }, at),
+      event({ kind: 'result', subtype: 'success', isError: false, durationMs: 48_000, numTurns: 2, costUsd: 0.5, usage, ...lead }, at),
+    ]);
+    const keys = rows.map((row) => row.key);
+    expect(rows).toEqual([
+      { type: 'user', key: keys[0], at, text: 'Cut it over', source: 'launch', priority: 'next', messageId: 'u1' },
+      { type: 'turn-end', key: keys[1], at, durationMs: 72_000, costUsd: 0.42, live: false },
+      { type: 'user', key: keys[2], at, text: '/code-review', source: 'skill', priority: 'now', messageId: 'u2' },
+      // The second turn's cost is the change in the running total.
+      { type: 'turn-end', key: keys[3], at, durationMs: 48_000, costUsd: expect.closeTo(0.08, 5), live: true },
+    ]);
+    expect(turnEndLabel(rows[1] as Extract<OutputRow, { type: 'turn-end' }>)).toBe('Turn ended · 1m 12s · $0.42');
+    expect(turnEndLabel(rows[3] as Extract<OutputRow, { type: 'turn-end' }>)).toBe('Turn ended · 48s · $0.08 · waiting for you');
+    expect(userCaption({ source: 'launch', at, priority: 'next' })).toBe('Launched · 14:02');
+    expect(userCaption({ source: 'skill', at, priority: 'now' })).toBe('Skill · 14:02 · steered now');
+    expect(userCaption({ source: 'composer', at: 0, priority: null })).toBe('You');
+    expect(estimateRowHeight(rows[0]!)).toBeGreaterThan(estimateRowHeight(rows[1]!));
   });
 });

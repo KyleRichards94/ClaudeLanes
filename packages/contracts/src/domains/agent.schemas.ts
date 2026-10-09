@@ -41,6 +41,15 @@ export const OUTPUT_TOOL_KINDS = ['read', 'edit', 'write', 'bash', 'grep', 'glob
 export const OutputToolKindSchema = z.enum(OUTPUT_TOOL_KINDS);
 export type OutputToolKind = z.infer<typeof OutputToolKindSchema>;
 
+/**
+ * Where a user message came from (AL-251): typed in the composer, a skill chip (`/code-review`), the
+ * launch's job description, the brief a new agent was handed (AL-263), or a turn the app sent on its
+ * own, which the Output tab leaves out.
+ */
+export const USER_MESSAGE_SOURCES = ['composer', 'skill', 'launch', 'hand-over', 'app'] as const;
+export const UserMessageSourceSchema = z.enum(USER_MESSAGE_SOURCES);
+export type UserMessageSource = z.infer<typeof UserMessageSourceSchema>;
+
 /** Fields every output item has. */
 const OutputItemBase = z.object({
   /**
@@ -58,6 +67,8 @@ const OutputItemBase = z.object({
  *   `rowId` replaces the row (e.g. a Spawn row gaining its third sub-agent);
  * - `tool-result`: what a tool call returned, summary only; its `stats` replace the row's;
  * - `system`: a line from the app ("Plan approved by Kyle · moved to Implementing");
+ * - `user`: what the user sent: a composer message, a skill command, the launch job or a hand-over
+ *   brief (AL-251); the app's own turns ("Continue where you left off.") are not shown;
  * - `result`: a turn ended: usage, cost and duration.
  */
 export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
@@ -98,6 +109,15 @@ export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
   OutputItemBase.extend({
     kind: z.literal('system'),
     text: OutputLineSchema,
+  }),
+  OutputItemBase.extend({
+    kind: z.literal('user'),
+    /** The SDK message's uuid: what Rewind to here and Fork from here take (AL-265); null for history without one. */
+    messageId: z.string().max(200).nullable(),
+    text: z.string().max(OUTPUT_TEXT_LIMIT),
+    /** `now` when sent with Steer now (D11); null when unknown. */
+    priority: z.enum(['now', 'next']).nullable(),
+    source: UserMessageSourceSchema,
   }),
   OutputItemBase.extend({
     kind: z.literal('result'),
@@ -224,6 +244,13 @@ export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 /** `held`: the session is paused, so the message waits for Resume. */
 export const SendMessageResponseSchema = z.object({ held: z.boolean() });
 export type SendMessageResponse = z.infer<typeof SendMessageResponseSchema>;
+
+/** `agent:stop` (AL-253): whether a live session was closed, and the ticket's status after. */
+export const StopSessionResponseSchema = z.object({ stopped: z.boolean(), status: AgentSessionStatusSchema });
+export type StopSessionResponse = z.infer<typeof StopSessionResponseSchema>;
+
+/** Why a session ended at the user's request, shown on the status pill (AL-252, AL-253). */
+export const SESSION_ENDED_BY_USER_MESSAGE = 'You ended this session. The worktree and branch are intact.';
 
 // ── MCP servers of agent sessions (AL-108, design §7 MCP servers, artboard 1 "MCP online") ─────────
 
@@ -453,6 +480,10 @@ export const agentInvokeContracts = {
   'agent:launchFromAdo': { request: LaunchFromAdoRequestSchema, response: LaunchFromAdoResponseSchema },
   /** Undo (AL-237): within 10 s and before the first turn ends, puts the item back and removes the agent, worktree and ticket. */
   'agent:undoLaunch': { request: UndoLaunchRequestSchema, response: UndoLaunchResponseSchema },
+  /** Stop turn (AL-253): ends the running turn at its next tool boundary; the session stays live for the next message. */
+  'agent:interrupt': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
+  /** End session (AL-253): closes the session and its `claude` process; the worktree and branch stay. `stopped` false when none was live. */
+  'agent:stop': { request: AgentTicketRequestSchema, response: StopSessionResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

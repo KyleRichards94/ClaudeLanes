@@ -20,3 +20,4 @@ export {
   type WorkItemStateLabelProps,
   type WorkItemTypeBarProps,
 } from './work-item-colors';
+export { ActionMenu, type ActionMenuItem, type ActionMenuProps } from './action-menu';

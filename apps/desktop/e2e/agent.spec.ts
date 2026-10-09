@@ -166,3 +166,9 @@ test('agent:getUsage reports no tokens for a ticket whose session has not run (A
   });
   expect(await invoke(page, 'agent:getUsage', { ticketId: 'NOT A TICKET' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
+
+test('Stop turn and End session answer over IPC when no session runs (AL-253)', async () => {
+  expect(await invoke(page, 'agent:interrupt', { ticketId: '71273' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+  expect(await invoke(page, 'agent:stop', { ticketId: '71273' })).toMatchObject({ ok: true, data: { stopped: false, status: { ticketId: '71273', state: 'none' } } });
+  expect(await invoke(page, 'agent:stop', { ticketId: 'NOT A TICKET' })).toMatchObject({ ok: false, code: 'VALIDATION' });
+});

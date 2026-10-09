@@ -12,6 +12,14 @@ export default defineConfig([
     },
   },
   {
+    files: ['./apps/desktop/src/renderer/features/agent-menu/**'],
+    rules: {
+      // The drill-in's Agent ▾ menu (AL-253) is one slice several tickets add items to (AL-257, AL-263,
+      // AL-264); only the ticket page mounts it.
+      'fsd/insignificant-slice': 'off',
+    },
+  },
+  {
     rules: {
       // Design §5 keeps the processes layer for flows across pages (first run, AL-047; new ticket).
       'fsd/no-processes': 'off',

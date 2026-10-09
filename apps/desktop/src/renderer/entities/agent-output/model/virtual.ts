@@ -25,7 +25,13 @@ export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH): numbe
       return 38 + OUTPUT_ROW_GAP;
     case 'system':
     case 'failed':
+    case 'turn-end':
       return 18 + OUTPUT_ROW_GAP;
+    case 'user': {
+      const perLine = Math.max(Math.floor((width * 0.8) / CHAR_PX), 20);
+      const lines = row.text.split('\n').reduce((sum, line) => sum + Math.max(Math.ceil(line.length / perLine), 1), 0);
+      return 16 + 8 + lines * PROSE_LINE_PX + 16 + OUTPUT_ROW_GAP;
+    }
     case 'prose':
     case 'streaming': {
       const perLine = Math.max(Math.floor(width / CHAR_PX), 20);

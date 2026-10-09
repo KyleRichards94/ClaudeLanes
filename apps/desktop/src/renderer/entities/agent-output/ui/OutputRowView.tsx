@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { color, font, fontSize, fontWeight, radius, space, tone } from '@agent-lanes/tokens';
 import { Text } from '@agent-lanes/ui';
 import { OUTPUT_ROW_GAP } from '../model/virtual';
-import { outputClock, proseSpans, statSpans, type OutputRow, type StatSpan } from '../model/rows';
+import { outputClock, proseSpans, statSpans, turnEndLabel, userCaption, type OutputRow, type StatSpan } from '../model/rows';
 
 /**
  * One row of the output stream (artboard 3 Output): a system line, a tool row with its coloured verb
@@ -25,6 +25,29 @@ export function OutputRowView({ row }: { row: OutputRow }) {
           <Text variant="meta" color={tone.danger.text} selectable>
             {row.text}
           </Text>
+        </View>
+      );
+    case 'turn-end':
+      return (
+        <View style={[styles.row, styles.turnEnd]} testID="output-turn-end">
+          <View style={styles.turnRule} aria-hidden />
+          <Text variant="meta" selectable>
+            {turnEndLabel(row)}
+          </Text>
+          <View style={styles.turnRule} aria-hidden />
+        </View>
+      );
+    case 'user':
+      return (
+        <View style={[styles.row, styles.userRow]} testID="output-user">
+          <View style={[styles.bubble, row.source === 'skill' && styles.bubbleSkill]}>
+            <Text variant="meta" size="xs" color={color.claudeText}>
+              {userCaption(row)}
+            </Text>
+            <Text variant={row.source === 'skill' ? 'mono' : 'body'} size="md" selectable style={styles.prose}>
+              {row.text}
+            </Text>
+          </View>
         </View>
       );
     case 'tool':
@@ -108,6 +131,36 @@ const styles = StyleSheet.create({
   },
   prose: {
     lineHeight: 22,
+  },
+  // The user's messages sit on the right in a violet-tinted bubble, as a chat shows them (AL-251).
+  userRow: {
+    alignItems: 'flex-end',
+  },
+  bubble: {
+    maxWidth: '80%',
+    gap: space.xs,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    borderRadius: radius.card,
+    borderBottomRightRadius: radius.chip - 2,
+    backgroundColor: tone.claude.wash,
+    borderWidth: 1,
+    borderColor: tone.claude.band,
+  },
+  bubbleSkill: {
+    backgroundColor: color.bg,
+    borderColor: color.line,
+  },
+  turnEnd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingVertical: space.xs,
+  },
+  turnRule: {
+    flex: 1,
+    height: 1,
+    backgroundColor: color.line,
   },
   bold: {
     fontWeight: fontWeight.heading,

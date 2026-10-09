@@ -1,10 +1,18 @@
 import type { SDKMessage, SessionMessage } from '@anthropic-ai/claude-agent-sdk';
-import { TRANSCRIPT_CAPACITY, type AgentOutputEvent, type AgentOutputItem, type AgentTranscript } from '@agent-lanes/contracts';
+import { APPLY_MODEL_NOW_MESSAGE, OUTPUT_TEXT_LIMIT, TRANSCRIPT_CAPACITY, type AgentOutputEvent, type AgentOutputItem, type AgentTranscript } from '@agent-lanes/contracts';
 import type { Emit } from '../../ipc/emit';
 import type { Logger } from '../../logging';
 import type { TicketRecordStore } from '../../tickets';
-import type { SessionManager } from '../session-manager';
+import { RECOVERED_MESSAGE } from '../recovery';
+import { RESUME_MESSAGE, type SessionManager } from '../session-manager';
 import { createOutputNormaliser, firstLine, type OutputNormaliser } from './normalise';
+
+/** User turns the app sends on its own; read back from a saved session they are left out (AL-251). */
+export const APP_USER_TEXTS: ReadonlySet<string> = new Set([RESUME_MESSAGE, APPLY_MODEL_NOW_MESSAGE, RECOVERED_MESSAGE]);
+
+function clipText(text: string): string {
+  return text.length > OUTPUT_TEXT_LIMIT ? `${text.slice(0, OUTPUT_TEXT_LIMIT - 1)}…` : text;
+}
 
 /**
  * Each ticket's output (AL-102): every session message is normalised, numbered and pushed to the
@@ -86,14 +94,21 @@ export function createTranscriptService(options: TranscriptServiceOptions): Tran
     emit('agent:output', event);
   }
 
-  const unsubscribe = options.sessions.subscribe(({ ticketId, cwd, resumed, message }) => {
+  const unsubscribe = options.sessions.subscribe(({ ticketId, cwd, resumed, message, sent }) => {
     const output = outputOf(ticketId);
     if (!output.normaliser) {
-      output.normaliser = createOutputNormaliser({ cwd });
+      output.normaliser = createOutputNormaliser({ cwd, hiddenUserTexts: APP_USER_TEXTS });
       // A fresh session has no older output to read back.
       if (!resumed && output.lastSeq === 0) output.historyDone = true;
     }
     if (message.type !== 'stream_event' && 'uuid' in message && typeof message.uuid === 'string') output.seen.add(message.uuid);
+    if (sent) {
+      // The app's own pushes (AL-251): the user's messages show as sent; the app's turns are left out.
+      if (sent.source !== 'app') {
+        publish(ticketId, output, { kind: 'user', messageId: sent.messageId, text: clipText(sent.text), priority: sent.priority, source: sent.source, parentToolUseId: null });
+      }
+      return;
+    }
     for (const item of output.normaliser.normalise(message)) publish(ticketId, output, item);
   });
 
@@ -111,7 +126,7 @@ export function createTranscriptService(options: TranscriptServiceOptions): Tran
       options.log?.warn(`Could not read the saved output of ticket ${ticketId}: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    const normaliser = createOutputNormaliser({ cwd: record.worktreePath });
+    const normaliser = createOutputNormaliser({ cwd: record.worktreePath, hiddenUserTexts: APP_USER_TEXTS });
     const items: Array<{ item: AgentOutputItem; at: number }> = [];
     for (const saved of messages) {
       if (output.seen.has(saved.uuid)) continue;
