@@ -1,5 +1,6 @@
 import {
   STAGES,
+  type AgentSessionState,
   type BuildJob,
   type DesignSpecChange,
   type Effort,
@@ -144,6 +145,7 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     activity: null,
     progress: null,
     lastOutputAt: null,
+    session: 'none',
     switching: null,
     gate: null,
     needsYou: [],
@@ -177,6 +179,11 @@ export function withDesignSpec(ticket: AgentTicket, version: number, change: Des
  * Moves the ticket to another lane. A waiting gate is resolved by the move (the agent only moves
  * on once its gate was approved, AL-104), so its `approval` reason goes too.
  */
+/** The session's state changed (`agent:status`). */
+export function withSession(ticket: AgentTicket, session: AgentSessionState): AgentTicket {
+  return ticket.session === session ? ticket : { ...ticket, session };
+}
+
 export function withStage(ticket: AgentTicket, stage: Lane, at: number): AgentTicket {
   if (ticket.stage === stage) return ticket;
   return withGateResolved({ ...ticket, stage, stageEnteredAt: at });

@@ -55,6 +55,7 @@ export { reconnectSession, useCompactSession, useInterruptTurn, useReconnectSess
 export { createDesignSpecEventHandlers, designSpecQueryKey, useDesignSpec, useReshipDesignSpec, useShipDesignSpec } from './design-specs';
 export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
 export { planLimitsEventHandlers, planLimitsQueryKey, usePlanLimits } from './plan-limits';
+export { sessionCommandsQueryKey, useSessionCommands, useWorktreeFiles, worktreeFilesQueryKey } from './composer-sources';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';
 export {
   designThreadEventHandlers,

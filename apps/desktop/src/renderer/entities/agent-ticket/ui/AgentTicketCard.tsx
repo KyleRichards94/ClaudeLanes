@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
@@ -26,6 +27,8 @@ export interface AgentTicketCardViewProps {
   selected?: boolean;
   /** Opens the ticket's drill-in. */
   onPress?: () => void;
+  /** A control in the card's top-right corner, after the state (the board's "Remove from board…" menu). */
+  cornerAction?: ReactNode;
   testID?: string;
 }
 
@@ -34,7 +37,7 @@ export interface AgentTicketCardViewProps {
  * progress bar, "Model · Effort" and sub-agents, and a status band when the ticket needs something.
  * Presentational: give it a ticket; `AgentTicketCard` reads one from the store.
  */
-export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, testID }: AgentTicketCardViewProps) {
+export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, cornerAction, testID }: AgentTicketCardViewProps) {
   const view = cardView(ticket);
   const cardTone = selected ? 'selected' : view.border;
   const activityTone = activityTones[view.activity.tone];
@@ -73,7 +76,11 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
                 </Text>
               </View>
             )}
-            {adoState ? <WorkItemStateLabel state={adoState} stateColor={stateColor} testID={testID ? `${testID}-state` : undefined} /> : null}
+            <View style={styles.corner}>
+              {adoState ? <WorkItemStateLabel state={adoState} stateColor={stateColor} testID={testID ? `${testID}-state` : undefined} /> : null}
+              {!adoState && view.corner ? <Pill label={view.corner.label} tone={view.corner.tone} dot testID={testID ? `${testID}-corner` : 'ticket-card-corner'} /> : null}
+              {cornerAction}
+            </View>
           </View>
           <Text variant="title" size="md" numberOfLines={3} style={styles.title}>
             {ticket.title}
@@ -149,6 +156,11 @@ function progressTone(activity: CardActivityTone): ProgressTone {
 const styles = StyleSheet.create({
   target: {
     borderRadius: radius.card,
+  },
+  corner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
   },
   idRow: {
     flexDirection: 'row',

@@ -17,6 +17,8 @@ export interface ModelEffortControlsProps {
   ticket: ModelControlsTicket;
   /** The store the switch is shown in; the app's own by default. */
   store?: AgentTicketStore;
+  /** One row for the composer footer (AL-259): the model track and the effort pills side by side, hugging their content. */
+  compact?: boolean;
 }
 
 const MODEL_OPTIONS = MODELS.map((model) => ({ value: model, label: MODEL_LABELS[model] }));
@@ -35,7 +37,7 @@ const EFFORT_OPTIONS = EFFORTS.map((effort) => ({ value: effort, label: EFFORT_L
  * until main reports the session using it (`agent:model`, AL-106). A refused change puts the
  * switchers back and raises a toast.
  */
-export function ModelEffortControls({ ticket, store = agentTickets }: ModelEffortControlsProps) {
+export function ModelEffortControls({ ticket, store = agentTickets, compact = false }: ModelEffortControlsProps) {
   const setModel = useSetAgentModel(store);
   const setEffort = useSetAgentEffort(store);
   const view = modelControls(ticket);
@@ -50,6 +52,7 @@ export function ModelEffortControls({ ticket, store = agentTickets }: ModelEffor
   return (
     <ModelEffortControlsView
       ticket={ticket}
+      compact={compact}
       onModel={(model) => setModel.mutate({ ticketId: ticket.id, model }, { onError: onError("Couldn't switch the model") })}
       onEffort={(effort) => setEffort.mutate({ ticketId: ticket.id, effort }, { onError: onError("Couldn't change the effort") })}
     />
@@ -58,23 +61,24 @@ export function ModelEffortControls({ ticket, store = agentTickets }: ModelEffor
 
 export interface ModelEffortControlsViewProps {
   ticket: ModelControlsTicket;
+  compact?: boolean;
   onModel(model: Model): void;
   onEffort(effort: Effort): void;
 }
 
 /** The switchers with no actions behind them: the panel body, and the component gallery's samples. */
-export function ModelEffortControlsView({ ticket, onModel, onEffort }: ModelEffortControlsViewProps) {
+export function ModelEffortControlsView({ ticket, compact = false, onModel, onEffort }: ModelEffortControlsViewProps) {
   const view = modelControls(ticket);
   const disabled = view.disabledReason !== null;
   return (
-    <View style={styles.body} testID="model-effort-controls">
+    <View style={compact ? styles.row : styles.body} testID="model-effort-controls">
       <SegmentedControl<Model>
         label="Model"
         options={MODEL_OPTIONS}
         value={view.model}
         onChange={onModel}
         disabled={disabled}
-        fill
+        fill={!compact}
         testID="agent-model"
       />
       <SegmentedControl<Effort>
@@ -84,7 +88,7 @@ export function ModelEffortControlsView({ ticket, onModel, onEffort }: ModelEffo
         value={view.effort}
         onChange={onEffort}
         disabled={disabled}
-        fill
+        fill={!compact}
         testID="agent-effort"
       />
       <View aria-live="polite" style={styles.status}>
@@ -106,6 +110,12 @@ export function ModelEffortControlsView({ ticket, onModel, onEffort }: ModelEffo
 const styles = StyleSheet.create({
   body: {
     gap: space.md,
+  },
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: space.sm,
   },
   status: {
     minHeight: 0,

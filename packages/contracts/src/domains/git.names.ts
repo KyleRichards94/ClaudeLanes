@@ -14,5 +14,7 @@ export const GIT_INVOKE_CHANNELS = [
   'git:openConflictFiles',
   // Workspace preview in the New agent ticket modal (AL-164).
   'git:previewWorktree',
+  // Worktree files for the composer's @ picker (AL-259).
+  'git:listFiles',
 ] as const;
 export const GIT_EVENT_CHANNELS = [] as const;

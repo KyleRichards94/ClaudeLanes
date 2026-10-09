@@ -2,6 +2,7 @@ export {
   DEFAULT_EMBED_MODE,
   createUiPrefsStore,
   hydrateUiPrefs,
+  useComposerDraft,
   useEmbedMode,
   useLaneCollapsed,
   useUiPrefs,

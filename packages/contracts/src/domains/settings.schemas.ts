@@ -99,6 +99,11 @@ export const UiPrefsSchema = z.object({
   collapsedLanes: z.array(LaneSchema).refine(unique, 'Each lane can be listed once'),
   /** Claude Design embed mode per agent ticket id; tickets not listed use the webview (AL-194). */
   embedModeByTicket: z.record(z.string().min(1), EmbedModeSchema),
+  /**
+   * Unsent composer text per ticket (AL-259), so leaving the page keeps a draft. Optional, not
+   * defaulted: a `settings:update` patch of one UI pref must not reset the drafts.
+   */
+  composerDrafts: z.record(z.string().min(1), z.string().max(20_000)).optional(),
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
@@ -213,7 +218,7 @@ export function defaultAgentDefaults(): AgentDefaults {
 
 /** Done starts collapsed into its vertical strip (artboard 1). */
 export function defaultUiPrefs(): UiPrefs {
-  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {} };
+  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {}, composerDrafts: {} };
 }
 
 /** Fresh profile: no repos yet (AL-047 asks for one). */

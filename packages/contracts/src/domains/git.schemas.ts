@@ -307,7 +307,19 @@ export const OpenConflictFilesResultSchema = z.object({
 });
 export type OpenConflictFilesResult = z.infer<typeof OpenConflictFilesResultSchema>;
 
+/** `git:listFiles` (AL-259): worktree files whose path contains every word of `query`, for the composer's @ picker. */
+export const ListWorktreeFilesRequestSchema = z.strictObject({ ticketId: TicketIdSchema, query: z.string().max(200).default('') });
+export const WorktreeFilesSchema = z.object({
+  ticketId: TicketIdSchema,
+  query: z.string().max(200),
+  /** Worktree-relative, forward slashes, shortest first; at most 50. */
+  files: z.array(z.string().min(1).max(4096)).max(50),
+  truncated: z.boolean(),
+});
+export type WorktreeFiles = z.infer<typeof WorktreeFilesSchema>;
+
 export const gitInvokeContracts = {
+  'git:listFiles': { request: ListWorktreeFilesRequestSchema, response: WorktreeFilesSchema },
   /** `VALIDATION` with `details.reason: 'ticket-not-found'` for an unknown ticket. */
   'branches:status': { request: TicketRefRequestSchema, response: BranchStatusSchema },
   'git:mergeToMainPreview': { request: TicketRefRequestSchema, response: MergeToMainPreviewSchema },

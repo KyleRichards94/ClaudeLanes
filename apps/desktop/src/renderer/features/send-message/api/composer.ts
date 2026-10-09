@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AGENT_MESSAGE_LIMIT, skillCommand, type AgentSessionStatus } from '@agent-lanes/contracts';
+import { AGENT_MESSAGE_LIMIT, skillCommand, type AgentAttachment, type AgentSessionStatus } from '@agent-lanes/contracts';
 import { invoke, sessionStatusQueryKey, unwrap } from '@/shared/api';
 
 export { AGENT_MESSAGE_LIMIT };
@@ -8,13 +8,22 @@ export interface SendInput {
   text: string;
   /** "Steer now": delivered at the next tool boundary instead of after the turn (D11). */
   now?: boolean;
+  /** Pasted, dropped or picked files (AL-259). */
+  attachments?: readonly AgentAttachment[];
 }
 
 /** `agent:send` (AL-105): resolves `held: true` when the session is paused (D548). */
 export function useSendMessage(ticketId: string) {
   return useMutation({
-    mutationFn: async ({ text, now }: SendInput) =>
-      unwrap(await invoke('agent:send', { ticketId, text, ...(now ? { priority: 'now' as const } : {}) })),
+    mutationFn: async ({ text, now, attachments }: SendInput) =>
+      unwrap(
+        await invoke('agent:send', {
+          ticketId,
+          text,
+          ...(now ? { priority: 'now' as const } : {}),
+          ...(attachments && attachments.length > 0 ? { attachments: attachments.map(({ kind, name, mediaType, data }) => ({ kind, name, mediaType, data })) } : {}),
+        }),
+      ),
   });
 }
 

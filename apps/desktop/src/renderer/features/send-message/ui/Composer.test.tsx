@@ -59,7 +59,7 @@ function type(text: string) {
 }
 
 function calls(bridge: FakeBridge) {
-  return (bridge.invoke as ReturnType<typeof vi.fn>).mock.calls.map(([channel, payload]) => [channel, payload]).filter(([channel]) => channel !== 'agent:getStatus');
+  return (bridge.invoke as ReturnType<typeof vi.fn>).mock.calls.map(([channel, payload]) => [channel, payload]).filter(([channel]) => !['agent:getStatus', 'agent:listCommands', 'skills:list', 'git:listFiles', 'settings:update'].includes(channel as string));
 }
 
 describe('Composer (AL-176)', () => {
@@ -100,24 +100,24 @@ describe('Composer (AL-176)', () => {
     expect(await screen.findByRole('button', { name: 'Resume' })).toBeTruthy();
   });
 
-  it('sends on Ctrl+Enter but not on Enter, and "Steer now" sends with priority now', async () => {
+  it('sends on Enter but not on Shift+Enter, and "Steer now" sends with priority now (AL-259)', async () => {
     const bridge = fakeSession();
     renderComposer();
     await ready();
 
     type('first');
-    fireEvent.keyDown(screen.getByTestId('composer-input'), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByTestId('composer-input'), { key: 'Enter', shiftKey: true });
     expect(calls(bridge)).toEqual([]);
-    fireEvent.keyDown(screen.getByTestId('composer-input'), { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(screen.getByTestId('composer-input'), { key: 'Enter' });
     await waitFor(() => expect(calls(bridge)).toEqual([['agent:send', { ticketId: '71273', text: 'first' }]]));
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Steer now' }));
-    expect(screen.getByRole('checkbox', { name: 'Steer now' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('switch', { name: /Steer now/ }));
+    expect(screen.getByRole('switch', { name: /Steer now/ }).getAttribute('aria-checked')).toBe('true');
     type('stop editing the grid');
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
     await waitFor(() => expect(calls(bridge).at(-1)).toEqual(['agent:send', { ticketId: '71273', text: 'stop editing the grid', priority: 'now' }]));
     // Steer now applies to one message.
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Steer now' }).getAttribute('aria-checked')).toBe('false'));
+    await waitFor(() => expect(screen.getByRole('switch', { name: /Steer now/ }).getAttribute('aria-checked')).toBe('false'));
   });
 
   it('runs a skill chip as /skill-name and applies a waiting model change now', async () => {

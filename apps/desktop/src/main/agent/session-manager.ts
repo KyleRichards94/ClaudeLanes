@@ -13,6 +13,7 @@ import {
   type Model,
   type ModelEffort,
   type Result,
+  type AgentAttachment,
   type TicketRecord,
   type UserMessageSource,
 } from '@agent-lanes/contracts';
@@ -79,6 +80,8 @@ export interface SessionManager {
   status(ticketId: string): AgentSessionStatus;
   /** Tickets whose agent is starting or in a turn (not idle or paused): quitting now would cut them off (AL-213). */
   midTurn(): string[];
+  /** The live session's slash commands (`supportedCommands()`, AL-259); an empty list when none runs. */
+  supportedCommands(ticketId: string): Promise<Result<Array<{ name: string; description: string; argumentHint: string }>>>;
   /** The live session's context window (`getContextUsage`, AL-113), from the last response's usage. */
   contextUsage(ticketId: string): Promise<Result<{ totalTokens: number; maxTokens: number; percentage: number }>>;
   /** The status of every session the app has started since it opened, live or not. */
@@ -114,6 +117,8 @@ export interface SessionResumeOptions {
 
 export interface SessionMessageInput {
   text: string;
+  /** Files sent with the message as content blocks (AL-259). */
+  attachments?: readonly AgentAttachment[];
   /** `next` (default) is delivered when the current turn ends; `now` at the next tool boundary (D11). */
   priority?: 'now' | 'next';
   /** False: added to the transcript and sent with the next turn, without starting one (D11, AL-112). */
@@ -258,11 +263,24 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
   };
 }
 
+/** The message's content: the text alone, or text and attachment blocks (AL-259). */
+export function messageContent(input: SessionMessageInput): SDKUserMessage['message']['content'] {
+  const attachments = input.attachments ?? [];
+  if (attachments.length === 0) return input.text;
+  const blocks: Array<Record<string, unknown>> = [{ type: 'text', text: input.text }];
+  for (const file of attachments) {
+    if (file.kind === 'image') blocks.push({ type: 'image', source: { type: 'base64', media_type: file.mediaType, data: file.data } });
+    else if (file.kind === 'document') blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: file.data }, title: file.name });
+    else blocks.push({ type: 'text', text: `File ${file.name}:\n\`\`\`\n${Buffer.from(file.data, 'base64').toString('utf8')}\n\`\`\`` });
+  }
+  return blocks as unknown as SDKUserMessage['message']['content'];
+}
+
 /** A user turn as the SDK's input stream takes it, with a uuid so it can be rewound to or forked from (AL-265). */
 export function userMessage(input: SessionMessageInput, uuid: string = randomUUID()): SDKUserMessage {
   return {
     type: 'user',
-    message: { role: 'user', content: input.text },
+    message: { role: 'user', content: messageContent(input) },
     parent_tool_use_id: null,
     priority: input.priority ?? 'next',
     uuid: uuid as SDKUserMessage['uuid'],
@@ -270,11 +288,13 @@ export function userMessage(input: SessionMessageInput, uuid: string = randomUUI
   };
 }
 
-/** What listeners are told about a pushed message (AL-251). */
+/** What listeners are told about a pushed message (AL-251); attachments are named after the text (AL-259). */
 export function sentMessage(message: SDKUserMessage, input: SessionMessageInput, held = false): SentMessage {
+  const files = input.attachments ?? [];
+  const echo = input.echo ?? input.text;
   return {
     messageId: String(message.uuid),
-    text: input.echo ?? input.text,
+    text: files.length > 0 ? `${echo}\n\n📎 ${files.map((file) => file.name).join(', ')}` : echo,
     priority: input.priority ?? 'next',
     source: input.source ?? 'app',
     held,
@@ -710,6 +730,17 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     },
 
     list: () => [...sessions.values()].map((session) => statusOf(session.ticketId, session)),
+
+    async supportedCommands(ticketId) {
+      const session = sessions.get(ticketId);
+      if (!session || !LIVE_STATES.has(session.state) || !session.query) return ok([]);
+      try {
+        const commands = await session.query.supportedCommands();
+        return ok(commands.map((command) => ({ name: command.name, description: command.description ?? '', argumentHint: command.argumentHint ?? '' })));
+      } catch (error) {
+        return err('INTERNAL', `The session's commands could not be listed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
 
     async mcpServerStatus(ticketId) {
       const found = live(ticketId);

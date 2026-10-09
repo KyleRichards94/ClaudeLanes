@@ -1,4 +1,5 @@
 import type {
+  AgentSessionState,
   BuildJobKind,
   Effort,
   Lane,
@@ -44,6 +45,8 @@ export interface AgentTicket {
   readonly progress: number | null;
   /** When the session last produced output (`agent:output`); null before any. */
   readonly lastOutputAt: number | null;
+  /** The agent session's state (`agent:status`); `none` until one reported. The card's corner reads "Done" from it. */
+  readonly session: AgentSessionState;
 
   /** The model and effort the session runs with now (R7). */
   readonly model: Model;

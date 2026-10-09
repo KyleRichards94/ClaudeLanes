@@ -44,6 +44,7 @@ describe('ticketFromRecord', () => {
       activity: null,
       progress: null,
       lastOutputAt: null,
+      session: 'none',
       model: 'opus',
       effort: 'xhigh',
       switching: null,

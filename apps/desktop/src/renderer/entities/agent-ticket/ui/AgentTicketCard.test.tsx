@@ -5,7 +5,8 @@ import { color, mutedOpacity, tone } from '@agent-lanes/tokens';
 import { fakeTicketRecord } from '@/shared/testing';
 import { createAgentTicketStore, type AgentTicketStore } from '../model/store';
 import { AgentTicketCard } from './AgentTicketCard';
-import { cardView, needsYouLabel, type CardState } from './card-view';
+import { ticketFromRecord } from '../model/ticket';
+import { agentFinished, cardView, needsYouLabel, type CardState } from './card-view';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
 function rgb(hex: string): string {
@@ -261,5 +262,22 @@ describe('AgentTicketCard design indicator (AL-200)', () => {
     store.load([fakeTicketRecord({ id: ID, design: { canvas: null, lastViewUrl: null, specs: [spec] } })]);
     render(<AgentTicketCard ticketId={ID} store={store} testID="ticket" />);
     expect(screen.getByTestId('ticket-design').textContent).toBe('Design v2 not yet used');
+  });
+});
+
+
+describe('the Done corner for review and no-ticket agents (Kyle, 2026-10-09)', () => {
+  const review = { ...ticketFromRecord(fakeTicketRecord({ id: 'pr-11622-review', ado: null, stage: 'code-review' })), lastOutputAt: 5 };
+
+  it('says Done once the session is idle or ended after output, and only on cards without a work item state', () => {
+    expect(agentFinished({ ...review, session: 'idle' })).toBe(true);
+    expect(agentFinished({ ...review, session: 'stopped' })).toBe(true);
+    expect(agentFinished({ ...review, session: 'running' })).toBe(false);
+    expect(agentFinished({ ...review, session: 'idle', lastOutputAt: null })).toBe(false);
+    expect(agentFinished({ ...review, session: 'idle', needsYou: [{ kind: 'permission', tool: 'Bash', since: 1 }] })).toBe(false);
+    expect(cardView({ ...review, session: 'idle' }).corner).toEqual({ label: 'Done', tone: 'ok' });
+    expect(cardView({ ...review, session: 'running' }).corner).toBeNull();
+    const withWorkItem = { ...ticketFromRecord(fakeTicketRecord()), lastOutputAt: 5, session: 'idle' as const };
+    expect(cardView(withWorkItem).corner).toBeNull();
   });
 });

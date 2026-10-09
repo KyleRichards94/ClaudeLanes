@@ -1,5 +1,6 @@
 import { workItemStateColor, workItemTypeColor } from '@agent-lanes/contracts';
 import { AgentTicketCardView, useAgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
+import { RemoveTicketMenu } from '@/features/remove-ticket';
 import { useConnections, useWorkItem, useWorkItemColors } from '@/shared/api';
 
 export interface BoardTicketCardProps {
@@ -37,6 +38,7 @@ export function BoardTicketCard({ ticketId, store, onPress, testID }: BoardTicke
       adoState={state}
       typeColor={workItemTypeColor(colors.data, type)}
       stateColor={workItemStateColor(colors.data, type, state)}
+      cornerAction={<RemoveTicketMenu ticketId={ticketId} />}
       {...(onPress ? { onPress } : {})}
       {...(testID ? { testID } : {})}
     />

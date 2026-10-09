@@ -1,4 +1,4 @@
-import { LANES, type BuildJob, type DesignSpecChange, type StageGates, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
+import { LANES, type AgentSessionState, type BuildJob, type DesignSpecChange, type StageGates, type Effort, type Lane, type Model, type Stage, type TicketLastBuild, type TicketRecord } from '@agent-lanes/contracts';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import {
   ticketFromRecord,
@@ -15,6 +15,7 @@ import {
   withOutputAt,
   withPullRequest,
   withRun,
+  withSession,
   withStage,
   withSubAgents,
   withoutNeedsYou,
@@ -64,6 +65,8 @@ export interface AgentTicketStore extends Pick<StoreApi<AgentTicketsState>, 'get
   setActivity(ticketId: string, activity: { text: string | null; progress?: number | null }, at: number): void;
   /** A frame's batch of `agent:output` events, across tickets, in one commit. */
   recordOutput(events: readonly { readonly ticketId: string; readonly at: number }[]): void;
+  /** The session's state (`agent:status`): the card's corner reads "Done" from it. */
+  setSession(ticketId: string, session: AgentSessionState): void;
 
   /** A stage gate waits for the user (AL-104), with the agent's summary of what to approve (AL-254). */
   openGate(ticketId: string, stage: Stage, at: number, summary?: string | null): void;
@@ -184,6 +187,7 @@ export function createAgentTicketStore(): AgentTicketStore {
     },
 
     setStage: (ticketId, stage, at) => update(ticketId, (ticket) => withStage(ticket, stage, at)),
+    setSession: (ticketId, session) => update(ticketId, (ticket) => withSession(ticket, session)),
     setActivity: (ticketId, activity, at) => update(ticketId, (ticket) => withActivity(ticket, activity, at)),
 
     recordOutput(events) {

@@ -62,6 +62,7 @@ import { createArchiveService, type ArchiveService } from './worktrees/archive';
 import { createDiffService, type DiffService } from './worktrees/diff';
 import { createMergeSubBranchesService, type MergeSubBranchesService } from './worktrees/merge-sub-branches';
 import { createSubWorktreeService, subWorktreeHooks, type SubWorktreeService } from './worktrees/sub-worktree';
+import { createWorktreeFileLister, type WorktreeFileLister } from './worktrees/list-files';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
@@ -148,6 +149,8 @@ export interface Services {
   readonly archive: ArchiveService;
   /** The Diff tab's files and per-file unified diffs against the base or a sub-branch (AL-089). */
   readonly diffs: DiffService;
+  /** Worktree files for the composer's @ picker (AL-259). */
+  readonly worktreeFiles: WorktreeFileLister;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -262,6 +265,7 @@ export function createServices(options: ServiceOptions): Services {
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
   const diffs = createDiffService({ git, tickets });
+  const worktreeFiles = createWorktreeFileLister({ git, tickets });
   const subWorktrees = createSubWorktreeService({ git, tickets, queue: repoQueue, log: log.child('worktrees') });
   const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
@@ -495,6 +499,7 @@ export function createServices(options: ServiceOptions): Services {
     ticketArchive,
     archive,
     diffs,
+    worktreeFiles,
     reconcile,
     pullRequests,
     designSpecs,

@@ -7,6 +7,8 @@ import { OutputStream } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
+import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
+import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt } from '@/features/resolve-permission';
@@ -84,6 +86,8 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const reconnect = useReconnectSession(ticket.id);
   const interrupt = useInterruptTurn(ticket.id);
   const setGate = useSetGate();
+  const { navigate } = useNavigation();
+  const [removing, setRemoving] = useState(false);
 
   // Esc stops the running turn, as in Claude Code (AL-253); a menu or modal that is open takes Esc first.
   const onKeyDown = (event: KeyDownEvent) => {
@@ -112,7 +116,14 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           <>
             <PlanLimitsPill testID="ticket-plan-limits" />
             <UsageStrip usage={usage} />
-            <AgentMenu ticketId={ticket.id} />
+            <AgentMenu
+              ticketId={ticket.id}
+              extraItems={[{ key: REMOVE_TICKET_KEY, label: 'Remove from board…', detail: 'Ends the agent and removes the worktree; the branch stays.', icon: 'archive', danger: true, section: 'Ticket' }]}
+              onExtraSelect={(key) => {
+                if (key === REMOVE_TICKET_KEY) setRemoving(true);
+              }}
+            />
+            <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
           </>
         }
       />
@@ -154,7 +165,14 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
               <OutputStream ticketId={ticket.id} style={styles.output} testID="ticket-tab-output" />
             </PanelErrorBoundary>
             {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}
-            <Composer ticketId={ticket.id} skills={record?.skills ?? []} switching={ticket.switching !== null} style={styles.composer} />
+            <Composer
+              ticketId={ticket.id}
+              repo={ticket.repo}
+              skills={record?.skills ?? []}
+              switching={ticket.switching !== null}
+              tools={<ModelEffortControls ticket={ticket} compact />}
+              style={styles.composer}
+            />
           </>
         ) : (
           <ScrollView style={styles.tabScroll} contentContainerStyle={styles.tabContent}>

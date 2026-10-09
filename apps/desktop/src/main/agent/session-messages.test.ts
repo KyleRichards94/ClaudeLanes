@@ -32,7 +32,7 @@ const toolUse = (id: string): SDKMessage =>
   }) as unknown as SDKMessage;
 
 async function setup() {
-  const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
+  const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')], commands: [{ name: 'commit', description: 'Commit the work', argumentHint: '<message>' }] });
   const tickets = await memoryTickets({ id: '71273' });
   const events = recordingEmit();
   const sessions = createSessionManager({
@@ -197,5 +197,33 @@ describe('Stop turn and End session (AL-253)', () => {
     expect(events.of('agent:status', '71273').at(-1)).toMatchObject({ state: 'stopped', message: SESSION_ENDED_BY_USER_MESSAGE });
     await expect(handleInvoke('agent:stop', { ticketId: '71273' }, handlers['agent:stop'])).resolves.toMatchObject({ ok: true, data: { stopped: false, status: { state: 'stopped' } } });
     expect(sessions.status('71273').state).toBe('stopped');
+  });
+});
+
+describe('attachments and the session commands (AL-259)', () => {
+  it('sends files as content blocks after the text and names them in the echo', async () => {
+    const { call, handlers, sessions, events } = await setup();
+    const png = { kind: 'image' as const, name: 'shot.png', mediaType: 'image/png', data: 'aGVsbG8=' };
+    const note = { kind: 'text' as const, name: 'notes.txt', mediaType: 'text/plain', data: Buffer.from('line one').toString('base64') };
+    await handleInvoke('agent:send', { ticketId: '71273', text: 'see these', attachments: [png, note] }, handlers['agent:send']);
+    await call.sentCount(2);
+    const content = call.sent[1]!.message.content as unknown as Array<Record<string, unknown>>;
+    expect(content).toEqual([
+      { type: 'text', text: 'see these' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+      { type: 'text', text: 'File notes.txt:\n```\nline one\n```' },
+    ]);
+    expect(events.of('agent:output', '71273').at(-1)).toMatchObject({ item: { kind: 'user', text: 'see these\n\n📎 shot.png, notes.txt', source: 'composer' } });
+    await sessions.dispose();
+  });
+
+  it('lists the live session’s slash commands, and none without a session', async () => {
+    const { handlers, sessions } = await setup();
+    await expect(handleInvoke('agent:listCommands', { ticketId: '71273' }, handlers['agent:listCommands'])).resolves.toEqual({
+      ok: true,
+      data: { ticketId: '71273', commands: [{ name: 'commit', description: 'Commit the work', argumentHint: '<message>' }] },
+    });
+    await expect(handleInvoke('agent:listCommands', { ticketId: '71274' }, handlers['agent:listCommands'])).resolves.toEqual({ ok: true, data: { ticketId: '71274', commands: [] } });
+    await sessions.dispose();
   });
 });

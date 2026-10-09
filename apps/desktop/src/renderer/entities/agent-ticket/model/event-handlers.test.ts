@@ -26,6 +26,7 @@ describe('agent ticket event handlers', () => {
       'agent:output',
       'agent:permission',
       'agent:stage',
+      'agent:status',
       'agent:subagent',
       'build:finished',
       'build:queued',

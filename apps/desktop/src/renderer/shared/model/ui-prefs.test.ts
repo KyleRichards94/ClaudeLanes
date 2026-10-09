@@ -24,7 +24,7 @@ describe('UI prefs store', () => {
   it('hydrates from the settings in the main process', async () => {
     installFakeSettings({
       ...defaultSettings(),
-      ui: { lastRepo: 'C:/src/osc', lastSprint: 'sprint-42', lastTeam: 'team-osc', collapsedLanes: ['queued'], embedModeByTicket: { '71273': 'mcp-link' } },
+      ui: { lastRepo: 'C:/src/osc', lastSprint: 'sprint-42', lastTeam: 'team-osc', collapsedLanes: ['queued'], embedModeByTicket: { '71273': 'mcp-link' }, composerDrafts: {} },
     });
     const store = newStore();
     await hydrateUiPrefs(store);
@@ -35,7 +35,7 @@ describe('UI prefs store', () => {
       lastSprint: 'sprint-42',
       lastTeam: 'team-osc',
       collapsedLanes: ['queued'],
-      embedModeByTicket: { '71273': 'mcp-link' },
+      embedModeByTicket: { '71273': 'mcp-link' }, composerDrafts: {},
     });
   });
 
@@ -85,7 +85,7 @@ describe('UI prefs store', () => {
 
     expect(store.getState()).toMatchObject({
       lastSprint: 'sprint-43',
-      embedModeByTicket: { '71273': 'mcp-link', '71330': 'webview' },
+      embedModeByTicket: { '71273': 'mcp-link', '71330': 'webview' }, composerDrafts: {},
     });
   });
 

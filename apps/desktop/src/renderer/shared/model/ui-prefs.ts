@@ -16,13 +16,15 @@ export interface UiPrefsState extends UiPrefs {
   setLaneCollapsed(lane: Lane, collapsed: boolean): void;
   toggleLane(lane: Lane): void;
   setEmbedMode(ticketId: string, mode: EmbedMode): void;
+  /** Keeps a ticket's unsent composer text (AL-259); an empty draft is dropped. */
+  setComposerDraft(ticketId: string, draft: string): void;
 }
 
 /** The embed mode of a ticket that has never been switched (AL-194). */
 export const DEFAULT_EMBED_MODE: EmbedMode = 'webview';
 
-function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket }: UiPrefsState): UiPrefs {
-  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket };
+function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts }: UiPrefsState): UiPrefs {
+  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts };
 }
 
 /** Builds a UI prefs store over the given storage; the app uses `useUiPrefs`, tests make their own. */
@@ -50,6 +52,13 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
           })),
         setEmbedMode: (ticketId, mode) =>
           set(({ embedModeByTicket }) => ({ embedModeByTicket: { ...embedModeByTicket, [ticketId]: mode } })),
+        setComposerDraft: (ticketId, draft) =>
+          set(({ composerDrafts }) => {
+            const next = { ...(composerDrafts ?? {}) };
+            if (draft.trim() === '') delete next[ticketId];
+            else next[ticketId] = draft;
+            return { composerDrafts: next };
+          }),
       }),
       {
         name: 'ui-prefs',
@@ -73,6 +82,10 @@ export async function hydrateUiPrefs(store: UiPrefsStore = useUiPrefs): Promise<
 
 export function useLaneCollapsed(lane: Lane): boolean {
   return useUiPrefs((state) => state.collapsedLanes.includes(lane));
+}
+
+export function useComposerDraft(ticketId: string): string {
+  return useUiPrefs((state) => state.composerDrafts?.[ticketId] ?? '');
 }
 
 export function useEmbedMode(ticketId: string): EmbedMode {

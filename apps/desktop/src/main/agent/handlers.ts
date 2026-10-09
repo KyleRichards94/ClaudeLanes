@@ -31,8 +31,12 @@ export function createAgentHandlers({
     'agent:setGate': ({ ticketId, stage, gate }) => stages.setGate(ticketId, stage, gate),
     'agent:getGate': ({ ticketId }) => ok({ gate: stages.pendingGate(ticketId) }),
     // A `/skill` on its own line is a skill chip or a typed command; anything else the user wrote (AL-251).
-    'agent:send': ({ ticketId, text, priority }) =>
-      sessions.send(ticketId, { text, priority: priority ?? 'next', source: /^\/\S+(?:\s[^\n]*)?$/.test(text.trim()) ? 'skill' : 'composer' }),
+    'agent:send': ({ ticketId, text, priority, attachments }) =>
+      sessions.send(ticketId, { text, priority: priority ?? 'next', source: /^\/\S+(?:\s[^\n]*)?$/.test(text.trim()) ? 'skill' : 'composer', ...(attachments ? { attachments } : {}) }),
+    'agent:listCommands': async ({ ticketId }) => {
+      const commands = await sessions.supportedCommands(ticketId);
+      return commands.ok ? ok({ ticketId, commands: commands.data }) : commands;
+    },
     'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
     'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
     'agent:getUsage': ({ ticketId }) => ok(usage.get(ticketId)),

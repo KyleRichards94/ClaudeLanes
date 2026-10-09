@@ -252,6 +252,7 @@ export function CardStatesSheet() {
         {composerStates.map((sample) => (
           <GalleryBlock key={sample.state} title={`Composer · ${sample.state}`} style={styles.wideBlock}>
             <ComposerView
+              ticketId="71273"
               skills={['code-review', 'commit']}
               controls={composerControls(sample.input)}
               text={sample.text}

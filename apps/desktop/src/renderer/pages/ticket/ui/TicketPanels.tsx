@@ -6,7 +6,6 @@ import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
 import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
-import { ModelEffortControls } from '@/features/change-model';
 import { MergeControls } from '@/features/merge-branches';
 import { useBranchStatus } from '@/shared/api';
 import { ErrorBoundary } from '@/shared/ui';
@@ -71,8 +70,8 @@ export function MergePanel({ ticket }: { ticket: AgentTicket }) {
 }
 
 /**
- * The Agents card (AL-250): the lead agent with its model and effort switchers (AL-172; a change
- * shows "Switching · next turn" until it applies) and the sub-agent tree with each one's status,
+ * The Agents card (AL-250): the lead agent (its model and effort switch in the composer footer, AL-259)
+ * and the sub-agent tree with each one's status,
  * line, model · effort and branch (AL-177, entities/sub-agent). The tree is read with
  * `agent:getSubagents` and kept current by `agent:subagent`; until it loads, the counts come from the
  * card's. The lead agent's tokens come from the live session usage (AL-113) when it has them.
@@ -96,7 +95,6 @@ export function AgentsPanel({ ticket, leadTokens, footer }: { ticket: AgentTicke
       }
     >
       <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={leadTokens && leadTokens > 0 ? leadTokens : (subAgents.data?.leadTokens ?? null)} />
-      <ModelEffortControls ticket={ticket} />
       {tree.length > 0 ? (
         <SubAgentList items={tree} lead={lead} />
       ) : subAgents.isError ? (

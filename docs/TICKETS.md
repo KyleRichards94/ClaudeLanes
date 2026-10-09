@@ -180,7 +180,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-256 | Expandable tool calls | E15 | M | — | done |
 | AL-257 | Usage strip and compaction | E15 | M | AL-250 | done |
 | AL-258 | Plan limits | E15 | M | — | done |
-| AL-259 | Composer parity | E15 | L | AL-250 | todo |
+| AL-259 | Composer parity | E15 | L | AL-250 | done |
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | todo |
 | AL-261 | Sub-agent transcripts | E15 | M | AL-256 | todo |
 | AL-262 | Thinking blocks | E15 | S | AL-255 | todo |
@@ -1305,7 +1305,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Composer; Kyle 2026-10-09 (Enter sends) · **Depends on:** AL-250
 - **Scope:** Enter sends, Shift+Enter adds a line. Typing `/` opens a menu of the repo's skills (`skills:list`) and the session's commands (`supportedCommands()`), filtered as you type. `@` opens a file picker over the worktree (git ls-files, fuzzy). Paste or drop images and files (sent as SDK image / document content; size limits with clear errors). Up-arrow recalls earlier messages for this ticket; drafts are kept per ticket in UI prefs. Model and effort pickers move into the composer footer. Skill chips, action buttons and the Steer now toggle get distinct styles (chips mono, actions buttons, toggle a real switch). Pause holds skill runs like other messages.
 - **Acceptance criteria:**
-  - [ ] Each behaviour above has a unit test; `composer.spec.ts` covers Enter, `/`, `@` and a pasted image.
+  - [x] Each behaviour above has a unit test; `composer.spec.ts` covers Enter, `/`, `@` and a pasted image.
 
 #### AL-260 · Permission prompts at the waiting row
 - **Design:** UXA Composer and permission prompts · **Depends on:** AL-256
@@ -2141,6 +2141,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D769 | AL-257: the usage strip in the header band shows the context bar (amber from 70%, red from 90%), tokens and cost, which supersedes AL-113's tooltip-only cost. Tokens move during a turn from the lead agent's assistant messages (`turnTokens`, once per API message), and the result folds them in. A `compact_boundary` system message becomes a `compact` output line and triggers a context measure; Compact in the Agent menu sends `/compact` as the next turn, which Claude Code runs as its slash command | The audit's usage gaps; the SDK already reports all three | 2026-10-09 |
 | D770 | The 10,000-event output load test counts commits, not wall time; its timeout is 30 s because a full parallel run tipped it over 5 s (AL-220) | It failed once under verify with the Markdown rows | 2026-10-09 |
 | D771 | AL-258: one plan-limits service reads every session's `rate_limit_event` into the 5-hour and 7-day windows (`agent:planLimits`, `agent:getPlanLimits`); reset times arrive as Unix seconds and are kept as epoch ms. `allowed_warning` raises one toast per window reset; `rejected` parks the ticket (its status says "Waiting for limit reset · resets 15:20") and a timer sends it a continue turn at the reset. The launch queue takes a `hold` reason: above `launchHoldPercent` (Settings, default 85) new launches queue with that reason and start on the next refresh; Start now ignores the hold. The meter (`shared/ui/plan-limits`) sits in the board header and the ticket header band and is hidden until a session reports limits, so API-key sign-ins never see it. The experimental `usage()` seed is not called: the first event fills the meter | Kyle: hold launches above 85%; the SDK's usage() is marked unstable | 2026-10-09 |
+| D772 | AL-259: Enter sends and Shift/Ctrl/Cmd+Enter add a line (Kyle, 2026-10-09). `/` at the start opens a completion menu of the repo's skills (`skills:list`), the ticket's own skills and the session's commands (`agent:listCommands` → `supportedCommands()`); `@` after a space lists worktree files (`git:listFiles`: `git ls-files --cached --others --exclude-standard`, every query word must match, shortest first, 50 at most). Attachments ride `agent:send` as base64 (5 files, 4 MB each, 8 MB together): images as image blocks, PDFs as document blocks, text files quoted in a text block; the echo names them. Up/Down recall the ticket's sent messages (in memory, 50); drafts live in the UI prefs (`composerDrafts`). The model and effort pickers moved into the composer footer (`ModelEffortControls compact`), handed in by the page; Apply model now is a button shown only while a change waits; Steer now is a Switch | The audit's composer gaps | 2026-10-09 |
+| D773 | Paste and drop are DOM listeners on the composer's node (`lib/files.web.ts`); the OS picker is a hidden input. React Native has no paste or drop events, and the app is web-only in Electron | No RN primitive for either | 2026-10-09 |
+| D774 | Kyle (2026-10-09): a PR review or "No ticket" card shows a green "Done" pill in its top-right corner once its agent finished: the session is idle or ended after producing output, with nothing waiting on the user. The ticket store now carries the session state from `agent:status`. Cards with a work item keep ADO's state there | The PR-comment actioner cards had an empty corner and no sign the agent was finished | 2026-10-09 |
+| D775 | Kyle (2026-10-09): tickets can be removed from the agent board — a chevron menu in the card's corner and "Remove from board…" in the ticket page's Agent menu open a confirm that ends the session, then calls `tickets:archive`; unmerged work is named and asked about again (`discardUnmerged`); merged branches can be deleted too. This is design §9 step 6's Archive, which had no UI (AL-264's Archive item is this) | Finished and abandoned tickets had no way off the board | 2026-10-09 |
 
 ---
 
@@ -2213,6 +2217,8 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | AL-255 and AL-256: Markdown with syntax colouring and Copy in the output; expandable tool rows with the full input, an inline Edit diff, the tool's output and a failed call's reason. |
 | 2026-10-09 | AL-257: usage strip with the context bar, live tokens and cost; compaction lines in the output and Compact in the Agent menu. |
 | 2026-10-09 | AL-258: plan limits from rate-limit events — header meter, warning toast, parked agents that resume at the reset, launches held above 85% of the 5-hour window (Settings). |
+| 2026-10-09 | AL-259: composer parity — Enter sends, / and @ completions, attachments, history, drafts, model and effort in the footer, distinct action styles. |
+| 2026-10-09 | Board asks from Kyle: a "Done" pill on finished review cards (session state on the ticket store), and Remove from board (card menu and Agent menu, over tickets:archive with the unmerged-work second confirm). |
 ---
 
 ## 7. Parallel build rules

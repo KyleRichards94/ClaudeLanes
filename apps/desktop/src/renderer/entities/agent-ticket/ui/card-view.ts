@@ -34,6 +34,17 @@ export interface CardView {
   footer: { tone: 'attention' | 'ado' | 'danger'; label: string } | null;
   /** "Design v2" once a spec was shipped; amber "Design v3 not yet used" until the agent acknowledges it (AL-200). */
   design: { label: string; tone: 'claude' | 'attention' } | null;
+  /**
+   * The top-right corner of a card without a work item state (a PR review or a "No ticket" ticket):
+   * "Done" once its agent finished (Kyle, 2026-10-09); null otherwise.
+   */
+  corner: { label: string; tone: 'ok' } | null;
+}
+
+/** A review or no-ticket agent has finished: its session is idle or ended after producing output. */
+export function agentFinished(ticket: Pick<AgentTicket, 'session' | 'lastOutputAt' | 'stage' | 'needsYou'>): boolean {
+  if (ticket.stage === 'queued' || ticket.needsYou.length > 0) return false;
+  return (ticket.session === 'idle' || ticket.session === 'stopped') && ticket.lastOutputAt !== null;
 }
 
 /** What a gate on each stage asks the user to approve ("Needs you · approve plan"). */
@@ -101,6 +112,7 @@ export function cardView(ticket: AgentTicket): CardView {
     modelLine: modelLine(ticket),
     subAgentsLine: total > 0 ? plural(total, 'sub-agent') : '—',
     design: designIndicator(ticket.design),
+    corner: ticket.ado === null && agentFinished(ticket) ? { label: 'Done', tone: 'ok' as const } : null,
   };
   const progress = ticket.progress ?? 0;
   const reason = ticket.needsYou[0];

@@ -17,6 +17,8 @@ import { agentTickets, type AgentTicketStore } from './store';
 export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHandlers {
   return {
     'agent:output': (events) => store.recordOutput(events),
+    // The session's state: a finished review agent's card says "Done" (Kyle, 2026-10-09).
+    'agent:status': (event) => store.setSession(event.ticketId, event.state),
     'agent:stage': (event) => {
       if (event.change === 'stage') {
         store.setStage(event.ticketId, event.stage, event.at);

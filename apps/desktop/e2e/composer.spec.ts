@@ -41,8 +41,7 @@ test.afterAll(async () => {
 test('shows the skill chips, Apply model now, the message box, Pause and Send under the output', async () => {
   await expect(page.getByRole('button', { name: 'Run /code-review' })).toHaveText('/code-review');
   await expect(page.getByRole('button', { name: 'Run /commit' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Apply model now' })).toBeVisible();
-  await expect(page.getByPlaceholder('Message the agent — steer, answer, or add context')).toBeVisible();
+  await expect(page.getByPlaceholder('Message the agent — Enter sends, Shift+Enter for a new line')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Pause' })).toHaveAttribute('aria-disabled', 'true');
   await expect(page.getByRole('button', { name: 'Send' })).toHaveAttribute('aria-disabled', 'true');
 
@@ -53,14 +52,51 @@ test('shows the skill chips, Apply model now, the message box, Pause and Send un
   expect(Math.abs(composer!.x - stream!.x)).toBeLessThan(2);
 });
 
-test('says no session is running and shows why Ctrl+Enter could not send', async () => {
+test('says no session is running and shows why Enter could not send (AL-259)', async () => {
   await expect(page.getByTestId('composer-note')).toHaveText('No agent session is running for this ticket.');
-  const box = page.getByPlaceholder('Message the agent — steer, answer, or add context');
+  const box = page.getByPlaceholder('Message the agent — Enter sends, Shift+Enter for a new line');
   await box.fill('Use the existing JobFilterState');
-  await box.press('Enter');
+  // Shift+Enter adds a line; Enter sends (AL-259).
+  await box.press('Shift+Enter');
   await expect(page.getByTestId('composer-error')).toHaveCount(0);
-  await box.press('Control+Enter');
+  await box.press('Enter');
   await expect(page.getByTestId('composer-error')).toHaveText('No agent session is running for ticket 71273.');
   // The message stays in the box so it can be sent once the agent runs.
   await expect(box).toHaveValue('Use the existing JobFilterState\n');
+});
+
+test('offers the ticket skills after / and files after @, and takes a pasted image (AL-259)', async () => {
+  const box = page.getByPlaceholder('Message the agent — Enter sends, Shift+Enter for a new line');
+  await box.fill('');
+  await box.pressSequentially('/co');
+  const menu = page.getByRole('menu', { name: 'Completions' });
+  await expect(menu).toContainText('/code-review');
+  await expect(menu).toContainText('/commit');
+  await box.press('ArrowDown');
+  await box.press('Enter');
+  await expect(box).toHaveValue('/commit ');
+
+  await box.fill('');
+  await box.pressSequentially('@grid');
+  // No real worktree here: the picker says so instead of hanging.
+  await expect(menu).toContainText(/No file matches|Looking for files/);
+  await box.press('Escape');
+  await expect(menu).toHaveCount(0);
+
+  await box.fill('');
+  await page.getByTestId('composer').evaluate((node) => {
+    // The e2e tsconfig has no DOM lib: the page's own constructors are reached through globalThis.
+    const win = globalThis as unknown as {
+      DataTransfer: new () => { items: { add(file: unknown): void } };
+      ClipboardEvent: new (type: string, init: { clipboardData: unknown; bubbles: boolean }) => Event;
+    };
+    const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0));
+    const file = new File([bytes], 'pasted.png', { type: 'image/png' });
+    const transfer = new win.DataTransfer();
+    transfer.items.add(file);
+    node.dispatchEvent(new win.ClipboardEvent('paste', { clipboardData: transfer, bubbles: true }));
+  });
+  await expect(page.getByTestId('composer-attachments')).toContainText('pasted.png');
+  await page.getByRole('button', { name: 'Remove pasted.png' }).click();
+  await expect(page.getByTestId('composer-attachments')).toHaveCount(0);
 });

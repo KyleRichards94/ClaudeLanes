@@ -246,16 +246,42 @@ export function skillCommand(skill: string): string {
   return `/${name}`;
 }
 
+/** Caps on what one message may carry (AL-259): base64 grows the bytes by a third, so these are generous but bounded. */
+export const ATTACHMENT_LIMITS = { count: 5, bytesEach: 4 * 1024 * 1024, bytesTotal: 8 * 1024 * 1024 } as const;
+
+/**
+ * A file sent with a message (AL-259): an image (as an image block), a PDF (a document block) or a
+ * text file (quoted in a text block). `data` is base64.
+ */
+export const AgentAttachmentSchema = z.object({
+  kind: z.enum(['image', 'document', 'text']),
+  name: z.string().min(1).max(200),
+  mediaType: z.string().min(1).max(100),
+  data: z.string().max(Math.ceil((ATTACHMENT_LIMITS.bytesEach * 4) / 3) + 4),
+});
+export type AgentAttachment = z.infer<typeof AgentAttachmentSchema>;
+
 /**
  * `agent:send`: a message from the composer, or a skill chip's `/skill-name`. `next` (default) is
  * delivered when the current turn ends, without stopping it; `now` ("steer now") at the next tool
- * boundary (D11).
+ * boundary (D11). `attachments` ride along as content blocks (AL-259).
  */
 export const SendMessageRequestSchema = z.strictObject({
   ticketId: TicketIdSchema,
   text: z.string().trim().min(1).max(AGENT_MESSAGE_LIMIT),
   priority: z.enum(['next', 'now']).optional(),
+  attachments: z.array(AgentAttachmentSchema).max(ATTACHMENT_LIMITS.count).optional(),
 });
+
+/** `agent:listCommands` (AL-259): the slash commands the ticket's live session lists, for the composer's `/` menu. */
+export const SessionCommandSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().max(1000),
+  argumentHint: z.string().max(200),
+});
+export type SessionCommand = z.infer<typeof SessionCommandSchema>;
+export const SessionCommandsSchema = z.object({ ticketId: TicketIdSchema, commands: z.array(SessionCommandSchema).max(2000) });
+export type SessionCommands = z.infer<typeof SessionCommandsSchema>;
 export type SendMessageRequest = z.input<typeof SendMessageRequestSchema>;
 
 /** `held`: the session is paused, so the message waits for Resume. */
@@ -505,6 +531,8 @@ export const agentInvokeContracts = {
   'agent:compact': { request: AgentTicketRequestSchema, response: SendMessageResponseSchema },
   /** The plan's 5-hour and 7-day windows as the sessions last reported them (AL-258). */
   'agent:getPlanLimits': { request: z.undefined(), response: PlanLimitsSchema },
+  /** The live session's slash commands (AL-259); an empty list when no session runs. */
+  'agent:listCommands': { request: AgentTicketRequestSchema, response: SessionCommandsSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

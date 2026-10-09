@@ -38,10 +38,11 @@ describe('composerControls (AL-176)', () => {
 });
 
 describe('isSendShortcut', () => {
-  it('is Ctrl+Enter (or Cmd+Enter), not plain Enter or Enter while composing', () => {
-    expect(isSendShortcut({ key: 'Enter', ctrlKey: true })).toBe(true);
-    expect(isSendShortcut({ key: 'Enter', metaKey: true })).toBe(true);
-    expect(isSendShortcut({ key: 'Enter' })).toBe(false);
+  it('is plain Enter; Shift, Ctrl and Cmd+Enter add a line, and nothing sends while composing (AL-259)', () => {
+    expect(isSendShortcut({ key: 'Enter' })).toBe(true);
+    expect(isSendShortcut({ key: 'Enter', shiftKey: true })).toBe(false);
+    expect(isSendShortcut({ key: 'Enter', ctrlKey: true })).toBe(false);
+    expect(isSendShortcut({ key: 'Enter', metaKey: true })).toBe(false);
     expect(isSendShortcut({ key: 'a', ctrlKey: true })).toBe(false);
     expect(isSendShortcut({ key: 'Enter', ctrlKey: true, isComposing: true })).toBe(false);
   });

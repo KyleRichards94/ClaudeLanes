@@ -1,4 +1,5 @@
 import type { AgentSessionState } from '@agent-lanes/contracts';
+import { isSendKey } from './completion';
 
 /** Session states with a live `claude` process that takes messages, pause and resume (AL-105). */
 const LIVE: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
@@ -64,7 +65,7 @@ function composerNote(state: AgentSessionState | undefined, held: number): strin
   }
 }
 
-/** Ctrl+Enter (or Cmd+Enter) sends; plain Enter types a new line. */
-export function isSendShortcut(event: { key: string; ctrlKey?: boolean; metaKey?: boolean; isComposing?: boolean }): boolean {
-  return event.key === 'Enter' && Boolean(event.ctrlKey || event.metaKey) && !event.isComposing;
+/** Enter sends; Shift+Enter, Ctrl+Enter and Cmd+Enter add a line (AL-259, as in Claude Code). */
+export function isSendShortcut(event: { key: string; shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean; isComposing?: boolean }): boolean {
+  return isSendKey(event);
 }

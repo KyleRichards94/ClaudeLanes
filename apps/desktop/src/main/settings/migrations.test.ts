@@ -38,7 +38,7 @@ const expectedV2: Settings = {
   },
   buildQueueSize: 2,
   adoStateTransitions: false,
-  ui: { lastRepo: repoPath, lastSprint: null, lastTeam: null, collapsedLanes: ['queued', 'done'], embedModeByTicket: {} },
+  ui: { lastRepo: repoPath, lastSprint: null, lastTeam: null, collapsedLanes: ['queued', 'done'], embedModeByTicket: {}, composerDrafts: {} },
 };
 
 describe('settings migration v1 → v2', () => {
@@ -87,7 +87,7 @@ describe('settings migration v1 → v2', () => {
 describe('settings saved before the board team (lastTeam)', () => {
   const savedBefore = {
     ...expectedV2,
-    ui: { lastRepo: repoPath, lastSprint: 'sprint-42', collapsedLanes: ['queued', 'done'], embedModeByTicket: {} },
+    ui: { lastRepo: repoPath, lastSprint: 'sprint-42', collapsedLanes: ['queued', 'done'], embedModeByTicket: {}, composerDrafts: {} },
   };
 
   it('load with lastTeam null, keep every other UI pref, and drop nothing', () => {
