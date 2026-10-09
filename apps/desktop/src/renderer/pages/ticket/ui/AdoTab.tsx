@@ -3,7 +3,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { formatPullRequestChecks, type PullRequestCheck, type PullRequestRef, type WorkItem, type WorkItemComment } from '@agent-lanes/contracts';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Pill, Text, type PillTone } from '@agent-lanes/ui';
-import { WorkItemChip, sprintNameOf, stateCategoryTone } from '@/entities/ado-work-item';
+import { WorkItemChip } from '@/entities/ado-work-item';
 import type { AgentTicket } from '@/entities/agent-ticket';
 import { usePullRequest, useWorkItem, useWorkItemComments } from '@/shared/api';
 import { RichText } from './RichText';
@@ -67,13 +67,14 @@ export function AdoTab({ ticket, pullRequestRef = null }: AdoTabProps) {
   );
 }
 
+/**
+ * The work item chip and the fields the header band's chip does not already show (AL-254): type, state,
+ * sprint and assignee live in the header; the tab adds the project and the area.
+ */
 function WorkItemFields({ item }: { item: WorkItem }) {
   const fields: [string, string][] = [
-    ['Type', item.type],
-    ['State', item.state],
-    ['Sprint', sprintNameOf(item.iterationPath) || '—'],
-    ['Assigned to', item.assignedTo?.displayName ?? 'Unassigned'],
     ['Project', item.project],
+    ['Iteration', item.iterationPath || '—'],
   ];
   return (
     <View style={styles.section} testID="ado-fields">
@@ -82,13 +83,9 @@ function WorkItemFields({ item }: { item: WorkItem }) {
         {fields.map(([label, value]) => (
           <View key={label} style={styles.field}>
             <Text variant="meta">{label}</Text>
-            {label === 'State' ? (
-              <Pill label={value} tone={stateCategoryTone(item.stateCategory)} dot />
-            ) : (
-              <Text variant="body" numberOfLines={1} selectable>
-                {value}
-              </Text>
-            )}
+            <Text variant="body" numberOfLines={1} selectable>
+              {value}
+            </Text>
           </View>
         ))}
       </View>

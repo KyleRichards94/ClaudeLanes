@@ -32,11 +32,13 @@ beforeEach(() => {
 });
 
 describe('resolve-gate (AL-104, AL-171, AL-220)', () => {
-  it('shows nothing until a gate waits, then names it', () => {
+  it('shows nothing until a gate waits, then names it and shows what the agent asked to approve', () => {
     renderGate();
     expect(gate()).toBeNull();
-    act(() => store.openGate(record.id, 'planning', 3_000));
+    act(() => store.openGate(record.id, 'planning', 3_000, 'Plan ready: JobGrid.razor replaces frmJobControl'));
     expect(screen.getByRole('group', { name: /^Planning gate: / })).toBeTruthy();
+    // The `set_stage` summary, so the user knows what they are approving (AL-254).
+    expect(screen.getByTestId(`gate-card-${record.id}-summary`).textContent).toBe('Plan ready: JobGrid.razor replaces frmJobControl');
   });
 
   it('asks what to change before sending Request changes, and sends the note as the decision', async () => {

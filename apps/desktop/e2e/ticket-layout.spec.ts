@@ -69,6 +69,22 @@ test('at 1100 × 800 the rail stacks under the panel and the transcript keeps at
   await expect(page.getByTestId('ticket-body-wide')).toBeVisible();
 });
 
+test('at 1100 × 800 the stepper stays on one row and no rail label is cut short (AL-254)', async () => {
+  await setContentSize(1100, 800);
+  await expect(page.getByTestId('ticket-body-stacked')).toBeVisible();
+  const steps = await Promise.all(['planning', 'implementing', 'code-review', 'qa', 'create-pr'].map((stage) => page.getByTestId(`stage-step-${stage}`).boundingBox()));
+  const tops = steps.map((box) => Math.round(box!.y));
+  expect(new Set(tops).size).toBe(1);
+  // Labels fit their buttons: the text is not ellipsised.
+  for (const name of ['Build', 'Run', 'Stop']) {
+    const label = page.getByTestId('build-run').getByRole('button', { name }).locator('span, div').filter({ hasText: name }).first();
+    await expect(label).toHaveText(name);
+  }
+  await expect(page.getByTestId('agent-effort').getByText('XHigh')).toBeVisible();
+  await setContentSize(1440, 900);
+  await expect(page.getByTestId('ticket-body-wide')).toBeVisible();
+});
+
 test('every control from the old panels is still reachable', async () => {
   for (const name of ['Build', 'Run', 'Stop']) await expect(page.getByTestId('build-run').getByRole('button', { name })).toBeVisible();
   await expect(page.getByTestId('merge-sub-branches')).toBeVisible();

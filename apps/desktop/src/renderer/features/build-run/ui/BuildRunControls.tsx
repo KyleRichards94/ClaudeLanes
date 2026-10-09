@@ -2,10 +2,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { color, minTarget, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import type { AgentTicket } from '@/entities/agent-ticket';
+import { useRepoCommands } from '@/shared/api';
 import { useBuildRunActions } from '../api/build-run';
 import { buildRunControls } from '../model/controls';
 
-type TicketSlice = Pick<AgentTicket, 'id' | 'build' | 'run'>;
+type TicketSlice = Pick<AgentTicket, 'id' | 'repo' | 'build' | 'run'>;
 
 export interface BuildRunControlsProps {
   ticket: TicketSlice;
@@ -18,10 +19,12 @@ export interface BuildRunControlsProps {
  */
 export function BuildRunControls({ ticket }: BuildRunControlsProps) {
   const actions = useBuildRunActions(ticket.id);
+  const commands = useRepoCommands(ticket.repo);
   const job = ticket.build.job;
   return (
     <BuildRunControlsView
       ticket={ticket}
+      runCommand={commands.data ? commands.data.run !== null : undefined}
       onBuild={() => actions.build.mutate()}
       onRun={() => actions.run.mutate()}
       onStop={(target) => {
@@ -40,6 +43,8 @@ export function BuildRunControls({ ticket }: BuildRunControlsProps) {
 
 export interface BuildRunControlsViewProps {
   ticket: Pick<AgentTicket, 'build' | 'run'>;
+  /** False when the repo has no run command (AL-254). */
+  runCommand?: boolean;
   onBuild(): void;
   onRun(): void;
   /** Stops the run, or cancels the queued or running build job. */
@@ -51,8 +56,8 @@ export interface BuildRunControlsViewProps {
 }
 
 /** The panel body without its actions, for the component gallery's Worktree panel states. */
-export function BuildRunControlsView({ ticket, onBuild, onRun, onStop, onOpen, pending = {} }: BuildRunControlsViewProps) {
-  const view = buildRunControls(ticket);
+export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onStop, onOpen, pending = {} }: BuildRunControlsViewProps) {
+  const view = buildRunControls(ticket, { runCommand });
   const stopTarget = view.stop.target;
 
   return (

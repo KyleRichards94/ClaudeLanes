@@ -14,6 +14,8 @@ body {
   color: var(--al-ink);
   font-family: var(--al-font-sans);
   -webkit-font-smoothing: antialiased;
+  /* No ligatures anywhere: "<=" in the agent's prose and code must read as it was written (AL-254). */
+  font-variant-ligatures: none;
 }
 
 #root {

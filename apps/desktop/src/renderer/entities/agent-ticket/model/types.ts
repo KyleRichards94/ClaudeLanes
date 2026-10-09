@@ -93,6 +93,8 @@ export interface AgentTicketGate {
   /** The gated stage whose approval is awaited, e.g. `planning` ("approve plan") or `create-pr` ("approve PR"). */
   readonly stage: Stage;
   readonly openedAt: number;
+  /** The agent's summary of what it asks to be approved ("Plan ready: …", AL-254); null when it gave none. */
+  readonly summary: string | null;
 }
 
 /**

@@ -143,7 +143,7 @@ describe('ticket changes', () => {
 
   it('keeps the approval reason in step with the gate', () => {
     const gated = withGateOpened(ticket(), 'planning', 10);
-    expect(gated.gate).toEqual({ stage: 'planning', openedAt: 10 });
+    expect(gated.gate).toEqual({ stage: 'planning', openedAt: 10, summary: null });
     expect(gated.needsYou).toEqual([{ kind: 'approval', stage: 'planning', since: 10 }]);
     expect(withGateOpened(gated, 'planning', 20)).toBe(gated);
 

@@ -25,8 +25,20 @@ export interface MergePanel {
 
 export type BranchStatusState = { status: 'pending' } | { status: 'error' } | { status: 'success'; data: BranchStatus };
 
+export interface MergePanelOptions {
+  /** The agent is in a turn (AL-254): merging the worktree now would race its edits, so Merge → main waits. */
+  agentBusy?: boolean;
+}
+
+export const AGENT_BUSY_REASON = 'The agent is mid-turn. Wait for it to finish, or stop it first.';
+
 function plural(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+/** "Merge sub-branches" with none to merge, else "Merge 3 sub-branches"; the target branch is shown under the button (AL-254). */
+export function subBranchesLabel(count: number): string {
+  return count === 0 ? 'Merge sub-branches' : `Merge ${plural(count, 'sub-branch', 'sub-branches')}`;
 }
 
 /** Ready (clean, its sub-agent finished), not merged yet, and with commits the ticket branch lacks. */
@@ -34,12 +46,12 @@ export function isMergeable(sub: SubBranchStatus): boolean {
   return sub.ready && sub.mergedAt === null && (sub.ahead ?? 0) > 0;
 }
 
-export function mergePanel(ticket: MergePanelTicket, state: BranchStatusState): MergePanel {
+export function mergePanel(ticket: MergePanelTicket, state: BranchStatusState, options: MergePanelOptions = {}): MergePanel {
   const subs = state.status === 'success' ? state.data.subBranches : [];
   const unmerged = subs.filter((sub) => sub.mergedAt === null);
   const readyCount = subs.filter(isMergeable).length;
   const shown = readyCount > 0 ? readyCount : unmerged.length;
-  const subLabel = `Merge ${plural(shown, 'sub-branch', 'sub-branches')} → ${ticket.branch}`;
+  const subLabel = subBranchesLabel(shown);
   const mainLabel = `Merge worktree → ${ticket.baseBranch}`;
 
   const shared = sharedReason(ticket, state);
@@ -56,7 +68,7 @@ export function mergePanel(ticket: MergePanelTicket, state: BranchStatusState): 
   const status = state.data;
   return {
     subBranches: { label: subLabel, disabledReason: readyCount > 0 ? null : nothingReadyReason(subs, unmerged) },
-    toMain: { label: mainLabel, disabledReason: mainReason(status, ticket) },
+    toMain: { label: mainLabel, disabledReason: options.agentBusy ? AGENT_BUSY_REASON : mainReason(status, ticket) },
     conflicted: false,
     readyCount,
   };

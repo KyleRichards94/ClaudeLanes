@@ -49,7 +49,7 @@ describe('subAgentRow (AL-177)', () => {
       status: 'queued',
       statusLabel: 'Queued',
       line: 'Starts at the Code review stage',
-      modelLine: 'Opus · XHigh',
+      modelLine: 'Inherits Opus · XHigh',
       branchLine: '—',
     });
     expect(subAgentRow(reviewer, { ...lead, stage: 'planning' }).line).toBe('Starts at the Code review stage');

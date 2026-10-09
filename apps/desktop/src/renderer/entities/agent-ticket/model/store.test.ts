@@ -118,7 +118,7 @@ describe('agent ticket store', () => {
 
     expect(ids(store, 'queued')).toEqual([]);
     expect(selectTicket(store.getState(), '71330')).toBeUndefined();
-    expect(selectTicket(store.getState(), '71322')?.gate).toEqual({ stage: 'planning', openedAt: 600 });
+    expect(selectTicket(store.getState(), '71322')?.gate).toEqual({ stage: 'planning', openedAt: 600, summary: null });
     expect(selectTicket(store.getState(), '71273')?.subAgents.running).toBe(3);
   });
 
