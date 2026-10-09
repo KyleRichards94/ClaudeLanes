@@ -23,6 +23,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:undoLaunch', // AL-237
   'agent:interrupt', // AL-253
   'agent:stop', // AL-253
+  'agent:compact', // AL-257
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

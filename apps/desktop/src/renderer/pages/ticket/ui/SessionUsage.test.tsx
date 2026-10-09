@@ -44,7 +44,9 @@ describe('session pill and lead agent tokens (AL-113)', () => {
 
     expect(await screen.findByText(/^Session cc-71273 · .* · 412k tokens$/)).toBeTruthy();
     expect((await screen.findByTestId('lead-agent-tokens')).textContent).toBe('212k tokens');
-    expect(screen.queryByText(/\$3\.46/)).toBeNull();
+    // The usage strip shows tokens, cost and the context bar at a glance (AL-257 supersedes AL-113's tooltip-only cost).
+    expect((await screen.findByTestId('usage-strip-label')).textContent).toBe('412k tokens · $3.46');
+    expect(screen.getByRole('progressbar', { name: 'Context window' }).getAttribute('aria-valuenow')).toBe('25');
 
     fireEvent.focus(screen.getByTestId('session-pill-anchor'));
     expect((await screen.findByRole('tooltip')).textContent).toBe('Cost about $3.46 · Context 25% of 200k · 7 turns');

@@ -21,6 +21,7 @@ import { AdoTab } from './AdoTab';
 import { DiffTab } from './DiffTab';
 import { StageStepper } from './StageStepper';
 import { TicketHeaderBand } from './TicketHeader';
+import { UsageStrip } from './UsageStrip';
 import { AgentsPanel, MergePanel, SubBranchesPanel, WorktreePanel } from './TicketPanels';
 
 export interface TicketPageProps {
@@ -107,7 +108,12 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           onReconnect: () => reconnect.mutate(undefined, { onError: (error) => toast({ id: `reconnect:${ticket.id}`, tone: 'error', title: "Couldn't reconnect", body: error.message }) }),
           reconnecting: reconnect.isPending,
         }}
-        trailing={<AgentMenu ticketId={ticket.id} />}
+        trailing={
+          <>
+            <UsageStrip usage={usage} />
+            <AgentMenu ticketId={ticket.id} />
+          </>
+        }
       />
     </ErrorBoundary>
   );

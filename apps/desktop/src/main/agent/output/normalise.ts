@@ -38,6 +38,8 @@ interface SpawnRow {
   rowId: string;
   toolUseIds: string[];
   names: string[];
+  /** Each sub-agent's prompt, for the expanded row (AL-256). */
+  prompts: string[];
 }
 
 type Block = { type: string; [key: string]: unknown };
@@ -123,6 +125,22 @@ function countsLine(errors: number | null, warnings: number | null): string {
   return [errors === null ? null : formatCount(errors, 'error'), warnings === null ? null : formatCount(warnings, 'warning')].filter(Boolean).join(' · ');
 }
 
+/** The full text of a tool call for the expanded row (AL-256): clipped to the text limit. */
+function clipText(text: string): string {
+  return clip(text, OUTPUT_TEXT_LIMIT);
+}
+
+/** A tool's input as readable JSON, for tools without a natural text form. */
+function inputJson(input: unknown): string | null {
+  if (input === null || input === undefined) return null;
+  if (typeof input === 'object' && Object.keys(input as object).length === 0) return null;
+  try {
+    return clipText(JSON.stringify(input, null, 2));
+  } catch {
+    return null;
+  }
+}
+
 function stringField(input: unknown, key: string): string | undefined {
   const value = (input as Record<string, unknown> | null | undefined)?.[key];
   return typeof value === 'string' ? value : undefined;
@@ -171,44 +189,67 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
         toolUses.set(id, 'hidden');
         return null;
       }
-      return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'mcp', label: 'MCP', detail: clip(`${server} · ${rest.join('__')}`), stats: null, parentToolUseId }, name);
+      return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'mcp', label: 'MCP', detail: clip(`${server} · ${rest.join('__')}`), stats: null, input: inputJson(input), edit: null, parentToolUseId }, name);
     }
 
     switch (name) {
-      case 'Read':
-        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'read', label: 'Read', detail: clip(displayPath(stringField(input, 'file_path'))), stats: null, parentToolUseId }, name);
+      case 'Read': {
+        const path = displayPath(stringField(input, 'file_path'));
+        const fields = input as Record<string, unknown> | null | undefined;
+        const span = ['offset', 'limit']
+          .filter((key) => typeof fields?.[key] === 'number')
+          .map((key) => `${key} ${String(fields?.[key])}`)
+          .join(', ');
+        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'read', label: 'Read', detail: clip(path), stats: null, input: span ? `${path} (${span})` : null, edit: null, parentToolUseId }, name);
+      }
       case 'Edit': {
-        const { added, removed } = lineChange(stringField(input, 'old_string') ?? '', stringField(input, 'new_string') ?? '');
-        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'edit', label: 'Edit', detail: clip(displayPath(stringField(input, 'file_path'))), stats: formatLineChange(added, removed), parentToolUseId }, name);
+        const before = stringField(input, 'old_string') ?? '';
+        const after = stringField(input, 'new_string') ?? '';
+        const { added, removed } = lineChange(before, after);
+        return remember(
+          id,
+          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'edit', label: 'Edit', detail: clip(displayPath(stringField(input, 'file_path'))), stats: formatLineChange(added, removed), input: null, edit: { before: clipText(before), after: clipText(after) }, parentToolUseId },
+          name,
+        );
       }
       case 'MultiEdit':
       case 'NotebookEdit':
         return remember(
           id,
-          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'edit', label: 'Edit', detail: clip(displayPath(stringField(input, 'file_path') ?? stringField(input, 'notebook_path'))), stats: null, parentToolUseId },
+          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'edit', label: 'Edit', detail: clip(displayPath(stringField(input, 'file_path') ?? stringField(input, 'notebook_path'))), stats: null, input: inputJson(input), edit: null, parentToolUseId },
           name,
         );
-      case 'Write':
+      case 'Write': {
+        const content = stringField(input, 'content') ?? '';
         return remember(
           id,
-          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'write', label: 'Write', detail: clip(displayPath(stringField(input, 'file_path'))), stats: formatLineChange(lineCount(stringField(input, 'content') ?? ''), 0), parentToolUseId },
+          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'write', label: 'Write', detail: clip(displayPath(stringField(input, 'file_path'))), stats: formatLineChange(lineCount(content), 0), input: null, edit: { before: '', after: clipText(content) }, parentToolUseId },
           name,
         );
-      case 'Bash':
-        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'bash', label: 'Bash', detail: firstLine(stringField(input, 'command') ?? ''), stats: null, parentToolUseId }, name);
+      }
+      case 'Bash': {
+        const command = stringField(input, 'command') ?? '';
+        const description = stringField(input, 'description');
+        return remember(
+          id,
+          { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'bash', label: 'Bash', detail: firstLine(command), stats: null, input: clipText(description ? `${command}\n# ${description}` : command), edit: null, parentToolUseId },
+          name,
+        );
+      }
       case 'Grep':
       case 'Glob': {
         const where = stringField(input, 'path');
         const detail = `${stringField(input, 'pattern') ?? ''}${where ? ` in ${displayPath(where)}` : ''}`;
-        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: name === 'Grep' ? 'grep' : 'glob', label: name, detail: clip(detail), stats: null, parentToolUseId }, name);
+        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: name === 'Grep' ? 'grep' : 'glob', label: name, detail: clip(detail), stats: null, input: inputJson(input), edit: null, parentToolUseId }, name);
       }
       case 'Agent':
       case 'Task': {
         // Sub-agents started in one assistant message share one Spawn row ("explore · razor-writer · test-writer").
         const key = `${parentToolUseId ?? ''}:${messageId}`;
-        const row = spawnRows.get(key) ?? { rowId: `spawn:${id}`, toolUseIds: [], names: [] };
+        const row = spawnRows.get(key) ?? { rowId: `spawn:${id}`, toolUseIds: [], names: [], prompts: [] };
         row.toolUseIds.push(id);
         row.names.push(spawnName(input));
+        row.prompts.push(`${spawnName(input)}: ${stringField(input, 'prompt') ?? stringField(input, 'description') ?? ''}`.trim());
         spawnRows.set(key, row);
         return remember(
           id,
@@ -220,6 +261,8 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
             label: 'Spawn',
             detail: clip(row.names.join(' · ')),
             stats: formatCount(row.toolUseIds.length, 'sub-agent'),
+            input: clipText(row.prompts.join('\n\n')),
+            edit: null,
             parentToolUseId,
           },
           name,
@@ -227,7 +270,7 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
       }
       default: {
         const detail = ['skill', 'url', 'query', 'command', 'description', 'prompt', 'file_path'].map((key) => stringField(input, key)).find(Boolean) ?? '';
-        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'other', label: clip(name, 100), detail: firstLine(detail), stats: null, parentToolUseId }, name);
+        return remember(id, { kind: 'tool', rowId: id, toolUseIds: [id], tool: 'other', label: clip(name, 100), detail: firstLine(detail), stats: null, input: inputJson(input), edit: null, parentToolUseId }, name);
       }
     }
   }
@@ -266,6 +309,16 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
       default:
         return null;
     }
+  }
+
+  /** What the expanded row shows as the tool's output: a Bash call's stdout and stderr when structured, else the result text. */
+  function resultOutput(use: ToolUse, text: string, structured: unknown): string {
+    const data = structured as Record<string, unknown> | undefined;
+    if (use.tool === 'bash' && data) {
+      const parts = [data['stdout'], data['stderr']].filter((part): part is string => typeof part === 'string' && part.trim() !== '');
+      if (parts.length > 0) return parts.join('\n');
+    }
+    return text;
   }
 
   function assistantItems(message: Extract<SDKMessage, { type: 'assistant' }>): AgentOutputItem[] {
@@ -324,6 +377,7 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
         isError: block['is_error'] === true,
         summary: firstLine(text),
         stats: resultStats(use, text, structured),
+        output: clipText(resultOutput(use, text, structured)),
         parentToolUseId: use.parentToolUseId,
       });
     }
@@ -349,6 +403,13 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
           return assistantItems(message);
         case 'user':
           return toolResultItems(message);
+        case 'system':
+          // A compaction (AL-257): the Output tab draws a line where the context was folded.
+          if (message.subtype === 'compact_boundary') {
+            const meta = message.compact_metadata;
+            return [{ kind: 'compact', trigger: meta.trigger === 'manual' ? 'manual' : 'auto', preTokens: Math.max(0, Math.round(meta.pre_tokens ?? 0)), postTokens: typeof meta.post_tokens === 'number' ? Math.max(0, Math.round(meta.post_tokens)) : null, parentToolUseId: null }];
+          }
+          return [];
         case 'result':
           return [
             {

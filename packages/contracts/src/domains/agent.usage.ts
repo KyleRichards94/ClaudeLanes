@@ -38,6 +38,13 @@ export const AgentUsageSchema = z.object({
   cacheCreationInputTokens: TokenCountSchema,
   /** The lead agent's own tokens: the main loop's per-turn `usage`, summed over turns (Lead agent card). */
   leadTokens: TokenCountSchema,
+  /**
+   * Tokens of the turn in progress, from its assistant messages so far (AL-257): the usage strip adds
+   * them to `totalTokens` while the turn runs; 0 once the result has folded them in. Absent on older senders.
+   */
+  turnTokens: TokenCountSchema.default(0),
+  /** How often the context was compacted this session (AL-257). Absent on older senders. */
+  compactions: z.int().nonnegative().default(0),
   /** Sub-agents' tokens from their assistant messages, oldest first. */
   subagents: z.array(SubagentUsageSchema).max(500),
   /** Estimated USD (`total_cost_usd`); shown in a tooltip only. */
@@ -64,6 +71,8 @@ export function emptyAgentUsage(ticketId: string): AgentUsage {
     cacheReadInputTokens: 0,
     cacheCreationInputTokens: 0,
     leadTokens: 0,
+    turnTokens: 0,
+    compactions: 0,
     subagents: [],
     costUsd: 0,
     turns: 0,

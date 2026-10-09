@@ -19,13 +19,15 @@ const PROSE_LINE_PX = 22;
 export const OUTPUT_ROW_GAP = 10;
 
 /** A first guess at a row's height, before it is measured. */
-export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH): number {
+export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH, expanded = false): number {
   switch (row.type) {
     case 'tool':
-      return 38 + OUTPUT_ROW_GAP;
+      // An open row shows its input and output (AL-256): a guess until it is measured.
+      return (expanded ? 38 + 240 : 38) + OUTPUT_ROW_GAP;
     case 'system':
     case 'failed':
     case 'turn-end':
+    case 'compact':
       return 18 + OUTPUT_ROW_GAP;
     case 'user': {
       const perLine = Math.max(Math.floor((width * 0.8) / CHAR_PX), 20);

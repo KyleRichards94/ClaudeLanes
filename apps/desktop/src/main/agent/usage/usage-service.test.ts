@@ -142,3 +142,36 @@ describe('usage service (AL-113)', () => {
     expect(sessions.listeners.size).toBe(0);
   });
 });
+
+/** A lead-agent assistant message with its API usage (AL-257); the same id twice is one message streamed in parts. */
+function assistantWithUsage(id: string, tokens: { input_tokens: number; output_tokens: number }): SDKMessage {
+  return {
+    type: 'assistant',
+    message: { id, type: 'message', role: 'assistant', model: 'claude-opus-5-5', content: [{ type: 'text', text: 'working' }], stop_reason: null, usage: tokens },
+    parent_tool_use_id: null,
+    uuid: `u-${id}-${Math.random()}`,
+    session_id: 's-1',
+  } as unknown as SDKMessage;
+}
+
+describe('live turn tokens and compaction (AL-257)', () => {
+  it('counts the turn in progress once per API message, folds it into the result, and counts compactions', () => {
+    const sessions = fakeSessions();
+    const contextUsage = { totalTokens: 40_000, maxTokens: 200_000, percentage: 20 };
+    const { emit, of } = recordingEmit();
+    createUsageService({ sessions: { ...sessions, contextUsage: async () => ({ ok: true, data: contextUsage }) }, emit });
+    const usageOf = () => of('agent:usage', '71273').at(-1)?.['usage'] as AgentUsage;
+
+    sessions.deliver('71273', assistantWithUsage('m1', { input_tokens: 1_000, output_tokens: 200 }));
+    sessions.deliver('71273', assistantWithUsage('m1', { input_tokens: 1_000, output_tokens: 200 }));
+    expect(usageOf().turnTokens).toBe(1_200);
+    sessions.deliver('71273', assistantWithUsage('m2', { input_tokens: 500, output_tokens: 100 }));
+    expect(usageOf().turnTokens).toBe(1_800);
+
+    sessions.deliver('71273', result({ modelUsage: { 'claude-opus-5-5': { inputTokens: 1_500, outputTokens: 300, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 } }, total_cost_usd: 0.1 }));
+    expect(usageOf()).toMatchObject({ turnTokens: 0, totalTokens: 1_800, turns: 1 });
+
+    sessions.deliver('71273', { type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 160_000, post_tokens: 40_000 }, uuid: 'c1', session_id: 's' } as unknown as SDKMessage);
+    expect(usageOf().compactions).toBe(1);
+  });
+});

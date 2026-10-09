@@ -178,8 +178,17 @@ describe('output normalisation: artboard 3 tool rows from SDK messages', () => {
     ].flatMap((message) => normaliser.normalise(message));
 
     expect(items).toEqual([
-      { kind: 'tool', rowId: 'toolu_ado', toolUseIds: ['toolu_ado'], tool: 'mcp', label: 'MCP', detail: 'azure-devops · wit_get_work_item', stats: null, parentToolUseId: null },
-      { kind: 'tool-result', rowId: 'toolu_ado', toolUseId: 'toolu_ado', isError: true, summary: 'TF401232: Work item 71273 does not exist …', stats: null, parentToolUseId: null },
+      { kind: 'tool', rowId: 'toolu_ado', toolUseIds: ['toolu_ado'], tool: 'mcp', label: 'MCP', detail: 'azure-devops · wit_get_work_item', stats: null, input: '{\n  "id": 71273\n}', edit: null, parentToolUseId: null },
+      {
+        kind: 'tool-result',
+        rowId: 'toolu_ado',
+        toolUseId: 'toolu_ado',
+        isError: true,
+        summary: 'TF401232: Work item 71273 does not exist …',
+        stats: null,
+        output: 'TF401232: Work item 71273 does not exist\nmore detail',
+        parentToolUseId: null,
+      },
     ]);
   });
 
@@ -243,5 +252,23 @@ describe("the user's own messages read back from a saved session (AL-251)", () =
     expect(normaliser.normalise(user('   '))).toEqual([]);
     // A sub-agent's prompt belongs to its tree, not the Output tab.
     expect(normaliser.normalise(user('Explore the forms', { parent_tool_use_id: 'toolu_spawn' }))).toEqual([]);
+  });
+});
+
+describe('full inputs and outputs for the expanded row (AL-256)', () => {
+  it('carries the whole command and its description, an Edit’s before and after, and a result’s text', () => {
+    const normaliser = createOutputNormaliser({ cwd: WORKTREE });
+    const [bash] = normaliser.normalise(toolUse('m1', 'tb', 'Bash', { command: 'dotnet test OnSite.Tests --filter JobGrid', description: 'Run the grid tests' }));
+    expect(bash).toMatchObject({ kind: 'tool', input: 'dotnet test OnSite.Tests --filter JobGrid\n# Run the grid tests', edit: null });
+    const [edit] = normaliser.normalise(toolUse('m2', 'te', 'Edit', { file_path: join(WORKTREE, 'A.cs'), old_string: 'a < b', new_string: 'a <= b' }));
+    expect(edit).toMatchObject({ kind: 'tool', input: null, edit: { before: 'a < b', after: 'a <= b' } });
+    const [write] = normaliser.normalise(toolUse('m3', 'tw', 'Write', { file_path: join(WORKTREE, 'B.cs'), content: 'x\ny\n' }));
+    expect(write).toMatchObject({ kind: 'tool', edit: { before: '', after: 'x\ny\n' } });
+    const [grep] = normaliser.normalise(toolUse('m4', 'tg', 'Grep', { pattern: 'Due', path: WORKTREE }));
+    expect(grep).toMatchObject({ kind: 'tool', input: expect.stringContaining('"pattern": "Due"') });
+    const [result] = normaliser.normalise(toolResult('tb', 'Passed!\nFailed: 0', { stdout: 'Passed!\nFailed: 0', stderr: 'warn: slow' }));
+    expect(result).toMatchObject({ kind: 'tool-result', output: 'Passed!\nFailed: 0\nwarn: slow' });
+    const [plain] = normaliser.normalise(toolResult('te', 'The file has been updated.'));
+    expect(plain).toMatchObject({ kind: 'tool-result', output: 'The file has been updated.' });
   });
 });

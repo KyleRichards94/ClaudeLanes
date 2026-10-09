@@ -69,7 +69,8 @@ const OutputItemBase = z.object({
  * - `system`: a line from the app ("Plan approved by Kyle · moved to Implementing");
  * - `user`: what the user sent: a composer message, a skill command, the launch job or a hand-over
  *   brief (AL-251); the app's own turns ("Continue where you left off.") are not shown;
- * - `result`: a turn ended: usage, cost and duration.
+ * - `result`: a turn ended: usage, cost and duration;
+ * - `compact`: the context was compacted (AL-257), by the agent or the user, from `preTokens` to `postTokens`.
  */
 export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
   OutputItemBase.extend({
@@ -95,6 +96,13 @@ export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
     detail: OutputLineSchema,
     /** `+214 −0`, `1,842 lines`, `0 errors · 2 warnings`, `3 sub-agents`; null until known. */
     stats: OutputLineSchema.nullable(),
+    /**
+     * The call's full input for the expanded row (AL-256): the whole command, the pattern and path,
+     * a sub-agent's prompt, or the input as JSON for other tools. Clipped; null when there is nothing beyond `detail`.
+     */
+    input: z.string().max(OUTPUT_TEXT_LIMIT).nullable().optional(),
+    /** An Edit or Write's text before and after, for the inline diff (AL-256); null for other tools. */
+    edit: z.object({ before: z.string().max(OUTPUT_TEXT_LIMIT), after: z.string().max(OUTPUT_TEXT_LIMIT) }).nullable().optional(),
   }),
   OutputItemBase.extend({
     kind: z.literal('tool-result'),
@@ -105,10 +113,18 @@ export const AgentOutputItemSchema = z.discriminatedUnion('kind', [
     summary: OutputLineSchema,
     /** Replaces the row's stats when not null. */
     stats: OutputLineSchema.nullable(),
+    /** What the tool returned, or its error, for the expanded row (AL-256); clipped. Absent on older buffers. */
+    output: z.string().max(OUTPUT_TEXT_LIMIT).optional(),
   }),
   OutputItemBase.extend({
     kind: z.literal('system'),
     text: OutputLineSchema,
+  }),
+  OutputItemBase.extend({
+    kind: z.literal('compact'),
+    trigger: z.enum(['auto', 'manual']),
+    preTokens: z.int().nonnegative(),
+    postTokens: z.int().nonnegative().nullable(),
   }),
   OutputItemBase.extend({
     kind: z.literal('user'),
@@ -484,6 +500,8 @@ export const agentInvokeContracts = {
   'agent:interrupt': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** End session (AL-253): closes the session and its `claude` process; the worktree and branch stay. `stopped` false when none was live. */
   'agent:stop': { request: AgentTicketRequestSchema, response: StopSessionResponseSchema },
+  /** Compact (AL-257): asks the live session to compact its context now (`/compact` as the next turn). */
+  'agent:compact': { request: AgentTicketRequestSchema, response: SendMessageResponseSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.

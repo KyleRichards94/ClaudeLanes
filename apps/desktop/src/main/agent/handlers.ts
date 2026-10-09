@@ -2,6 +2,9 @@ import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS } fr
 import type { HandlersFor } from '../ipc/handle-invoke';
 import type { Services } from '../services';
 
+/** What Compact sends (AL-257): Claude Code's own slash command, typed as the next turn. */
+export const COMPACT_COMMAND = '/compact';
+
 /** The `agent:*` invoke channels (AL-100 onwards), served by the session manager. */
 export function createAgentHandlers({
   sessions,
@@ -49,6 +52,8 @@ export function createAgentHandlers({
       const interrupted = await sessions.interrupt(ticketId);
       return interrupted.ok ? ok(launches.status(ticketId)) : interrupted;
     },
+    // Compact (AL-257): Claude Code runs /compact as a slash command from the next user turn.
+    'agent:compact': ({ ticketId }) => sessions.send(ticketId, { text: COMPACT_COMMAND, priority: 'next', source: 'app' }),
     // End session (AL-253): a queued launch is taken out of the queue; a live session is closed.
     'agent:stop': async ({ ticketId }) => {
       const dequeued = launches.cancel(ticketId);
