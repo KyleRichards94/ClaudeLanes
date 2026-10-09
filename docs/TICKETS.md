@@ -184,7 +184,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | done |
 | AL-261 | Sub-agent transcripts | E15 | M | AL-256 | done |
 | AL-262 | Thinking blocks | E15 | S | AL-255 | done |
-| AL-263 | Assign new agent | E15 | L | AL-253 | todo |
+| AL-263 | Assign new agent | E15 | L | AL-253 | in-progress |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
 | AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
 | AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
@@ -2231,6 +2231,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | AL-260: permission prompts at the waiting row — inline prompt with the full input, compact copy at the top while scrolled away, Deny with a reason the agent reads, Always allow saving `Bash(<prefix>:*)` / tool-name rules on the repo (Settings: Allowed without asking), fake claude `ask` step and permissions.spec.ts. |
 | 2026-10-09 | AL-261: sub-agent transcripts — rows nest under their Spawn row (latest line when closed), cards show tokens and Stop (`agent:stopSubagent` / `stopTask`), a card click scrolls the output to its row; fake claude `spawn` and `bash` steps; subagents.spec.ts. |
 | 2026-10-09 | AL-262: thinking blocks — `thinking` output items from the SDK's thinking blocks and deltas, collapsed muted rows in the stream, and a Show thinking switch in the Agent menu (UI pref). |
+| 2026-10-09 | AL-263 started: the hand-over brief builder, the assign service (`createAssignAgentService`) and the `features/assign-agent` slice (modal, api, draft model) with unit tests are on branch `wip/AL-263` (commit 36583a0), not yet wired: `agent:assign` contract and channel, `pastSessions` / `job` on the ticket record, session-manager saving the job, transcript history over past sessions, `stages.moveTo`, services/handlers wiring, TicketPage (menu item, Agents card footer, session pill button), TicketHeader `onAssign`, and `assign-agent.spec.ts` remain. |
 ---
 
 ## 7. Parallel build rules
