@@ -156,3 +156,35 @@ describe('concurrency cap and Queued lane (AL-111)', () => {
     await sessions.dispose();
   });
 });
+
+describe('plan-limit hold (AL-258)', () => {
+  it('queues new launches with the hold reason, lifts the hold on refresh, and lets Start now through', async () => {
+    let hold: string | null = 'Waiting for plan limit · 5-hour window at 87%';
+    const fake = createFakeClaude(() => ({ live: true, messages: [fakeInit('session-h')] }));
+    const tickets = await memoryTickets({ id: '1', repo: join(SESSION_TEST_BASE, 'a') }, { id: '2', repo: join(SESSION_TEST_BASE, 'a') });
+    const events = recordingEmit();
+    const sessions = createSessionManager({
+      claude: createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query }),
+      connections: fakeClaudeConnections(),
+      tickets,
+      emit: events.emit,
+    });
+    const launches = createLaunchQueue({ sessions, tickets, maxAgents: () => 3, hold: () => hold, emit: events.emit });
+
+    const queued = await launches.launch({ ticketId: '1', jobDescription: 'go' });
+    expect(queued).toMatchObject({ ok: true, data: { state: 'queued', message: 'Waiting for plan limit · 5-hour window at 87%' } });
+    expect(launches.queued(join(SESSION_TEST_BASE, 'a'))).toEqual(['1']);
+
+    // Start now ignores the hold.
+    await launches.launch({ ticketId: '2', jobDescription: 'go' });
+    expect(launches.queued(join(SESSION_TEST_BASE, 'a'))).toEqual(['1', '2']);
+    await launches.startNow('2');
+    await eventually(() => sessions.status('2').state === 'running');
+
+    hold = null;
+    await launches.refresh();
+    await eventually(() => sessions.status('1').state === 'running');
+    expect(launches.queued(join(SESSION_TEST_BASE, 'a'))).toEqual([]);
+    await sessions.dispose();
+  });
+});

@@ -56,6 +56,8 @@ async function setup() {
     // Launch from the team board (AL-236) has its own tests.
     adoLauncher: {} as Services['adoLauncher'],
     launchUndo: {} as Services['launchUndo'],
+    // Plan limits (AL-258) have their own tests.
+    planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
   });
   await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
   const call = fake.calls[0]!;

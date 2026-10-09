@@ -6,6 +6,7 @@ import { StageGatesSchema } from './settings.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
 import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema, UndoLaunchRequestSchema, UndoLaunchResponseSchema } from './agent.launch-from-ado';
+import { PlanLimitsEventSchema, PlanLimitsSchema } from './agent.plan-limits';
 import type { AGENT_EVENT_CHANNELS, AGENT_INVOKE_CHANNELS } from './agent.names';
 
 // ── Session manager (AL-100, design §4 Session manager, §7) ───────────────────────────────────────
@@ -502,6 +503,8 @@ export const agentInvokeContracts = {
   'agent:stop': { request: AgentTicketRequestSchema, response: StopSessionResponseSchema },
   /** Compact (AL-257): asks the live session to compact its context now (`/compact` as the next turn). */
   'agent:compact': { request: AgentTicketRequestSchema, response: SendMessageResponseSchema },
+  /** The plan's 5-hour and 7-day windows as the sessions last reported them (AL-258). */
+  'agent:getPlanLimits': { request: z.undefined(), response: PlanLimitsSchema },
 } as const satisfies Record<(typeof AGENT_INVOKE_CHANNELS)[number], InvokeContract>;
 
 // Event payloads start as the ticket envelope `{ ticketId, at }` (AL-012); the owning tickets add their fields.
@@ -589,4 +592,5 @@ export const agentEventContracts = {
   'agent:mcpStatus': McpStatusEventSchema,
   'agent:permission': AgentPermissionEventSchema,
   'agent:model': AgentModelEventSchema,
+  'agent:planLimits': PlanLimitsEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

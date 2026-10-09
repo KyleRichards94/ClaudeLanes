@@ -7,6 +7,7 @@ import {
   createDesignSpecEventHandlers,
   designThreadEventHandlers,
   mcpStatusEventHandlers,
+  planLimitsEventHandlers,
 } from '@/shared/api';
 import { subAgentEventHandlers } from '@/entities/sub-agent';
 import { permissionEventHandlers } from '@/features/resolve-permission';
@@ -45,6 +46,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(createDesignSpecEventHandlers(queryClient)), [queryClient]);
   // `agent:mcpStatus` keeps the header's MCP pill current (AL-108).
   useEffect(() => runningEventHub()?.register(mcpStatusEventHandlers(queryClient)), [queryClient]);
+  // `agent:planLimits` keeps the plan-limits meter current (AL-258).
+  useEffect(() => runningEventHub()?.register(planLimitsEventHandlers(queryClient)), [queryClient]);
   // `agent:permission` keeps each ticket's waiting permission request current (AL-109).
   useEffect(() => runningEventHub()?.register(permissionEventHandlers(queryClient)), [queryClient]);
   // `agent:subagent` → the ticket's cached sub-agent tree (AL-177).

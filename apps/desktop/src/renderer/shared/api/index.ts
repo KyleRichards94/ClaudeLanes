@@ -54,6 +54,7 @@ export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards'
 export { reconnectSession, useCompactSession, useInterruptTurn, useReconnectSession, useStopSession } from './agent-session';
 export { createDesignSpecEventHandlers, designSpecQueryKey, useDesignSpec, useReshipDesignSpec, useShipDesignSpec } from './design-specs';
 export { mcpStatusEventHandlers, mcpStatusQueryKey, useMcpStatus } from './mcp-status';
+export { planLimitsEventHandlers, planLimitsQueryKey, usePlanLimits } from './plan-limits';
 export { fetchWorktreePreview, useWorktreePreview, worktreePreviewQueryKey } from './worktrees';
 export {
   designThreadEventHandlers,

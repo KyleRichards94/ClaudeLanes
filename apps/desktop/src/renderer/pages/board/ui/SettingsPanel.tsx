@@ -236,6 +236,15 @@ function DefaultsSection({ draft, errors, dispatch }: SectionProps) {
         error={errors['buildQueueSize']}
         testID="settings-build-queue-size"
       />
+      <TextField
+        label="Hold new launches above this share of the 5-hour plan window (%)"
+        value={draft.launchHoldPercent}
+        onChangeText={(value) => dispatch({ type: 'text', field: 'launchHoldPercent', value })}
+        inputMode="numeric"
+        help="Launches wait in Queued while the plan's 5-hour window is at or over this; 100 turns the hold off. Start now still starts one."
+        error={errors['launchHoldPercent']}
+        testID="settings-launch-hold-percent"
+      />
       <Switch
         label="Move work items to the next state in Azure DevOps"
         value={draft.adoStateTransitions}

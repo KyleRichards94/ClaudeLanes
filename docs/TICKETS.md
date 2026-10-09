@@ -179,7 +179,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-255 | Markdown in the output | E15 | M | — | done |
 | AL-256 | Expandable tool calls | E15 | M | — | done |
 | AL-257 | Usage strip and compaction | E15 | M | AL-250 | done |
-| AL-258 | Plan limits | E15 | M | — | todo |
+| AL-258 | Plan limits | E15 | M | — | done |
 | AL-259 | Composer parity | E15 | L | AL-250 | todo |
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | todo |
 | AL-261 | Sub-agent transcripts | E15 | M | AL-256 | todo |
@@ -1296,10 +1296,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Usage and limits; Kyle 2026-10-09 (85% threshold) · **Depends on:** —
 - **Scope:** Main reads `rate_limit_event` from every session into one plan-limits store (5-hour and weekly utilisation, reset times, status) and emits `agent:planLimits`; on start it seeds from the experimental `usage()` call when available, tolerating its absence. App header shows a compact meter with reset times. `allowed_warning` raises a warning toast once per window; `rejected` marks affected agents "Waiting for limit reset · resets 15:20" instead of failing, and resumes them at the reset. The launch queue holds new launches while 5-hour use is above 85% (setting, default 85, shown in the queued note). API-key sign-ins hide the meter.
 - **Acceptance criteria:**
-  - [ ] Meter shows both windows with reset times from fake events.
-  - [ ] A `rejected` event parks the agent and it resumes after the reset (fake clock).
-  - [ ] A launch above 85% queues with the reason; it starts when use drops or on Start now.
-  - [ ] Store, queue and toast unit tests.
+  - [x] Meter shows both windows with reset times from fake events.
+  - [x] A `rejected` event parks the agent and it resumes after the reset (fake clock).
+  - [x] A launch above 85% queues with the reason; it starts when use drops or on Start now.
+  - [x] Store, queue and toast unit tests.
 
 #### AL-259 · Composer parity
 - **Design:** UXA Composer; Kyle 2026-10-09 (Enter sends) · **Depends on:** AL-250
@@ -2140,6 +2140,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D768 | AL-256: tool items carry the call's full input (the command and its description, a sub-agent's prompt, or the input as JSON), an Edit or Write's before and after, and the result's text (a Bash call's stdout and stderr when structured); all optional on the contract so older buffers still read. Open rows are kept in a store per ticket and row key, so they survive virtualisation and leaving the ticket; the diff is a line LCS of the Edit's old and new strings | The audit's expand-a-tool-call gap | 2026-10-09 |
 | D769 | AL-257: the usage strip in the header band shows the context bar (amber from 70%, red from 90%), tokens and cost, which supersedes AL-113's tooltip-only cost. Tokens move during a turn from the lead agent's assistant messages (`turnTokens`, once per API message), and the result folds them in. A `compact_boundary` system message becomes a `compact` output line and triggers a context measure; Compact in the Agent menu sends `/compact` as the next turn, which Claude Code runs as its slash command | The audit's usage gaps; the SDK already reports all three | 2026-10-09 |
 | D770 | The 10,000-event output load test counts commits, not wall time; its timeout is 30 s because a full parallel run tipped it over 5 s (AL-220) | It failed once under verify with the Markdown rows | 2026-10-09 |
+| D771 | AL-258: one plan-limits service reads every session's `rate_limit_event` into the 5-hour and 7-day windows (`agent:planLimits`, `agent:getPlanLimits`); reset times arrive as Unix seconds and are kept as epoch ms. `allowed_warning` raises one toast per window reset; `rejected` parks the ticket (its status says "Waiting for limit reset · resets 15:20") and a timer sends it a continue turn at the reset. The launch queue takes a `hold` reason: above `launchHoldPercent` (Settings, default 85) new launches queue with that reason and start on the next refresh; Start now ignores the hold. The meter (`shared/ui/plan-limits`) sits in the board header and the ticket header band and is hidden until a session reports limits, so API-key sign-ins never see it. The experimental `usage()` seed is not called: the first event fills the meter | Kyle: hold launches above 85%; the SDK's usage() is marked unstable | 2026-10-09 |
 
 ---
 
@@ -2211,6 +2212,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | AL-254: the audit's bug fixes (log error counts, sideways log scrolling, one-row stepper, gate summary, Merge → main mid-turn, Run without a command, merge labels, ADO tab duplicates, ligatures, held skills, inherited model and same-worktree sub-agent rows, unmeasured context). |
 | 2026-10-09 | AL-255 and AL-256: Markdown with syntax colouring and Copy in the output; expandable tool rows with the full input, an inline Edit diff, the tool's output and a failed call's reason. |
 | 2026-10-09 | AL-257: usage strip with the context bar, live tokens and cost; compaction lines in the output and Compact in the Agent menu. |
+| 2026-10-09 | AL-258: plan limits from rate-limit events — header meter, warning toast, parked agents that resume at the reset, launches held above 85% of the 5-hour window (Settings). |
 ---
 
 ## 7. Parallel build rules

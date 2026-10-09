@@ -157,6 +157,8 @@ test('agent:getUsage reports no tokens for a ticket whose session has not run (A
       cacheReadInputTokens: 0,
       cacheCreationInputTokens: 0,
       leadTokens: 0,
+      turnTokens: 0,
+      compactions: 0,
       subagents: [],
       costUsd: 0,
       turns: 0,

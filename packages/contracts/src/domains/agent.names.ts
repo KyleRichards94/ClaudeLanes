@@ -24,6 +24,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:interrupt', // AL-253
   'agent:stop', // AL-253
   'agent:compact', // AL-257
+  'agent:getPlanLimits', // AL-258
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',
@@ -35,4 +36,5 @@ export const AGENT_EVENT_CHANNELS = [
   'agent:mcpStatus', // AL-108
   'agent:permission', // AL-109
   'agent:model', // AL-106
+  'agent:planLimits', // AL-258
 ] as const;

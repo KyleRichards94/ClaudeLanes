@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_LAUNCH_HOLD_PERCENT } from './agent.plan-limits';
 import type { InvokeContract } from '../contract';
 import {
   EffortSchema,
@@ -164,8 +165,18 @@ export const SettingsSchema = z.object({
   agentPermissions: AgentPermissionsSchema.optional(),
   /** Settings › Drops (AL-240): each kind of team board drop's skills, model and effort. Unset is TB§3's (`dropDefaultsOf`). */
   dropDefaults: DropDefaultsSchema.optional(),
+  /**
+   * New launches wait in Queued while the plan's 5-hour window is at or over this share (AL-258);
+   * 100 turns the hold off. Optional so settings saved before it stay valid; unset is DEFAULT_LAUNCH_HOLD_PERCENT.
+   */
+  launchHoldPercent: z.int().min(0).max(100).optional(),
 });
 export type Settings = z.infer<typeof SettingsSchema>;
+
+/** The 5-hour share above which launches wait: the saved value, else 85 (Kyle, 2026-10-09). */
+export function launchHoldPercentOf(settings: Pick<Settings, 'launchHoldPercent'>): number {
+  return settings.launchHoldPercent ?? DEFAULT_LAUNCH_HOLD_PERCENT;
+}
 
 /** The permission policy in force: the saved one, or the D18 default when none was saved. */
 export function agentPermissionPolicy(settings: Pick<Settings, 'agentPermissions'>): AgentPermissions {
@@ -184,6 +195,7 @@ export const SettingsPatchSchema = z.strictObject({
   agentPermissions: AgentPermissionsSchema.optional(),
   /** Every row at once, as the Drops tab saves them. */
   dropDefaults: DropDefaultsSchema.optional(),
+  launchHoldPercent: z.int().min(0).max(100).optional(),
   ui: z.strictObject(UiPrefsSchema.shape).partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;

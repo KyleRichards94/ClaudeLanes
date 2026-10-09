@@ -18,7 +18,8 @@ export function createAgentHandlers({
   launches,
   adoLauncher,
   launchUndo,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  planLimits,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -35,6 +36,7 @@ export function createAgentHandlers({
     'agent:pause': ({ ticketId }) => sessions.pause(ticketId),
     'agent:resume': ({ ticketId }) => sessions.resume(ticketId),
     'agent:getUsage': ({ ticketId }) => ok(usage.get(ticketId)),
+    'agent:getPlanLimits': () => ok(planLimits.get()),
     'agent:getMcpStatus': () => ok(mcpStatus.summary()),
     'agent:resolvePermission': ({ ticketId, requestId, decision }) => ok({ resolved: permissions.resolve(ticketId, requestId, decision) }),
     'agent:getPermission': ({ ticketId }) => ok({ request: permissions.pending(ticketId) }),

@@ -39,6 +39,11 @@ export interface LaunchQueueOptions {
   tickets: Pick<TicketRecordStore, 'get'>;
   /** The repo's `maxConcurrentAgents` setting, read at each decision. */
   maxAgents: (repo: string) => number;
+  /**
+   * Why a new launch should wait whatever the cap (AL-258: the plan's 5-hour window is nearly used),
+   * or null. Read at each decision; "Start now" ignores it.
+   */
+  hold?: () => string | null;
   emit: Emit;
   log?: Pick<Logger, 'info' | 'warn'>;
 }
@@ -53,6 +58,8 @@ interface Waiting {
   repo: string;
   sessionId: string | null;
   onStarted?: () => void;
+  /** Queued by the plan-limit hold (AL-258), with its reason; undefined when queued at the cap. */
+  held?: string;
 }
 
 export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
@@ -96,7 +103,7 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
     ticketId: entry.request.ticketId,
     state: 'queued',
     sessionId: entry.sessionId,
-    message: QUEUED_MESSAGE,
+    message: entry.held ?? QUEUED_MESSAGE,
   });
 
   function enqueue(entry: Waiting, front = false): AgentSessionStatus {
@@ -104,7 +111,7 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
     else waiting.push(entry);
     const status = queuedStatus(entry);
     emit('agent:status', status);
-    log?.info(`Queued ticket ${entry.request.ticketId}: ${entry.repo} is at its cap of ${cap(entry.repo)} agents`);
+    log?.info(entry.held ? `Queued ticket ${entry.request.ticketId}: ${entry.held}` : `Queued ticket ${entry.request.ticketId}: ${entry.repo} is at its cap of ${cap(entry.repo)} agents`);
     return status;
   }
 
@@ -122,8 +129,19 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
 
   /** Starts the oldest waiting launches of each repo while the repo has a free slot. Runs inside `serial`. */
   async function drain(): Promise<void> {
+    const hold = options.hold?.() ?? null;
     for (let index = 0; index < waiting.length; ) {
       const entry = waiting[index]!;
+      // A plan-limit hold keeps everything waiting; a lifted hold starts the held launches like any other.
+      if (hold !== null) {
+        if (entry.held !== hold) {
+          entry.held = hold;
+          emit('agent:status', queuedStatus(entry));
+        }
+        index += 1;
+        continue;
+      }
+      if (entry.held !== undefined) delete entry.held;
       if ((await liveIn(entry.repo)) >= cap(entry.repo)) {
         index += 1;
         continue;
@@ -133,7 +151,7 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
     }
   }
 
-  async function admit(request: SessionStartRequest, front: boolean, onStarted?: () => void): Promise<Result<AgentSessionStatus>> {
+  async function admit(request: SessionStartRequest, front: boolean, onStarted?: () => void, ignoreHold = false): Promise<Result<AgentSessionStatus>> {
     const { ticketId } = request;
     const already = waiting.find((entry) => entry.request.ticketId === ticketId);
     if (already) return ok(queuedStatus(already));
@@ -142,6 +160,8 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
     // An unknown ticket: the session manager says so.
     if (repo === null) return sessions.start(request);
     const entry: Waiting = { request, repo, sessionId: sessions.status(ticketId).sessionId, ...(onStarted ? { onStarted } : {}) };
+    const hold = ignoreHold ? null : (options.hold?.() ?? null);
+    if (hold !== null) return ok(enqueue({ ...entry, held: hold }, front));
     // FIFO: a new launch waits behind the ones already queued for its repo.
     const ahead = !front && waiting.some((other) => other.repo === repo);
     if (ahead || (await liveIn(repo)) >= cap(repo)) return ok(enqueue(entry, front));
@@ -155,7 +175,7 @@ export function createLaunchQueue(options: LaunchQueueOptions): LaunchQueue {
     startNow: (ticketId) =>
       serial(async () => {
         const entry = take(ticketId);
-        if (!entry) return admit({ ticketId }, false);
+        if (!entry) return admit({ ticketId }, false, undefined, true);
         log?.info(`Starting queued ticket ${ticketId} now, over the cap`);
         return startEntry(entry);
       }),

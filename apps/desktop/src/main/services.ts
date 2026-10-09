@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, agentPermissionPolicy, dropDefaultsOf, dropKindOf } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, agentPermissionPolicy, dropDefaultsOf, dropKindOf, launchHoldPercentOf } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -14,6 +14,7 @@ import { createPermissionService, sdkPermissionMode, type PermissionService } fr
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
+import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
 import { createBuildContext } from './agent/build-context';
 import { sdkStageServer, stageSessionExtras } from './agent/stages/stage-server';
 import { createStageService, type StageService } from './agent/stages/stage-service';
@@ -135,6 +136,8 @@ export interface Services {
   readonly recovery: SessionRecovery;
   /** Per-repo cap on running agents and the Queued lane: every session start goes through it (AL-111). */
   readonly launches: LaunchQueue;
+  /** The plan's 5-hour and 7-day windows from every session's rate-limit events; holds launches and parks rejected agents (AL-258). */
+  readonly planLimits: PlanLimitsService;
   /** Ticket branch vs base and sub-branches vs the ticket branch: ahead/behind, dirty, ready (AL-085). */
   readonly branches: BranchStatusService;
   /** Merge worktree → main: merges the ticket branch into its base, pushes, moves the card to Done (AL-087). */
@@ -190,7 +193,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -213,7 +216,7 @@ export function createServices(options: ServiceOptions): Services {
       // A larger queue size starts waiting jobs straight away.
       if (result.ok) {
         buildQueue.refresh();
-        // A raised agent cap starts queued launches (AL-111).
+        // A raised agent cap, or a changed plan-limit threshold, starts queued launches (AL-111, AL-258).
         void launches.refresh();
         // A new permission mode reaches running agents too, not only new sessions.
         const mode = agentPermissionMode(agentPermissionPolicy(result.data));
@@ -409,9 +412,20 @@ export function createServices(options: ServiceOptions): Services {
     tickets,
     // The repo's `maxConcurrentAgents` (default 3, Q5), read at each decision.
     maxAgents: (repo) => settings.get().repos.find((item) => item.path === repo)?.maxConcurrentAgents ?? DEFAULT_MAX_CONCURRENT_AGENTS,
+    // Above the plan-limit threshold new launches wait (AL-258); `planLimits` is created just below.
+    hold: () => late.planLimits?.holdReason() ?? null,
     emit: options.emit,
     log: log.child('agent'),
   });
+  const planLimits = createPlanLimitsService({
+    sessions,
+    emit: options.emit,
+    holdPercent: () => launchHoldPercentOf(settings.get()),
+    // A changed window may lift or start the hold on queued launches.
+    onChange: () => void launches.refresh(),
+    log: log.child('agent'),
+  });
+  late.planLimits = planLimits;
   const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
@@ -475,6 +489,7 @@ export function createServices(options: ServiceOptions): Services {
     permissions,
     recovery,
     launches,
+    planLimits,
     branches,
     mergeToMain,
     ticketArchive,
@@ -508,6 +523,7 @@ export async function disposeServices(services: Services): Promise<void> {
   services.credentialFailures.dispose();
   services.subagents.dispose();
   services.usage.dispose();
+  services.planLimits.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.
   await services.runs.dispose();
   await services.buildQueue.dispose();
