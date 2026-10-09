@@ -95,7 +95,7 @@ async function backlogSetup(client: AdoClient, project: string, team: TeamRef, c
   for (const mapping of config.workItemTypeMappedStates ?? []) {
     for (const [state, category] of Object.entries(mapping.states)) if (/^(completed|removed)$/i.test(category)) closedStates.add(state);
   }
-  const iteration = settings.data.backlogIteration;
+  const backlogIteration = await backlogIterationPath(client, project, settings.data.backlogIteration, call);
   return ok({
     team,
     types,
@@ -103,9 +103,73 @@ async function backlogSetup(client: AdoClient, project: string, team: TeamRef, c
     orderField: config.backlogFields?.typeFields?.['Order'] ?? DEFAULT_ORDER_FIELD,
     closedStates: [...closedStates],
     area: teamFieldClause(teamField.data),
-    // ADO answers the root iteration with an empty path; work items name it by the project.
-    backlogIteration: iteration.path?.replace(/^\\+/, '') || iteration.name,
+    backlogIteration,
   });
+}
+
+const iterationNodeSchema: z.ZodType<IterationNode> = z.lazy(() =>
+  z.object({
+    identifier: z.string().nullish(),
+    name: z.string(),
+    path: z.string().nullish(),
+    children: z.array(iterationNodeSchema).nullish(),
+  }),
+);
+interface IterationNode {
+  identifier?: string | null | undefined;
+  name: string;
+  path?: string | null | undefined;
+  children?: IterationNode[] | null | undefined;
+}
+
+/** How deep the iteration tree is read when the backlog iteration's path has to be looked up. */
+const ITERATION_TREE_DEPTH = 10;
+
+/**
+ * The team's backlog iteration as WIQL names it (`Development\Team Liink`). Azure DevOps Services
+ * returns its `path` in the team settings; Azure DevOps Server (REST 6.x) leaves it out and gives only
+ * the name and id, and WIQL refuses the bare name (TF51011). Then the id is looked up in the project's
+ * iteration tree, whose `\Development\Iteration\Team Liink` paths drop the `Iteration` segment in
+ * WIQL. If that read fails, `project\name` is the best guess. Never throws.
+ */
+export async function backlogIterationPath(
+  client: AdoClient,
+  project: string,
+  iteration: { id?: string | null | undefined; name: string; path?: string | null | undefined },
+  call: TeamCallOptions,
+): Promise<string> {
+  // ADO answers the root iteration with an empty path; work items name it by the project.
+  const given = iteration.path?.replace(/^\\+/, '');
+  if (given) return given;
+  if (iteration.name.toLowerCase() === project.trim().toLowerCase()) return iteration.name;
+
+  if (iteration.id) {
+    const tree = await client.get(adoPath`/${project.trim()}/_apis/wit/classificationnodes/iterations`, iterationNodeSchema, {
+      ...call,
+      query: { $depth: ITERATION_TREE_DEPTH },
+    });
+    if (tree.ok) {
+      const found = findNode(tree.data, iteration.id.toLowerCase());
+      if (found?.path) return wiqlIterationPath(found.path);
+    }
+  }
+  return `${project.trim()}\\${iteration.name}`;
+}
+
+function findNode(node: IterationNode, id: string): IterationNode | undefined {
+  if (node.identifier?.toLowerCase() === id) return node;
+  for (const child of node.children ?? []) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/** `\Development\Iteration\Team Liink` → `Development\Team Liink`; the root `\Development\Iteration` → `Development`. */
+export function wiqlIterationPath(nodePath: string): string {
+  const segments = nodePath.split('\\').filter(Boolean);
+  if (segments[1]?.toLowerCase() === 'iteration') segments.splice(1, 1);
+  return segments.join('\\');
 }
 
 /** The backlog query: the team's open stories, bugs and tasks, every filter ANDed, in backlog order. */
