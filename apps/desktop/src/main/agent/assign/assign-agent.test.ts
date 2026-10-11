@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ok, type AgentSessionStatus, type AgentTranscript } from '@agent-lanes/contracts';
+import type { SessionStartRequest } from '../session-manager';
 import { memoryTickets } from '../testing/sessions';
 import { HAND_OVER_ECHO, SESSION_REPLACED_MESSAGE, createAssignAgentService, newAgentLine } from './assign-agent';
 import { HAND_OVER_HEADING } from './hand-over-brief';
@@ -18,7 +19,7 @@ async function setup(options: { state?: AgentSessionStatus['state']; sessionId?:
     ],
   };
   const sessions = { status: vi.fn(() => status(options.state ?? 'running', options.sessionId === undefined ? 'session-a' : options.sessionId)), stop: vi.fn(async () => ok(options.state === 'none' ? false : true)) };
-  const launches = { launch: vi.fn(async () => ok(status('running', 'session-b'))), cancel: vi.fn(() => false) };
+  const launches = { launch: vi.fn(async (_request: SessionStartRequest) => ok(status('running', 'session-b'))), cancel: vi.fn(() => false) };
   const transcripts = { get: vi.fn(async () => transcript), appendSystem: vi.fn() };
   const stages = { pendingGate: vi.fn(() => null), moveTo: vi.fn(async () => ok({ from: 'planning' as const, to: 'implementing' as const, changed: true })) };
   const service = createAssignAgentService({ sessions, launches, tickets, transcripts, stages, now: () => 5_000 });
@@ -44,10 +45,10 @@ describe('assign new agent (AL-263)', () => {
     });
     expect(transcripts.appendSystem).toHaveBeenCalledWith('71273', 'New agent · Sonnet · High · handed over');
 
-    const launch = launches.launch.mock.calls[0]![0] as { jobDescription: string; firstTurnSource: string; firstTurnEcho?: string; workItem: unknown };
+    const launch = launches.launch.mock.calls[0]![0];
     expect(launch.firstTurnSource).toBe('hand-over');
     expect(launch.firstTurnEcho).toBe(HAND_OVER_ECHO);
-    expect(launch.jobDescription.startsWith(`${HAND_OVER_HEADING}: you are taking over`)).toBe(true);
+    expect(launch.jobDescription?.startsWith(`${HAND_OVER_HEADING}: you are taking over`)).toBe(true);
     expect(launch.jobDescription).toContain('The original job:\nCut it over.');
     expect(launch.jobDescription).toContain('Half the grid is wired.');
     expect(launch.workItem).toEqual({ id: 71273, title: 'Cutover frmJobControl to Blazor' });
@@ -58,7 +59,7 @@ describe('assign new agent (AL-263)', () => {
     const result = await service.assign({ ticketId: '71273', model: 'opus', effort: 'max', skills: [], stage: 'implementing', mode: 'fresh' });
     expect(result.ok).toBe(true);
     expect(stages.moveTo).toHaveBeenCalledWith('71273', 'implementing', 'the new agent');
-    const launch = launches.launch.mock.calls[0]![0] as { jobDescription: string; firstTurnSource: string; firstTurnEcho?: string };
+    const launch = launches.launch.mock.calls[0]![0];
     expect(launch).toMatchObject({ jobDescription: 'Cut it over.', firstTurnSource: 'launch' });
     expect(launch.firstTurnEcho).toBeUndefined();
     expect((await tickets.get('71273'))?.pastSessions).toHaveLength(1);

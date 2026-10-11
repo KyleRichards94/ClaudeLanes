@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, type PressableInstance } from 'react-na
 import { color, radius, space } from '@agent-lanes/tokens';
 import { Icon } from '@agent-lanes/ui';
 import { useAgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
+import { AssignAgentModal } from '@/features/assign-agent';
 import { RemoveTicketModal } from '@/features/remove-ticket';
 import { ChangeStateModal, MoveStageModal, TICKET_MENU, ViewDescriptionModal, ticketMenuItems } from '@/features/ticket-actions';
 import { useConnections, useOpenWorktree, useReconnectSession, useTicketRecord, useWorkItem, type AdoOrgId } from '@/shared/api';
@@ -24,7 +25,7 @@ export interface TicketContextMenuProps {
   testID?: string;
 }
 
-type Dialog = 'description' | 'ado-state' | 'move-stage' | 'remove' | null;
+type Dialog = 'description' | 'ado-state' | 'move-stage' | 'assign' | 'remove' | null;
 
 /**
  * The card's context menu (AL-270): right-click, the Menu key or the corner chevron. The page
@@ -65,6 +66,9 @@ export function TicketContextMenu({ ticketId, store, anchor, onClose, testID = `
       case TICKET_MENU.moveStage:
         setDialog('move-stage');
         return;
+      case TICKET_MENU.assign:
+        setDialog('assign');
+        return;
       case TICKET_MENU.resume:
         reconnect.mutate(undefined, { onError: fail("Couldn't resume the session") });
         return;
@@ -96,6 +100,7 @@ export function TicketContextMenu({ ticketId, store, anchor, onClose, testID = `
         </>
       ) : null}
       <MoveStageModal visible={dialog === 'move-stage'} ticketId={ticketId} title={ticket.title} stage={ticket.stage} onClose={() => setDialog(null)} />
+      <AssignAgentModal ticketId={ticketId} skills={record?.skills ?? []} visible={dialog === 'assign'} onClose={() => setDialog(null)} />
       <RemoveTicketModal ticketId={ticketId} visible={dialog === 'remove'} onClose={() => setDialog(null)} />
     </>
   );

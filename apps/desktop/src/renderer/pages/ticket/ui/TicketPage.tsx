@@ -9,6 +9,7 @@ import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
 import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
 import { MoveStageModal } from '@/features/ticket-actions';
+import { ASSIGN_AGENT_KEY, AssignAgentModal } from '@/features/assign-agent';
 import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
@@ -99,6 +100,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const [removing, setRemoving] = useState(false);
   const showThinking = useShowThinking();
   const [movingStage, setMovingStage] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   // A sub-agent card opens its output in the stream, or stops it (AL-261).
   const stopSubagent = useStopSubagent(ticket.id);
   const subAgentActions = {
@@ -133,6 +135,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           status,
           onReconnect: () => reconnect.mutate(undefined, { onError: (error) => toast({ id: `reconnect:${ticket.id}`, tone: 'error', title: "Couldn't reconnect", body: error.message }) }),
           reconnecting: reconnect.isPending,
+          onAssign: () => setAssigning(true),
         }}
         trailing={
           <>
@@ -141,6 +144,8 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             <AgentMenu
               ticketId={ticket.id}
               extraItems={[
+                // Assign new agent (AL-263): ends this agent and starts another in the same worktree.
+                { key: ASSIGN_AGENT_KEY, label: 'Assign new agent…', detail: 'Ends this agent and starts another here, with a hand-over brief or fresh.', icon: 'add-agent', section: 'Agent' },
                 // Move to stage… (AL-264, AL-270): the user's own lane move; the agent is told at its next turn.
                 { key: MOVE_STAGE_KEY, label: 'Move to stage…', detail: `Now ${LANE_LABELS[ticket.stage]}`, icon: 'branch', section: 'Agent' },
                 { key: SHOW_THINKING_KEY, label: 'Show thinking', detail: "The agent's reasoning, collapsed in the output.", icon: 'thinking', selected: showThinking, section: 'Output' },
@@ -150,10 +155,12 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
                 if (key === REMOVE_TICKET_KEY) setRemoving(true);
                 else if (key === SHOW_THINKING_KEY) useUiPrefs.getState().setShowThinking(!showThinking);
                 else if (key === MOVE_STAGE_KEY) setMovingStage(true);
+                else if (key === ASSIGN_AGENT_KEY) setAssigning(true);
               }}
             />
             <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
             <MoveStageModal visible={movingStage} ticketId={ticket.id} title={ticket.title} stage={ticket.stage} onClose={() => setMovingStage(false)} />
+            <AssignAgentModal ticketId={ticket.id} skills={record?.skills ?? []} visible={assigning} onClose={() => setAssigning(false)} />
           </>
         }
       />
@@ -234,7 +241,12 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       {ticket.stage === 'create-pr' || ticket.pullRequest || record?.pullRequest ? <CreatePullRequestPanel ticket={ticket} saved={record?.pullRequest} /> : null}
       <WorktreePanel ticket={ticket} />
       <MergePanel ticket={ticket} />
-      <AgentsPanel actions={subAgentActions} ticket={ticket} leadTokens={usage?.leadTokens} />
+      <AgentsPanel
+        actions={subAgentActions}
+        ticket={ticket}
+        leadTokens={usage?.leadTokens}
+        footer={<Button size="sm" variant="secondary" icon="add-agent" label="Assign new agent" onPress={() => setAssigning(true)} testID="assign-agent-open" />}
+      />
       <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
     </View>
   );

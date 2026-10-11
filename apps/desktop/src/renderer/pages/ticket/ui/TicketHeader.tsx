@@ -25,6 +25,8 @@ export interface TicketHeaderBandProps {
     status?: AgentSessionStatus;
     onReconnect?: () => void;
     reconnecting?: boolean;
+    /** A lost or ended session also offers Assign new agent (AL-263). */
+    onAssign?: () => void;
   };
   /** Controls right of the session pill: the usage strip and the Agent menu (AL-253, AL-257). */
   trailing?: ReactNode;
@@ -101,7 +103,7 @@ export const SESSION_PILL_STATES: Readonly<Record<AgentSessionState, { tone: Pil
   lost: { tone: 'danger', word: 'lost' },
 };
 
-function SessionPill({ id, startedAt, now, usage, status, onReconnect, reconnecting }: NonNullable<TicketHeaderBandProps['session']>) {
+function SessionPill({ id, startedAt, now, usage, status, onReconnect, reconnecting, onAssign }: NonNullable<TicketHeaderBandProps['session']>) {
   const [open, setOpen] = useState(false);
   const state = status?.state ?? (id ? 'idle' : 'none');
   const view = SESSION_PILL_STATES[state];
@@ -134,6 +136,7 @@ function SessionPill({ id, startedAt, now, usage, status, onReconnect, reconnect
         ) : null}
       </Pressable>
       {ended && onReconnect ? <Button size="sm" variant="primary" icon="refresh" label="Reconnect" onPress={onReconnect} loading={reconnecting} testID="session-reconnect" /> : null}
+      {ended && onAssign ? <Button size="sm" variant="secondary" icon="add-agent" label="Assign new agent" onPress={onAssign} testID="session-assign" /> : null}
     </View>
   );
 }

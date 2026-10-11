@@ -196,3 +196,25 @@ describe('what the app sent the session (AL-251)', () => {
     ]);
   });
 });
+
+describe('past sessions (AL-263)', () => {
+  const saved = (uuid: string, content: string): SessionMessage => ({
+    type: 'assistant',
+    uuid,
+    session_id: 'session-past',
+    message: { id: `m-${uuid}`, role: 'assistant', content: [{ type: 'text', text: content }] },
+    parent_tool_use_id: null,
+    parent_agent_id: null,
+  });
+
+  it('reads the output of the sessions a hand-over ended before the current one, oldest first', async () => {
+    const history = vi.fn(async (sessionId: string) => (sessionId === 'session-old' ? [saved('o1', 'the first agent said')] : [saved('n1', 'the second agent said')]));
+    const { sessions, tickets, transcripts } = await setup({ history });
+    await tickets.update('71273', (record) => ({ ...record, sessionId: 'session-new', pastSessions: [{ sessionId: 'session-old', model: 'opus', effort: 'xhigh', endedAt: 5, reason: 'assigned' }] }));
+
+    sessions.deliver('71273', text('live now', 'live'), true);
+    const transcript = await transcripts.get('71273');
+    expect(history.mock.calls.map((call) => call[0])).toEqual(['session-old', 'session-new']);
+    expect(transcript.events.map((event) => (event.item.kind === 'text' ? event.item.text : ''))).toEqual(['the first agent said', 'the second agent said', 'live now']);
+  });
+});

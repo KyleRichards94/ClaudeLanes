@@ -138,6 +138,16 @@ export const TicketDesignSchema = z.object({
 });
 export type TicketDesign = z.infer<typeof TicketDesignSchema>;
 
+/** A session Assign new agent ended (AL-263), kept so its output can still be read back. */
+export const TicketPastSessionSchema = z.object({
+  sessionId: z.string().min(1).max(200),
+  model: ModelSchema,
+  effort: EffortSchema,
+  endedAt: EpochMsSchema,
+  reason: z.enum(['assigned']),
+});
+export type TicketPastSession = z.infer<typeof TicketPastSessionSchema>;
+
 /** What a review or comment-actioner agent did on its pull request (AL-269). */
 export const TicketPrActivitySchema = z.object({
   comments: z.int().nonnegative(),
@@ -188,6 +198,10 @@ export const TicketRecordSchema = z
     pullRequest: TicketPullRequestSchema.nullable().optional(),
     /** PR comments posted and threads settled by the ticket's agents (AL-269); absent before any. */
     prActivity: TicketPrActivitySchema.nullable().optional(),
+    /** Sessions Assign new agent ended (AL-263), oldest first; absent before any. */
+    pastSessions: z.array(TicketPastSessionSchema).max(50).optional(),
+    /** "What should the agent do?" as the launch gave it (AL-263), so a new agent can start fresh from it; absent on older records. */
+    job: z.string().max(20_000).optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

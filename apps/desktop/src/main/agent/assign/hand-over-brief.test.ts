@@ -38,6 +38,7 @@ const diff: GitDiff = {
     { path: 'assets/logo.png', oldPath: null, status: 'added', additions: null, deletions: null, binary: true },
   ],
   truncated: false,
+  totals: { files: 3, additions: 217, deletions: 40 },
 };
 
 describe('hand-over brief (AL-263)', () => {

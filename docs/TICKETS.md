@@ -184,7 +184,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-260 | Permission prompts at the waiting row | E15 | M | AL-256 | done |
 | AL-261 | Sub-agent transcripts | E15 | M | AL-256 | done |
 | AL-262 | Thinking blocks | E15 | S | AL-255 | done |
-| AL-263 | Assign new agent | E15 | L | AL-253 | in-progress |
+| AL-263 | Assign new agent | E15 | L | AL-253 | done |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
 | AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
 | AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
@@ -1342,10 +1342,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Agent control; Kyle 2026-10-09 (hand over is the default) · **Depends on:** AL-253
 - **Scope:** "Assign new agent" in the Agent ▾ menu and the rail's Agents card (and on a lost or ended session). A dialog picks model, effort, skills, the stage to restart from, and Hand over (default) or Start fresh. It ends the current session (AL-253), then launches a new session in the same worktree and branch. Hand over sends a brief built in main: the ticket, the plan summary, the stage history, the diff stat against base, the last N assistant messages and open gates. The ticket record keeps a list of past sessions; the output shows a divider "New agent · Sonnet · High · handed over".
 - **Acceptance criteria:**
-  - [ ] Assigning from a running, lost and ended session each produce a live new session in the same worktree.
-  - [ ] Hand over's first turn includes the brief; Start fresh's doesn't.
-  - [ ] Past sessions' output stays readable above the divider.
-  - [ ] Unit tests for the brief and the record; `assign-agent.spec.ts`.
+  - [x] Assigning from a running, lost and ended session each produce a live new session in the same worktree.
+  - [x] Hand over's first turn includes the brief; Start fresh's doesn't.
+  - [x] Past sessions' output stays readable above the divider.
+  - [x] Unit tests for the brief and the record; `assign-agent.spec.ts`.
 
 #### AL-264 · Agent menu: permission mode, stage, archive
 - **Design:** UXA Agent control · **Depends on:** AL-253
@@ -2238,6 +2238,8 @@ the main checkout has checked out and does not push.
 | D791 | AL-271: Merge worktree → main merges into the branch the repo's main checkout has checked out, in that checkout, and pushes nothing (`target: 'checkout'`, the default); the modal offers "<base> and push" as the second choice, which is AL-087's merge unchanged. A detached main checkout, a dirty one, or one that has the ticket branch itself checked out is refused; the card still moves to Done. The button reads "Merge worktree → main checkout" | Kyle (2026-10-12): the work should land in his main worktree, not go straight to version/main | 2026-10-12 |
 | D792 | AL-274: an agent board card is a `LaneDragCard` whose drag data carries its own lanes (`agentTicketDrag`: any lane but Queued and its own; a PR review or comment-actioner card only Done) instead of the team board's drop rules; the drop is `agent:moveStage`. Inside the board's drag provider the draggable wrapper is the card's button and press (`embedded` card view), so no button nests in another | Kyle (2026-10-12): a review or failed-ticket card should be his to move, to Done or Create PR as he sees fit; one drag feel for both boards | 2026-10-12 |
 | D793 | AL-272: the digest is built in the renderer from the ticket store alone (`boardDigest`: waiting for you → agent stopped → build failed → finished → quiet 2 h+ → queued → working → done), so it is instant and free; its rows offer Open and Resume. "Generate next actions" runs one Sonnet session with no tools, `maxTurns: 1` and a JSON output schema over the digest text (`agent:nextActions`), and each suggestion has "Send to agent" (over `agent:send`, which resumes a stopped agent, AL-268). Nothing is sent without that press | Kyle (2026-10-12): a board-level summary with next actions; the deterministic part answers at once and the model pass is optional and cheap | 2026-10-12 |
+| D794 | AL-263: Assign new agent builds the hand-over brief in main before the old session ends (ticket, original job, stage history, the open gate, what the output said, the diff against the base branch, the previous agent's last five messages), ends the session (or drops its queued launch), records it on the ticket as a past session, saves the new model/effort/skills, moves the stage when asked, writes the divider and launches a fresh session whose first turn is the brief ("Handed over" bubble) or the original job (Start fresh). The job is kept on the record from the first launch; the transcript reads past sessions' histories before the current one | Kyle (2026-10-09): hand over by default; the earlier output must stay readable | 2026-10-12 |
+| D795 | AL-263: the "lost" case is covered by the assign service's unit test (status lost → stop answers false → a fresh session still starts); the e2e covers running and ended, as the fake claude cannot be killed mid-run without losing its log | The log is written when the fake's stdin closes | 2026-10-12 |
 
 ---
 
@@ -2321,6 +2323,7 @@ the main checkout has checked out and does not push.
 | 2026-10-12 | AL-271: Merge worktree → main lands in the main checkout's current branch by default (no push), with the base-branch-and-push merge as the modal's second choice; the preview reports the checkout's branch and cleanliness. |
 | 2026-10-12 | AL-274: agent board cards drag to any lane but Queued (PR cards only to Done) with the team board's drag feel; the drop is a stage move. |
 | 2026-10-12 | AL-272: Digest on the board header — every ticket ranked by what it needs with Open/Resume, and Generate next actions (one Sonnet session, JSON) with Send to agent per suggestion. |
+| 2026-10-12 | AL-263: Assign new agent — Agent menu item, Agents card button and the ended/lost session pill open a dialog (model, effort, skills, stage, Hand over / Start fresh); `agent:assign`, hand-over brief, past sessions on the record, transcript history across them; assign-agent.spec.ts. |
 ---
 
 ## 7. Parallel build rules

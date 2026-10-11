@@ -14,6 +14,7 @@ import { createPermissionService, sdkPermissionMode, type PermissionService } fr
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { createPrActivityTracker, type PrActivityTracker } from './agent/pr-activity';
 import { createNextActionsService, type NextActionsService } from './agent/next-actions';
+import { createAssignAgentService, type AssignAgentService } from './agent/assign/assign-agent';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
@@ -160,6 +161,8 @@ export interface Services {
   readonly prActivity: PrActivityTracker;
   /** Next actions for the board digest (AL-272). */
   readonly nextActions: NextActionsService;
+  /** Assign new agent (AL-263). */
+  readonly assignments: AssignAgentService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -474,6 +477,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.adoLauncher = adoLauncher;
   const launchUndo = createLaunchUndo({ launcher: adoLauncher, sessions, launches, worktrees, ado, emit: options.emit, log: log.child('launch') });
+  const assignments = createAssignAgentService({ sessions, launches, tickets, transcripts, stages, diffs, log: log.child('agent') });
 
   return {
     backlogWindow: options.backlogWindow ?? createBacklogWindowController(() => null),
@@ -517,6 +521,7 @@ export function createServices(options: ServiceOptions): Services {
     worktreeOpener,
     prActivity,
     nextActions,
+    assignments,
     reconcile,
     pullRequests,
     designSpecs,

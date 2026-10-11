@@ -39,6 +39,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
     tickets,
     // Next actions (AL-272) have their own tests.
     nextActions: {} as Services['nextActions'],
+    assignments: {} as Services['assignments'],
     // Plan limits (AL-258) have their own tests.
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),

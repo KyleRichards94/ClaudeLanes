@@ -8,6 +8,7 @@ export const TICKET_MENU = {
   description: 'view-description',
   adoState: 'change-ado-state',
   moveStage: 'move-stage',
+  assign: 'assign-agent',
   resume: 'resume-session',
   openWorktree: 'open-worktree',
   copyBranch: 'copy-branch',
@@ -36,6 +37,7 @@ export function ticketMenuItems({ ticket, workItem, resumable }: TicketMenuInput
   const ended = ticket.session === 'stopped' || ticket.session === 'lost' || ticket.session === 'none';
   items.push(
     { key: TICKET_MENU.moveStage, label: 'Move to stage…', detail: `Now ${LANE_LABELS[ticket.stage]}`, icon: 'branch', section: 'Agent' },
+    { key: TICKET_MENU.assign, label: 'Assign new agent…', detail: 'Ends this agent and starts another here, with a hand-over brief or fresh.', icon: 'add-agent', section: 'Agent' },
     {
       key: TICKET_MENU.resume,
       label: ticket.session === 'lost' ? 'Reconnect session' : 'Resume session',

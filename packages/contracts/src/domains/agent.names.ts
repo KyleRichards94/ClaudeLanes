@@ -29,6 +29,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:stopSubagent', // AL-261
   'agent:moveStage', // AL-270
   'agent:nextActions', // AL-272
+  'agent:assign', // AL-263
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

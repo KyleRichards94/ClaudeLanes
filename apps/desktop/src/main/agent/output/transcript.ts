@@ -114,13 +114,16 @@ export function createTranscriptService(options: TranscriptServiceOptions): Tran
 
   async function loadHistory(ticketId: string, output: TicketOutput): Promise<void> {
     const record = await tickets.get(ticketId);
-    if (!record?.sessionId || !options.history) {
+    // Past sessions first (AL-263), then the current one: the output reads oldest to newest.
+    const sessionIds = record ? [...(record.pastSessions ?? []).map((past) => past.sessionId), ...(record.sessionId ? [record.sessionId] : [])] : [];
+    const history = options.history;
+    if (!record || sessionIds.length === 0 || !history) {
       output.historyDone = true;
       return;
     }
     let messages: SessionMessage[];
     try {
-      messages = await options.history(record.sessionId, record.worktreePath);
+      messages = (await Promise.all(sessionIds.map((sessionId) => history(sessionId, record.worktreePath)))).flat();
     } catch (error) {
       // Not marked done: the next backfill tries again.
       options.log?.warn(`Could not read the saved output of ticket ${ticketId}: ${error instanceof Error ? error.message : String(error)}`);

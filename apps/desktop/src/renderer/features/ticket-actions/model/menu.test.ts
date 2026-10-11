@@ -11,6 +11,7 @@ describe('ticket context menu items (AL-270)', () => {
       TICKET_MENU.description,
       TICKET_MENU.adoState,
       TICKET_MENU.moveStage,
+      TICKET_MENU.assign,
       TICKET_MENU.resume,
       TICKET_MENU.openWorktree,
       TICKET_MENU.copyBranch,
@@ -31,7 +32,7 @@ describe('ticket context menu items (AL-270)', () => {
 
   it('has no work item actions for a No-ticket or PR review card', () => {
     const items = ticketMenuItems({ ticket: { ...ticket, id: 'pr-11635-review', ado: null }, resumable: false });
-    expect(items.map((item) => item.key)).toEqual([TICKET_MENU.moveStage, TICKET_MENU.resume, TICKET_MENU.openWorktree, TICKET_MENU.copyBranch, TICKET_MENU.remove]);
+    expect(items.map((item) => item.key)).toEqual([TICKET_MENU.moveStage, TICKET_MENU.assign, TICKET_MENU.resume, TICKET_MENU.openWorktree, TICKET_MENU.copyBranch, TICKET_MENU.remove]);
   });
 
   it('turns an ADO description into readable text', () => {

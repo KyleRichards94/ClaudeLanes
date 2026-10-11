@@ -26,7 +26,8 @@ export function createAgentHandlers({
   planLimits,
   tickets,
   nextActions,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  assignments,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions' | 'assignments'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -82,6 +83,8 @@ export function createAgentHandlers({
     'agent:getSubagents': ({ ticketId }) => ok(subagents.get(ticketId)),
     // Next actions for the board digest (AL-272).
     'agent:nextActions': (request) => nextActions.generate(request),
+    // Assign new agent (AL-263): hand over with a brief, or start fresh.
+    'agent:assign': (request) => assignments.assign(request),
     // Stop one sub-agent (AL-261): its SDK task is stopped; the lead agent's turn goes on.
     'agent:stopSubagent': async ({ ticketId, nodeId }) => {
       const node = subagents.get(ticketId).nodes.find((entry) => entry.id === nodeId);

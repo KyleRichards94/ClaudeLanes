@@ -507,6 +507,29 @@ export const NextActionsResponseSchema = z.object({
 });
 export type NextActionsResponse = z.infer<typeof NextActionsResponseSchema>;
 
+/** Assign new agent (AL-263): hand over with a brief (the default), or start fresh from the original job. */
+export const ASSIGN_AGENT_MODES = ['hand-over', 'fresh'] as const;
+export const AssignAgentModeSchema = z.enum(ASSIGN_AGENT_MODES);
+export type AssignAgentMode = z.infer<typeof AssignAgentModeSchema>;
+
+/** `agent:assign`: ends the ticket's session and starts another in the same worktree and branch. */
+export const AssignAgentRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  model: ModelSchema,
+  effort: EffortSchema,
+  skills: z.array(z.string().min(1).max(200)).max(64),
+  /** The stage the new agent starts from; the ticket's current one when left out. */
+  stage: StageSchema.optional(),
+  mode: AssignAgentModeSchema,
+});
+export type AssignAgentRequest = z.infer<typeof AssignAgentRequestSchema>;
+export const AssignAgentResponseSchema = z.object({
+  status: AgentSessionStatusSchema,
+  /** The session that ended, now on the ticket's past sessions; null when none was live. */
+  previousSessionId: z.string().nullable(),
+});
+export type AssignAgentResponse = z.infer<typeof AssignAgentResponseSchema>;
+
 /** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
 export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
 export type StopSubagentRequest = z.infer<typeof StopSubagentRequestSchema>;
@@ -559,6 +582,7 @@ export const agentInvokeContracts = {
   'agent:stopSubagent': { request: StopSubagentRequestSchema, response: StopSubagentResponseSchema },
   'agent:moveStage': { request: MoveStageRequestSchema, response: MoveStageResponseSchema },
   'agent:nextActions': { request: NextActionsRequestSchema, response: NextActionsResponseSchema },
+  'agent:assign': { request: AssignAgentRequestSchema, response: AssignAgentResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

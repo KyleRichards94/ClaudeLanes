@@ -31,12 +31,12 @@ describe('AssignAgentModal (AL-263)', () => {
     expect(screen.getByRole('radio', { name: 'Opus' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: 'Implementing' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('radio', { name: 'Hand over' }).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByTestId('assign-agent-skills-input').getAttribute('value') ?? (screen.getByTestId('assign-agent-skills-input') as HTMLInputElement).value).toBe('/code-review');
+    expect((screen.getByTestId('assign-agent-skills') as HTMLInputElement).value).toBe('/code-review');
 
     fireEvent.click(screen.getByRole('radio', { name: 'Sonnet' }));
     fireEvent.click(screen.getByRole('radio', { name: 'High' }));
     fireEvent.click(screen.getByRole('radio', { name: 'Code review' }));
-    fireEvent.change(screen.getByTestId('assign-agent-skills-input'), { target: { value: '/code-review, commit' } });
+    fireEvent.change(screen.getByTestId('assign-agent-skills'), { target: { value: '/code-review, commit' } });
     fireEvent.click(screen.getByTestId('assign-agent-confirm'));
 
     await waitFor(() =>

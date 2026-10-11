@@ -535,6 +535,12 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       });
     }
 
+    // The job is kept on the record (AL-263), so a new agent can start fresh from it.
+    if (!resuming && job && record.job === undefined) {
+      const kept = await tickets.update(ticketId, (current) => (current.job === undefined ? { ...current, job } : current));
+      if (!kept.ok) log?.warn(`Could not keep the job of ticket ${ticketId}: ${kept.message}`);
+    }
+
     let query: ClaudeQuery;
     try {
       query = await claude.launch({
