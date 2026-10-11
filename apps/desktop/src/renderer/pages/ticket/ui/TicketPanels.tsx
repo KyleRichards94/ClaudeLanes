@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { subagentCountsLabel, type TicketSubBranch } from '@agent-lanes/contracts';
 import { color, space } from '@agent-lanes/tokens';
-import { GlassPanel, Pill, Text } from '@agent-lanes/ui';
+import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { subAgentTotal, type AgentTicket } from '@/entities/agent-ticket';
 import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents, type SubAgentActions } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
 import { MergeControls } from '@/features/merge-branches';
-import { useBranchStatus } from '@/shared/api';
+import { useBranchStatus, useOpenWorktree } from '@/shared/api';
+import { toast } from '@/shared/model';
 import { ErrorBoundary } from '@/shared/ui';
 import { subBranchRows } from '../lib/sub-branch-rows';
 
@@ -45,14 +46,28 @@ export function Panel({ title, aside, children, testID, style }: PanelProps) {
 
 /** Branch name, Build / Run / Stop and their status (AL-173, features/build-run). */
 export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
+  const openFolder = useOpenWorktree(ticket.id);
   return (
     <Panel
       title="Worktree"
       testID="worktree-panel"
       aside={
-        <Text variant="mono" size="xs" color={color.claudeText} numberOfLines={1} selectable style={styles.branch}>
-          {ticket.branch}
-        </Text>
+        <View style={styles.worktreeAside}>
+          <Text variant="mono" size="xs" color={color.claudeText} numberOfLines={1} selectable style={styles.branch}>
+            {ticket.branch}
+          </Text>
+          {/* Open worktree folder (AL-267). */}
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="folder"
+            iconOnly
+            label="Open worktree folder"
+            loading={openFolder.isPending}
+            onPress={() => openFolder.mutate(undefined, { onError: (error) => toast({ id: `open-worktree:${ticket.id}`, tone: 'error', title: "Couldn't open the worktree folder", body: error.message }) })}
+            testID="open-worktree-folder"
+          />
+        </View>
       }
     >
       <BuildRunControls ticket={ticket} />
@@ -155,6 +170,12 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   branch: {
+    flexShrink: 1,
+  },
+  worktreeAside: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
     flexShrink: 1,
   },
   flexText: {

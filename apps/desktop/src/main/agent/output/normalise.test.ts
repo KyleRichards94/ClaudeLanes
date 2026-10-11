@@ -293,3 +293,12 @@ describe('thinking blocks (AL-262)', () => {
     ]);
   });
 });
+
+describe('app notes (AL-273)', () => {
+  const user = (content: unknown): SDKMessage => ({ type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, uuid: nextUuid(), ...ids }) as unknown as SDKMessage;
+  it('reads a note the app pushed back from history as an app note, not as the user', () => {
+    const normaliser = createOutputNormaliser({ cwd: WORKTREE });
+    expect(normaliser.normalise(user('[Agent Lanes · build result] The build step of a Run has finished.'))).toMatchObject([{ kind: 'user', source: 'app-note' }]);
+    expect(normaliser.normalise(user('Agent Lanes is great'))).toMatchObject([{ kind: 'user', source: 'composer' }]);
+  });
+});

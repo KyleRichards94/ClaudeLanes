@@ -141,7 +141,7 @@ describe('Composer (AL-176)', () => {
       'agent:send': { ok: false, code: 'VALIDATION', message: 'No agent session is running for ticket 71273.' },
     });
     renderComposer();
-    expect(await screen.findByText('No agent session is running for this ticket.')).toBeTruthy();
+    expect(await screen.findByText('No agent is running: sending starts one with your message.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Send' }).getAttribute('aria-disabled')).toBe('true');
     expect(screen.getByRole('button', { name: 'Pause' }).getAttribute('aria-disabled')).toBe('true');
 

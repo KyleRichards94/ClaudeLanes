@@ -28,6 +28,7 @@ describe('event contracts', () => {
         'agent:mcpStatus', // AL-108
         'agent:permission', // AL-109
         'agent:planLimits', // AL-258
+        'agent:prActivity', // AL-269
       ].sort(),
     );
   });

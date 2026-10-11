@@ -12,6 +12,7 @@ import { combineSessionExtras } from './agent/session-extras';
 import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from './agent/mcp';
 import { createPermissionService, sdkPermissionMode, type PermissionService } from './agent/permissions';
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
+import { createPrActivityTracker, type PrActivityTracker } from './agent/pr-activity';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
@@ -63,6 +64,7 @@ import { createDiffService, type DiffService } from './worktrees/diff';
 import { createMergeSubBranchesService, type MergeSubBranchesService } from './worktrees/merge-sub-branches';
 import { createSubWorktreeService, subWorktreeHooks, type SubWorktreeService } from './worktrees/sub-worktree';
 import { createWorktreeFileLister, type WorktreeFileLister } from './worktrees/list-files';
+import { createWorktreeOpener, type WorktreeOpener } from './worktrees/open-folder';
 import { createKeyedQueue } from './worktrees/keyed-queue';
 import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './tickets/archive-store';
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
@@ -151,6 +153,10 @@ export interface Services {
   readonly diffs: DiffService;
   /** Worktree files for the composer's @ picker (AL-259). */
   readonly worktreeFiles: WorktreeFileLister;
+  /** Opens a ticket worktree in the OS file manager (AL-267). */
+  readonly worktreeOpener: WorktreeOpener;
+  /** PR comments and threads a ticket's agents posted (AL-269). */
+  readonly prActivity: PrActivityTracker;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -190,6 +196,8 @@ export interface ServiceOptions {
   designTestOrigin?: string;
   /** A `claude` executable to start instead of the Agent SDK's: the e2e fake, unpackaged builds only (AL-044). */
   claudeExecutable?: string;
+  /** Electron's `shell.openPath` (AL-267); tests pass a fake. */
+  openPath?: (path: string) => Promise<string>;
   /** Opens the Backlog in its own window (AL-239); without it, `app:popOutBacklog` reports that it can't. */
   backlogWindow?: BacklogWindowController;
 }
@@ -266,6 +274,7 @@ export function createServices(options: ServiceOptions): Services {
   const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
   const diffs = createDiffService({ git, tickets });
   const worktreeFiles = createWorktreeFileLister({ git, tickets });
+  const worktreeOpener = createWorktreeOpener({ tickets, openPath: options.openPath ?? (async () => 'Opening folders is not available here.') });
   const subWorktrees = createSubWorktreeService({ git, tickets, queue: repoQueue, log: log.child('worktrees') });
   const reconcile = createReconcileService({ git, settings, tickets, ignoredFile: ignoredWorktreesFile(options.appDataDir) });
 
@@ -400,6 +409,7 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('design'),
   });
   const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
+  const prActivity = createPrActivityTracker({ sessions, tickets, emit: options.emit, log: log.child('agent') });
   late.subagents = subagents;
   const mergeSubBranches = createMergeSubBranchesService({
     git,
@@ -500,6 +510,8 @@ export function createServices(options: ServiceOptions): Services {
     archive,
     diffs,
     worktreeFiles,
+    worktreeOpener,
+    prActivity,
     reconcile,
     pullRequests,
     designSpecs,
@@ -527,6 +539,7 @@ export async function disposeServices(services: Services): Promise<void> {
   services.designShip.dispose();
   services.credentialFailures.dispose();
   services.subagents.dispose();
+  services.prActivity.dispose();
   services.usage.dispose();
   services.planLimits.dispose();
   // Closing the app stops every run it started (design §10, AL-134), then aborts queued and running builds.

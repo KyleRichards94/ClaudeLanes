@@ -45,6 +45,7 @@ async function setup() {
   const stages = createStageService({ tickets, emit: events.emit });
   const handlers = createAgentHandlers({
     sessions,
+    tickets,
     transcripts,
     stages,
     mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }),

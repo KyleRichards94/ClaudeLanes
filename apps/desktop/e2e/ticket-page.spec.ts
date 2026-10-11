@@ -87,3 +87,14 @@ test('switches tabs and opens Claude Design on its own page', async () => {
   // Back on the drill-in, on the tab it was left on.
   await expect(page.getByTestId('ticket-tab-diff')).toBeVisible();
 });
+
+test('offers Open worktree folder, which says when the worktree is gone (AL-267)', async () => {
+  // The seeded record's worktree does not exist on disk, so the OS is never asked and the button reports it.
+  await expect(page.getByTestId('open-worktree-folder')).toBeVisible();
+  const answer = await page.evaluate(() =>
+    (globalThis as unknown as { agentLanes: { invoke(channel: string, payload?: unknown): Promise<unknown> } }).agentLanes.invoke('git:openWorktree', { ticketId: '71273' }),
+  );
+  expect(answer).toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'worktree-missing' } });
+  await page.getByTestId('open-worktree-folder').click();
+  await expect(page.getByTestId('toast-host')).toContainText("Couldn't open the worktree folder");
+});

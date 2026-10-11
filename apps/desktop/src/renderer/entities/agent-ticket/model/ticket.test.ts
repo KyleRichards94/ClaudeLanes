@@ -54,6 +54,7 @@ describe('ticketFromRecord', () => {
       build: { job: null, last: { outcome: 'failed', startedAt: 10, finishedAt: 20, errors: 3, warnings: 0 } },
       run: { state: 'stopped', url: null, startedAt: null },
       pullRequest: null,
+      prActivity: null,
       design: null,
     });
   });

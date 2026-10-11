@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
-import { Card, CardSection, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
+import { Card, CardSection, Icon, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/shared/config';
 import { WorkItemStateLabel, WorkItemTypeBar } from '@/shared/ui';
 import { useAgentTicket } from '../model/hooks';
@@ -78,7 +78,13 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
             )}
             <View style={styles.corner}>
               {adoState ? <WorkItemStateLabel state={adoState} stateColor={stateColor} testID={testID ? `${testID}-state` : undefined} /> : null}
-              {!adoState && view.corner ? <Pill label={view.corner.label} tone={view.corner.tone} dot testID={testID ? `${testID}-corner` : 'ticket-card-corner'} /> : null}
+              {!adoState && view.corner ? (
+                <View style={styles.cornerPill} testID={testID ? `${testID}-corner` : 'ticket-card-corner'}>
+                  {/* A green tick once the review's comments are up (AL-269). */}
+                  {view.corner.tick ? <Icon name="check" size={14} color={tone.ok.text} testID="ticket-card-tick" /> : null}
+                  <Pill label={view.corner.label} tone={view.corner.tone} dot={!view.corner.tick} />
+                </View>
+              ) : null}
               {cornerAction}
             </View>
           </View>
@@ -158,6 +164,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
   },
   corner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+  },
+  cornerPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.xs,

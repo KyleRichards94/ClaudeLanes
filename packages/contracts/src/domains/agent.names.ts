@@ -39,4 +39,5 @@ export const AGENT_EVENT_CHANNELS = [
   'agent:permission', // AL-109
   'agent:model', // AL-106
   'agent:planLimits', // AL-258
+  'agent:prActivity', // AL-269
 ] as const;

@@ -52,15 +52,16 @@ test('shows the skill chips, Apply model now, the message box, Pause and Send un
   expect(Math.abs(composer!.x - stream!.x)).toBeLessThan(2);
 });
 
-test('says no session is running and shows why Enter could not send (AL-259)', async () => {
-  await expect(page.getByTestId('composer-note')).toHaveText('No agent session is running for this ticket.');
+test('says a message starts an agent, and shows why Enter could not (AL-259, AL-268)', async () => {
+  await expect(page.getByTestId('composer-note')).toHaveText('No agent is running: sending starts one with your message.');
   const box = page.getByPlaceholder('Message the agent — Enter sends, Shift+Enter for a new line');
   await box.fill('Use the existing JobFilterState');
   // Shift+Enter adds a line; Enter sends (AL-259).
   await box.press('Shift+Enter');
   await expect(page.getByTestId('composer-error')).toHaveCount(0);
   await box.press('Enter');
-  await expect(page.getByTestId('composer-error')).toHaveText('No agent session is running for ticket 71273.');
+  // No Claude connection in this profile: starting the agent is what fails.
+  await expect(page.getByTestId('composer-error')).toHaveText('Connect Claude in Connections before starting an agent.');
   // The message stays in the box so it can be sent once the agent runs.
   await expect(box).toHaveValue('Use the existing JobFilterState\n');
 });

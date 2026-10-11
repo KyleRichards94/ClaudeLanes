@@ -10,7 +10,8 @@ export function createGitHandlers({
   mergeSubBranches,
   worktrees,
   worktreeFiles,
-}: Pick<Services, 'branches' | 'mergeToMain' | 'diffs' | 'mergeSubBranches' | 'worktrees' | 'worktreeFiles'>): HandlersFor<(typeof GIT_INVOKE_CHANNELS)[number]> {
+  worktreeOpener,
+}: Pick<Services, 'branches' | 'mergeToMain' | 'diffs' | 'mergeSubBranches' | 'worktrees' | 'worktreeFiles' | 'worktreeOpener'>): HandlersFor<(typeof GIT_INVOKE_CHANNELS)[number]> {
   return {
     'branches:status': ({ ticketId }) => branches.status(ticketId),
     'git:mergeToMainPreview': ({ ticketId }) => mergeToMain.preview(ticketId),
@@ -22,5 +23,6 @@ export function createGitHandlers({
     'git:openConflictFiles': ({ ticketId }) => mergeSubBranches.openConflictFiles(ticketId),
     'git:previewWorktree': (request) => worktrees.preview(request),
     'git:listFiles': ({ ticketId, query }) => worktreeFiles.list(ticketId, query ?? ''),
+    'git:openWorktree': ({ ticketId }) => worktreeOpener.open(ticketId),
   };
 }

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { TicketIdSchema } from '../events';
 import type { GIT_EVENT_CHANNELS, GIT_INVOKE_CHANNELS } from './git.names';
-import { TicketRecordSchema } from './tickets.schemas';
+import { TicketRecordSchema, LocalPathSchema } from './tickets.schemas';
 
 // ── Workspace preview in the New agent ticket modal (AL-164, artboard 2) ───────────────────────
 //
@@ -320,6 +320,8 @@ export type WorktreeFiles = z.infer<typeof WorktreeFilesSchema>;
 
 export const gitInvokeContracts = {
   'git:listFiles': { request: ListWorktreeFilesRequestSchema, response: WorktreeFilesSchema },
+  /** Opens the ticket worktree in the OS file manager (AL-267); VALIDATION `worktree-missing` when it is gone. */
+  'git:openWorktree': { request: TicketRefRequestSchema, response: z.object({ path: LocalPathSchema }) },
   /** `VALIDATION` with `details.reason: 'ticket-not-found'` for an unknown ticket. */
   'branches:status': { request: TicketRefRequestSchema, response: BranchStatusSchema },
   'git:mergeToMainPreview': { request: TicketRefRequestSchema, response: MergeToMainPreviewSchema },

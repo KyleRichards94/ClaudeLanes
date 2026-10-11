@@ -3,6 +3,7 @@ import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { StageGatesSchema } from './settings.schemas';
+import { TicketPrActivitySchema } from './tickets.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
 import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema, UndoLaunchRequestSchema, UndoLaunchResponseSchema } from './agent.launch-from-ado';
@@ -47,7 +48,8 @@ export type OutputToolKind = z.infer<typeof OutputToolKindSchema>;
  * launch's job description, the brief a new agent was handed (AL-263), or a turn the app sent on its
  * own, which the Output tab leaves out.
  */
-export const USER_MESSAGE_SOURCES = ['composer', 'skill', 'launch', 'hand-over', 'app'] as const;
+/** `app-note` (AL-273): a message the app pushed for the agent and shows ("Agent Lanes · build result"); `app` ones stay hidden. */
+export const USER_MESSAGE_SOURCES = ['composer', 'skill', 'launch', 'hand-over', 'app', 'app-note'] as const;
 export const UserMessageSourceSchema = z.enum(USER_MESSAGE_SOURCES);
 export type UserMessageSource = z.infer<typeof UserMessageSourceSchema>;
 
@@ -486,6 +488,10 @@ export type SubagentNode = z.infer<typeof SubagentNodeSchema>;
 /** Most sub-agents kept per ticket; the oldest finished ones are dropped first. */
 export const SUBAGENT_TREE_LIMIT = 200;
 
+/** `agent:prActivity` (AL-269): the ticket's PR comment and thread counts grew. */
+export const AgentPrActivityEventSchema = TicketEventEnvelopeSchema.extend({ activity: TicketPrActivitySchema });
+export type AgentPrActivityEvent = z.infer<typeof AgentPrActivityEventSchema>;
+
 /** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
 export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
 export type StopSubagentRequest = z.infer<typeof StopSubagentRequestSchema>;
@@ -653,4 +659,5 @@ export const agentEventContracts = {
   'agent:permission': AgentPermissionEventSchema,
   'agent:model': AgentModelEventSchema,
   'agent:planLimits': PlanLimitsEventSchema,
+  'agent:prActivity': AgentPrActivityEventSchema,
 } as const satisfies Record<(typeof AGENT_EVENT_CHANNELS)[number], z.ZodType>;

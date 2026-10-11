@@ -229,3 +229,9 @@ describe('thinking rows (AL-262)', () => {
     expect(withoutThinking(rows).map((row) => row.type)).toEqual(['prose']);
   });
 });
+
+describe('app notes (AL-273)', () => {
+  it('captions a note the app pushed as Agent Lanes', () => {
+    expect(userCaption({ source: 'app-note', at: 0, priority: null })).toBe('Agent Lanes');
+  });
+});

@@ -3,6 +3,7 @@ import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 // One module per glyph keeps the bundle to the icons below instead of the whole lucide set.
 import Archive from 'lucide-react-native/icons/archive';
+import FolderOpen from 'lucide-react-native/icons/folder-open';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ArrowRight from 'lucide-react-native/icons/arrow-right';
 import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
@@ -93,6 +94,7 @@ const glyphs = {
   copy: { component: Copy },
   thinking: { component: Brain },
   archive: { component: Archive },
+  folder: { component: FolderOpen },
   send: { component: Send },
   attach: { component: Paperclip },
   'add-agent': { component: UserPlus },

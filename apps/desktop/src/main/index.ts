@@ -188,6 +188,8 @@ if (!app.requestSingleInstanceLock()) {
       designTestOrigin: testHooks.designTestOrigin,
       // e2e starts a fake `claude` instead of the real one (AL-044); never honoured in the installed app.
       claudeExecutable: testHooks.claudeExecutable,
+      // AL-267: Open worktree folder.
+      openPath: (path) => shell.openPath(path),
       // AL-239: Pop out opens the Backlog in its own window.
       backlogWindow: createBacklogWindowController(createBacklogWindow),
     });

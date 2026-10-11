@@ -35,7 +35,7 @@ export const TICKET_RECORD_LIMITS = {
 /** Milliseconds since the Unix epoch (`Date.now()`), as in events (D36). */
 const EpochMsSchema = z.int().nonnegative();
 /** An absolute path on this machine. The main process checks it is absolute for its platform. */
-const LocalPathSchema = z.string().min(1).max(4096);
+export const LocalPathSchema = z.string().min(1).max(4096);
 const BranchNameSchema = z.string().min(1).max(255);
 
 function unique<T>(items: readonly T[]): boolean {
@@ -138,6 +138,14 @@ export const TicketDesignSchema = z.object({
 });
 export type TicketDesign = z.infer<typeof TicketDesignSchema>;
 
+/** What a review or comment-actioner agent did on its pull request (AL-269). */
+export const TicketPrActivitySchema = z.object({
+  comments: z.int().nonnegative(),
+  threads: z.int().nonnegative(),
+  updatedAt: EpochMsSchema,
+});
+export type TicketPrActivity = z.infer<typeof TicketPrActivitySchema>;
+
 export const TicketRecordSchema = z
   .object({
     version: z.literal(TICKET_RECORD_VERSION),
@@ -178,6 +186,8 @@ export const TicketRecordSchema = z
     design: TicketDesignSchema,
     /** The PR the Create PR stage opened (AL-181); absent or null before one. Optional, so older records still read. */
     pullRequest: TicketPullRequestSchema.nullable().optional(),
+    /** PR comments posted and threads settled by the ticket's agents (AL-269); absent before any. */
+    prActivity: TicketPrActivitySchema.nullable().optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

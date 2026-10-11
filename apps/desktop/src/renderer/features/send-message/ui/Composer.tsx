@@ -314,7 +314,7 @@ export function ComposerView({
           value={steerNow}
           onValueChange={onSteerNowChange}
           stateText={{ on: 'next tool call', off: 'after the turn' }}
-          disabled={!controls.live || controls.paused}
+          disabled={controls.sendBlocked || controls.paused}
           testID="composer-steer-now"
         />
       </View>
@@ -349,7 +349,7 @@ export function ComposerView({
           />
         </View>
         {onAddFiles ? (
-          <Button label="Attach a file" icon="attach" iconOnly onPress={() => void pickFiles().then(onAddFiles)} disabled={!controls.live} style={styles.square} testID="composer-attach" />
+          <Button label="Attach a file" icon="attach" iconOnly onPress={() => void pickFiles().then(onAddFiles)} disabled={controls.sendBlocked} style={styles.square} testID="composer-attach" />
         ) : null}
         {controls.stop.visible ? <Button label="Stop" icon="stop" variant="danger" onPress={() => onStop?.()} loading={pending.stop} testID="composer-stop" /> : null}
         <Button

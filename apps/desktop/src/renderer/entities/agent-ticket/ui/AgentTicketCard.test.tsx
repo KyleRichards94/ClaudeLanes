@@ -275,7 +275,11 @@ describe('the Done corner for review and no-ticket agents (Kyle, 2026-10-09)', (
     expect(agentFinished({ ...review, session: 'running' })).toBe(false);
     expect(agentFinished({ ...review, session: 'idle', lastOutputAt: null })).toBe(false);
     expect(agentFinished({ ...review, session: 'idle', needsYou: [{ kind: 'permission', tool: 'Bash', since: 1 }] })).toBe(false);
-    expect(cardView({ ...review, session: 'idle' }).corner).toEqual({ label: 'Done', tone: 'ok' });
+    expect(cardView({ ...review, session: 'idle' }).corner).toEqual({ label: 'Done', tone: 'ok', tick: false });
+    // Once the agent posted to the pull request, the corner says what it did, with a tick (AL-269).
+    expect(cardView({ ...review, session: 'idle', prActivity: { comments: 4, threads: 0, updatedAt: 9 } }).corner).toEqual({ label: 'Reviewed · 4 comments', tone: 'ok', tick: true });
+    expect(cardView({ ...review, session: 'idle', prActivity: { comments: 2, threads: 3, updatedAt: 9 } }).corner).toEqual({ label: 'Actioned · 3 threads', tone: 'ok', tick: true });
+    expect(cardView({ ...review, session: 'running', prActivity: { comments: 4, threads: 0, updatedAt: 9 } }).corner).toBeNull();
     expect(cardView({ ...review, session: 'running' }).corner).toBeNull();
     const withWorkItem = { ...ticketFromRecord(fakeTicketRecord()), lastOutputAt: 5, session: 'idle' as const };
     expect(cardView(withWorkItem).corner).toBeNull();

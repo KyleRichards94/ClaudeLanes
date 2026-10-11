@@ -188,6 +188,14 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | todo |
 | AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
 | AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
+| AL-267 | Open worktree folder | E16 | S | — | done |
+| AL-268 | Message a ticket without a live session | E16 | M | AL-110 | done |
+| AL-269 | Review tick on PR cards | E16 | M | AL-236 | done |
+| AL-270 | Card context menu | E16 | L | AL-267, AL-268 | todo |
+| AL-271 | Merge worktree into the main checkout | E16 | M | AL-087 | todo |
+| AL-272 | Board digest and next actions | E16 | L | AL-269 | todo |
+| AL-273 | App notes in the output | E16 | S | AL-251 | done |
+| AL-274 | Drag agent cards to any lane | E16 | M | AL-270 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1365,6 +1373,73 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
   - [ ] Stopping one agent leaves the other running.
   - [ ] Unit tests; `second-agent.spec.ts`.
 
+### E16 — Board heuristics (Kyle, 2026-10-12)
+
+Kyle's asks from running the board for a few days: a dead ticket should still take a message, the
+board should tell him where he is needed, cards should do more on a right-click, review cards should
+say when their comments are up, and Merge worktree → main should land the work in his main checkout.
+Defaults taken where he did not say: the digest is deterministic with an optional model-written
+"next actions" pass; ADO state changes from a card sit behind a confirm; the merge targets the branch
+the main checkout has checked out and does not push.
+
+#### AL-267 · Open worktree folder
+- **Design:** Kyle 2026-10-12 · **Depends on:** —
+- **Scope:** `git:openWorktree` opens the ticket's worktree folder in the OS file manager (`shell.openPath`, refused when the folder is gone). A button on the drill-in's Worktree card, an item in the card's menu (AL-270).
+- **Acceptance criteria:**
+  - [x] The button and the menu item open the folder; a missing worktree says so.
+  - [x] Handler unit test; `ticket-page.spec.ts` extended (the IPC answer, not the OS window).
+
+#### AL-268 · Message a ticket without a live session
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-110
+- **Scope:** `agent:send` on a ticket whose session ended, was lost or never ran brings an agent back instead of refusing: a saved session is resumed (the Reconnect path) and the message queued; a resume the SDK refuses, or a ticket with no session, starts a fresh session with the message as its job (a hand-over brief comes with AL-263). The composer sends in every state but Queued and says what sending will do.
+- **Acceptance criteria:**
+  - [x] A message on an ended ticket resumes it and reaches the agent; on a never-run ticket it starts one.
+  - [x] Handler unit tests; `composer.spec.ts` updated.
+
+#### AL-269 · Review tick on PR cards
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-236
+- **Scope:** Main counts a session's pull request comment and thread-status tool calls (any ADO MCP server) on the ticket record (`prActivity`) and pushes them as `agent:prActivity`. Once the agent finished, a PR card's corner shows a green tick with "Reviewed · 4 comments" (a code review) or "Actioned · 3 threads" (the comment actioner) in place of "Done".
+- **Acceptance criteria:**
+  - [x] A finished review card shows the tick and the count; the count survives a restart.
+  - [x] Tracker, card-view and event-handler unit tests.
+
+#### AL-270 · Card context menu
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-267, AL-268
+- **Scope:** Right-click (and the Menu key) on an agent board card opens a menu at the pointer: Open in Azure DevOps, View description (the work item's description as text), Change ADO state… (the type's states, behind a confirm; `ado:setWorkItemState` over the write-back client), Move to stage… (`agent:moveStage`, the stage service's user move; the agent hears about it at its next turn), Resume session, Open worktree folder, Copy branch, Remove from board….
+- **Acceptance criteria:**
+  - [ ] Every item works from the board; ADO state and stage changes show on the card at once.
+  - [ ] Menu, stage-move and state-change unit tests; `board.spec.ts` extended.
+
+#### AL-271 · Merge worktree into the main checkout
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-087
+- **Scope:** "Merge worktree → main" merges the ticket branch into the branch the repo's main checkout currently has checked out, in that checkout, without pushing; the button names that branch. The base-branch merge with push stays available as a second choice in the confirm modal. Refuses on a dirty checkout or a detached HEAD, as before.
+- **Acceptance criteria:**
+  - [ ] The default merge lands in the main checkout's current branch and pushes nothing; the base-branch choice behaves as AL-087 did.
+  - [ ] Merge unit tests; `merge-to-main.spec.ts` or the golden path extended.
+
+#### AL-272 · Board digest and next actions
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-269
+- **Scope:** A "Digest" button on the board header opens a panel that ranks every agent ticket by what it needs: waiting on you (gate, permission), dead or lost session, failed build, finished with unmerged work, quiet for hours, open PR state — with one-click actions (approve, resume, open). "Generate next actions" sends the digest to one short Claude session and shows its suggestions per ticket, each with "Send to agent".
+- **Acceptance criteria:**
+  - [ ] The digest is built from the store alone, instantly, and its actions work.
+  - [ ] Next actions come from one session and can be sent to a ticket's agent.
+  - [ ] Digest unit tests; `board.spec.ts` extended.
+
+#### AL-273 · App notes in the output
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-251
+- **Scope:** Messages the app pushes for the agent (build results, "Connection restored") show as "Agent Lanes" notes, not "You" bubbles — live and when read back from the session's history.
+- **Acceptance criteria:**
+  - [x] A build note reads "Agent Lanes · build result" in the output, before and after a restart.
+  - [x] Normaliser and row unit tests.
+
+#### AL-274 · Drag agent cards to any lane
+- **Design:** Kyle 2026-10-12 · **Depends on:** AL-270
+- **Scope:** An agent board card can be dragged to any lane but Queued (Done and Create PR included), with the same drag-to-lane feel as the team board's cards; a PR review or comment-actioner card can only be dragged to Done. The drop is `agent:moveStage` (AL-270): the card moves at once, a waiting gate closes, and a running agent is told at its next turn.
+- **Acceptance criteria:**
+  - [ ] A work item card drops on any lane but Queued; a PR card only on Done; the lanes say so while dragging.
+  - [ ] Keyboard: Space picks a card up, arrows choose a lane, Enter drops.
+  - [ ] Drag-rule unit tests; `drag-to-lane.spec.ts` extended.
+
 ---
 ## 4. Decisions
 
@@ -2154,6 +2229,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | D782 | AL-261: the fake `claude` gained `spawn` (an Agent tool use, the SDK task messages and child steps with `parent_tool_use_id`; `holdUntilStopped` waits for `stop_task`) and `bash` (a tool use and result with no prompt) steps; `subagents.spec.ts` drives them | No e2e path exercised sub-agents before | 2026-10-09 |
 | D783 | AL-260 and AL-261 are one commit: AL-261's edits landed on the same files (OutputStream, TicketPage, rows, the fake claude) before AL-260's e2e re-run finished, and splitting them by hand was not worth the risk | Keep commits honest about what was verified together | 2026-10-09 |
 | D784 | AL-262: thinking is kept as `thinking-delta` / `thinking` output items (clipped like text, redacted blocks left out) and drawn as one muted "Thinking…" / "Thought" line that opens on its text, in the lead's and sub-agents' lanes alike. The switch is a UI pref (`ui.showThinking`, shown by default) toggled from the ticket's Agent menu ("Show thinking"), not a Settings field | It is a per-user viewing choice like the collapsed lanes, and the Agent menu is where the user already is when reading output | 2026-10-09 |
+| D785 | AL-268: `agent:send` on a ticket without a live session resumes the saved session (the Reconnect path) and queues the message; when the SDK refuses the resume the saved id is cleared and a fresh session starts with the message as its job; a ticket that never ran starts the same way. Only a Queued ticket refuses a message. The composer's note says what sending will do instead of blocking | Kyle (2026-10-12): a status check on an old ticket must not be met with "the agent has died" | 2026-10-12 |
+| D786 | AL-269: PR activity is counted from the sessions' ADO MCP tool calls (comment and thread-status tools of any server), only once each call returned without error, and kept on the ticket record (`prActivity`) so it survives a restart. A finished PR card's corner shows a green tick with "Actioned · N threads" when threads were settled, else "Reviewed · N comments"; plain "Done" otherwise | Kyle (2026-10-12): a review card should say its comments are up, not just that the agent stopped | 2026-10-12 |
+| D787 | AL-273: notes the app pushes for the agent carry source `app-note` and show as "Agent Lanes" bubbles (dashed, mono); the `[Agent Lanes` prefix marks them when read back from history | They were drawn as the user's own messages after a restart | 2026-10-12 |
+| D788 | AL-267: `git:openWorktree` goes through Electron's `shell.openPath`, injected into services as `openPath`; a missing worktree is refused before the OS is asked | Keeps `electron` out of the worktree service and lets tests pass a fake | 2026-10-12 |
 
 ---
 
@@ -2232,6 +2311,7 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 | 2026-10-09 | AL-261: sub-agent transcripts — rows nest under their Spawn row (latest line when closed), cards show tokens and Stop (`agent:stopSubagent` / `stopTask`), a card click scrolls the output to its row; fake claude `spawn` and `bash` steps; subagents.spec.ts. |
 | 2026-10-09 | AL-262: thinking blocks — `thinking` output items from the SDK's thinking blocks and deltas, collapsed muted rows in the stream, and a Show thinking switch in the Agent menu (UI pref). |
 | 2026-10-09 | AL-263 started: the hand-over brief builder, the assign service (`createAssignAgentService`) and the `features/assign-agent` slice (modal, api, draft model) with unit tests are on branch `wip/AL-263` (commit 36583a0), not yet wired: `agent:assign` contract and channel, `pastSessions` / `job` on the ticket record, session-manager saving the job, transcript history over past sessions, `stages.moveTo`, services/handlers wiring, TicketPage (menu item, Agents card footer, session pill button), TicketHeader `onAssign`, and `assign-agent.spec.ts` remain. |
+| 2026-10-12 | E16 first batch — AL-267 Open worktree folder (Worktree card button, `git:openWorktree`), AL-268 messaging a ticket without a live session resumes or starts one, AL-269 review tick with comment/thread counts on PR cards (`prActivity`, `agent:prActivity`), AL-273 app notes in the output. Also AL-274 (drag agent cards to any lane) added from Kyle's message. |
 ---
 
 ## 7. Parallel build rules

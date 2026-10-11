@@ -1,4 +1,7 @@
-import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS } from '@agent-lanes/contracts';
+import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS, type AgentSessionState } from '@agent-lanes/contracts';
+
+/** Session states with a `claude` process that takes messages. */
+const LIVE_SESSION_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
 import type { HandlersFor } from '../ipc/handle-invoke';
 import type { Services } from '../services';
 
@@ -19,7 +22,8 @@ export function createAgentHandlers({
   adoLauncher,
   launchUndo,
   planLimits,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  tickets,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -31,8 +35,22 @@ export function createAgentHandlers({
     'agent:setGate': ({ ticketId, stage, gate }) => stages.setGate(ticketId, stage, gate),
     'agent:getGate': ({ ticketId }) => ok({ gate: stages.pendingGate(ticketId) }),
     // A `/skill` on its own line is a skill chip or a typed command; anything else the user wrote (AL-251).
-    'agent:send': ({ ticketId, text, priority, attachments }) =>
-      sessions.send(ticketId, { text, priority: priority ?? 'next', source: /^\/\S+(?:\s[^\n]*)?$/.test(text.trim()) ? 'skill' : 'composer', ...(attachments ? { attachments } : {}) }),
+    'agent:send': async ({ ticketId, text, priority, attachments }) => {
+      const message = { text, priority: priority ?? 'next', source: (/^\/\S+(?:\s[^\n]*)?$/.test(text.trim()) ? 'skill' : 'composer') as 'skill' | 'composer', ...(attachments ? { attachments } : {}) };
+      const status = launches.status(ticketId);
+      if (LIVE_SESSION_STATES.has(status.state)) return sessions.send(ticketId, message);
+      if (status.state === 'queued') return err('VALIDATION', 'The agent is waiting for a free slot; send again once it has started.');
+      // AL-268: a ticket whose agent ended, was lost or never ran takes the message anyway.
+      if (status.sessionId) {
+        const resumed = await recovery.reconnect(ticketId);
+        if (resumed.ok) return resumed.data.state === 'queued' ? err('VALIDATION', 'The agent is waiting for a free slot; send again once it has started.') : sessions.send(ticketId, message);
+        // The SDK would not resume it (its session file is gone): a fresh session takes the message as its job.
+        const cleared = await tickets.update(ticketId, (record) => ({ ...record, sessionId: null }));
+        if (!cleared.ok) return cleared;
+      }
+      const started = await launches.launch({ ticketId, jobDescription: text, firstTurnSource: message.source, firstTurnEcho: text });
+      return started.ok ? ok({ held: false }) : started;
+    },
     'agent:listCommands': async ({ ticketId }) => {
       const commands = await sessions.supportedCommands(ticketId);
       return commands.ok ? ok({ ticketId, commands: commands.data }) : commands;

@@ -31,8 +31,9 @@ describe('composerControls (AL-176)', () => {
   });
 
   it('explains why a ticket without a live session cannot take messages', () => {
-    expect(composerControls({ state: 'none', switching: false, held: 0 })).toMatchObject({ live: false, skillsDisabled: true, note: 'No agent session is running for this ticket.' });
-    expect(composerControls({ state: 'lost', switching: false, held: 0 }).note).toMatch(/Reconnect/);
+    expect(composerControls({ state: 'none', switching: false, held: 0 })).toMatchObject({ live: false, skillsDisabled: false, sendBlocked: false, note: 'No agent is running: sending starts one with your message.' });
+    expect(composerControls({ state: 'lost', switching: false, held: 0 }).note).toMatch(/sending resumes it/);
+    expect(composerControls({ state: 'queued', switching: false, held: 0 })).toMatchObject({ skillsDisabled: true, sendBlocked: true });
     expect(composerControls({ state: 'queued', switching: false, held: 0 }).note).toMatch(/free slot/);
   });
 });

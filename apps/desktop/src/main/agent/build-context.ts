@@ -67,7 +67,7 @@ export function createBuildContext(options: BuildContextOptions): BuildContext {
         log?.debug(`No live session for ticket ${result.ticketId}; its build result is not sent`);
         return;
       }
-      const sent = sessions.send(result.ticketId, { text, shouldQuery: false });
+      const sent = sessions.send(result.ticketId, { text, shouldQuery: false, source: 'app-note' });
       if (sent.ok) log?.info(`Sent the ${result.outcome} build of ticket ${result.ticketId} to its session as context`);
       else log?.warn(`Could not send the build result of ticket ${result.ticketId} to its session: ${sent.message}`);
     },

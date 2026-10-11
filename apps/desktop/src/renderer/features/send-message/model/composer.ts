@@ -16,6 +16,8 @@ export interface ComposerControls {
   applyModel: { disabled: boolean };
   /** Skill chips send `/skill-name`, like Send. */
   skillsDisabled: boolean;
+  /** Sending is impossible right now (the agent waits for a slot); every other state takes a message (AL-268). */
+  sendBlocked: boolean;
   /** One line under the box when the composer can't send right away; null otherwise. */
   note: string | null;
 }
@@ -39,7 +41,8 @@ export function composerControls({ state, switching, held }: ComposerInput): Com
     pause: paused ? { label: 'Resume', icon: 'play', disabled: false } : { label: 'Pause', icon: 'pause', disabled: !live || state === 'starting' },
     stop: { visible: state === 'running' },
     applyModel: { disabled: !live || paused || !switching },
-    skillsDisabled: !live,
+    skillsDisabled: state === 'queued',
+    sendBlocked: state === 'queued',
     note: composerNote(state, held),
   };
 }
@@ -57,11 +60,13 @@ function composerNote(state: AgentSessionState | undefined, held: number): strin
         : 'Paused · messages you send now are delivered on Resume';
     case 'queued':
       return 'The agent has not started yet: it is waiting for a free slot.';
+    // AL-268: a message brings the agent back.
     case 'lost':
-      return 'The session was lost. Reconnect to message the agent.';
-    case 'none':
+      return 'The session was lost: sending resumes it.';
     case 'stopped':
-      return 'No agent session is running for this ticket.';
+      return 'The session ended: sending resumes it.';
+    case 'none':
+      return 'No agent is running: sending starts one with your message.';
   }
 }
 

@@ -36,6 +36,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
       // Launch from the team board (AL-236) has its own tests.
       adoLauncher: {} as Services['adoLauncher'],
       launchUndo: {} as Services['launchUndo'],
+    tickets,
     // Plan limits (AL-258) have their own tests.
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),
@@ -183,6 +184,32 @@ describe('agent:stopSubagent (AL-261)', () => {
     await expect(handleInvoke('agent:stopSubagent', { ticketId: '71273', nodeId: 'toolu_b' }, handlers['agent:stopSubagent'])).resolves.toEqual({ ok: true, data: { stopped: false } });
     await expect(handleInvoke('agent:stopSubagent', { ticketId: '71273', nodeId: 'nope' }, handlers['agent:stopSubagent'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
     expect(fake.calls[0]!.stoppedTasks).toEqual(['task_1']);
+    await sessions.dispose();
+  });
+});
+
+describe('agent:send without a live session (AL-268)', () => {
+  it('starts an agent with the message as its job when the ticket never ran, and resumes an ended session', async () => {
+    const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
+    const claude = createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query });
+    const tickets = await memoryTickets({ id: '71273' });
+    const sessions = createSessionManager({ claude, connections: fakeClaudeConnections(), tickets, emit: recordingEmit().emit });
+    const { handlers } = handlersFor(sessions, tickets);
+
+    await expect(handleInvoke('agent:send', { ticketId: '71273', text: 'What is the status?' }, handlers['agent:send'])).resolves.toEqual({ ok: true, data: { held: false } });
+    const first = fake.calls[0]!;
+    await first.sentCount(1);
+    expect(JSON.stringify(first.sent[0])).toContain('What is the status?');
+    await eventually(() => sessions.status('71273').sessionId === 'session-a');
+
+    // The session ended: the next message resumes it instead of being refused.
+    await sessions.stop('71273');
+    expect(sessions.status('71273').state).toBe('stopped');
+    await expect(handleInvoke('agent:send', { ticketId: '71273', text: 'Still there?' }, handlers['agent:send'])).resolves.toEqual({ ok: true, data: { held: false } });
+    expect(fake.calls).toHaveLength(2);
+    expect(fake.calls[1]!.options.resume).toBe('session-a');
+    await fake.calls[1]!.sentCount(1);
+    expect(JSON.stringify(fake.calls[1]!.sent[0])).toContain('Still there?');
     await sessions.dispose();
   });
 });

@@ -10,6 +10,7 @@ import {
   type StageGates,
   type TicketLastBuild,
   type TicketRecord,
+  type TicketPrActivity,
 } from '@agent-lanes/contracts';
 import {
   SUB_AGENT_STATES,
@@ -132,6 +133,8 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     const merged: AgentTicket = {
       ...previous,
       ...recordFields,
+      // The record's count is newer when it was written after what the events said (AL-269).
+      prActivity: record.prActivity && (!previous.prActivity || record.prActivity.updatedAt >= previous.prActivity.updatedAt) ? record.prActivity : previous.prActivity,
       switching,
       build: sameLastBuild(previous.build.last, record.lastBuild) ? previous.build : { ...previous.build, last: record.lastBuild },
       design: keepDesign ? previous.design : design,
@@ -154,6 +157,7 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     run: lastRunFromRecord(record),
     // The PR the Create PR stage opened (AL-181); its checks come with the next 'pr:status'.
     pullRequest: record.pullRequest ? { id: record.pullRequest.id, status: record.pullRequest.status, checks: null } : null,
+    prActivity: record.prActivity ?? null,
     design,
   };
 }
@@ -182,6 +186,13 @@ export function withDesignSpec(ticket: AgentTicket, version: number, change: Des
 /** The session's state changed (`agent:status`). */
 export function withSession(ticket: AgentTicket, session: AgentSessionState): AgentTicket {
   return ticket.session === session ? ticket : { ...ticket, session };
+}
+
+/** The ticket's PR activity grew (AL-269). */
+export function withPrActivity(ticket: AgentTicket, activity: TicketPrActivity): AgentTicket {
+  const current = ticket.prActivity;
+  if (current && current.comments === activity.comments && current.threads === activity.threads && current.updatedAt === activity.updatedAt) return ticket;
+  return { ...ticket, prActivity: activity };
 }
 
 export function withStage(ticket: AgentTicket, stage: Lane, at: number): AgentTicket {

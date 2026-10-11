@@ -10,6 +10,7 @@ import type {
   StageGates,
   TicketAdoRef,
   TicketLastBuild,
+  TicketPrActivity,
 } from '@agent-lanes/contracts';
 
 /**
@@ -67,6 +68,8 @@ export interface AgentTicket {
   readonly run: AgentTicketRun;
   /** The pull request the Create PR stage opened (AL-181); null before one exists. */
   readonly pullRequest: AgentTicketPullRequest | null;
+  /** PR comments and threads the ticket's agents posted (AL-269); null before any. */
+  readonly prActivity: TicketPrActivity | null;
   /** The latest design spec shipped to the agent (AL-197, AL-200): "Design v2" on the card; null before any. */
   readonly design: AgentTicketDesign | null;
 }

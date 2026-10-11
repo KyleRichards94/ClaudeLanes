@@ -16,5 +16,6 @@ export const GIT_INVOKE_CHANNELS = [
   'git:previewWorktree',
   // Worktree files for the composer's @ picker (AL-259).
   'git:listFiles',
+  'git:openWorktree', // AL-267
 ] as const;
 export const GIT_EVENT_CHANNELS = [] as const;

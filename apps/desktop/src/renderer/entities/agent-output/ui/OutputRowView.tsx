@@ -54,11 +54,11 @@ export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputR
     case 'user':
       return (
         <View style={[styles.row, styles.userRow]} testID="output-user">
-          <View style={[styles.bubble, row.source === 'skill' && styles.bubbleSkill]}>
-            <Text variant="meta" size="xs" color={color.claudeText}>
+          <View style={[styles.bubble, row.source === 'skill' && styles.bubbleSkill, row.source === 'app-note' && styles.bubbleNote]}>
+            <Text variant="meta" size="xs" color={row.source === 'app-note' ? color.muted : color.claudeText}>
               {userCaption(row)}
             </Text>
-            <Text variant={row.source === 'skill' ? 'mono' : 'body'} size="md" selectable style={styles.prose}>
+            <Text variant={row.source === 'skill' || row.source === 'app-note' ? 'mono' : 'body'} size={row.source === 'app-note' ? 'sm' : 'md'} selectable style={styles.prose}>
               {row.text}
             </Text>
           </View>
@@ -291,6 +291,12 @@ const styles = StyleSheet.create({
   bubbleSkill: {
     backgroundColor: color.bg,
     borderColor: color.line,
+  },
+  // A note from the app (AL-273): plain, muted, not the user's violet.
+  bubbleNote: {
+    backgroundColor: color.bg,
+    borderColor: color.line,
+    borderStyle: 'dashed',
   },
   turnEnd: {
     flexDirection: 'row',

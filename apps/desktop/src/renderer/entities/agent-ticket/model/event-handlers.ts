@@ -19,6 +19,8 @@ export function createAgentTicketEventHandlers(store: AgentTicketStore): EventHa
     'agent:output': (events) => store.recordOutput(events),
     // The session's state: a finished review agent's card says "Done" (Kyle, 2026-10-09).
     'agent:status': (event) => store.setSession(event.ticketId, event.state),
+    // A review agent's PR comments and threads (AL-269): the finished card's tick and count.
+    'agent:prActivity': (event) => store.setPrActivity(event.ticketId, event.activity),
     'agent:stage': (event) => {
       if (event.change === 'stage') {
         store.setStage(event.ticketId, event.stage, event.at);

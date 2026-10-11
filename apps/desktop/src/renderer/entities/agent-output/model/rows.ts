@@ -325,7 +325,7 @@ export function compactLabel(row: Pick<Extract<OutputRow, { type: 'compact' }>, 
 
 /** The caption over a user bubble: "You · 14:02", "Skill · 14:02", "Launched · 14:02", "Handed over · 14:02". */
 export function userCaption(row: Pick<Extract<OutputRow, { type: 'user' }>, 'source' | 'at' | 'priority'>): string {
-  const who = row.source === 'skill' ? 'Skill' : row.source === 'launch' ? 'Launched' : row.source === 'hand-over' ? 'Handed over' : 'You';
+  const who = row.source === 'skill' ? 'Skill' : row.source === 'launch' ? 'Launched' : row.source === 'hand-over' ? 'Handed over' : row.source === 'app-note' ? 'Agent Lanes' : 'You';
   const when = row.at > 0 ? ` · ${outputClock(row.at)}` : '';
   return `${who}${when}${row.priority === 'now' ? ' · steered now' : ''}`;
 }

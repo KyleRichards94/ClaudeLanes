@@ -36,9 +36,19 @@ export interface CardView {
   design: { label: string; tone: 'claude' | 'attention' } | null;
   /**
    * The top-right corner of a card without a work item state (a PR review or a "No ticket" ticket):
-   * "Done" once its agent finished (Kyle, 2026-10-09); null otherwise.
+   * "Done" once its agent finished (Kyle, 2026-10-09), or with a tick "Reviewed · 4 comments" /
+   * "Actioned · 3 threads" once it posted to its pull request (AL-269); null otherwise.
    */
-  corner: { label: string; tone: 'ok' } | null;
+  corner: { label: string; tone: 'ok'; tick: boolean } | null;
+}
+
+/** The finished corner (AL-269): what the agent did on the PR, or plain "Done". */
+export function finishedCorner(ticket: Pick<AgentTicket, 'ado' | 'session' | 'lastOutputAt' | 'stage' | 'needsYou' | 'prActivity'>): CardView['corner'] {
+  if (ticket.ado !== null || !agentFinished(ticket)) return null;
+  const activity = ticket.prActivity;
+  if (activity && activity.threads > 0) return { label: `Actioned · ${plural(activity.threads, 'thread')}`, tone: 'ok', tick: true };
+  if (activity && activity.comments > 0) return { label: `Reviewed · ${plural(activity.comments, 'comment')}`, tone: 'ok', tick: true };
+  return { label: 'Done', tone: 'ok', tick: false };
 }
 
 /** A review or no-ticket agent has finished: its session is idle or ended after producing output. */
@@ -112,7 +122,7 @@ export function cardView(ticket: AgentTicket): CardView {
     modelLine: modelLine(ticket),
     subAgentsLine: total > 0 ? plural(total, 'sub-agent') : '—',
     design: designIndicator(ticket.design),
-    corner: ticket.ado === null && agentFinished(ticket) ? { label: 'Done', tone: 'ok' as const } : null,
+    corner: finishedCorner(ticket),
   };
   const progress = ticket.progress ?? 0;
   const reason = ticket.needsYou[0];

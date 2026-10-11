@@ -25,6 +25,7 @@ describe('agent ticket event handlers', () => {
       'agent:model',
       'agent:output',
       'agent:permission',
+      'agent:prActivity', // AL-269
       'agent:stage',
       'agent:status',
       'agent:subagent',

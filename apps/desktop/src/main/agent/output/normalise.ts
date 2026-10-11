@@ -156,6 +156,9 @@ function resultText(content: unknown): string {
     .join('\n');
 }
 
+/** Every note the app pushes for the agent starts like this (build results, AL-173). */
+export const APP_NOTE_PREFIX = '[Agent Lanes';
+
 export function createOutputNormaliser(options: OutputNormaliserOptions): OutputNormaliser {
   const platform = options.platform ?? process.platform;
   const toolUses = new Map<string, ToolUse | 'hidden'>();
@@ -355,7 +358,8 @@ export function createOutputNormaliser(options: OutputNormaliserOptions): Output
         messageId: typeof message.uuid === 'string' ? message.uuid : null,
         text: clip(text, OUTPUT_TEXT_LIMIT),
         priority: message.priority === 'now' || message.priority === 'next' ? message.priority : null,
-        source: text.startsWith('/') && !text.includes('\n') ? 'skill' : 'composer',
+        // A note the app pushed (AL-273) reads as one after a restart too.
+        source: text.startsWith(APP_NOTE_PREFIX) ? 'app-note' : text.startsWith('/') && !text.includes('\n') ? 'skill' : 'composer',
         parentToolUseId: null,
       },
     ];
