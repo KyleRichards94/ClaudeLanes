@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { workItemStateColor, workItemTypeColor } from '@agent-lanes/contracts';
-import { AgentTicketCardView, useAgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
-import { RemoveTicketMenu } from '@/features/remove-ticket';
+import { AgentTicketCardView, agentCardName, useAgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
+import { LaneDragCard, agentTicketDrag, useDragToLaneAvailable } from '@/features/drag-to-lane';
+import type { MenuAnchor } from '@/shared/ui';
+import { TicketContextMenu, TicketMenuButton } from './TicketContextMenu';
 import { useConnections, useWorkItem, useWorkItemColors } from '@/shared/api';
 
 export interface BoardTicketCardProps {
@@ -28,19 +31,37 @@ export function BoardTicketCard({ ticketId, store, onPress, testID }: BoardTicke
   const org = ado ? connections.data?.find((row) => row.kind === 'ado' && sameOrgUrl(row.orgUrl, ado.orgUrl))?.id : undefined;
   const workItem = useWorkItem(ado?.workItemId, org);
   const colors = useWorkItemColors({ ...(org ? { org } : {}), ...(ado ? { project: ado.project } : {}) }, { enabled: ado !== null });
+  // The context menu (AL-270): right-click, the Menu key, or the corner chevron.
+  const [menuAt, setMenuAt] = useState<MenuAnchor | null>(null);
+  // Inside the board's drag provider the card is a draggable (AL-274): the wrapper is the button and the press.
+  const draggable = useDragToLaneAvailable();
   if (!ticket) return null;
 
   const type = workItem.data?.type ?? null;
   const state = workItem.data?.state ?? null;
-  return (
+  const card = (
     <AgentTicketCardView
       ticket={ticket}
       adoState={state}
       typeColor={workItemTypeColor(colors.data, type)}
       stateColor={workItemStateColor(colors.data, type, state)}
-      cornerAction={<RemoveTicketMenu ticketId={ticketId} />}
-      {...(onPress ? { onPress } : {})}
-      {...(testID ? { testID } : {})}
+      cornerAction={<TicketMenuButton onOpen={setMenuAt} testID={`ticket-menu-${ticketId}`} />}
+      onContextMenu={setMenuAt}
+      embedded={draggable}
+      {...(onPress && !draggable ? { onPress } : {})}
+      {...(testID ? { testID: draggable ? `${testID}-card` : testID } : {})}
     />
+  );
+  return (
+    <>
+      {draggable ? (
+        <LaneDragCard drag={agentTicketDrag(ticket)} label={agentCardName(ticket)} {...(onPress ? { onClick: onPress } : {})} {...(testID ? { testID } : {})}>
+          {card}
+        </LaneDragCard>
+      ) : (
+        card
+      )}
+      <TicketContextMenu ticketId={ticketId} {...(store ? { store } : {})} anchor={menuAt} onClose={() => setMenuAt(null)} />
+    </>
   );
 }

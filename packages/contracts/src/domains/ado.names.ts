@@ -12,5 +12,6 @@ export const ADO_INVOKE_CHANNELS = [
   'ado:activePrs',
   'ado:backlog',
   'ado:workItemColors',
+  'ado:setWorkItemState', // AL-270
 ] as const;
 export const ADO_EVENT_CHANNELS = [] as const;

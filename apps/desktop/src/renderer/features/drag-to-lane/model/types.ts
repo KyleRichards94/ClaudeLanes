@@ -16,7 +16,15 @@ export type LaneDropSource =
       column?: string;
     }
   | { kind: 'backlog-item'; id: number }
-  | { kind: 'pull-request'; id: number; team?: string };
+  | { kind: 'pull-request'; id: number; team?: string }
+  /** An agent board card (AL-274): the drop is a stage move, not a launch. */
+  | { kind: 'agent-ticket'; ticketId: string };
+
+/** An agent board card as drag data (AL-274): no team board drop rules apply; `LaneDragCard.lanes` says where it goes. */
+export interface AgentTicketDragCard {
+  kind: 'agent-ticket';
+  ticketId: string;
+}
 
 /** A card that can be dragged onto an agent lane, or sent to one from the keyboard menu. */
 export interface LaneDragCard {
@@ -25,8 +33,10 @@ export interface LaneDragCard {
   /** `#71318` or `!10571`. */
   label: string;
   title: string;
-  /** The card for the drop rules (AL-230). */
-  card: DropCard;
+  /** The card for the drop rules (AL-230), or an agent card (AL-274). */
+  card: DropCard | AgentTicketDragCard;
+  /** The lanes that take the card with what each drop does, when the drop rules do not apply (an agent card). */
+  lanes?: Partial<Record<Lane, DropAction>>;
   /** The signed-in user as the drop rules know them. */
   me: DropMe;
   /** The signed-in user's display name, for the optimistic "assigned to you" (T5). */

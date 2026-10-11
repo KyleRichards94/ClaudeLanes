@@ -10,6 +10,12 @@ export interface ActiveDrag {
   input: DragInput;
 }
 
+/** What each lane does with one card: the team board's drop rules, or an agent card's own lanes (AL-274). */
+export function laneActions(card: LaneDragCard): Partial<Record<Lane, DropAction>> {
+  if (card.card.kind === 'agent-ticket') return card.lanes ?? {};
+  return allowedLanes(card.card, card.me);
+}
+
 /** The cards a drag carries: the group it was picked up with, or just the card. */
 export function dragMembers(card: LaneDragCard): readonly LaneDragCard[] {
   return card.group && card.group.length > 0 ? card.group : [card];
@@ -26,8 +32,8 @@ function forSeveral(action: DropAction): DropAction {
  */
 function lanesFor(card: LaneDragCard): Partial<Record<Lane, DropAction>> {
   const members = dragMembers(card);
-  if (members.length <= 1) return allowedLanes(card.card, card.me);
-  const each = members.map((member) => allowedLanes(member.card, member.me));
+  if (members.length <= 1) return laneActions(card);
+  const each = members.map((member) => laneActions(member));
   const allowed: Partial<Record<Lane, DropAction>> = {};
   for (const lane of LANES) {
     const first = each[0]?.[lane];
@@ -48,7 +54,8 @@ export function activeDrag(card: LaneDragCard, input: DragInput): ActiveDrag {
     // A group is announced and previewed as "2 items".
     card: several ? { ...card, label: dragLabel(card) } : card,
     allowed: lanesFor(card),
-    refused: refusedLanes(card.card, card.me),
+    // An agent card's other lanes just dim: there is no team board reason to show.
+    refused: card.card.kind === 'agent-ticket' ? {} : refusedLanes(card.card, card.me),
     input,
   };
 }

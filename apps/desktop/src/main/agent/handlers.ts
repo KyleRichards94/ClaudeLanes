@@ -1,5 +1,7 @@
 import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS, type AgentSessionState } from '@agent-lanes/contracts';
 
+import { LANE_LABELS } from './stages/stage-rules';
+
 /** Session states with a `claude` process that takes messages. */
 const LIVE_SESSION_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
 import type { HandlersFor } from '../ipc/handle-invoke';
@@ -23,7 +25,8 @@ export function createAgentHandlers({
   launchUndo,
   planLimits,
   tickets,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  nextActions,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -67,7 +70,18 @@ export function createAgentHandlers({
     'agent:setEffort': ({ ticketId, effort }) => sessions.setEffort(ticketId, effort),
     'agent:applyModelNow': ({ ticketId }) => sessions.applyModelNow(ticketId),
     'agent:getModel': ({ ticketId }) => sessions.modelState(ticketId),
+    // Move to stage (AL-270, AL-274): the user's own lane move; a live agent is told at its next turn.
+    'agent:moveStage': async ({ ticketId, stage }) => {
+      const moved = await stages.moveTo(ticketId, stage);
+      if (!moved.ok) return moved;
+      if (moved.data.changed && LIVE_SESSION_STATES.has(sessions.status(ticketId).state)) {
+        sessions.send(ticketId, { text: `[Agent Lanes · stage] The user moved this ticket to ${LANE_LABELS[stage]}. Carry on from that stage; report it with set_stage only when you move it again.`, shouldQuery: false, source: 'app-note' });
+      }
+      return ok({ from: moved.data.from, to: moved.data.to, changed: moved.data.changed });
+    },
     'agent:getSubagents': ({ ticketId }) => ok(subagents.get(ticketId)),
+    // Next actions for the board digest (AL-272).
+    'agent:nextActions': (request) => nextActions.generate(request),
     // Stop one sub-agent (AL-261): its SDK task is stopped; the lead agent's turn goes on.
     'agent:stopSubagent': async ({ ticketId, nodeId }) => {
       const node = subagents.get(ticketId).nodes.find((entry) => entry.id === nodeId);

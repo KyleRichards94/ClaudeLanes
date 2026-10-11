@@ -45,12 +45,15 @@ import {
   type WorkItemColors,
   type WorkItemColorsRequest,
   type WorkItemComment,
+  type SetWorkItemStateRequest,
+  type WorkItemStateChange,
 } from '@agent-lanes/contracts';
 import type { ConnectionsService } from '../connections';
 import type { Logger } from '../logging';
 import type { SettingsService } from '../settings/service';
 import { isRegisteredRepository } from './registered-repos';
 import { createWorkItemWriteBack, type WorkItemWriteBack } from './write-back';
+import { setWorkItemState as setWorkItemStateInAdo } from '@agent-lanes/ado-client';
 
 /**
  * Azure DevOps in the main process (AL-065, design §4 "ADO client: REST, PAT/org"). Every `ado:*`
@@ -86,6 +89,8 @@ export interface AdoService {
   backlog(request: BacklogRequest): Promise<Result<BacklogPage>>;
   /** The project's work item type and state colours, kept for {@link WORK_ITEM_COLORS_TTL_MS} per organisation and project. */
   workItemColors(request: WorkItemColorsRequest): Promise<Result<WorkItemColors>>;
+  /** The user's own state change from a card (AL-270); not subject to Settings › ADO state transitions. */
+  setWorkItemState(request: SetWorkItemStateRequest): Promise<Result<WorkItemStateChange>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -277,6 +282,8 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
 
     // Work items are read at organisation level: no project needed.
     getWorkItem: (request) => withClient(request, (client) => getWorkItem(client, { id: request.id }), false),
+
+    setWorkItemState: ({ org, project, id, state }) => withClient({ org, project }, (client, resolvedProject) => setWorkItemStateInAdo(client, { project: resolvedProject, workItemId: id }, state)),
 
     getComments: (request) => withClient(request, (client, project) => listWorkItemComments(client, { project, workItemId: request.workItemId })),
 

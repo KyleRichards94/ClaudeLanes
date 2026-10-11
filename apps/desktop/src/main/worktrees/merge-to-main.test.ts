@@ -53,7 +53,7 @@ describe('merge worktree → main', () => {
     const before = await repo.exec(['rev-parse', 'HEAD']);
     const ticketHead = await repo.exec(['rev-parse', BRANCH]);
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -80,7 +80,7 @@ describe('merge worktree → main', () => {
     await makeDirty();
     const before = await repo.exec(['rev-parse', 'HEAD']);
 
-    const result = await service().merge('71273', { acceptQaWarning: true });
+    const result = await service().merge('71273', { target: 'base', acceptQaWarning: true });
 
     expect(result).toMatchObject({ ok: false, code: 'GIT_DIRTY', details: { reason: 'worktree-dirty', fileCount: 1 } });
     expect(await repo.exec(['rev-parse', 'HEAD'])).toBe(before);
@@ -91,10 +91,10 @@ describe('merge worktree → main', () => {
   it('warns when QA has not passed, and merges once the user accepts the warning', async () => {
     await moveTo('implementing');
 
-    const warned = await service().merge('71273');
+    const warned = await service().merge('71273', { target: 'base' });
     expect(warned).toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'qa-not-passed' } });
 
-    const merged = await service().merge('71273', { acceptQaWarning: true });
+    const merged = await service().merge('71273', { target: 'base', acceptQaWarning: true });
     expect(merged).toMatchObject({ ok: true, data: { record: { stage: 'done' } } });
   });
 
@@ -103,7 +103,7 @@ describe('merge worktree → main', () => {
     const before = await repo.commit('Teammate edit');
     await repo.exec(['push', '--quiet', 'origin', 'main']);
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result).toMatchObject({ ok: false, code: 'MERGE_CONFLICT', details: { reason: 'conflict', files: ['src/JobControl.razor'] } });
     expect(await repo.exec(['rev-parse', 'HEAD'])).toBe(before);
@@ -114,7 +114,7 @@ describe('merge worktree → main', () => {
   it('refuses when the main checkout has uncommitted changes to tracked files', async () => {
     await repo.write('README.md', 'local edit\n');
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result).toMatchObject({ ok: false, code: 'GIT_DIRTY', details: { reason: 'base-checkout-dirty', worktreePath: repo.dir } });
   });
@@ -123,7 +123,7 @@ describe('merge worktree → main', () => {
     await repo.exec(['switch', '--quiet', '-c', 'side']);
     const mainBefore = await repo.exec(['rev-parse', 'main']);
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result.ok).toBe(true);
     const merged = await repo.exec(['rev-parse', 'main']);
@@ -138,7 +138,7 @@ describe('merge worktree → main', () => {
     await repo.commit('Teammate edit');
     await repo.exec(['switch', '--quiet', '-c', 'side']);
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result).toMatchObject({ ok: false, code: 'MERGE_CONFLICT', details: { files: ['src/JobControl.razor'] } });
   });
@@ -151,7 +151,7 @@ describe('merge worktree → main', () => {
     await repo.exec(['push', '--quiet', 'origin', 'main']);
     await repo.exec(['reset', '--quiet', '--hard', known]);
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result.ok).toBe(true);
     expect(await repo.exec(['rev-parse', 'HEAD^1'])).toBe(teammate);
@@ -167,7 +167,7 @@ describe('merge worktree → main', () => {
     await repo.write('mine.txt', 'local\n');
     await repo.commit('Local change');
 
-    const result = await service().merge('71273');
+    const result = await service().merge('71273', { target: 'base' });
 
     expect(result).toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'base-diverged' } });
   });
@@ -183,12 +183,12 @@ describe('merge worktree → main', () => {
     };
     const merge = service(flaky);
 
-    const first = await merge.merge('71273');
+    const first = await merge.merge('71273', { target: 'base' });
     expect(first).toMatchObject({ ok: false, code: 'INTERNAL', details: { reason: 'push-failed' } });
     const merged = await repo.exec(['rev-parse', 'HEAD']);
     expect((await tickets.get('71273'))?.stage).toBe('create-pr');
 
-    const second = await merge.merge('71273');
+    const second = await merge.merge('71273', { target: 'base' });
     expect(second).toMatchObject({ ok: true, data: { mergeCommit: null, pushed: true } });
     expect(await repo.exec(['rev-parse', 'HEAD'])).toBe(merged);
     expect(await originMain()).toBe(merged);
@@ -205,6 +205,8 @@ describe('merge worktree → main', () => {
         ticketId: '71273',
         source: BRANCH,
         target: 'main',
+        checkoutBranch: 'main',
+        checkoutClean: true,
         repo: repo.dir,
         qaPassed: true,
         worktree: { worktreePath: ticketPath, present: true, dirty: true, changedFiles: 1, conflicted: false },
@@ -229,5 +231,44 @@ describe('qaPassed', () => {
     // QA sent it back to Implementing; it has not been through QA again.
     const sentBack = [...record.stageHistory, { stage: 'implementing' as const, at: 9 }, { stage: 'create-pr' as const, at: 10 }];
     expect(qaPassed({ ...record, stage: 'create-pr', stageHistory: sentBack })).toBe(false);
+  });
+});
+
+describe('merge worktree → the main checkout (AL-271)', () => {
+  it('merges into the branch the main checkout has, without pushing, and moves the card to Done', async () => {
+    await repo.exec(['checkout', '--quiet', '-b', 'feature/next']);
+    const before = await repo.exec(['rev-parse', 'HEAD']);
+    const ticketHead = await repo.exec(['rev-parse', BRANCH]);
+    const originBefore = await originMain();
+    await expect(service().preview('71273')).resolves.toMatchObject({ ok: true, data: { checkoutBranch: 'feature/next', checkoutClean: true, target: 'main' } });
+
+    const result = await service().merge('71273');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const merged = await repo.exec(['rev-parse', 'HEAD']);
+    expect(result.data).toMatchObject({ target: 'feature/next', targetKind: 'checkout', mergeCommit: merged, pushed: false });
+    expect(await repo.exec(['rev-list', '--parents', '-n', '1', 'HEAD'])).toBe(`${merged} ${before} ${ticketHead}`);
+    expect(await repo.exec(['log', '-1', '--format=%B'])).toContain(`Merge branch '${BRANCH}' into feature/next`);
+    // main and origin are untouched.
+    expect(await originMain()).toBe(originBefore);
+    expect(await repo.exec(['rev-parse', 'refs/heads/main'])).toBe(originBefore);
+    expect(await repo.exec(['status', '--porcelain'])).toBe('');
+    expect((await tickets.get('71273'))?.stage).toBe('done');
+
+    // Merging again finds the branch already in and changes nothing.
+    await moveTo('create-pr');
+    await expect(service().merge('71273')).resolves.toMatchObject({ ok: true, data: { mergeCommit: null, pushed: false, targetKind: 'checkout' } });
+  });
+
+  it('refuses a detached main checkout and a dirty one, and names the reason', async () => {
+    await repo.exec(['checkout', '--quiet', '--detach']);
+    await expect(service().preview('71273')).resolves.toMatchObject({ ok: true, data: { checkoutBranch: null } });
+    await expect(service().merge('71273')).resolves.toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'checkout-detached' } });
+
+    await repo.exec(['checkout', '--quiet', 'main']);
+    await repo.write('README.md', '# edited\n');
+    await expect(service().preview('71273')).resolves.toMatchObject({ ok: true, data: { checkoutBranch: 'main', checkoutClean: false } });
+    await expect(service().merge('71273')).resolves.toMatchObject({ ok: false, code: 'GIT_DIRTY', details: { reason: 'base-checkout-dirty' } });
+    expect((await tickets.get('71273'))?.stage).toBe('create-pr');
   });
 });

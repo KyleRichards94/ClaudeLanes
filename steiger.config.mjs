@@ -20,6 +20,13 @@ export default defineConfig([
     },
   },
   {
+    files: ['./apps/desktop/src/renderer/features/board-digest/**'],
+    rules: {
+      // The board digest (AL-272) belongs to the board page alone: it reads the whole ticket store.
+      'fsd/insignificant-slice': 'off',
+    },
+  },
+  {
     rules: {
       // Design §5 keeps the processes layer for flows across pages (first run, AL-047; new ticket).
       'fsd/no-processes': 'off',

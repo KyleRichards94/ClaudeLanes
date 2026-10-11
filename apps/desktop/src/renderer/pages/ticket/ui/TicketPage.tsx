@@ -8,6 +8,7 @@ import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentT
 import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
 import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
+import { MoveStageModal } from '@/features/ticket-actions';
 import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
@@ -15,6 +16,7 @@ import { PermissionPrompt, usePendingPermission } from '@/features/resolve-permi
 import { QueuedNotice } from '@/features/start-queued-agent';
 import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useStopSubagent, useTicketRecord, useWorkItem } from '@/shared/api';
 import { setTicketPageTab, toast, useShowThinking, useTicketPageTab, useUiPrefs, type TicketPageTab } from '@/shared/model';
+import { LANE_LABELS } from '@/shared/config';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, PlanLimitsPill, TicketTabBar } from '@/shared/ui';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
@@ -39,6 +41,7 @@ export const STACKED_PANEL_MIN_HEIGHT = 480;
 const STACKED_PANEL_CHROME = 200;
 const TABS_ID = 'ticket-tabs';
 const SHOW_THINKING_KEY = 'show-thinking';
+const MOVE_STAGE_KEY = 'move-stage';
 
 /**
  * Route `ticket/:id`, the ticket drill-in (AL-250, artboard 3 reshaped for an output-first page): a
@@ -95,6 +98,7 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const { navigate } = useNavigation();
   const [removing, setRemoving] = useState(false);
   const showThinking = useShowThinking();
+  const [movingStage, setMovingStage] = useState(false);
   // A sub-agent card opens its output in the stream, or stops it (AL-261).
   const stopSubagent = useStopSubagent(ticket.id);
   const subAgentActions = {
@@ -137,15 +141,19 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             <AgentMenu
               ticketId={ticket.id}
               extraItems={[
+                // Move to stage… (AL-264, AL-270): the user's own lane move; the agent is told at its next turn.
+                { key: MOVE_STAGE_KEY, label: 'Move to stage…', detail: `Now ${LANE_LABELS[ticket.stage]}`, icon: 'branch', section: 'Agent' },
                 { key: SHOW_THINKING_KEY, label: 'Show thinking', detail: "The agent's reasoning, collapsed in the output.", icon: 'thinking', selected: showThinking, section: 'Output' },
                 { key: REMOVE_TICKET_KEY, label: 'Remove from board…', detail: 'Ends the agent and removes the worktree; the branch stays.', icon: 'archive', danger: true, section: 'Ticket' },
               ]}
               onExtraSelect={(key) => {
                 if (key === REMOVE_TICKET_KEY) setRemoving(true);
                 else if (key === SHOW_THINKING_KEY) useUiPrefs.getState().setShowThinking(!showThinking);
+                else if (key === MOVE_STAGE_KEY) setMovingStage(true);
               }}
             />
             <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
+            <MoveStageModal visible={movingStage} ticketId={ticket.id} title={ticket.title} stage={ticket.stage} onClose={() => setMovingStage(false)} />
           </>
         }
       />

@@ -51,7 +51,7 @@ describe('mergePanel (AL-174)', () => {
   it('reads "Merge 3 sub-branches → <ticket branch>" and "Merge worktree → main", both on, when ready', () => {
     expect(mergePanel(ticket, status())).toEqual({
       subBranches: { label: 'Merge 3 sub-branches', disabledReason: null },
-      toMain: { label: 'Merge worktree → main', disabledReason: null },
+      toMain: { label: 'Merge worktree → main checkout', disabledReason: null },
       conflicted: false,
       readyCount: 3,
     });

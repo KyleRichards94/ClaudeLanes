@@ -47,6 +47,7 @@ export {
   windowVisibilityEventHandlers,
   type AdoQueryOptions,
   type AdoScope,
+  type AdoOrgId,
 } from './ado';
 export { teamBoardKeys, useActivePrs, useBacklog, useBacklogTotal, useTeamBoard } from './team-board';
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';

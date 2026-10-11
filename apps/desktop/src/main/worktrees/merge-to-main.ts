@@ -6,6 +6,7 @@ import {
   type MergeToMainResult,
   type Result,
   type TicketRecord,
+  type MergeTarget,
 } from '@agent-lanes/contracts';
 import { isGitError } from '../git/git-error';
 import type { CallOptions, GitService } from '../git/git-service';
@@ -34,7 +35,7 @@ import { fetchBase } from './worktree-git';
  */
 export interface MergeToMainService {
   preview(ticketId: string, call?: CallOptions): Promise<Result<MergeToMainPreview>>;
-  merge(ticketId: string, options?: { acceptQaWarning?: boolean } & CallOptions): Promise<Result<MergeToMainResult>>;
+  merge(ticketId: string, options?: { acceptQaWarning?: boolean; target?: MergeTarget } & CallOptions): Promise<Result<MergeToMainResult>>;
 }
 
 export interface MergeToMainServiceOptions {
@@ -94,8 +95,8 @@ async function commitOf(git: MergeToMainServiceOptions['git'], repo: string, ref
   return (await git.run(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`], { cwd: repo, ...call })).stdout.trim();
 }
 
-function mergeMessage(record: TicketRecord): string {
-  const subject = `Merge branch '${record.branch}' into ${record.baseBranch}`;
+function mergeMessage(record: TicketRecord, target: string = record.baseBranch): string {
+  const subject = `Merge branch '${record.branch}' into ${target}`;
   const workItem = record.ado ? `Work item #${record.ado.workItemId}: ${record.title}` : record.title;
   return workItem.trim() === '' ? subject : `${subject}\n\n${workItem}`;
 }
@@ -124,10 +125,13 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
         : null;
     const branchExists = await refExists(git, repo, branchRef, call);
     const ahead = baseRef && branchExists ? (await git.aheadBehind(repo, baseRef, branchRef, call)).ahead : null;
+    const checkout = await mainCheckout(repo, call);
     return {
       ticketId: record.id,
       source: record.branch,
       target: record.baseBranch,
+      checkoutBranch: checkout.branch,
+      checkoutClean: checkout.clean,
       repo,
       qaPassed: qaPassed(record),
       worktree,
@@ -136,12 +140,21 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
     };
   }
 
-  async function mergeInRepo(record: TicketRecord, acceptQaWarning: boolean, call: CallOptions): Promise<MergeToMainResult> {
-    const { repo, baseBranch: base, branch } = record;
-    const baseRef = `${HEADS}${base}`;
-    const branchRef = `${HEADS}${branch}`;
+  /** The repo's main checkout (AL-271): the branch it has checked out and whether its tracked files are clean. */
+  async function mainCheckout(repo: string, call: CallOptions): Promise<{ branch: string | null; clean: boolean }> {
+    try {
+      const entries = await git.worktrees(repo, call);
+      const main = entries.find((entry) => isSameRepoPath(entry.path, repo)) ?? entries[0];
+      const clean = dirtyFiles(await git.status(repo, call), { tracked: true }).length === 0;
+      return { branch: main?.branch ?? null, clean };
+    } catch {
+      return { branch: null, clean: false };
+    }
+  }
 
-    // 1. The ticket worktree must be fully committed.
+  /** The ticket worktree must be fully committed, QA passed (or waived) and the branch present, whatever the target. */
+  async function checkTicketBranch(record: TicketRecord, acceptQaWarning: boolean, target: string, call: CallOptions): Promise<void> {
+    const { repo, branch } = record;
     let ticketStatus: GitStatus;
     try {
       ticketStatus = await git.status(record.worktreePath, call);
@@ -153,17 +166,58 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
     }
     const uncommitted = dirtyFiles(ticketStatus, { tracked: false });
     if (uncommitted.length > 0) {
-      refuse('GIT_DIRTY', 'worktree-dirty', `${branch} has uncommitted changes. Commit or discard them before merging into ${base}.`, {
+      refuse('GIT_DIRTY', 'worktree-dirty', `${branch} has uncommitted changes. Commit or discard them before merging into ${target}.`, {
         worktreePath: record.worktreePath,
         ...listed(uncommitted),
       });
     }
     if (!qaPassed(record) && !acceptQaWarning) {
-      refuse('VALIDATION', 'qa-not-passed', `QA has not passed for ${record.id}. Confirm again to merge into ${base} anyway.`);
+      refuse('VALIDATION', 'qa-not-passed', `QA has not passed for ${record.id}. Confirm again to merge into ${target} anyway.`);
     }
-    if (!(await refExists(git, repo, branchRef, call))) {
+    if (!(await refExists(git, repo, `${HEADS}${branch}`, call))) {
       refuse('VALIDATION', 'branch-missing', `The ticket branch ${branch} no longer exists.`, { branch });
     }
+  }
+
+  /** The card moves to Done once the branch is in. */
+  async function finishMerge(record: TicketRecord, target: string, targetKind: MergeTarget, mergeCommit: string | null, pushed: boolean): Promise<MergeToMainResult> {
+    const mergedAt = now();
+    const updated = await tickets.update(record.id, (current) => ({ ...current, stage: 'done' }));
+    if (!updated.ok) throw new MergeRefusal(updated);
+    await tickets.flush(record.id);
+    return { record: updated.data, target, targetKind, mergeCommit, pushed, mergedAt: updated.data.stageHistory.at(-1)?.at ?? mergedAt };
+  }
+
+  /**
+   * Merge worktree → the main checkout (AL-271, the default): the ticket branch merges into whatever
+   * branch the repo's main checkout has checked out, in that checkout, and nothing is pushed.
+   */
+  async function mergeIntoCheckout(record: TicketRecord, acceptQaWarning: boolean, call: CallOptions): Promise<MergeToMainResult> {
+    const { repo, branch } = record;
+    const checkout = await mainCheckout(repo, call);
+    const target = checkout.branch;
+    if (target === null) refuse('VALIDATION', 'checkout-detached', `The main checkout ${repo} has no branch checked out. Check one out, or merge into ${record.baseBranch} instead.`, { repo });
+    if (target === branch) refuse('VALIDATION', 'checkout-is-ticket-branch', `The main checkout has the ticket branch ${branch} checked out; there is nothing to merge it into.`, { repo });
+    await checkTicketBranch(record, acceptQaWarning, target, call);
+    if (!checkout.clean) {
+      const files = dirtyFiles(await git.status(repo, call), { tracked: true });
+      refuse('GIT_DIRTY', 'base-checkout-dirty', `${repo} has ${target} checked out with uncommitted changes. Commit or stash them first.`, { worktreePath: repo, ...listed(files) });
+    }
+    let mergeCommit: string | null = null;
+    if (!(await isAncestor(git, repo, `${HEADS}${branch}`, 'HEAD', call))) {
+      mergeCommit = await mergeInCheckout(repo, record, call, target);
+      log.info(`Ticket ${record.id}: merged ${branch} into ${target} in the main checkout (${mergeCommit.slice(0, 12)}).`);
+    }
+    return finishMerge(record, target, 'checkout', mergeCommit, false);
+  }
+
+  async function mergeInRepo(record: TicketRecord, acceptQaWarning: boolean, call: CallOptions): Promise<MergeToMainResult> {
+    const { repo, baseBranch: base, branch } = record;
+    const baseRef = `${HEADS}${base}`;
+    const branchRef = `${HEADS}${branch}`;
+
+    // 1. The ticket worktree must be fully committed.
+    await checkTicketBranch(record, acceptQaWarning, base, call);
 
     // 2. The checkout that has the base checked out, if any, must be clean (untracked files are fine).
     const holder = (await git.worktrees(repo, call)).find((entry) => entry.branchRef === baseRef);
@@ -225,16 +279,12 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
     }
 
     // 6. The card moves to Done.
-    const mergedAt = now();
-    const updated = await tickets.update(record.id, (current) => ({ ...current, stage: 'done' }));
-    if (!updated.ok) throw new MergeRefusal(updated);
-    await tickets.flush(record.id);
-    return { record: updated.data, target: base, mergeCommit, pushed: hasOrigin, mergedAt: updated.data.stageHistory.at(-1)?.at ?? mergedAt };
+    return finishMerge(record, base, 'base', mergeCommit, hasOrigin);
   }
 
-  async function mergeInCheckout(checkout: string, record: TicketRecord, call: CallOptions): Promise<string> {
+  async function mergeInCheckout(checkout: string, record: TicketRecord, call: CallOptions, target: string = record.baseBranch): Promise<string> {
     const result = await git.run(
-      ['merge', '--no-ff', '--no-edit', '--quiet', '-m', mergeMessage(record), `${HEADS}${record.branch}`],
+      ['merge', '--no-ff', '--no-edit', '--quiet', '-m', mergeMessage(record, target), `${HEADS}${record.branch}`],
       { cwd: checkout, allowedExitCodes: [1, 2, 128], ...call },
     );
     if (result.exitCode === 0) return commitOf(git, checkout, 'HEAD', call);
@@ -283,7 +333,7 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
 
   return {
     preview: (ticketId, call = {}) => guarded(() => preview(ticketId, call)),
-    merge: (ticketId, { acceptQaWarning = false, ...call } = {}) =>
+    merge: (ticketId, { acceptQaWarning = false, target = 'checkout', ...call } = {}) =>
       guarded(async () => {
         const record = await load(ticketId);
         await git.ensureSupported(call);
@@ -291,7 +341,7 @@ export function createMergeToMainService(options: MergeToMainServiceOptions): Me
           // Read again inside the queue: an earlier merge in this repo may have changed it.
           const current = await load(ticketId);
           if (!isSameRepoPath(current.repo, record.repo)) refuse('VALIDATION', 'ticket-not-found', `There is no ticket ${ticketId}.`);
-          return mergeInRepo(current, acceptQaWarning, call);
+          return target === 'base' ? mergeInRepo(current, acceptQaWarning, call) : mergeIntoCheckout(current, acceptQaWarning, call);
         });
       }),
   };

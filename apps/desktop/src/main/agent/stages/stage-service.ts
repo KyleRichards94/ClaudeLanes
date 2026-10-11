@@ -43,6 +43,11 @@ export interface StageService {
   pendingGate(ticketId: string): PendingGate | null;
   /** The session ended while a gate waited: the gate closes and the waiting call returns. */
   cancelGate(ticketId: string): void;
+  /**
+   * The user's own lane move (AL-270, AL-274): any lane but Queued, no rules check; a gate waiting on
+   * the old stage is cancelled. `by` names who moved it in the output ("Moved to QA by Kyle").
+   */
+  moveTo(ticketId: string, stage: Exclude<Lane, 'queued'>, by?: string): Promise<Result<StageChange>>;
 }
 
 export type GateDecision = { approve: true } | { approve: false; note: string };
@@ -200,6 +205,18 @@ export function createStageService(options: StageServiceOptions): StageService {
         if (gateStage) return gatedMove(ticketId, record.stage, stage, gateStage, summary, callOptions.signal);
         return move(ticketId, stage, summary);
       }),
+
+    moveTo: (ticketId, stage, by) => {
+      // The user decided the move: a gate waiting on the old stage no longer applies. It is settled
+      // first, outside the queue, because the `set_stage` call holding it also holds the queue.
+      waiting.get(ticketId)?.settle({ outcome: 'cancelled', note: null, by: null });
+      return queue(ticketId, async () => {
+        const record = await tickets.get(ticketId);
+        if (!record) return err('VALIDATION', `There is no ticket ${ticketId}.`);
+        if (record.stage === stage) return ok({ from: record.stage, to: stage, changed: false });
+        return move(ticketId, stage, null, `Moved to ${LANE_LABELS[stage]} by ${by ?? userName()}`);
+      });
+    },
 
     async reportActivity(ticketId, text, progress) {
       const activity = oneLine(text);

@@ -28,7 +28,7 @@ describe('merge worktree → main', () => {
     store.load([fakeTicketRecord({ stage: 'create-pr' })]);
     const done = fakeTicketRecord({ stage: 'done', stageEnteredAt: MERGED_AT });
     const bridge = installFakeBridge({
-      'git:mergeToMain': { ok: true, data: { record: done, target: 'main', mergeCommit: 'abc123', pushed: true, mergedAt: MERGED_AT } },
+      'git:mergeToMain': { ok: true, data: { record: done, target: 'main', targetKind: 'base', mergeCommit: 'abc123', pushed: true, mergedAt: MERGED_AT } },
     });
     const { client, wrapper } = setup();
     client.setQueryData(branchesQueryKey('71273'), { stale: false });
@@ -67,6 +67,8 @@ describe('merge worktree → main', () => {
       ticketId: '71273',
       source: '71273-cutover-job-control',
       target: 'main',
+      checkoutBranch: 'main',
+      checkoutClean: true,
       repo: 'C:\\src\\onsite-companion',
       qaPassed: false,
       worktree: { worktreePath: 'C:\\src\\.agent-lanes\\71273', present: true, dirty: false, changedFiles: 0, conflicted: false },

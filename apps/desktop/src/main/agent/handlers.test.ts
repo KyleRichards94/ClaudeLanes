@@ -37,6 +37,8 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
       adoLauncher: {} as Services['adoLauncher'],
       launchUndo: {} as Services['launchUndo'],
     tickets,
+    // Next actions (AL-272) have their own tests.
+    nextActions: {} as Services['nextActions'],
     // Plan limits (AL-258) have their own tests.
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),
@@ -210,6 +212,27 @@ describe('agent:send without a live session (AL-268)', () => {
     expect(fake.calls[1]!.options.resume).toBe('session-a');
     await fake.calls[1]!.sentCount(1);
     expect(JSON.stringify(fake.calls[1]!.sent[0])).toContain('Still there?');
+    await sessions.dispose();
+  });
+});
+
+describe('agent:moveStage (AL-270)', () => {
+  it('moves the ticket and tells a live agent as an app note; a ticket with no session just moves', async () => {
+    const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
+    const claude = createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query });
+    const tickets = await memoryTickets({ id: '71273' });
+    const sessions = createSessionManager({ claude, connections: fakeClaudeConnections(), tickets, emit: recordingEmit().emit });
+    const { handlers } = handlersFor(sessions, tickets);
+
+    await expect(handleInvoke('agent:moveStage', { ticketId: '71273', stage: 'qa' }, handlers['agent:moveStage'])).resolves.toMatchObject({ ok: true, data: { to: 'qa', changed: true } });
+    expect(fake.calls).toHaveLength(0);
+
+    await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
+    await fake.calls[0]!.sentCount(1);
+    await expect(handleInvoke('agent:moveStage', { ticketId: '71273', stage: 'code-review' }, handlers['agent:moveStage'])).resolves.toMatchObject({ ok: true, data: { from: 'qa', to: 'code-review', changed: true } });
+    await fake.calls[0]!.sentCount(2);
+    expect(JSON.stringify(fake.calls[0]!.sent[1])).toContain('moved this ticket to Code review');
+    await expect(handleInvoke('agent:moveStage', { ticketId: '71273', stage: 'queued' }, handlers['agent:moveStage'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
     await sessions.dispose();
   });
 });

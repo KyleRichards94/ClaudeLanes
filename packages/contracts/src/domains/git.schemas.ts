@@ -142,6 +142,10 @@ export const MergeToMainPreviewSchema = z.object({
   target: z.string().min(1),
   /** The repo's main checkout. */
   repo: z.string().min(1),
+  /** The branch the repo's main checkout has checked out (AL-271): the default merge target; null when detached. */
+  checkoutBranch: z.string().min(1).nullable(),
+  /** The main checkout has no uncommitted changes to tracked files, so it can take the merge. */
+  checkoutClean: z.boolean(),
   /** QA passed: the ticket went through QA and on to Create PR or Done. The modal warns when false. */
   qaPassed: z.boolean(),
   /** The ticket worktree; a dirty one cannot be merged. */
@@ -153,20 +157,28 @@ export const MergeToMainPreviewSchema = z.object({
 });
 export type MergeToMainPreview = z.infer<typeof MergeToMainPreviewSchema>;
 
+/** Where Merge worktree → main lands (AL-271): the main checkout's current branch, locally (default), or the base branch, pushed. */
+export const MERGE_TARGETS = ['checkout', 'base'] as const;
+export const MergeTargetSchema = z.enum(MERGE_TARGETS);
+export type MergeTarget = z.infer<typeof MergeTargetSchema>;
+
 export const MergeToMainRequestSchema = z.strictObject({
   ticketId: TicketIdSchema,
   /** The user confirmed the merge in the modal. */
   confirmed: z.literal(true),
   /** The user saw the "QA has not passed" warning and merges anyway. */
   acceptQaWarning: z.boolean().optional(),
+  /** `checkout` when left out (AL-271). */
+  target: MergeTargetSchema.optional(),
 });
 export type MergeToMainRequest = z.infer<typeof MergeToMainRequestSchema>;
 
 export const MergeToMainResultSchema = z.object({
   /** The ticket record, now in Done. */
   record: TicketRecordSchema,
-  /** The base branch merged into. */
+  /** The branch merged into: the main checkout's, or the base. */
   target: z.string().min(1),
+  targetKind: MergeTargetSchema,
   /** The merge commit; null when the ticket branch was already part of the base. */
   mergeCommit: z.string().min(1).nullable(),
   /** False when the repo has no origin remote, so there was nothing to push to. */

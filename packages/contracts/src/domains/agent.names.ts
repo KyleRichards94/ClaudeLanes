@@ -27,6 +27,8 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:getPlanLimits', // AL-258
   'agent:listCommands', // AL-259
   'agent:stopSubagent', // AL-261
+  'agent:moveStage', // AL-270
+  'agent:nextActions', // AL-272
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

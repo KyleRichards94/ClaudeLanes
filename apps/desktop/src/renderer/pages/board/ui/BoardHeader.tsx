@@ -17,6 +17,8 @@ export interface BoardHeaderProps {
   needsYouOnly: boolean;
   onNeedsYouOnlyChange(on: boolean): void;
   onOpenSettings(): void;
+  /** The board digest (AL-272). */
+  onOpenDigest(): void;
   store?: AgentTicketStore;
 }
 
@@ -25,7 +27,7 @@ export interface BoardHeaderProps {
  * the live count pills, Connections, Settings and "+ New agent ticket". The counts come from the
  * agent ticket store and change as events arrive; "need you" toggles the board's needs-you filter.
  */
-export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings, store = agentTickets }: BoardHeaderProps) {
+export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings, onOpenDigest, store = agentTickets }: BoardHeaderProps) {
   const running = useAgentTicketCount('running', store);
   const needsYou = useAgentTicketCount('needs-you', store);
   const queued = useAgentTicketCount('queued', store);
@@ -65,6 +67,8 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         {/* The plan's 5-hour and 7-day windows, once a session reported them (AL-258). */}
         <PlanLimitsPill />
       </View>
+      {/* The board digest: every ticket ranked by what it needs, and next actions (AL-272). */}
+      <Button label="Digest" icon="backlog" onPress={onOpenDigest} testID="open-digest" />
       {/* Artboard 1's Connections icon button (AL-046). */}
       <Button label="Connections" icon="link" iconOnly onPress={() => openConnections()} testID="open-connections" />
       {/* Repo and app settings (AL-146); not on artboard 1, which predates the panel. */}

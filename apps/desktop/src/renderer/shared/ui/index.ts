@@ -20,5 +20,5 @@ export {
   type WorkItemStateLabelProps,
   type WorkItemTypeBarProps,
 } from './work-item-colors';
-export { ActionMenu, type ActionMenuItem, type ActionMenuProps } from './action-menu';
+export { ActionMenu, MenuPopover, type ActionMenuItem, type ActionMenuProps, type MenuAnchor, type MenuPopoverProps } from './action-menu';
 export { PLAN_LIMIT_DANGER_PERCENT, PLAN_LIMIT_WARN_PERCENT, PlanLimitsPill, planLimitsView } from './plan-limits';

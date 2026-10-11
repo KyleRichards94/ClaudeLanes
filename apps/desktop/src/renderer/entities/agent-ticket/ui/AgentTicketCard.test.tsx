@@ -1,10 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { color, mutedOpacity, tone } from '@agent-lanes/tokens';
 import { fakeTicketRecord } from '@/shared/testing';
 import { createAgentTicketStore, type AgentTicketStore } from '../model/store';
-import { AgentTicketCard } from './AgentTicketCard';
+import { AgentTicketCard, AgentTicketCardView } from './AgentTicketCard';
 import { ticketFromRecord } from '../model/ticket';
 import { agentFinished, cardView, needsYouLabel, type CardState } from './card-view';
 
@@ -283,5 +283,17 @@ describe('the Done corner for review and no-ticket agents (Kyle, 2026-10-09)', (
     expect(cardView({ ...review, session: 'running' }).corner).toBeNull();
     const withWorkItem = { ...ticketFromRecord(fakeTicketRecord()), lastOutputAt: 5, session: 'idle' as const };
     expect(cardView(withWorkItem).corner).toBeNull();
+  });
+});
+
+describe('the card context menu (AL-270)', () => {
+  it('opens on a right-click at the pointer, and on the Menu key', async () => {
+    const onContextMenu = vi.fn();
+    render(<AgentTicketCardView ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} onContextMenu={onContextMenu} testID="card-71273" />);
+    const card = screen.getByTestId('card-71273');
+    fireEvent.contextMenu(card, { clientX: 120, clientY: 240 });
+    expect(onContextMenu).toHaveBeenCalledWith({ x: 120, y: 240 });
+    fireEvent.keyDown(card, { key: 'ContextMenu' });
+    await waitFor(() => expect(onContextMenu).toHaveBeenCalledTimes(2));
   });
 });

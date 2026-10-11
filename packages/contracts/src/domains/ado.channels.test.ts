@@ -113,6 +113,10 @@ const examples = {
     request: { org: ADO_FIXTURE_ORG_ID, project: ADO_FIXTURE_PROJECT },
     response: { types: { Bug: '#CC293D', 'User Story': '#009CCC' }, states: { Bug: { Active: '#007ACC', Closed: '#339933' } } },
   },
+  'ado:setWorkItemState': {
+    request: { org: ADO_FIXTURE_ORG_ID, project: ADO_FIXTURE_PROJECT, id: 71273, state: 'Active' },
+    response: { outcome: 'changed', workItemId: 71273, state: 'Active', previousState: 'New', rev: 4 },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
@@ -130,6 +134,7 @@ describe('ado:* channel contracts', () => {
       'ado:activePrs',
       'ado:backlog',
       'ado:workItemColors',
+      'ado:setWorkItemState', // AL-270
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

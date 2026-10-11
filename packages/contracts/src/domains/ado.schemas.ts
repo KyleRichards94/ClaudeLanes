@@ -9,7 +9,7 @@ import {
   PullRequestRefSchema,
   PullRequestSnapshotSchema,
 } from './ado.pull-requests';
-import { WorkItemCommentSchema } from './ado.write-back';
+import { WorkItemCommentSchema, WorkItemStateChangeSchema } from './ado.write-back';
 import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
 import { ActivePullRequestListSchema } from './ado.active-prs';
 import { BACKLOG_PAGE_SIZE_MAX, BacklogKindSchema, BacklogPageSchema } from './ado.backlog';
@@ -198,6 +198,15 @@ export const SearchWorkItemsRequestSchema = z.strictObject({
 export type SearchWorkItemsRequest = z.infer<typeof SearchWorkItemsRequestSchema>;
 
 /** `ado:getWorkItem`: one work item by id, in any project of the organisation. */
+/** `ado:setWorkItemState` (AL-270): the user's own state change from a card, whatever Settings › ADO state transitions says. */
+export const SetWorkItemStateRequestSchema = z.strictObject({
+  org: AdoOrgIdSchema.optional(),
+  project: z.string().min(1),
+  id: WorkItemIdSchema,
+  state: z.string().min(1).max(200),
+});
+export type SetWorkItemStateRequest = z.infer<typeof SetWorkItemStateRequestSchema>;
+
 export const GetWorkItemRequestSchema = z.strictObject({
   org: AdoOrgIdSchema.optional(),
   id: WorkItemIdSchema,
@@ -306,6 +315,7 @@ export const adoInvokeContracts = {
   'ado:backlog': { request: BacklogRequestSchema, response: BacklogPageSchema },
   /** Each work item type's colour and each type's state colours, read from the project's process. */
   'ado:workItemColors': { request: WorkItemColorsRequestSchema, response: WorkItemColorsSchema },
+  'ado:setWorkItemState': { request: SetWorkItemStateRequestSchema, response: WorkItemStateChangeSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;

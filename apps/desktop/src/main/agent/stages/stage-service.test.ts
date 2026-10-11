@@ -214,3 +214,25 @@ describe('stage gates (AL-104)', () => {
     expect(firstName('kyle')).toBe('Kyle');
   });
 });
+
+describe('the user moves the stage (AL-270)', () => {
+  it('moves to any lane without the rules, cancels a waiting gate, names who moved it, and does nothing for the same lane', async () => {
+    const { tickets, events, appendSystem, stages } = await setup('planning');
+    await expect(stages.moveTo('71273', 'done', 'Kyle')).resolves.toEqual({ ok: true, data: { from: 'planning', to: 'done', changed: true } });
+    expect((await tickets.get('71273'))?.stage).toBe('done');
+    expect(events.of('agent:stage', '71273').at(-1)).toMatchObject({ change: 'stage', stage: 'done', from: 'planning' });
+    expect(appendSystem).toHaveBeenCalledWith('71273', 'Moved to Done by Kyle');
+    await expect(stages.moveTo('71273', 'done')).resolves.toEqual({ ok: true, data: { from: 'done', to: 'done', changed: false } });
+    await expect(stages.moveTo('nope', 'qa')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+
+    // A gate waiting on the old stage closes when the user moves the ticket by hand.
+    const gated = await setup('planning', { ...ALL_AUTO, planning: 'approval' });
+    const pending = gated.stages.setStage('71273', 'implementing', 'Plan ready');
+    await settle();
+    expect(gated.stages.pendingGate('71273')?.stage).toBe('planning');
+    await gated.stages.moveTo('71273', 'qa', 'Kyle');
+    await expect(pending).resolves.toMatchObject({ ok: true, data: { changed: false, gate: { outcome: 'cancelled' } } });
+    expect(gated.stages.pendingGate('71273')).toBeNull();
+    expect((await gated.tickets.get('71273'))?.stage).toBe('qa');
+  });
+});

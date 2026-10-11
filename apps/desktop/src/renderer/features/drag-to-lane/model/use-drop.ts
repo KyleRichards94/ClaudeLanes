@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import { allowedLanes, type DropAction } from '@/entities/agent-ticket';
 import { toast } from '@/shared/model';
 import { clearPendingLane, setPendingLane } from './drag-store';
-import { dragMembers } from './lane-state';
+import { dragMembers, laneActions } from './lane-state';
 import type { LaneDragCard, LaunchFromLane } from './types';
 
 /** The team board's ADO queries (TB§6): a drop updates them optimistically and refetches them once main answers. */
@@ -102,7 +102,7 @@ export function useDropOnLane(onLaunch?: LaunchFromLane): DropOnLane {
       const members = dragMembers(card);
       if (members.length <= 1) return dropCard(queryClient, onLaunch, card, lane, options.alt === true);
       for (const member of members) {
-        if (member.card.kind !== 'pull-request' && allowedLanes(member.card, member.me)[lane]) setPendingLane(member.card.id, lane);
+        if ((member.card.kind === 'board-item' || member.card.kind === 'backlog-item') && allowedLanes(member.card, member.me)[lane]) setPendingLane(member.card.id, lane);
       }
       let confirmed = false;
       for (const member of members) confirmed = (await dropCard(queryClient, onLaunch, member, lane, false)) || confirmed;
@@ -114,9 +114,9 @@ export function useDropOnLane(onLaunch?: LaunchFromLane): DropOnLane {
 
 /** One card's drop: the optimistic update, the launch, and the rollback when main did not confirm it. */
 async function dropCard(queryClient: QueryClient, onLaunch: LaunchFromLane | undefined, card: LaneDragCard, lane: Lane, alt: boolean): Promise<boolean> {
-  const action = allowedLanes(card.card, card.me)[lane];
+  const action = laneActions(card)[lane];
   if (!action) return false;
-  const itemId = card.card.kind === 'pull-request' ? null : card.card.id;
+  const itemId = card.card.kind === 'board-item' || card.card.kind === 'backlog-item' ? card.card.id : null;
 
   // A refetch already on its way would overwrite the optimistic board.
   await queryClient.cancelQueries({ queryKey: DROP_QUERY_KEYS[0] });

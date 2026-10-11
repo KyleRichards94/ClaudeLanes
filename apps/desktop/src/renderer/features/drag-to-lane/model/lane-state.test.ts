@@ -14,6 +14,7 @@ import {
   sentAnnouncement,
 } from './lane-state';
 import type { LaneDragCard } from './types';
+import { agentDragLanes, agentTicketDrag } from './agent-card';
 
 const ME = { id: 'me' };
 const KR = { id: 'me', displayName: 'Kyle Richards' };
@@ -136,5 +137,23 @@ describe('group drags (AL-239, TB§5, artboard 12)', () => {
     expect(active.card.label).toBe('#71360');
     expect(active.allowed.planning?.title).toBe('Plan this');
     expect(dragStatusText(active)).toBe('Drop #71360 on a highlighted lane');
+  });
+});
+
+describe('agent board cards (AL-274)', () => {
+  it('a work item card goes to any lane but Queued and its own; a PR card only to Done', () => {
+    const ticket = agentTicketDrag({ id: '71273', title: 'Cutover frmJobControl to Blazor', stage: 'implementing', ado: { orgUrl: 'https://dev.azure.com/contoso', project: 'OnSite Companion', workItemId: 71273 } });
+    expect(ticket).toMatchObject({ key: 'ticket:71273', label: '#71273', card: { kind: 'agent-ticket', ticketId: '71273' }, source: { kind: 'agent-ticket', ticketId: '71273' } });
+    expect(allowedLaneList(ticket).map((entry) => entry.lane)).toEqual(['planning', 'code-review', 'qa', 'create-pr', 'done']);
+    const active = activeDrag(ticket, 'pointer');
+    expect(laneDropState(active, 'done', 'done')).toEqual({ kind: 'accept', action: expect.objectContaining({ title: 'Move to Done', changesAdo: false }), over: true });
+    expect(laneDropState(active, 'queued', null)).toEqual({ kind: 'refuse', reason: null });
+    expect(laneDropState(active, 'implementing', null)).toEqual({ kind: 'refuse', reason: null });
+    expect(dragStatusText(active)).toBe('Drop #71273 on a highlighted lane');
+
+    const review = agentTicketDrag({ id: 'pr-11635-review', title: 'Review PR !11635', stage: 'code-review', ado: null });
+    expect(review.label).toBe('pr-11635-review');
+    expect(allowedLaneList(review).map((entry) => entry.lane)).toEqual(['done']);
+    expect(agentDragLanes({ id: 'pr-11635-review', title: '', stage: 'done', ado: null })).toEqual([]);
   });
 });

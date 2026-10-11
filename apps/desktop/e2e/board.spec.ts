@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
+import { _electron as electron, expect, test, type ElectronApplication, type Locator, type Page } from '@playwright/test';
 import type { Lane, TicketRecord } from '@agent-lanes/contracts';
 
 /**
@@ -160,4 +160,76 @@ test('the header shows live counts, the legend and the Repo menu (AL-142)', asyn
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByTestId('board-header').screenshot({ path: test.info().outputPath('board-header.png') });
+});
+
+test('a right-click on a card opens its menu, and Move to stage… moves the card (AL-270)', async () => {
+  const page = await launch();
+  const card = page.getByTestId('lane-implementing').getByRole('button', { name: /^#71288/ });
+  await card.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: 'Ticket actions' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Open worktree folder' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Copy branch name' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Remove from board…' })).toBeVisible();
+
+  await menu.getByRole('menuitem', { name: 'Move to stage…' }).click();
+  const modal = page.getByTestId('move-stage-modal');
+  await expect(modal).toBeVisible();
+  // QA, not Done: the Done lane is collapsed by default and draws no cards.
+  await modal.getByRole('radio', { name: 'QA' }).click();
+  await modal.getByTestId('move-stage-confirm').click();
+  await expect(modal).toBeHidden();
+  await expect(page.getByTestId('lane-qa').getByRole('button', { name: /^#71288/ })).toBeVisible();
+  await expect(page.getByTestId('lane-implementing').getByRole('button', { name: /^#71288/ })).toHaveCount(0);
+
+  // The corner chevron opens the same menu.
+  await page.getByTestId('ticket-menu-71273').click();
+  await expect(page.getByRole('menu', { name: 'Ticket actions' })).toBeVisible();
+  await page.keyboard.press('Escape');
+});
+
+/** The centre of an element in page coordinates. */
+async function middle(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error('not visible');
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+test('an agent card drags to any lane but Queued; a PR card only to Done (AL-274)', async () => {
+  const page = await launch();
+  const card = page.getByTestId('lane-implementing').getByRole('button', { name: /^#71288/ });
+  const from = await middle(card);
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 10, from.y - 10, { steps: 3 });
+  await expect(page.getByTestId('drag-status')).toHaveText('Drop #71288 on a highlighted lane');
+  await expect(page.getByTestId('lane-qa-drop-hint')).toContainText('Move to QA');
+  // Done is collapsed by default, so its strip takes the drop without a hint; Create PR shows one.
+  await expect(page.getByTestId('lane-create-pr-drop-hint')).toContainText('Move to Create PR');
+  await expect(page.getByTestId('lane-queued-drop-hint')).toHaveCount(0);
+  await expect(page.getByTestId('lane-implementing-drop-hint')).toHaveCount(0);
+
+  const qa = page.getByTestId('lane-qa');
+  const over = await middle(qa);
+  await page.mouse.move(over.x, over.y, { steps: 8 });
+  await page.mouse.up();
+  await expect(qa.getByRole('button', { name: /^#71288/ })).toBeVisible();
+  await expect(page.getByTestId('lane-implementing').getByRole('button', { name: /^#71288/ })).toHaveCount(0);
+});
+
+test('the Digest ranks every ticket by what it needs and offers Open and Resume (AL-272)', async () => {
+  const page = await launch();
+  await page.getByTestId('open-digest').click();
+  const digest = page.getByTestId('board-digest-modal');
+  await expect(digest).toBeVisible();
+  await expect(digest.getByRole('listitem')).toHaveCount(7);
+  // Nothing has run in this profile: every ticket says no agent is running, the queued one that it waits for a slot.
+  await expect(digest.getByTestId('board-digest-71330-reasons')).toHaveText('Waiting for a free slot');
+  await expect(digest.getByTestId('board-digest-71273-reasons')).toHaveText('No agent running');
+  await expect(digest.getByTestId('board-digest-71273-resume')).toBeVisible();
+  // Without a Claude connection, next actions say so instead of hanging.
+  await digest.getByTestId('board-digest-generate').click();
+  await expect(digest.getByTestId('board-digest-error')).toContainText('Connect Claude in Connections');
+  await digest.getByTestId('board-digest-71310-open').click();
+  await expect(page.getByText('Agent board')).toBeHidden();
 });

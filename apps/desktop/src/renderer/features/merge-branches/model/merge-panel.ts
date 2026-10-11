@@ -52,7 +52,8 @@ export function mergePanel(ticket: MergePanelTicket, state: BranchStatusState, o
   const readyCount = subs.filter(isMergeable).length;
   const shown = readyCount > 0 ? readyCount : unmerged.length;
   const subLabel = subBranchesLabel(shown);
-  const mainLabel = `Merge worktree → ${ticket.baseBranch}`;
+  // AL-271: the default target is the main checkout's branch; the modal names it and offers the base branch too.
+  const mainLabel = 'Merge worktree → main checkout';
 
   const shared = sharedReason(ticket, state);
   if (shared !== null || state.status !== 'success') {

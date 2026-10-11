@@ -237,6 +237,8 @@ test('first run to merged: connect, pick a repo, launch, approve the plan, ship 
     await expect(modal.getByTestId('merge-to-main-summary')).toContainText('2 commits on 71273-');
     // QA passed, so there is no warning and no "Merge anyway".
     await expect(modal.getByTestId('merge-to-main-qa-warning')).toHaveCount(0);
+    // AL-271: the default lands in the main checkout; the team flow pushes main.
+    await modal.getByTestId('merge-to-main-target-base').click();
     await modal.getByRole('button', { name: 'Merge into main' }).click();
     await expect(page.getByText(/^Merged into main · /)).toBeVisible({ timeout: 60_000 });
 

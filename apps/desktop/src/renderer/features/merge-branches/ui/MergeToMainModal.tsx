@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import type { MergeTarget } from '@agent-lanes/contracts';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
-import { Button, Icon, Modal, Text } from '@agent-lanes/ui';
+import { Button, Icon, Modal, SegmentedControl, Text } from '@agent-lanes/ui';
 import { agentTickets, clockTime, useMergeToMain, useMergeToMainPreview, type AgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
 import { toast } from '@/shared/model';
 import { mergeErrorInfo } from '../model/conflict';
@@ -28,9 +30,15 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
   const merge = useMergeToMain(store);
   const data = preview.data;
   const failure = merge.error ? mergeErrorInfo(merge.error) : null;
+  // AL-271: into the main checkout's branch by default (no push); the base branch with a push as the second choice.
+  const [choice, setChoice] = useState<MergeTarget | null>(null);
+  const targetKind: MergeTarget = choice ?? (data && data.checkoutBranch === null ? 'base' : 'checkout');
+  const checkoutUnavailable = data !== undefined && data.checkoutBranch === null;
+  const targetName = targetKind === 'base' ? (data?.target ?? ticket.baseBranch) : (data?.checkoutBranch ?? 'the main checkout');
 
   const close = () => {
     merge.reset();
+    setChoice(null);
     onClose();
   };
 
@@ -38,25 +46,31 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
   const dirty = data?.worktree.dirty === true || failure?.code === 'GIT_DIRTY';
   const missing = data !== undefined && !data.worktree.present;
   const qaWarning = data !== undefined && !data.qaPassed;
-  const blocked = data === undefined || dirty || missing || data.worktree.conflicted;
+  const checkoutBlocked = targetKind === 'checkout' && (checkoutUnavailable || data?.checkoutClean === false);
+  const blocked = data === undefined || dirty || missing || data.worktree.conflicted || checkoutBlocked;
 
   const onConfirm = () =>
     merge.mutate(
-      { ticketId: ticket.id, ...(qaWarning ? { acceptQaWarning: true } : {}) },
+      { ticketId: ticket.id, target: targetKind, ...(qaWarning ? { acceptQaWarning: true } : {}) },
       {
         onSuccess: (result) => {
           toast({
             id: `merge-main:${ticket.id}`,
             tone: 'success',
             title: `Merged into ${result.target} · ${clockTime(result.mergedAt)}`,
-            body: result.pushed ? `${ticket.branch} is merged and pushed.` : 'The repo has no origin remote, so nothing was pushed.',
+            body:
+              result.targetKind === 'checkout'
+                ? `${ticket.branch} is merged into the main checkout; nothing was pushed.`
+                : result.pushed
+                  ? `${ticket.branch} is merged and pushed.`
+                  : 'The repo has no origin remote, so nothing was pushed.',
           });
           close();
         },
       },
     );
 
-  const target = data?.target ?? ticket.baseBranch;
+  const target = targetName;
   return (
     <Modal
       visible={visible}
@@ -90,11 +104,29 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
           <Notice tone="danger" title="Couldn't check the worktree" body={preview.error.message} testID="merge-to-main-preview-error" />
         ) : data ? (
           <>
+            <SegmentedControl<MergeTarget>
+              label="Merge into"
+              value={targetKind}
+              onChange={setChoice}
+              options={[
+                { value: 'checkout', label: data.checkoutBranch ? `${data.checkoutBranch} (main checkout)` : 'Main checkout' },
+                { value: 'base', label: `${data.target} and push` },
+              ]}
+              fill
+              testID="merge-to-main-target"
+            />
             <Text variant="body" testID="merge-to-main-summary">
-              {data.alreadyMerged
-                ? `${data.source} is already part of ${data.target}. Merging pushes ${data.target} and moves the card to Done.`
-                : `${plural(data.ahead ?? 0, 'commit')} on ${data.source} merge into ${data.target} with a merge commit, then ${data.target} is pushed and the card moves to Done.`}
+              {targetKind === 'checkout'
+                ? checkoutUnavailable
+                  ? `The main checkout has no branch checked out, so the merge can only go into ${data.target}.`
+                  : `${plural(data.ahead ?? 0, 'commit')} on ${data.source} merge into ${data.checkoutBranch} in ${data.repo} with a merge commit. Nothing is pushed; the card moves to Done.`
+                : data.alreadyMerged
+                  ? `${data.source} is already part of ${data.target}. Merging pushes ${data.target} and moves the card to Done.`
+                  : `${plural(data.ahead ?? 0, 'commit')} on ${data.source} merge into ${data.target} with a merge commit, then ${data.target} is pushed and the card moves to Done.`}
             </Text>
+            {targetKind === 'checkout' && data.checkoutBranch !== null && !data.checkoutClean ? (
+              <Notice tone="danger" title="The main checkout has uncommitted changes" body={`Commit or stash them in ${data.repo} before merging into ${data.checkoutBranch}.`} testID="merge-to-main-checkout-dirty" />
+            ) : null}
             {dirty ? (
               <Notice
                 tone="danger"

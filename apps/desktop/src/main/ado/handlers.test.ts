@@ -150,6 +150,7 @@ describe('ado:* IPC handlers', () => {
       'ado:getComments': { workItemId: 71273 },
       'ado:createPullRequest': { ...PR_REF, sourceBranch: 'a', targetBranch: 'main', title: 'x' },
       'ado:getPullRequest': PR_REF,
+      'ado:setWorkItemState': { project: ADO_FIXTURE_PROJECT, id: 71273, state: 'Active' },
       'ado:listTeams': {},
       'ado:teamBoard': {},
       'ado:activePrs': {},

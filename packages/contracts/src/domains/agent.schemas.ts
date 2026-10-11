@@ -492,6 +492,21 @@ export const SUBAGENT_TREE_LIMIT = 200;
 export const AgentPrActivityEventSchema = TicketEventEnvelopeSchema.extend({ activity: TicketPrActivitySchema });
 export type AgentPrActivityEvent = z.infer<typeof AgentPrActivityEventSchema>;
 
+/** `agent:moveStage` (AL-270, AL-274): the user moves a ticket to any lane but Queued; a waiting gate closes and the agent is told at its next turn. */
+export const MoveStageRequestSchema = z.strictObject({ ticketId: TicketIdSchema, stage: LaneSchema.exclude(['queued']) });
+export type MoveStageRequest = z.infer<typeof MoveStageRequestSchema>;
+export const MoveStageResponseSchema = z.object({ from: LaneSchema, to: LaneSchema, changed: z.boolean() });
+export type MoveStageResponse = z.infer<typeof MoveStageResponseSchema>;
+
+/** `agent:nextActions` (AL-272): one short session over the board digest, a next step per ticket. */
+export const NextActionsRequestSchema = z.strictObject({ digest: z.string().min(1).max(40_000) });
+export type NextActionsRequest = z.infer<typeof NextActionsRequestSchema>;
+export const NextActionsResponseSchema = z.object({
+  model: ModelSchema,
+  actions: z.array(z.object({ ticketId: z.string().min(1).max(200), text: z.string().min(1).max(1_000) })).max(200),
+});
+export type NextActionsResponse = z.infer<typeof NextActionsResponseSchema>;
+
 /** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
 export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
 export type StopSubagentRequest = z.infer<typeof StopSubagentRequestSchema>;
@@ -542,6 +557,8 @@ export const agentInvokeContracts = {
   /** The ticket's sub-agent tree and counts, for a drill-in opened mid-run (AL-107). */
   'agent:getSubagents': { request: AgentTicketRequestSchema, response: AgentSubagentsSchema },
   'agent:stopSubagent': { request: StopSubagentRequestSchema, response: StopSubagentResponseSchema },
+  'agent:moveStage': { request: MoveStageRequestSchema, response: MoveStageResponseSchema },
+  'agent:nextActions': { request: NextActionsRequestSchema, response: NextActionsResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

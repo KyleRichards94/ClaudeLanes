@@ -210,7 +210,7 @@ describe('Backlog popout (AL-239, TB§5, artboard 11)', () => {
     const dataTransfer = { setData: (type: string, value: string) => data.set(type, value), effectAllowed: 'none' };
     fireEvent.dragStart(source, { dataTransfer });
     const card = decodeNativeBacklogDrag(data.get(NATIVE_BACKLOG_DRAG_TYPE) ?? '');
-    expect(card?.group?.map((member) => member.source.id)).toEqual([71360, 71362]);
+    expect(card?.group?.map((member) => (member.source.kind === 'backlog-item' ? member.source.id : null))).toEqual([71360, 71362]);
     expect(data.get('text/plain')).toContain('#71362 Job search ignores archived clients filter');
     expect(dataTransfer.effectAllowed).toBe('copy');
   });

@@ -51,6 +51,14 @@ export function finishedCorner(ticket: Pick<AgentTicket, 'ado' | 'session' | 'la
   return { label: 'Done', tone: 'ok', tick: false };
 }
 
+/** What a screen reader says for the card: "#71273, Cutover frmJobControl to Blazor, Implementing, …". */
+export function agentCardName(ticket: AgentTicket): string {
+  const view = cardView(ticket);
+  return [ticket.ado ? `#${ticket.ado.workItemId}` : ticket.id, ticket.title, LANE_LABELS[ticket.stage], view.activity.text, view.design?.label, view.footer?.label]
+    .filter(Boolean)
+    .join(', ');
+}
+
 /** A review or no-ticket agent has finished: its session is idle or ended after producing output. */
 export function agentFinished(ticket: Pick<AgentTicket, 'session' | 'lastOutputAt' | 'stage' | 'needsYou'>): boolean {
   if (ticket.stage === 'queued' || ticket.needsYou.length > 0) return false;

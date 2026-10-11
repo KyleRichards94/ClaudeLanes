@@ -15,7 +15,7 @@ export function createGitHandlers({
   return {
     'branches:status': ({ ticketId }) => branches.status(ticketId),
     'git:mergeToMainPreview': ({ ticketId }) => mergeToMain.preview(ticketId),
-    'git:mergeToMain': ({ ticketId, acceptQaWarning }) => mergeToMain.merge(ticketId, { acceptQaWarning }),
+    'git:mergeToMain': ({ ticketId, acceptQaWarning, target }) => mergeToMain.merge(ticketId, { acceptQaWarning, target }),
     'git:diff': ({ ticketId, against }) => diffs.files(ticketId, against),
     'git:diffFile': ({ ticketId, against, path, oldPath }) => diffs.file(ticketId, against, path, oldPath),
     'git:mergeSubBranches': ({ ticketId }) => mergeSubBranches.merge(ticketId),

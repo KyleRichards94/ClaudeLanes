@@ -17,7 +17,7 @@ import { invoke, unwrap } from './ipc';
 /** How often the board's ADO data refreshes while it is open and the window can be seen (design §6). */
 export const ADO_REFETCH_INTERVAL_MS = 60_000;
 
-type AdoOrgId = z.infer<typeof AdoOrgIdSchema>;
+export type AdoOrgId = z.infer<typeof AdoOrgIdSchema>;
 
 /** Which organisation and project a query reads; both default in the main process (AL-065). */
 export interface AdoScope {

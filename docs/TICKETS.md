@@ -191,11 +191,11 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-267 | Open worktree folder | E16 | S | — | done |
 | AL-268 | Message a ticket without a live session | E16 | M | AL-110 | done |
 | AL-269 | Review tick on PR cards | E16 | M | AL-236 | done |
-| AL-270 | Card context menu | E16 | L | AL-267, AL-268 | todo |
-| AL-271 | Merge worktree into the main checkout | E16 | M | AL-087 | todo |
-| AL-272 | Board digest and next actions | E16 | L | AL-269 | todo |
+| AL-270 | Card context menu | E16 | L | AL-267, AL-268 | done |
+| AL-271 | Merge worktree into the main checkout | E16 | M | AL-087 | done |
+| AL-272 | Board digest and next actions | E16 | L | AL-269 | done |
 | AL-273 | App notes in the output | E16 | S | AL-251 | done |
-| AL-274 | Drag agent cards to any lane | E16 | M | AL-270 | todo |
+| AL-274 | Drag agent cards to any lane | E16 | M | AL-270 | done |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1407,23 +1407,23 @@ the main checkout has checked out and does not push.
 - **Design:** Kyle 2026-10-12 · **Depends on:** AL-267, AL-268
 - **Scope:** Right-click (and the Menu key) on an agent board card opens a menu at the pointer: Open in Azure DevOps, View description (the work item's description as text), Change ADO state… (the type's states, behind a confirm; `ado:setWorkItemState` over the write-back client), Move to stage… (`agent:moveStage`, the stage service's user move; the agent hears about it at its next turn), Resume session, Open worktree folder, Copy branch, Remove from board….
 - **Acceptance criteria:**
-  - [ ] Every item works from the board; ADO state and stage changes show on the card at once.
-  - [ ] Menu, stage-move and state-change unit tests; `board.spec.ts` extended.
+  - [x] Every item works from the board; ADO state and stage changes show on the card at once.
+  - [x] Menu, stage-move and state-change unit tests; `board.spec.ts` extended.
 
 #### AL-271 · Merge worktree into the main checkout
 - **Design:** Kyle 2026-10-12 · **Depends on:** AL-087
 - **Scope:** "Merge worktree → main" merges the ticket branch into the branch the repo's main checkout currently has checked out, in that checkout, without pushing; the button names that branch. The base-branch merge with push stays available as a second choice in the confirm modal. Refuses on a dirty checkout or a detached HEAD, as before.
 - **Acceptance criteria:**
-  - [ ] The default merge lands in the main checkout's current branch and pushes nothing; the base-branch choice behaves as AL-087 did.
-  - [ ] Merge unit tests; `merge-to-main.spec.ts` or the golden path extended.
+  - [x] The default merge lands in the main checkout's current branch and pushes nothing; the base-branch choice behaves as AL-087 did.
+  - [x] Merge unit tests; `merge-to-main.spec.ts` or the golden path extended.
 
 #### AL-272 · Board digest and next actions
 - **Design:** Kyle 2026-10-12 · **Depends on:** AL-269
 - **Scope:** A "Digest" button on the board header opens a panel that ranks every agent ticket by what it needs: waiting on you (gate, permission), dead or lost session, failed build, finished with unmerged work, quiet for hours, open PR state — with one-click actions (approve, resume, open). "Generate next actions" sends the digest to one short Claude session and shows its suggestions per ticket, each with "Send to agent".
 - **Acceptance criteria:**
-  - [ ] The digest is built from the store alone, instantly, and its actions work.
-  - [ ] Next actions come from one session and can be sent to a ticket's agent.
-  - [ ] Digest unit tests; `board.spec.ts` extended.
+  - [x] The digest is built from the store alone, instantly, and its actions work.
+  - [x] Next actions come from one session and can be sent to a ticket's agent.
+  - [x] Digest unit tests; `board.spec.ts` extended.
 
 #### AL-273 · App notes in the output
 - **Design:** Kyle 2026-10-12 · **Depends on:** AL-251
@@ -1436,9 +1436,9 @@ the main checkout has checked out and does not push.
 - **Design:** Kyle 2026-10-12 · **Depends on:** AL-270
 - **Scope:** An agent board card can be dragged to any lane but Queued (Done and Create PR included), with the same drag-to-lane feel as the team board's cards; a PR review or comment-actioner card can only be dragged to Done. The drop is `agent:moveStage` (AL-270): the card moves at once, a waiting gate closes, and a running agent is told at its next turn.
 - **Acceptance criteria:**
-  - [ ] A work item card drops on any lane but Queued; a PR card only on Done; the lanes say so while dragging.
-  - [ ] Keyboard: Space picks a card up, arrows choose a lane, Enter drops.
-  - [ ] Drag-rule unit tests; `drag-to-lane.spec.ts` extended.
+  - [x] A work item card drops on any lane but Queued; a PR card only on Done; the lanes say so while dragging.
+  - [x] Keyboard: Space picks a card up, arrows choose a lane, Enter drops.
+  - [x] Drag-rule unit tests; `drag-to-lane.spec.ts` extended.
 
 ---
 ## 4. Decisions
@@ -2233,6 +2233,11 @@ the main checkout has checked out and does not push.
 | D786 | AL-269: PR activity is counted from the sessions' ADO MCP tool calls (comment and thread-status tools of any server), only once each call returned without error, and kept on the ticket record (`prActivity`) so it survives a restart. A finished PR card's corner shows a green tick with "Actioned · N threads" when threads were settled, else "Reviewed · N comments"; plain "Done" otherwise | Kyle (2026-10-12): a review card should say its comments are up, not just that the agent stopped | 2026-10-12 |
 | D787 | AL-273: notes the app pushes for the agent carry source `app-note` and show as "Agent Lanes" bubbles (dashed, mono); the `[Agent Lanes` prefix marks them when read back from history | They were drawn as the user's own messages after a restart | 2026-10-12 |
 | D788 | AL-267: `git:openWorktree` goes through Electron's `shell.openPath`, injected into services as `openPath`; a missing worktree is refused before the OS is asked | Keeps `electron` out of the worktree service and lets tests pass a fake | 2026-10-12 |
+| D789 | AL-270: the card's context menu (right-click, the Menu key, or the corner chevron) is composed by the board page from `features/ticket-actions` (View description, Change ADO state…, Move to stage…), the Reconnect path, Open worktree folder, Copy branch and Remove from board; `MenuPopover` (split out of ActionMenu) draws any menu at a point. The drill-in's Agent menu gained Move to stage… too (AL-264's item) | Kyle (2026-10-12): cards should do more than open; one popover serves the Agent menu and the card | 2026-10-12 |
+| D790 | AL-270: `ado:setWorkItemState` is the user's own action and ignores Settings › ADO state transitions (which governs the app's automatic moves); it is confirmed in a modal that lists the type's states from the project's process. `agent:moveStage` is the stage service's `moveTo`: no rules check, any lane but Queued, a waiting gate is cancelled first (outside the per-ticket queue, which the gated `set_stage` call holds), and a live agent gets an app note at its next turn | An explicit click is consent; the automatic write-back setting is about what the app does on its own | 2026-10-12 |
+| D791 | AL-271: Merge worktree → main merges into the branch the repo's main checkout has checked out, in that checkout, and pushes nothing (`target: 'checkout'`, the default); the modal offers "<base> and push" as the second choice, which is AL-087's merge unchanged. A detached main checkout, a dirty one, or one that has the ticket branch itself checked out is refused; the card still moves to Done. The button reads "Merge worktree → main checkout" | Kyle (2026-10-12): the work should land in his main worktree, not go straight to version/main | 2026-10-12 |
+| D792 | AL-274: an agent board card is a `LaneDragCard` whose drag data carries its own lanes (`agentTicketDrag`: any lane but Queued and its own; a PR review or comment-actioner card only Done) instead of the team board's drop rules; the drop is `agent:moveStage`. Inside the board's drag provider the draggable wrapper is the card's button and press (`embedded` card view), so no button nests in another | Kyle (2026-10-12): a review or failed-ticket card should be his to move, to Done or Create PR as he sees fit; one drag feel for both boards | 2026-10-12 |
+| D793 | AL-272: the digest is built in the renderer from the ticket store alone (`boardDigest`: waiting for you → agent stopped → build failed → finished → quiet 2 h+ → queued → working → done), so it is instant and free; its rows offer Open and Resume. "Generate next actions" runs one Sonnet session with no tools, `maxTurns: 1` and a JSON output schema over the digest text (`agent:nextActions`), and each suggestion has "Send to agent" (over `agent:send`, which resumes a stopped agent, AL-268). Nothing is sent without that press | Kyle (2026-10-12): a board-level summary with next actions; the deterministic part answers at once and the model pass is optional and cheap | 2026-10-12 |
 
 ---
 
@@ -2312,6 +2317,10 @@ the main checkout has checked out and does not push.
 | 2026-10-09 | AL-262: thinking blocks — `thinking` output items from the SDK's thinking blocks and deltas, collapsed muted rows in the stream, and a Show thinking switch in the Agent menu (UI pref). |
 | 2026-10-09 | AL-263 started: the hand-over brief builder, the assign service (`createAssignAgentService`) and the `features/assign-agent` slice (modal, api, draft model) with unit tests are on branch `wip/AL-263` (commit 36583a0), not yet wired: `agent:assign` contract and channel, `pastSessions` / `job` on the ticket record, session-manager saving the job, transcript history over past sessions, `stages.moveTo`, services/handlers wiring, TicketPage (menu item, Agents card footer, session pill button), TicketHeader `onAssign`, and `assign-agent.spec.ts` remain. |
 | 2026-10-12 | E16 first batch — AL-267 Open worktree folder (Worktree card button, `git:openWorktree`), AL-268 messaging a ticket without a live session resumes or starts one, AL-269 review tick with comment/thread counts on PR cards (`prActivity`, `agent:prActivity`), AL-273 app notes in the output. Also AL-274 (drag agent cards to any lane) added from Kyle's message. |
+| 2026-10-12 | AL-270: card context menu — right-click / Menu key / corner chevron opens Open in ADO, View description, Change ADO state…, Move to stage…, Resume session, Open worktree folder, Copy branch, Remove from board; `agent:moveStage` and `ado:setWorkItemState`; Move to stage… in the drill-in's Agent menu. |
+| 2026-10-12 | AL-271: Merge worktree → main lands in the main checkout's current branch by default (no push), with the base-branch-and-push merge as the modal's second choice; the preview reports the checkout's branch and cleanliness. |
+| 2026-10-12 | AL-274: agent board cards drag to any lane but Queued (PR cards only to Done) with the team board's drag feel; the drop is a stage move. |
+| 2026-10-12 | AL-272: Digest on the board header — every ticket ranked by what it needs with Open/Resume, and Generate next actions (one Sonnet session, JSON) with Send to agent per suggestion. |
 ---
 
 ## 7. Parallel build rules

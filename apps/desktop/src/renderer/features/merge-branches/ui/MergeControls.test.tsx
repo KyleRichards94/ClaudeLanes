@@ -53,6 +53,8 @@ function preview(fields: Partial<MergeToMainPreview> = {}): MergeToMainPreview {
     ticketId: '71273',
     source: ticket.branch,
     target: 'main',
+    checkoutBranch: 'main',
+    checkoutClean: true,
     repo: 'C:/src/onsite-companion',
     qaPassed: true,
     worktree: { worktreePath: 'C:/wt/71273', present: true, dirty: false, changedFiles: 0, conflicted: false },
@@ -190,7 +192,7 @@ describe('MergeControls (AL-174)', () => {
       'git:mergeToMainPreview': { ok: true, data: preview({ qaPassed: false }) },
       'git:mergeToMain': {
         ok: true,
-        data: { record: fakeTicketRecord({ id: '71273', stage: 'done' }), target: 'main', mergeCommit: 'm1', pushed: true, mergedAt: new Date(2026, 9, 8, 15, 20).getTime() },
+        data: { record: fakeTicketRecord({ id: '71273', stage: 'done' }), target: 'main', targetKind: 'checkout', mergeCommit: 'm1', pushed: false, mergedAt: new Date(2026, 9, 8, 15, 20).getTime() },
       },
     });
     await waitFor(() => expect(mainButton().getAttribute('aria-disabled')).toBeNull());
@@ -202,7 +204,8 @@ describe('MergeControls (AL-174)', () => {
     expect(bridge.invoke).not.toHaveBeenCalledWith('git:mergeToMain', expect.anything());
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Merge anyway' }));
-    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('git:mergeToMain', { ticketId: '71273', acceptQaWarning: true, confirmed: true }));
+    // AL-271: the main checkout's branch is the default target.
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('git:mergeToMain', { ticketId: '71273', target: 'checkout', acceptQaWarning: true, confirmed: true }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Merge worktree → main' })).toBeNull());
     expect(getToasts().at(-1)).toMatchObject({ tone: 'success', title: 'Merged into main · 15:20' });
     expect(selectTicket(store.getState(), '71273')?.stage).toBe('done');

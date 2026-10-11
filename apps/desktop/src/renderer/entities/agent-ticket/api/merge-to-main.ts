@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { MergeToMainResult } from '@agent-lanes/contracts';
+import type { MergeTarget, MergeToMainResult } from '@agent-lanes/contracts';
 import { branchesQueryKey, invoke, unwrap } from '@/shared/api';
 import { agentTickets, type AgentTicketStore } from '../model/store';
 
@@ -37,7 +37,7 @@ export function useMergeToMainPreview(ticketId: string, options: { enabled?: boo
 export function useMergeToMain(store: AgentTicketStore = agentTickets) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (request: { ticketId: string; acceptQaWarning?: boolean }) =>
+    mutationFn: async (request: { ticketId: string; acceptQaWarning?: boolean; target?: MergeTarget }) =>
       unwrap(await invoke('git:mergeToMain', { ...request, confirmed: true })),
     onSuccess: (result: MergeToMainResult) => {
       const { record } = result;

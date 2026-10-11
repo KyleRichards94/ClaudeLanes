@@ -3,7 +3,9 @@ import { ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScroll
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
-import { DragStatusPill, DragToLaneProvider, useActiveDrag } from '@/features/drag-to-lane';
+import { DragStatusPill, DragToLaneProvider, useActiveDrag, type LaunchFromLane } from '@/features/drag-to-lane';
+import { useMoveStageOnDrop } from '@/features/ticket-actions';
+import { DigestPanel } from '@/features/board-digest';
 import { useLaunchFromAdo } from '@/features/launch-from-ado';
 import { invoke, useAppInfo } from '@/shared/api';
 import { usePrefersReducedMotion } from '@/shared/lib';
@@ -31,7 +33,13 @@ import { StickyTop } from './StickyTop';
  */
 export function BoardPage() {
   // A drop starts the agent through main (AL-236): it rechecks the card, makes the ADO change and launches.
-  const launch = useLaunchFromAdo();
+  const launchFromAdo = useLaunchFromAdo();
+  // An agent card dropped on a lane moves its stage instead (AL-274).
+  const moveStage = useMoveStageOnDrop();
+  const launch = useCallback<LaunchFromLane>(
+    (drop, options) => (drop.source.kind === 'agent-ticket' ? moveStage(drop.source.ticketId, drop.lane) : launchFromAdo({ ...drop, source: drop.source }, options)),
+    [launchFromAdo, moveStage],
+  );
   const [collapsed, setCollapsed] = useState(false);
   return (
     // While the strip is pinned at the top, a card dragged up to it must not scroll the page under it.
@@ -50,6 +58,7 @@ interface BoardContentProps {
 function BoardContent({ collapsed, onCollapsedChange }: BoardContentProps) {
   useBoardTickets();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
   const [needsYouOnly, setNeedsYouOnly] = useState(false);
   const [backlogOpen, setBacklogOpen] = useState(false);
   const backlogTeam = useTeamBoardSession().teamId;
@@ -100,7 +109,7 @@ function BoardContent({ collapsed, onCollapsedChange }: BoardContentProps) {
       >
         {/* Pinned while the page scrolls down to the team board; the content scrolls under its glass. */}
         <StickyTop testID="board-header-sticky" onLayout={onHeaderLayout}>
-          <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} />
+          <BoardHeader needsYouOnly={needsYouOnly} onNeedsYouOnlyChange={setNeedsYouOnly} onOpenSettings={() => setSettingsOpen(true)} onOpenDigest={() => setDigestOpen(true)} />
           {/* The lanes folded into a strip under the header once they have scrolled away. */}
           <AgentBoardStrip visible={collapsed} onExpand={expand} needsYouOnly={needsYouOnly} />
         </StickyTop>
@@ -143,6 +152,7 @@ function BoardContent({ collapsed, onCollapsedChange }: BoardContentProps) {
         onPopOut={() => void popOutBacklog(backlogTeam).then((opened) => opened && setBacklogOpen(false))}
       />
       <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <DigestPanel visible={digestOpen} onClose={() => setDigestOpen(false)} />
     </View>
   );
 }

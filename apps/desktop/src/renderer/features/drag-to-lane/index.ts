@@ -5,6 +5,8 @@ export { resetDragToLane, useActiveDrag, useLaneDropState, usePendingDropLanes }
 export { DROP_QUERY_KEYS, initialsOf, useDropOnLane, withItemInProgress, type DropOnLane } from './model/use-drop';
 export { LANE_KEYBOARD_CODES, laneKeyboardCoordinates } from './model/keyboard';
 export { DragToLaneProvider, type DragToLaneProviderProps } from './ui/DragToLaneProvider';
+export { useDragToLaneAvailable } from './ui/context';
+export { agentDragLanes, agentMoveAction, agentTicketDrag, isPullRequestTicket, type AgentDragTicket } from './model/agent-card';
 export { LaneDragCard, type LaneDragCardProps } from './ui/LaneDragCard';
 export { LaneDropHint, laneDropStyle } from './ui/LaneDropHint';
 export { useLaneDropTarget, type LaneDropTarget, type LaneDropTargetOptions } from './ui/lane-target';

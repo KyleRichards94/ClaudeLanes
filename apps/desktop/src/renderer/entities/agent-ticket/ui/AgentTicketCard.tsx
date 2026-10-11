@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type KeyDownEvent, type PressableInstance } from 'react-native';
+import { useRef } from 'react';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, Icon, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/shared/config';
@@ -7,7 +8,7 @@ import { WorkItemStateLabel, WorkItemTypeBar } from '@/shared/ui';
 import { useAgentTicket } from '../model/hooks';
 import type { AgentTicketStore } from '../model/store';
 import type { AgentTicket } from '../model/types';
-import { cardView, type CardActivityTone } from './card-view';
+import { agentCardName, cardView, type CardActivityTone } from './card-view';
 
 export interface AgentTicketCardViewProps {
   ticket: AgentTicket;
@@ -27,6 +28,10 @@ export interface AgentTicketCardViewProps {
   selected?: boolean;
   /** Opens the ticket's drill-in. */
   onPress?: () => void;
+  /** A right-click or the Menu key (AL-270): opens the card's context menu at this window point. */
+  onContextMenu?: (point: { x: number; y: number }) => void;
+  /** Inside a draggable wrapper that is the button (AL-274): the card is a plain view with no press, role or name of its own. */
+  embedded?: boolean;
   /** A control in the card's top-right corner, after the state (the board's "Remove from board…" menu). */
   cornerAction?: ReactNode;
   testID?: string;
@@ -37,30 +42,31 @@ export interface AgentTicketCardViewProps {
  * progress bar, "Model · Effort" and sub-agents, and a status band when the ticket needs something.
  * Presentational: give it a ticket; `AgentTicketCard` reads one from the store.
  */
-export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, cornerAction, testID }: AgentTicketCardViewProps) {
+export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, onContextMenu, cornerAction, embedded = false, testID }: AgentTicketCardViewProps) {
+  const node = useRef<PressableInstance>(null);
+  // The Menu key (or Shift+F10) opens the menu at the card's top-left corner.
+  const onKeyDown = (event: KeyDownEvent) => {
+    const { key, shiftKey } = event.nativeEvent;
+    if (!onContextMenu || !(key === 'ContextMenu' || (key === 'F10' && shiftKey))) return;
+    event.preventDefault();
+    node.current?.measureInWindow((x, y) => onContextMenu({ x: x + 8, y: y + 8 }));
+  };
+  const contextMenuProps = onContextMenu
+    ? {
+        onContextMenu: (event: { preventDefault(): void; nativeEvent: { clientX: number; clientY: number } }) => {
+          event.preventDefault();
+          // Viewport coordinates: the menu sits in a modal over the window.
+          onContextMenu({ x: event.nativeEvent.clientX, y: event.nativeEvent.clientY });
+        },
+      }
+    : {};
   const view = cardView(ticket);
   const cardTone = selected ? 'selected' : view.border;
   const activityTone = activityTones[view.activity.tone];
-  const name = [
-    ticket.ado ? `#${ticket.ado.workItemId}` : ticket.id,
-    ticket.title,
-    LANE_LABELS[ticket.stage],
-    view.activity.text,
-    view.design?.label,
-    view.footer?.label,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const name = agentCardName(ticket);
 
-  return (
-    <Pressable
-      testID={testID}
-      role="button"
-      aria-label={name}
-      onPress={onPress}
-      // The whole card is the target (artboard 1); the global :focus-visible ring follows its radius.
-      style={styles.target}
-    >
+  const content = (
+    <>
       <Card tone={cardTone} footer={view.footer ?? undefined} testID={testID ? `${testID}-card` : undefined}>
         <CardSection>
           <View style={styles.idRow}>
@@ -125,6 +131,29 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
           </View>
         </CardSection>
       </Card>
+    </>
+  );
+  // Inside a draggable (AL-274) the wrapper is the button: a plain view here, so clicks reach it.
+  if (embedded) {
+    return (
+      <View testID={testID} {...contextMenuProps} style={styles.target}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      ref={node}
+      testID={testID}
+      role="button"
+      aria-label={name}
+      onPress={onPress}
+      onKeyDown={onContextMenu ? onKeyDown : undefined}
+      {...contextMenuProps}
+      // The whole card is the target (artboard 1); the global :focus-visible ring follows its radius.
+      style={styles.target}
+    >
+      {content}
     </Pressable>
   );
 }

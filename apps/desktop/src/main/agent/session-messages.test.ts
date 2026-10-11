@@ -46,6 +46,7 @@ async function setup() {
   const handlers = createAgentHandlers({
     sessions,
     tickets,
+    nextActions: { generate: () => Promise.reject(new Error('not in this test')) },
     transcripts,
     stages,
     mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }),

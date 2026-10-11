@@ -13,3 +13,8 @@ export const DragToLaneContext = createContext<DragToLaneContextValue | null>(nu
 export function useDragToLane(): DragToLaneContextValue | null {
   return useContext(DragToLaneContext);
 }
+
+/** True inside a `DragToLaneProvider`: an agent card then wraps itself as a draggable (AL-274). */
+export function useDragToLaneAvailable(): boolean {
+  return useContext(DragToLaneContext) !== null;
+}

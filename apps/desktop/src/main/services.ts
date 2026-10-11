@@ -13,6 +13,7 @@ import { createMcpStatusMonitor, mcpSessionExtras, type McpStatusMonitor } from 
 import { createPermissionService, sdkPermissionMode, type PermissionService } from './agent/permissions';
 import { createSubagentTracker, type SubagentTracker } from './agent/subagents/subagent-tracker';
 import { createPrActivityTracker, type PrActivityTracker } from './agent/pr-activity';
+import { createNextActionsService, type NextActionsService } from './agent/next-actions';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
@@ -157,6 +158,8 @@ export interface Services {
   readonly worktreeOpener: WorktreeOpener;
   /** PR comments and threads a ticket's agents posted (AL-269). */
   readonly prActivity: PrActivityTracker;
+  /** Next actions for the board digest (AL-272). */
+  readonly nextActions: NextActionsService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -410,6 +413,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   const subagents = createSubagentTracker({ sessions, emit: options.emit, log: log.child('agent') });
   const prActivity = createPrActivityTracker({ sessions, tickets, emit: options.emit, log: log.child('agent') });
+  const nextActions = createNextActionsService({ claude, connections, cwd: options.appDataDir, log: log.child('agent') });
   late.subagents = subagents;
   const mergeSubBranches = createMergeSubBranchesService({
     git,
@@ -512,6 +516,7 @@ export function createServices(options: ServiceOptions): Services {
     worktreeFiles,
     worktreeOpener,
     prActivity,
+    nextActions,
     reconcile,
     pullRequests,
     designSpecs,
