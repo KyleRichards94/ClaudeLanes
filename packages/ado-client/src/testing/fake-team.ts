@@ -270,6 +270,8 @@ export interface FakeTeamOrgState {
   pullRequests: FakeTeamPullRequest[];
   /** api-versions refused as newer than `serverVersion`. */
   versionRefusals: string[];
+  /** `System.AssignedTo` values the on-prem fixture refused as unknown identities. */
+  refusedAssignees: string[];
 }
 
 export interface FakeTeamOrg {
@@ -285,7 +287,16 @@ export interface FakeTeamOrgOptions {
   items?: FakeWorkItem[];
   /** Acts as Azure DevOps Server whose newest REST version is this (`6.0`): newer requests get its 400. */
   serverVersion?: string;
+  /**
+   * Windows identities as Azure DevOps Server has them: `connectionData` gives a bare account and a
+   * domain, and `System.AssignedTo` takes only a known identity id or display name (anything else is
+   * the on-prem "unknown identity" 400).
+   */
+  identities?: 'any' | 'on-prem';
 }
+
+/** What the on-prem fixture's `connectionData` says about Kyle: the account without its domain. */
+export const ON_PREM_IDENTITY = { account: 'Kyle.Richards', domain: 'COMPANION' } as const;
 
 const SPRINTS = [
   { id: 'it-41', name: 'Sprint 41', path: SPRINT_41, attributes: { startDate: '2026-09-23T00:00:00Z', finishDate: '2026-10-06T00:00:00Z', timeFrame: 'past' } },
@@ -303,6 +314,7 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
     requests: [],
     unhandled: [],
     versionRefusals: [],
+    refusedAssignees: [],
     pullRequests: artboard08PullRequests(),
   };
   const members = [PEOPLE.KR, PEOPLE.MD, PEOPLE.RJ, PEOPLE.TY];
@@ -447,7 +459,10 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
         authenticatedUser: {
           id: PEOPLE.KR.id,
           providerDisplayName: PEOPLE.KR.displayName,
-          properties: { Account: { $type: 'System.String', $value: PEOPLE.KR.uniqueName } },
+          properties:
+            options.identities === 'on-prem'
+              ? { Account: { $type: 'System.String', $value: ON_PREM_IDENTITY.account }, Domain: { $type: 'System.String', $value: ON_PREM_IDENTITY.domain } }
+              : { Account: { $type: 'System.String', $value: PEOPLE.KR.uniqueName } },
         },
       }),
     ),
@@ -469,8 +484,17 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
         if (operation.path === '/fields/System.AssignedTo') {
           if (operation.op === 'remove') delete item.assignedTo;
           else {
-            const person = Object.values(PEOPLE).find((candidate) => sameText(candidate.uniqueName, operation.value));
-            item.assignedTo = person ?? String(operation.value);
+            const value = String(operation.value);
+            const person = Object.values(PEOPLE).find(
+              (candidate) =>
+                sameText(candidate.uniqueName, value) || sameText(candidate.id, value) || sameText(candidate.displayName, value) || sameText(`${candidate.displayName} <${candidate.uniqueName}>`, value),
+            );
+            // Azure DevOps Server knows an identity by id or display name; a bare or domain account is refused.
+            if (options.identities === 'on-prem' && (!person || sameText(person.uniqueName, value))) {
+              state.refusedAssignees.push(value);
+              return adoError(400, `The identity value '${value}' for field 'Assigned To' is an unknown identity.`, 'WorkItemFieldInvalidException');
+            }
+            item.assignedTo = person ?? value;
           }
         } else if (operation.path === '/fields/System.State' && operation.op === 'add') {
           const next = String(operation.value);
@@ -510,8 +534,8 @@ function paging(request: Request): { top: number; skip: number } {
   return { top: Number(query.get('$top') ?? 100), skip: Number(query.get('$skip') ?? 0) };
 }
 
-function adoError(status: number, message: string) {
-  return HttpResponse.json({ message, typeKey: 'FakeAdoException' }, { status });
+function adoError(status: number, message: string, typeKey = 'FakeAdoException') {
+  return HttpResponse.json({ message, typeKey }, { status });
 }
 
 function workItemNotFound(id: number) {

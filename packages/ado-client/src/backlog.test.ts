@@ -217,6 +217,17 @@ describe('backlog iteration path on Azure DevOps Server', () => {
     expect(await backlogIterationPath(stub(tree), 'Development', { id: 'root-guid', name: 'Development', path: '' }, {})).toBe('Development');
   });
 
+  it('does not trust a bare name as the path: the id is looked up, else project and name (TF51011 on Azure DevOps Server)', async () => {
+    const seen: string[] = [];
+    expect(await backlogIterationPath(stub(tree, seen), 'Development', { id: 'liink-guid', name: 'Team Liink', path: 'Team Liink' }, {})).toBe(`Development${B}Team Liink`);
+    expect(seen).toHaveLength(1);
+    expect(await backlogIterationPath(stub(null), 'Development', { id: 'liink-guid', name: 'Team Liink', path: `${B}Team Liink` }, {})).toBe(`Development${B}Team Liink`);
+    expect(await backlogIterationPath(stub(tree), 'Development', { id: null, name: 'Team Liink', path: 'Team Liink' }, {})).toBe(`Development${B}Team Liink`);
+    // A path without the project is given it; the project root stays the project.
+    expect(await backlogIterationPath(stub(tree), 'Development', { id: 'x', name: 'Sprint 19', path: `Team Liink${B}Sprint 19` }, {})).toBe(['Development', 'Team Liink', 'Sprint 19'].join(B));
+    expect(await backlogIterationPath(stub(tree), 'Development', { id: 'root', name: 'Development', path: 'Development' }, {})).toBe('Development');
+  });
+
   it('falls back to project and name when the tree cannot be read', async () => {
     expect(await backlogIterationPath(stub(null), 'Development', { id: 'liink-guid', name: 'Team Liink' }, {})).toBe(`Development${B}Team Liink`);
   });

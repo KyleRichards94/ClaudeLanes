@@ -127,8 +127,8 @@ const ITERATION_TREE_DEPTH = 10;
 
 /**
  * The team's backlog iteration as WIQL names it (`Development\Team Liink`). Azure DevOps Services
- * returns its `path` in the team settings; Azure DevOps Server (REST 6.x) leaves it out and gives only
- * the name and id, and WIQL refuses the bare name (TF51011). Then the id is looked up in the project's
+ * returns its `path` in the team settings; Azure DevOps Server (REST 6.x) leaves it out, or gives the
+ * bare name as the path, and WIQL refuses a bare name (TF51011). Then the id is looked up in the project's
  * iteration tree, whose `\Development\Iteration\Team Liink` paths drop the `Iteration` segment in
  * WIQL. If that read fails, `project\name` is the best guess. Never throws.
  */
@@ -139,9 +139,12 @@ export async function backlogIterationPath(
   call: TeamCallOptions,
 ): Promise<string> {
   // ADO answers the root iteration with an empty path; work items name it by the project.
-  const given = iteration.path?.replace(/^\\+/, '');
-  if (given) return given;
-  if (iteration.name.toLowerCase() === project.trim().toLowerCase()) return iteration.name;
+  const given = iteration.path?.replace(/^\\+/, '') ?? '';
+  const isProject = (name: string) => name.toLowerCase() === project.trim().toLowerCase();
+  // A path with the project in it is WIQL's; a bare name ("Team Liink") is only the iteration's name.
+  if (given.includes('\\')) return isProject(given.split('\\')[0]!) ? given : `${project.trim()}\\${given}`;
+  if (given && isProject(given)) return given;
+  if (isProject(iteration.name)) return iteration.name;
 
   if (iteration.id) {
     const tree = await client.get(adoPath`/${project.trim()}/_apis/wit/classificationnodes/iterations`, iterationNodeSchema, {
@@ -153,7 +156,7 @@ export async function backlogIterationPath(
       if (found?.path) return wiqlIterationPath(found.path);
     }
   }
-  return `${project.trim()}\\${iteration.name}`;
+  return `${project.trim()}\\${given || iteration.name}`;
 }
 
 function findNode(node: IterationNode, id: string): IterationNode | undefined {

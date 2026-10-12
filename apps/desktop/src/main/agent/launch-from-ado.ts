@@ -264,7 +264,8 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     if (!before.ok) return before;
     const state = await inProgressStateOf(client, project, before.data.type);
     if (!state.ok) return state;
-    const after = await setWorkItemAssignment(client, { project, workItemId }, { expectedRev: before.data.rev, assignee: me.uniqueName ?? me.displayName, state: state.data });
+    // Every name the person is known by is tried: Azure DevOps Server refuses a bare account name (AL-236 on-prem fix).
+    const after = await setWorkItemAssignment(client, { project, workItemId }, { expectedRev: before.data.rev, assignee: me, state: state.data });
     return after.ok ? ok({ before: before.data, after: after.data }) : after;
   }
 
@@ -461,7 +462,7 @@ export async function restoreAssignment(client: AdoClient, change: AdoRestore): 
   const restored = await setWorkItemAssignment(
     client,
     { project: change.project, workItemId: change.workItemId },
-    { expectedRev: change.rev, assignee: change.previousAssignee ? (change.previousAssignee.uniqueName ?? change.previousAssignee.displayName) : null, state: change.previousState },
+    { expectedRev: change.rev, assignee: change.previousAssignee, state: change.previousState },
   );
   return restored.ok ? ok(undefined) : restored;
 }

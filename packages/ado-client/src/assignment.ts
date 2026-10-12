@@ -19,8 +19,36 @@ export type AssignmentCallOptions = Pick<AdoCallOptions, 'signal' | 'timeoutMs'>
 export interface AdoPerson {
   id: string | null;
   displayName: string;
-  /** Sign-in name (usually an email); what a JSON Patch to `System.AssignedTo` takes. */
+  /** Sign-in name: an email on Azure DevOps Services, `DOMAIN\\account` on Azure DevOps Server. */
   uniqueName: string | null;
+}
+
+/**
+ * Whom to assign, with every name Azure DevOps may know the person by: `assigneeValues` tries them
+ * in turn, because a server that rejects one ("unknown identity") often takes another.
+ */
+export type AssigneeIdentity = Pick<AdoPerson, 'displayName' | 'uniqueName'> & { id?: string | null };
+
+/** The values `System.AssignedTo` is tried with, most specific first: sign-in name, identity id, display name. */
+export function assigneeValues(person: AssigneeIdentity): string[] {
+  const values = [person.uniqueName, person.id, person.displayName].map((value) => value?.trim() ?? '').filter(Boolean);
+  return [...new Set(values)];
+}
+
+/**
+ * The sign-in name `System.AssignedTo` takes, from `connectionData`'s Account and Domain properties:
+ * the account as given when it is an email or already has a domain (Services, or AAD-backed Server);
+ * `DOMAIN\\account` on Azure DevOps Server with Windows accounts, where the bare account
+ * ("Kyle.Richards") is an unknown identity.
+ */
+export function signInName(account: string | null | undefined, domain: string | null | undefined): string | null {
+  const name = account?.trim() ?? '';
+  if (!name) return null;
+  if (name.includes('@') || name.includes('\\')) return name;
+  const realm = domain?.trim() ?? '';
+  // A tenant id (a GUID) is no Windows domain.
+  if (!realm || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(realm)) return name;
+  return `${realm}\\${name}`;
 }
 
 /** The fields an assignment change reads and writes. */
@@ -75,7 +103,14 @@ const connectionDataSchema = z.object({
     id: z.string().min(1),
     providerDisplayName: z.string().nullish(),
     customDisplayName: z.string().nullish(),
-    properties: z.object({ Account: z.object({ $value: z.string().nullish() }).loose().nullish() }).loose().nullish(),
+    properties: z
+      .object({
+        Account: z.object({ $value: z.string().nullish() }).loose().nullish(),
+        /** The Windows domain on Azure DevOps Server; a tenant id on Services. */
+        Domain: z.object({ $value: z.string().nullish() }).loose().nullish(),
+      })
+      .loose()
+      .nullish(),
   }),
 });
 
@@ -85,8 +120,7 @@ export async function getSignedInUser(client: AdoClient, options: AssignmentCall
   if (!answer.ok) return answer;
   const user = answer.data.authenticatedUser;
   const displayName = user.customDisplayName?.trim() || user.providerDisplayName?.trim() || '';
-  const account = user.properties?.Account?.$value?.trim();
-  return ok({ id: user.id, displayName, uniqueName: account ? account : null });
+  return ok({ id: user.id, displayName, uniqueName: signInName(user.properties?.Account?.$value, user.properties?.Domain?.$value) });
 }
 
 const statesSchema = z.object({ value: z.array(z.object({ name: z.string().min(1), category: z.string().nullish() })) });
@@ -105,14 +139,24 @@ export async function inProgressStateOf(client: AdoClient, project: string, type
 export interface AssignmentChange {
   /** The revision the change was decided on; the write is refused when the item changed since. */
   expectedRev: number;
-  /** Sign-in name to assign, or null to leave it unassigned. */
-  assignee: string | null;
+  /** Whom to assign (a sign-in name, or a person whose names are tried in turn), or null to leave it unassigned. */
+  assignee: string | AssigneeIdentity | null;
   state: string;
+}
+
+/** Azure DevOps refused the `System.AssignedTo` value as an identity it does not know. */
+export function isUnknownIdentity(failure: Result<unknown>): boolean {
+  if (failure.ok) return false;
+  const details = isAdoErrorDetails(failure.details) ? failure.details : undefined;
+  const text = `${failure.message} ${details?.adoMessage ?? ''} ${details?.adoTypeKey ?? ''}`;
+  return /unknown identity|WorkItemFieldInvalidException|not a valid identity/i.test(text);
 }
 
 /**
  * Sets `System.AssignedTo` and `System.State` in one revision, guarded by `expectedRev`. Someone
- * else's change in between gives INTERNAL with `details.reason: 'changed'` and writes nothing. Never throws.
+ * else's change in between gives INTERNAL with `details.reason: 'changed'` and writes nothing. A person
+ * is tried by each of their names (`assigneeValues`) until the server takes one: Azure DevOps Server
+ * refuses a bare account name but knows the identity id and the display name. Never throws.
  */
 export async function setWorkItemAssignment(
   client: AdoClient,
@@ -120,9 +164,22 @@ export async function setWorkItemAssignment(
   change: AssignmentChange,
   options: AssignmentCallOptions = {},
 ): Promise<Result<WorkItemAssignment>> {
+  const values = change.assignee === null ? [null] : typeof change.assignee === 'string' ? [change.assignee] : assigneeValues(change.assignee);
+  if (values.length === 0) return err('VALIDATION', `Work item #${ref.workItemId} cannot be assigned: the person has no sign-in name, id or display name.`, { reason: 'no-identity' });
+  let last: Result<WorkItemAssignment> | undefined;
+  for (const value of values) {
+    const attempt = await writeAssignment(client, ref, value, change, options);
+    // A refused value never changed the revision: the next name is tried against the same one.
+    if (attempt.ok || !isUnknownIdentity(attempt) || value === values.at(-1)) return attempt;
+    last = attempt;
+  }
+  return last ?? err('INTERNAL', 'The assignment was not written.');
+}
+
+async function writeAssignment(client: AdoClient, ref: AssignmentRef, assignee: string | null, change: AssignmentChange, options: AssignmentCallOptions): Promise<Result<WorkItemAssignment>> {
   const patch = [
     { op: 'test', path: '/rev', value: change.expectedRev },
-    change.assignee === null ? { op: 'remove', path: '/fields/System.AssignedTo' } : { op: 'add', path: '/fields/System.AssignedTo', value: change.assignee },
+    assignee === null ? { op: 'remove', path: '/fields/System.AssignedTo' } : { op: 'add', path: '/fields/System.AssignedTo', value: assignee },
     { op: 'add', path: '/fields/System.State', value: change.state },
   ];
   const updated = await client.request({
