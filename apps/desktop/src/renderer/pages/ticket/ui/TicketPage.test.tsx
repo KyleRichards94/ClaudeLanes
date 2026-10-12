@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADO_FIXTURE_IDENTITY, adoFixtureWorkItem } from '@agent-lanes/contracts/testing';
 import { agentTickets } from '@/entities/agent-ticket';
@@ -190,6 +190,56 @@ describe('TicketPage', () => {
     await screen.findByTestId('ticket-title');
     fireEvent.click(screen.getByRole('tab', { name: 'ADO' }));
     expect(await screen.findByTestId('ticket-work-item')).toBeTruthy();
+  });
+
+  it('switches the output, composer and status to a second agent and back (AL-266)', async () => {
+    const reviewer = fakeTicketRecord({ id: '71273-reviewer-eyes', ado: null, sessionId: 'cc-eyes', companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    const bridge = installFakeBridge({
+      'tickets:get': { ok: true, data: { record } },
+      'tickets:list': { ok: true, data: [record, reviewer] },
+      'ado:getWorkItem': { ok: true, data: adoFixtureWorkItem(71273) },
+      'branches:status': { ok: true, data: branchStatus },
+    });
+    const replies = vi.mocked(bridge.invoke).getMockImplementation()!;
+    vi.mocked(bridge.invoke).mockImplementation(async (channel: string, payload?: unknown) => {
+      const ticketId = (payload as { ticketId: string } | undefined)?.ticketId ?? '';
+      if (channel === 'agent:getStatus') return { ok: true, data: { ticketId, state: ticketId === '71273' ? 'idle' : 'running', sessionId: ticketId === '71273' ? 'cc-71273' : 'cc-eyes', message: null } };
+      return replies(channel as never, payload as never);
+    });
+    renderPage();
+    await screen.findByTestId('ticket-title');
+    const switcher = await screen.findByTestId('agent-switcher');
+    expect(within(switcher).getByRole('radio', { name: 'Lead' }).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('agent:getUsage', { ticketId: '71273' }));
+
+    fireEvent.click(within(switcher).getByRole('radio', { name: 'Eyes · Reviewer' }));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('agent:getUsage', { ticketId: '71273-reviewer-eyes' }));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('agent:getStatus', { ticketId: '71273-reviewer-eyes' }));
+    expect(screen.getByTestId('companion-71273-reviewer-eyes')).toBeTruthy();
+    expect(screen.queryByTestId('companion-71273-reviewer-eyes-open')).toBeNull();
+    // The stepper and the rail stay the lead's.
+    expect(screen.getByLabelText('Implementing, current stage')).toBeTruthy();
+
+    fireEvent.click(within(switcher).getByRole('radio', { name: 'Lead' }));
+    expect(await screen.findByTestId('companion-71273-reviewer-eyes-open')).toBeTruthy();
+  });
+
+  it("opens a second agent's id on its lead's page (AL-266)", async () => {
+    const reviewer = fakeTicketRecord({ id: '71273-reviewer-eyes', ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    const bridge = installFakeBridge({
+      'tickets:list': { ok: true, data: [record, reviewer] },
+      'ado:getWorkItem': { ok: true, data: adoFixtureWorkItem(71273) },
+      'branches:status': { ok: true, data: branchStatus },
+    });
+    const replies = vi.mocked(bridge.invoke).getMockImplementation()!;
+    vi.mocked(bridge.invoke).mockImplementation(async (channel: string, payload?: unknown) => {
+      const ticketId = (payload as { ticketId: string } | undefined)?.ticketId ?? '';
+      if (channel === 'tickets:get') return { ok: true, data: { record: ticketId === '71273' ? record : reviewer } };
+      return replies(channel as never, payload as never);
+    });
+    renderPage('71273-reviewer-eyes');
+    expect((await screen.findByTestId('ticket-breadcrumb')).textContent).toContain('#71273');
+    expect(await screen.findByTestId('agent-switcher')).toBeTruthy();
   });
 
   it('goes to the board from the top bar', async () => {

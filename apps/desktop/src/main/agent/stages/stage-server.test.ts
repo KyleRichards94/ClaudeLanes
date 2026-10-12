@@ -9,8 +9,8 @@ import { SESSION_TEST_BASE, eventually, fakeClaudeConnections, memoryTickets, re
 import { createDesignSpecFiles } from '../../design/spec-store';
 import { fakeSpec } from '../../design/testing/specs';
 import { createDesignSpecService } from '../../design/specs';
-import { createMemoryRecordFs } from '../../tickets/testing';
-import { DESIGN_SPEC_TOOLS, STAGE_PROTOCOL, STAGE_PROTOCOL_REMINDER, STAGE_SERVER_TOOLS, sdkStageServer, stageServerTools, stageSessionExtras } from './stage-server';
+import { createMemoryRecordFs, newTicketInput } from '../../tickets/testing';
+import { COMPANION_PROTOCOL, DESIGN_SPEC_TOOLS, STAGE_PROTOCOL, STAGE_PROTOCOL_REMINDER, STAGE_SERVER_TOOLS, sdkStageServer, stageServerTools, stageSessionExtras } from './stage-server';
 import { createStageService } from './stage-service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the handlers take each tool's own input
@@ -265,5 +265,29 @@ describe('design-spec tools on the agent_lanes server (AL-198)', () => {
     expect(STAGE_PROTOCOL).toContain('ack_design_spec');
     expect(STAGE_PROTOCOL).toContain('in Planning, fold it into the plan');
     expect(STAGE_PROTOCOL).toContain('A later version supersedes earlier ones');
+  });
+});
+
+describe('a second agent (AL-266)', () => {
+  it('gets report_activity only, no stage move and a protocol without stages', async () => {
+    const { tickets, stages, events } = await setup('queued');
+    const lead = (await tickets.get('71273'))!;
+    const created = await tickets.create({ ...newTicketInput(SESSION_TEST_BASE, { id: '71273-reviewer-eyes', stage: 'queued', branch: lead.branch, worktreePath: lead.worktreePath }), ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    if (!created.ok) throw new Error(created.message);
+    const servers: AnyTool[][] = [];
+    const extras = await stageSessionExtras({
+      stages,
+      createServer: (tools) => {
+        servers.push(tools as AnyTool[]);
+        return { type: 'sdk', name: 'agent_lanes', instance: {} } as unknown as McpServerConfig;
+      },
+    })((await tickets.get('71273-reviewer-eyes'))!);
+    expect(servers[0]!.map((tool) => tool.name)).toEqual(['report_activity']);
+    expect(extras.allowedTools).toEqual(['mcp__agent_lanes__report_activity']);
+    expect(extras.systemPromptAppend).toBe(COMPANION_PROTOCOL);
+    expect(extras.firstTurnAppendix).toBeUndefined();
+    // No stage move for a companion, whatever its record says.
+    expect((await tickets.get('71273-reviewer-eyes'))?.stage).toBe('queued');
+    expect(events.of('agent:stage')).toEqual([]);
   });
 });

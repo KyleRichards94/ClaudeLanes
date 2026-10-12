@@ -187,7 +187,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-263 | Assign new agent | E15 | L | AL-253 | done |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | done |
 | AL-265 | Rewind and fork | E15 | L | AL-251 | done |
-| AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
+| AL-266 | Second agent on a ticket | E15 | L | AL-263 | done |
 | AL-267 | Open worktree folder | E16 | S | — | done |
 | AL-268 | Message a ticket without a live session | E16 | M | AL-110 | done |
 | AL-269 | Review tick on PR cards | E16 | M | AL-236 | done |
@@ -1368,10 +1368,10 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Decisions; Kyle 2026-10-09 · **Depends on:** AL-263
 - **Scope:** "Add agent" on the rail's Agents card starts a second session on the ticket (e.g. a reviewer): role (Reviewer read-only, or Helper on its own `sub/<ticket>-<name>` sub-branch), model, effort, skills, a prompt. The ticket record keeps both sessions; the output and composer get an agent switcher (Lead / Reviewer); permissions, usage and stop apply per agent. A read-only agent's write tools are denied by policy. Counts against the repo's concurrency limit.
 - **Acceptance criteria:**
-  - [ ] A reviewer runs beside the lead with its own output and composer; it cannot write in the worktree.
-  - [ ] A helper's commits land on its sub-branch and show in Sub-branches.
-  - [ ] Stopping one agent leaves the other running.
-  - [ ] Unit tests; `second-agent.spec.ts`.
+  - [x] A reviewer runs beside the lead with its own output and composer; it cannot write in the worktree.
+  - [x] A helper's commits land on its sub-branch and show in Sub-branches.
+  - [x] Stopping one agent leaves the other running.
+  - [x] Unit tests; `second-agent.spec.ts`.
 
 ### E16 — Board heuristics (Kyle, 2026-10-12)
 
@@ -2243,6 +2243,9 @@ the main checkout has checked out and does not push.
 | D796 | AL-264: a ticket's permission mode lives on its record (`permissionMode`), wins over Settings in `sessionExtras`, is applied to a live session at once (`setPermissionModeFor`), and a Settings change no longer touches tickets that override it. The Agent menu lists Follow Settings and the three modes with the current one ticked. Move to stage… landed with AL-270 and Archive is AL-274's Remove from board | A per-ticket mode must survive a restart and a global change; the menu is where the user changes it mid-run | 2026-10-12 |
 | D797 | AL-265: sessions run with the SDK's file checkpointing; each of the user's messages (not the app's notes) shows Rewind to here and Fork from here while the pointer is over it. Rewind opens on a dry run (`agent:rewind`, `rewindFiles`) that lists the files, confirms, then restores them and writes "Kyle rewound the worktree to 14:02 · 2 files restored (+12 −3)"; it is refused when commits made after that message are already on origin. Fork goes through Assign new agent with "Start from fork": the SDK's `forkSession` copies the old session up to that message and the new agent resumes the copy | The SDK owns both operations; routing the fork through the assign dialog keeps one way to start a replacement agent | 2026-10-12 |
 | D798 | AL-265: the e2e covers Rewind against the fake `claude` (which answers `rewind_files`); Fork is unit-tested with a fake `forkSession`, because the real one reads session files the fake never writes | No session file exists for the fake | 2026-10-12 |
+| D799 | AL-266: a second agent is a ticket record of its own (`71273-reviewer-eyes`) marked `companion: { of, role, name }`, so sessions, output, usage, permissions, Stop and `agent:send` work by its id as for any ticket; the board keeps it out of every lane, its lead's drill-in gets an agent switcher (Lead / Eyes · Reviewer) beside the tab bar and lists it on the Agents card with Open, Stop and Remove. A reviewer shares the lead's worktree and branch; a helper gets `sub/<ticket>-<name>` through the sub-worktree service, so it shows in Sub-branches and merges like a writer sub-agent | Everything downstream is keyed by ticket id; a second id reuses all of it, where a session list per ticket would have touched every service | 2026-10-12 |
+| D800 | AL-266: a reviewer is read-only by policy: its session runs with `disallowedTools` Edit/Write/MultiEdit/NotebookEdit, and a PreToolUse hook (and `canUseTool`) refuses those tools and any Bash command outside the allowed prefixes (git reads, the repo's build and test commands) with a message the agent reads; it never becomes a Needs-you prompt | A reviewer that could still write through Bash would not be read-only | 2026-10-12 |
+| D801 | AL-266: companions get no stage server, no stage protocol and all-auto gates; their ADO ref is null, so nothing writes to the work item for them. Archiving the lead ends its companions' sessions first and deletes their records with it; Remove on a companion alone deletes only its record (a helper's branch and sub-worktree stay with the lead). Opening a companion's id as a route shows its lead's page switched to it | A hidden record must never wait on a gate or move a card; a reviewer's worktree is the lead's | 2026-10-12 |
 
 ---
 
@@ -2329,6 +2332,7 @@ the main checkout has checked out and does not push.
 | 2026-10-12 | AL-263: Assign new agent — Agent menu item, Agents card button and the ended/lost session pill open a dialog (model, effort, skills, stage, Hand over / Start fresh); `agent:assign`, hand-over brief, past sessions on the record, transcript history across them; assign-agent.spec.ts. |
 | 2026-10-12 | AL-264: per-ticket permission mode in the Agent menu (`agent:setPermissionMode`, record `permissionMode`, applied live; Settings changes skip overriding tickets). |
 | 2026-10-12 | AL-265: Rewind to here (dry-run preview, pushed-commit refusal, output line) and Fork from here (Assign new agent · Start from fork) on the user's messages; file checkpointing on; rewind.spec.ts. |
+| 2026-10-12 | AL-266: Add agent (Reviewer read-only in the ticket worktree, Helper on its own sub-branch) as companion records; agent switcher and Agents card rows on the drill-in; read-only policy via disallowedTools and a PreToolUse hook; archive clean-up; second-agent.spec.ts. E15 complete. |
 ---
 
 ## 7. Parallel build rules

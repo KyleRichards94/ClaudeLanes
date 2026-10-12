@@ -15,6 +15,7 @@ import { createSubagentTracker, type SubagentTracker } from './agent/subagents/s
 import { createPrActivityTracker, type PrActivityTracker } from './agent/pr-activity';
 import { createNextActionsService, type NextActionsService } from './agent/next-actions';
 import { createAssignAgentService, type AssignAgentService } from './agent/assign/assign-agent';
+import { createAddAgentService, type AddAgentService } from './agent/companions/add-agent';
 import { createRewindService, type RewindService } from './agent/rewind';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
@@ -166,6 +167,8 @@ export interface Services {
   readonly assignments: AssignAgentService;
   /** Rewind to here (AL-265). */
   readonly rewinds: RewindService;
+  /** Add agent (AL-266): a second session on a ticket, as a companion record. */
+  readonly companions: AddAgentService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -213,7 +216,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -281,7 +284,18 @@ export function createServices(options: ServiceOptions): Services {
   const repoQueue = createKeyedQueue();
   const mergeToMain = createMergeToMainService({ git, tickets, log: log.child('merge'), queue: repoQueue });
   const ticketArchive = createTicketArchive({ rootDir: ticketsArchiveDir(options.appDataDir), warn: (message) => log.child('archive').warn(message) });
-  const archive = createArchiveService({ git, tickets, archive: ticketArchive, log: log.child('archive'), queue: repoQueue });
+  const archive = createArchiveService({
+    git,
+    tickets,
+    archive: ticketArchive,
+    log: log.child('archive'),
+    queue: repoQueue,
+    // A ticket's second agents (AL-266) end before its worktrees go; `sessions` is created below.
+    stopSession: async (ticketId) => {
+      late.launches?.cancel(ticketId);
+      await late.sessions?.stop(ticketId, { reason: 'The ticket was removed from the board' });
+    },
+  });
   const diffs = createDiffService({ git, tickets });
   const worktreeFiles = createWorktreeFileLister({ git, tickets });
   const worktreeOpener = createWorktreeOpener({ tickets, openPath: options.openPath ?? (async () => 'Opening folders is not available here.') });
@@ -373,6 +387,7 @@ export function createServices(options: ServiceOptions): Services {
     // A silent session is lost only while nobody is asked anything (AL-110).
     isWaitingOnUser: (ticketId) => stages.pendingGate(ticketId) !== null || permissions.pending(ticketId) !== null,
   });
+  late.sessions = sessions;
   const transcripts = createTranscriptService({
     sessions,
     tickets,
@@ -442,6 +457,7 @@ export function createServices(options: ServiceOptions): Services {
     emit: options.emit,
     log: log.child('agent'),
   });
+  late.launches = launches;
   const planLimits = createPlanLimitsService({
     sessions,
     emit: options.emit,
@@ -493,6 +509,7 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   const rewinds = createRewindService({ sessions, tickets, transcripts, git, log: log.child('agent') });
+  const companions = createAddAgentService({ tickets, launches, subWorktrees, transcripts, log: log.child('agent') });
 
   return {
     backlogWindow: options.backlogWindow ?? createBacklogWindowController(() => null),
@@ -538,6 +555,7 @@ export function createServices(options: ServiceOptions): Services {
     nextActions,
     assignments,
     rewinds,
+    companions,
     reconcile,
     pullRequests,
     designSpecs,

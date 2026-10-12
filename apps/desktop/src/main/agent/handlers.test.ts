@@ -43,6 +43,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
     assignments: {} as Services['assignments'],
     settings: { get: () => defaultSettings() } as Services['settings'],
     rewinds: {} as Services['rewinds'],
+    companions: {} as Services['companions'],
     // Plan limits (AL-258) have their own tests.
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),

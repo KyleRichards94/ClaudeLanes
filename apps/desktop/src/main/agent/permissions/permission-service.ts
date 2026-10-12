@@ -70,6 +70,10 @@ export interface PermissionServiceOptions {
 /** What the agent reads when the user says no. */
 export const PERMISSION_DENIED_MESSAGE = 'The user denied this in Agent Lanes. Do not retry it; find another way or explain what you need in your reply.';
 export const PERMISSION_CANCELLED_MESSAGE = 'The permission request was cancelled because the turn ended.';
+/** Tools a read-only reviewer (AL-266) never gets. */
+export const READ_ONLY_DENIED_TOOLS: readonly string[] = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+/** What a read-only reviewer reads when it tries to change the worktree. */
+export const READ_ONLY_MESSAGE = 'This agent is a read-only reviewer in Agent Lanes: it cannot change the worktree. Reading files, git reads and the build and test commands are allowed; say what you would change in your reply instead.';
 
 interface Waiting {
   request: PermissionRequest;
@@ -129,6 +133,8 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
   const bashPrefixes = new Map<string, string[]>();
   /** Each ticket's repo path, from `sessionExtras`, for the repo's saved rules (AL-260). */
   const repoByTicket = new Map<string, string>();
+  /** Tickets whose agent is a read-only reviewer (AL-266). */
+  const readOnly = new Set<string>();
 
   const oldest = (ticketId: string): PermissionRequest | null => waiting.get(ticketId)?.[0]?.request ?? null;
 
@@ -207,6 +213,26 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
     };
   }
 
+  /** A read-only reviewer's answer for a tool call (AL-266): null when the call may go ahead. */
+  function readOnlyRefusal(ticketId: string, toolName: string, input: Record<string, unknown>): string | null {
+    if (!readOnly.has(ticketId)) return null;
+    const refused = READ_ONLY_DENIED_TOOLS.includes(toolName) || (toolName === 'Bash' && !(typeof input['command'] === 'string' && bashCommandAllowed(input['command'], bashPrefixes.get(ticketId) ?? [])));
+    if (!refused) return null;
+    log?.info(`Ticket ${ticketId}: refused ${toolLabel(toolName)} for the read-only reviewer`);
+    options.transcripts?.appendSystem(ticketId, `Agent Lanes refused ${toolLabel(toolName)}: this agent is read-only`);
+    return READ_ONLY_MESSAGE;
+  }
+
+  /** PreToolUse for a read-only reviewer: write tools and worktree-changing commands never reach the mode or the classifier. */
+  function readOnlyHook(ticketId: string): HookCallback {
+    return async (hookInput) => {
+      if (hookInput.hook_event_name !== 'PreToolUse') return {};
+      const input = hookInput.tool_input !== null && typeof hookInput.tool_input === 'object' ? (hookInput.tool_input as Record<string, unknown>) : {};
+      const refusal = readOnlyRefusal(ticketId, hookInput.tool_name, input);
+      return refusal === null ? {} : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: refusal } };
+    };
+  }
+
   /** The ticket's repo and its saved rules, from the settings. */
   function repoRulesFor(ticketId: string): { repo: string | null; rules: string[] } {
     const repo = repoByTicket.get(ticketId) ?? null;
@@ -250,6 +276,9 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       if (toolName === 'Bash' && typeof input['command'] === 'string' && bashCommandAllowed(input['command'], bashPrefixes.get(ticketId) ?? [])) {
         return { behavior: 'allow', updatedInput: input };
       }
+      // A read-only reviewer (AL-266) is refused, never asked for.
+      const refusal = readOnlyRefusal(ticketId, toolName, input);
+      if (refusal !== null) return { behavior: 'deny', message: refusal };
       if (allowedForTicket.get(ticketId)?.has(ruleFor(toolName, input))) return { behavior: 'allow', updatedInput: input };
       // Rules the repo remembers from "Always allow" (AL-260).
       if (repoRulesFor(ticketId).rules.some((rule) => ruleAllows(rule, toolName, input))) {
@@ -268,12 +297,19 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       const prefixes = allowedBashPrefixes(policy, commands?.ok ? commands.data : null);
       bashPrefixes.set(record.id, prefixes);
       repoByTicket.set(record.id, record.repo);
+      // A reviewer companion (AL-266) runs without its write tools; a hook refuses the rest.
+      const reviewer = record.companion?.role === 'reviewer';
+      if (reviewer) readOnly.add(record.id);
+      else readOnly.delete(record.id);
       return {
         // The ticket's own mode (AL-264) wins over Settings.
         permissionMode: sdkPermissionMode(record.permissionMode ?? agentPermissionMode(policy)),
         allowedTools: bashAllowRules(prefixes),
         canUseTool: canUseTool(record.id),
-        hooks: { PreToolUse: [{ matcher: '^mcp__', hooks: [commentHook(record.id)] }] },
+        ...(reviewer ? { disallowedTools: [...READ_ONLY_DENIED_TOOLS] } : {}),
+        hooks: {
+          PreToolUse: [{ matcher: '^mcp__', hooks: [commentHook(record.id)] }, ...(reviewer ? [{ matcher: '^(Edit|Write|MultiEdit|NotebookEdit|Bash)$', hooks: [readOnlyHook(record.id)] }] : [])],
+        },
       };
     },
 

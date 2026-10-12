@@ -17,6 +17,7 @@ export function combineSessionExtras(sources: readonly SessionExtrasSource[]): S
   return async (record) => {
     const mcpServers: NonNullable<SessionExtras['mcpServers']> = {};
     const allowedTools: string[] = [];
+    const disallowedTools: string[] = [];
     const prompts: string[] = [];
     const appendix: string[] = [];
     let permissionMode: SessionExtras['permissionMode'];
@@ -26,6 +27,7 @@ export function combineSessionExtras(sources: readonly SessionExtrasSource[]): S
       const extras = await source(record);
       for (const [name, server] of Object.entries(extras.mcpServers ?? {})) if (!(name in mcpServers)) mcpServers[name] = server;
       for (const tool of extras.allowedTools ?? []) if (!allowedTools.includes(tool)) allowedTools.push(tool);
+      for (const tool of extras.disallowedTools ?? []) if (!disallowedTools.includes(tool)) disallowedTools.push(tool);
       if (extras.systemPromptAppend) prompts.push(extras.systemPromptAppend);
       appendix.push(...(extras.firstTurnAppendix ?? []));
       permissionMode ??= extras.permissionMode;
@@ -37,6 +39,7 @@ export function combineSessionExtras(sources: readonly SessionExtrasSource[]): S
     return {
       mcpServers,
       allowedTools,
+      ...(disallowedTools.length > 0 ? { disallowedTools } : {}),
       ...(prompts.length > 0 ? { systemPromptAppend: prompts.join('\n\n') } : {}),
       firstTurnAppendix: appendix,
       ...(permissionMode ? { permissionMode } : {}),

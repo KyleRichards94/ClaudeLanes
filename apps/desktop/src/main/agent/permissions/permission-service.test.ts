@@ -7,6 +7,7 @@ import { createTranscriptService } from '../output/transcript';
 import { combineSessionExtras } from '../session-extras';
 import { createSessionManager } from '../session-manager';
 import { createFakeClaude, fakeInit } from '../testing/fake-claude';
+import { newTicketInput } from '../../tickets/testing';
 import { SESSION_TEST_BASE, fakeClaudeConnections, memoryTickets, recordingEmit, testPermissions } from '../testing/sessions';
 import { PERMISSION_CANCELLED_MESSAGE, PERMISSION_DENIED_MESSAGE, createPermissionService, sdkPermissionMode } from './permission-service';
 
@@ -321,5 +322,58 @@ describe("the ticket's own permission mode (AL-264)", () => {
     await tickets.update('71273', (record) => ({ ...record, permissionMode: 'ask' }));
     expect((await permissions.sessionExtras((await tickets.get('71273'))!)).permissionMode).toBe('default');
     expect((await permissions.sessionExtras((await tickets.get('71274'))!)).permissionMode).toBe('auto');
+  });
+});
+
+describe('a read-only reviewer (AL-266)', () => {
+  async function reviewer() {
+    const system: string[] = [];
+    const tickets = await memoryTickets({ id: '71273' });
+    const lead = (await tickets.get('71273'))!;
+    const created = await tickets.create({ ...newTicketInput(SESSION_TEST_BASE, { id: '71273-reviewer-eyes', branch: lead.branch, worktreePath: lead.worktreePath }), ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    if (!created.ok) throw new Error(created.message);
+    const events = recordingEmit();
+    const permissions = createPermissionService({
+      settings: { get: () => defaultSettings() },
+      tickets,
+      buildCommands: { forRepo: async () => ({ ok: true, data: dotnet }) },
+      emit: events.emit,
+      transcripts: { appendSystem: (_ticketId: string, text: string) => void system.push(text) } as never,
+    });
+    const extras = await permissions.sessionExtras((await tickets.get('71273-reviewer-eyes'))!);
+    const leadExtras = await permissions.sessionExtras(lead);
+    return { permissions, extras, leadExtras, events, system };
+  }
+
+  it('runs without its write tools, and a PreToolUse hook refuses them and worktree-changing commands', async () => {
+    const { extras, leadExtras, system } = await reviewer();
+    expect(extras.disallowedTools).toEqual(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+    expect(leadExtras.disallowedTools).toBeUndefined();
+    const matcher = extras.hooks?.PreToolUse?.[1];
+    if (!matcher) throw new Error('no read-only hook');
+    expect(new RegExp(matcher.matcher!).test('Edit')).toBe(true);
+    expect(new RegExp(matcher.matcher!).test('Read')).toBe(false);
+    const hook = (tool: string, input: Record<string, unknown>) =>
+      matcher.hooks[0]!({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, tool_use_id: 'toolu_9' } as never, 'toolu_9', { signal: new AbortController().signal });
+    await expect(hook('Edit', { file_path: 'a.cs' })).resolves.toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny', permissionDecisionReason: expect.stringContaining('read-only reviewer') } });
+    await expect(hook('Bash', { command: 'rm -rf bin' })).resolves.toMatchObject({ hookSpecificOutput: { permissionDecision: 'deny' } });
+    await expect(hook('Bash', { command: 'git status' })).resolves.toEqual({});
+    await expect(hook('Bash', { command: 'dotnet build OnSite.sln -c Debug' })).resolves.toEqual({});
+    expect(system).toEqual(['Agent Lanes refused Edit: this agent is read-only', 'Agent Lanes refused Bash: this agent is read-only']);
+    // The lead's hooks are untouched: only the comment gate.
+    expect(leadExtras.hooks?.PreToolUse).toHaveLength(1);
+  });
+
+  it('canUseTool denies the same calls with a message, never a Needs-you prompt; the lead still asks', async () => {
+    const { permissions, events } = await reviewer();
+    await expect(permissions.canUseTool('71273-reviewer-eyes')('Write', { file_path: 'a.cs', content: '' }, context())).resolves.toMatchObject({ behavior: 'deny', message: expect.stringContaining('read-only') });
+    await expect(permissions.canUseTool('71273-reviewer-eyes')('Bash', { command: 'echo hi > a.txt' }, context())).resolves.toMatchObject({ behavior: 'deny' });
+    await expect(permissions.canUseTool('71273-reviewer-eyes')('Bash', { command: 'git log -3' }, context())).resolves.toMatchObject({ behavior: 'allow' });
+    expect(permissions.pending('71273-reviewer-eyes')).toBeNull();
+    expect(events.of('agent:permission')).toEqual([]);
+    const asked = permissions.canUseTool('71273')('Bash', { command: 'echo hi > a.txt' }, context());
+    expect(permissions.pending('71273')).not.toBeNull();
+    permissions.cancelAll('71273');
+    await asked;
   });
 });

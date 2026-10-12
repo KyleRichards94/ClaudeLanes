@@ -40,7 +40,7 @@ export function clampProgress(progress: number): number {
 
 type RecordFields = Pick<
   AgentTicket,
-  'id' | 'title' | 'ado' | 'repo' | 'branch' | 'baseBranch' | 'createdAt' | 'stage' | 'stageEnteredAt' | 'gates' | 'model' | 'effort'
+  'id' | 'title' | 'ado' | 'repo' | 'branch' | 'baseBranch' | 'createdAt' | 'stage' | 'stageEnteredAt' | 'gates' | 'model' | 'effort' | 'companion'
 >;
 
 function sameRecordFields(ticket: AgentTicket, fields: RecordFields): boolean {
@@ -53,9 +53,13 @@ function sameRecordFields(ticket: AgentTicket, fields: RecordFields): boolean {
       ticket.ado.workItemId === fields.ado.workItemId);
   const sameGates =
     ticket.gates === fields.gates || STAGES.every((stage) => ticket.gates[stage] === fields.gates[stage]);
+  const sameCompanion =
+    ticket.companion === fields.companion ||
+    (ticket.companion !== null && fields.companion !== null && ticket.companion.of === fields.companion.of && ticket.companion.role === fields.companion.role && ticket.companion.name === fields.companion.name);
   return (
     sameAdo &&
     sameGates &&
+    sameCompanion &&
     ticket.id === fields.id &&
     ticket.title === fields.title &&
     ticket.repo === fields.repo &&
@@ -119,6 +123,7 @@ export function ticketFromRecord(record: TicketRecord, previous?: AgentTicket): 
     gates: record.gates,
     model: record.model,
     effort: record.effort,
+    companion: record.companion ?? null,
   } satisfies Partial<AgentTicket>;
 
   const design = designFromRecord(record);

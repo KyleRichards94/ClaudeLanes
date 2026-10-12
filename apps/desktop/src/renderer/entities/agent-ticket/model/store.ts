@@ -134,6 +134,8 @@ function applyChanges(state: AgentTicketsState, changed: readonly AgentTicket[],
   for (const ticket of changed) {
     const previous = byId.get(ticket.id);
     byId.set(ticket.id, ticket);
+    // A second agent (AL-266) is not a card: it lives in `byId` for its lead's drill-in and in no lane.
+    if (ticket.companion) continue;
     if (previous && previous.stage === ticket.stage && previous.stageEnteredAt === ticket.stageEnteredAt && previous.createdAt === ticket.createdAt) {
       continue;
     }

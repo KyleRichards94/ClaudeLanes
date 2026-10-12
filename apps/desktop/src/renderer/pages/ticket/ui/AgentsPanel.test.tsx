@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
-import type { AgentSubagents, SubagentNode } from '@agent-lanes/contracts';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { emptyAgentUsage, type AgentSubagents, type SubagentNode } from '@agent-lanes/contracts';
+import { describe, expect, it, vi } from 'vitest';
 import { ticketFromRecord } from '@/entities/agent-ticket';
 import { subAgentEventHandlers } from '@/entities/sub-agent';
 import { fakeTicketRecord, installFakeBridge } from '@/shared/testing';
@@ -112,6 +112,48 @@ describe('AgentsPanel (AL-177)', () => {
     );
     const helper = await screen.findByTestId('sub-agent-grid-helper');
     expect(helper).toBeTruthy();
+  });
+
+  it('lists second agents with their role, state and Open / Stop / Remove (AL-266)', async () => {
+    const bridge = installFakeBridge({
+      'agent:getSubagents': { ok: true, data: { ...tree, leadTokens: 0, nodes: [], counts: { running: 0, done: 0, queued: 0, failed: 0 } } },
+      'agent:stop': { ok: true, data: { stopped: true, status: { ticketId: '71273-reviewer-eyes', state: 'stopped', sessionId: null, message: null } } },
+      'tickets:archive': { ok: true, data: { status: 'archived', archived: { archivedAt: 1, record: fakeTicketRecord({ id: '71273-helper-docs' }), deletedBranches: [], keptBranches: ['sub/71273-docs'] } } },
+    });
+    const replies = vi.mocked(bridge.invoke).getMockImplementation()!;
+    vi.mocked(bridge.invoke).mockImplementation(async (channel: string, payload?: unknown) => {
+      const ticketId = (payload as { ticketId: string } | undefined)?.ticketId ?? '';
+      if (channel === 'agent:getStatus') return { ok: true, data: { ticketId, state: ticketId.includes('reviewer') ? 'running' : 'stopped', sessionId: null, message: null } };
+      if (channel === 'agent:getUsage') return { ok: true, data: { ...emptyAgentUsage(ticketId), leadTokens: 12_000, totalTokens: 12_000 } };
+      return replies(channel as never, payload as never);
+    });
+    const onOpen = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const companions = [
+      fakeTicketRecord({ id: '71273-reviewer-eyes', ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } }),
+      fakeTicketRecord({ id: '71273-helper-docs', ado: null, branch: 'sub/71273-docs', companion: { of: '71273', role: 'helper', name: 'Docs' } }),
+    ];
+    render(
+      <QueryClientProvider client={client}>
+        <AgentsPanel ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} companions={companions} activeId="71273" onOpenCompanion={onOpen} />
+      </QueryClientProvider>,
+    );
+    const reviewer = screen.getByTestId('companion-71273-reviewer-eyes');
+    expect(within(reviewer).getByText('Eyes · Reviewer')).toBeTruthy();
+    expect(within(reviewer).getByText('Read-only, in the ticket worktree')).toBeTruthy();
+    expect(await within(reviewer).findByText('Running')).toBeTruthy();
+    expect(await within(reviewer).findByText('12k tokens')).toBeTruthy();
+    const helper = screen.getByTestId('companion-71273-helper-docs');
+    expect(within(helper).getByText('Docs · Helper')).toBeTruthy();
+    expect(within(helper).getByText('sub/71273-docs')).toBeTruthy();
+    expect(await within(helper).findByText('Stopped')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('companion-71273-reviewer-eyes-open'));
+    expect(onOpen).toHaveBeenCalledWith('71273-reviewer-eyes');
+    fireEvent.click(screen.getByTestId('companion-71273-reviewer-eyes-stop'));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('agent:stop', { ticketId: '71273-reviewer-eyes' }));
+    fireEvent.click(screen.getByTestId('companion-71273-helper-docs-remove'));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('tickets:archive', { ticketId: '71273-helper-docs', confirmed: true }));
   });
 
   it('says none yet before any sub-agent', async () => {

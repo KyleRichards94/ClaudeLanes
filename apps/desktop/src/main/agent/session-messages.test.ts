@@ -50,6 +50,7 @@ async function setup() {
     assignments: { assign: () => Promise.reject(new Error('not in this test')) },
     settings: { get: () => defaultSettings() } as never,
     rewinds: { rewind: () => Promise.reject(new Error('not in this test')) },
+    companions: { add: () => Promise.reject(new Error('not in this test')) },
     transcripts,
     stages,
     mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }),

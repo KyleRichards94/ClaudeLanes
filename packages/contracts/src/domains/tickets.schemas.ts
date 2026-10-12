@@ -156,6 +156,18 @@ export const TicketPrActivitySchema = z.object({
 });
 export type TicketPrActivity = z.infer<typeof TicketPrActivitySchema>;
 
+/** A second agent on a ticket (AL-266): the ticket it works beside, its role and its name. */
+export const TICKET_COMPANION_ROLES = ['reviewer', 'helper'] as const;
+export const TicketCompanionRoleSchema = z.enum(TICKET_COMPANION_ROLES);
+export type TicketCompanionRole = z.infer<typeof TicketCompanionRoleSchema>;
+export const TicketCompanionSchema = z.object({
+  of: TicketIdSchema,
+  /** A reviewer shares the lead's worktree read-only; a helper works on its own `sub/<ticket>-<name>` branch. */
+  role: TicketCompanionRoleSchema,
+  name: z.string().min(1).max(60),
+});
+export type TicketCompanion = z.infer<typeof TicketCompanionSchema>;
+
 export const TicketRecordSchema = z
   .object({
     version: z.literal(TICKET_RECORD_VERSION),
@@ -204,6 +216,8 @@ export const TicketRecordSchema = z
     job: z.string().max(20_000).optional(),
     /** This ticket's permission mode (AL-264), overriding Settings › Agent permissions; absent follows Settings. */
     permissionMode: AgentPermissionModeSchema.optional(),
+    /** Set on a second agent's record (AL-266): the board hides it, its lead's drill-in switches to it. Absent on a lead. */
+    companion: TicketCompanionSchema.optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

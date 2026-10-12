@@ -9,6 +9,7 @@ import type {
   Stage,
   StageGates,
   TicketAdoRef,
+  TicketCompanion,
   TicketLastBuild,
   TicketPrActivity,
 } from '@agent-lanes/contracts';
@@ -72,6 +73,8 @@ export interface AgentTicket {
   readonly prActivity: TicketPrActivity | null;
   /** The latest design spec shipped to the agent (AL-197, AL-200): "Design v2" on the card; null before any. */
   readonly design: AgentTicketDesign | null;
+  /** A second agent on another ticket (AL-266): kept out of the lanes, shown in its lead's drill-in. Null on a lead. */
+  readonly companion: TicketCompanion | null;
 }
 
 /** The ticket's latest design spec (AL-200): the card shows "Design v2", or amber "Design v3 not yet used". */

@@ -6,8 +6,7 @@ import {
   type Model,
   type StageGates,
   type TicketAdoRef,
-  type TicketRecord,
-} from '@agent-lanes/contracts';
+  type TicketRecord, type TicketCompanion } from '@agent-lanes/contracts';
 
 /** What launching a ticket knows (AL-161–AL-165); everything else starts empty. */
 export interface NewTicketRecord {
@@ -24,6 +23,8 @@ export interface NewTicketRecord {
   skills: string[];
   /** Lane the card starts in; Queued unless given. */
   stage?: Lane;
+  /** A second agent's record (AL-266). */
+  companion?: TicketCompanion;
 }
 
 /** A fresh record: no session, sub-branches, builds or design yet. Not validated; the store does that. */
@@ -49,6 +50,7 @@ export function createTicketRecord(input: NewTicketRecord, now: number): TicketR
     lastBuild: null,
     lastRun: null,
     design: { canvas: null, lastViewUrl: null, specs: [] },
+    ...(input.companion ? { companion: { ...input.companion } } : {}),
     createdAt: now,
     updatedAt: now,
   };

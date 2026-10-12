@@ -122,6 +122,22 @@ describe('agent ticket store', () => {
     expect(selectTicket(store.getState(), '71273')?.subAgents.running).toBe(3);
   });
 
+  it('keeps a second agent (AL-266) out of every lane while its lead\'s drill-in can still select it', () => {
+    const store = loadedStore();
+    const reviewer = fakeTicketRecord({ id: '71273-reviewer-eyes', stage: 'implementing', stageEnteredAt: 125, ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    store.load([...boardRecords(), reviewer]);
+    expect(ids(store, 'implementing')).toEqual(['71273', '71288']);
+    expect(selectTicket(store.getState(), '71273-reviewer-eyes')?.companion).toEqual({ of: '71273', role: 'reviewer', name: 'Eyes' });
+    expect(selectTicketTotal(store.getState())).toBe(boardRecords().length + 1);
+
+    store.setStage('71273-reviewer-eyes', 'done', 500);
+    expect(ids(store, 'done')).toEqual([]);
+    store.upsert(fakeTicketRecord({ id: '71273-helper-docs', stage: 'planning', stageEnteredAt: 105, ado: null, companion: { of: '71273', role: 'helper', name: 'Docs' } }));
+    expect(ids(store, 'planning')).toEqual(['71322']);
+    store.remove('71273-helper-docs');
+    expect(selectTicket(store.getState(), '71273-helper-docs')).toBeUndefined();
+  });
+
   it('upserts a launched ticket into its lane, and re-places a ticket whose lane entry time changed', () => {
     const store = loadedStore();
     store.upsert(fakeTicketRecord({ id: '71400', stage: 'planning', stageEnteredAt: 105 }));

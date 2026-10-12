@@ -88,6 +88,38 @@ describe('archive', () => {
     expect(await archive.list()).toMatchObject([{ archivedAt: 5_000, record: { id: '71273', branch: BRANCH } }]);
   });
 
+  it('ends and removes the ticket\'s second agents with it, and removing one alone leaves every worktree (AL-266)', async () => {
+    await mergeEverything();
+    const reviewer = await tickets.create({ ...newTicketInput(repo.root, { id: '71273-reviewer-eyes', repo: repo.dir, branch: BRANCH, worktreePath: ticketPath }), ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } });
+    const helper = await tickets.create({ ...newTicketInput(repo.root, { id: '71273-helper-grid', repo: repo.dir, branch: SUB, baseBranch: BRANCH, worktreePath: subPath }), ado: null, companion: { of: '71273', role: 'helper', name: 'Grid' } });
+    if (!reviewer.ok || !helper.ok) throw new Error('companions');
+    const stopped: string[] = [];
+    const withStop = createArchiveService({
+      git: createGitService({ runner: repo.git }),
+      tickets,
+      archive,
+      now: () => 5_000,
+      log: { info: () => undefined, warn: () => undefined },
+      retryDelaysMs: [0, 0],
+      stopSession: async (ticketId) => void stopped.push(ticketId),
+    });
+
+    // The reviewer on its own: only its record goes; the ticket worktree it shared stays.
+    const alone = await withStop.archive('71273-reviewer-eyes');
+    expect(alone).toMatchObject({ ok: true, data: { status: 'archived', archived: { deletedBranches: [], keptBranches: [], record: { id: '71273-reviewer-eyes' } } } });
+    expect(existsSync(ticketPath)).toBe(true);
+    expect(await tickets.get('71273-reviewer-eyes')).toBeUndefined();
+    expect(await archive.list()).toEqual([]);
+
+    // The lead: the helper's session ends first, its record goes with the lead's, its sub-worktree with the lead's worktrees.
+    const result = await withStop.archive('71273', { deleteMergedBranches: true });
+    expect(result).toMatchObject({ ok: true, data: { status: 'archived' } });
+    expect(stopped).toEqual(['71273-helper-grid']);
+    expect(await tickets.get('71273-helper-grid')).toBeUndefined();
+    expect(existsSync(subPath)).toBe(false);
+    expect(await branches()).toBe('main');
+  });
+
   it('keeps merged branches unless asked to delete them', async () => {
     await mergeEverything();
 

@@ -32,6 +32,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:assign', // AL-263
   'agent:setPermissionMode', // AL-264
   'agent:rewind', // AL-265
+  'agent:addAgent', // AL-266
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

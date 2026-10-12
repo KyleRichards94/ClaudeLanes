@@ -1,26 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions, type KeyDownEvent } from 'react-native';
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
-import { Button, TabPanel, Text } from '@agent-lanes/ui';
+import { Button, SegmentedControl, TabPanel, Text } from '@agent-lanes/ui';
 import { OutputStream, requestOutputScroll, userCaption, type WaitingRowState } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
 import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
 import { MoveStageModal } from '@/features/ticket-actions';
-import { ASSIGN_AGENT_KEY, AssignAgentModal } from '@/features/assign-agent';
+import { ASSIGN_AGENT_KEY, AddAgentModal, AssignAgentModal } from '@/features/assign-agent';
 import { RewindModal, UserMessageActions } from '@/features/rewind-fork';
 import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
 import { PermissionPrompt, usePendingPermission } from '@/features/resolve-permission';
 import { QueuedNotice } from '@/features/start-queued-agent';
-import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useStopSubagent, useTicketRecord, useWorkItem } from '@/shared/api';
+import { useAgentUsage, useInterruptTurn, useReconnectSession, useSessionStatus, useStopSubagent, useTicketRecord, useTicketRecords, useWorkItem } from '@/shared/api';
 import { setTicketPageTab, toast, useShowThinking, useTicketPageTab, useUiPrefs, type TicketPageTab } from '@/shared/model';
 import { LANE_LABELS } from '@/shared/config';
 import { routes, useNavigation } from '@/shared/routing';
 import { ErrorBoundary, PanelErrorBoundary, PlanLimitsPill, TicketTabBar } from '@/shared/ui';
+import { companionLabel, companionsOf } from '../lib/companions';
 import { sessionStartedAt, stageSteps } from '../lib/stage-steps';
 import { CreatePullRequestPanel } from './CreatePullRequestPanel';
 import { AdoTab } from './AdoTab';
@@ -44,6 +45,7 @@ const STACKED_PANEL_CHROME = 200;
 const TABS_ID = 'ticket-tabs';
 const SHOW_THINKING_KEY = 'show-thinking';
 const MOVE_STAGE_KEY = 'move-stage';
+const ADD_AGENT_KEY = 'add-agent';
 
 /**
  * Route `ticket/:id`, the ticket drill-in (AL-250, artboard 3 reshaped for an output-first page): a
@@ -65,6 +67,9 @@ export function TicketPage({ ticketId }: TicketPageProps) {
     if (record && !agentTickets.getState().byId.has(record.id)) agentTickets.upsert(record);
   }, [record]);
 
+  // A second agent's id (AL-266) opens its lead's page, switched to that agent.
+  if (record?.companion) return <TicketPage ticketId={record.companion.of} />;
+
   const ticket = live ?? (record ? ticketFromRecord(record) : undefined);
 
   if (!ticket) {
@@ -83,8 +88,21 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const { width, height } = useWindowDimensions();
   const wide = width >= SIDE_COLUMN_BREAKPOINT;
   const tab = useTicketPageTab(ticket.id);
+  // Second agents (AL-266): the page shows one agent's output, composer, status and usage at a time; the lead by default.
+  const records = useTicketRecords().data;
+  const companions = useMemo(() => companionsOf(records, ticket.id), [records, ticket.id]);
+  useEffect(() => {
+    for (const companion of companions) if (!agentTickets.getState().byId.has(companion.id)) agentTickets.upsert(companion);
+  }, [companions]);
+  const [agentId, setAgentId] = useState(ticket.id);
+  const activeCompanion = companions.find((companion) => companion.id === agentId);
+  const activeId = activeCompanion ? agentId : ticket.id;
+  const activeLive = useAgentTicket(activeId);
+  const active = activeCompanion ? (activeLive ?? ticketFromRecord(activeCompanion)) : ticket;
+  const activeRecord = activeCompanion ?? record;
+  const [adding, setAdding] = useState(false);
   // The permission prompt sits at the tool row that waits (AL-260); a compact copy stays at the top while that row is scrolled away.
-  const pendingPermission = usePendingPermission(ticket.id);
+  const pendingPermission = usePendingPermission(active.id);
   const waitingToolUseId = pendingPermission.data?.request?.toolUseId ?? null;
   const [waitingRow, setWaitingRow] = useState<WaitingRowState>('absent');
   const promptAtRow = tab === 'output' && waitingRow !== 'absent';
@@ -92,10 +110,10 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const now = useNow(60_000);
   const history = record?.stageHistory ?? [{ stage: ticket.stage, at: ticket.stageEnteredAt }];
   const subBranches = record?.subBranches ?? [];
-  const usage = useAgentUsage(ticket.id).data;
-  const status = useSessionStatus(ticket.id).data;
-  const reconnect = useReconnectSession(ticket.id);
-  const interrupt = useInterruptTurn(ticket.id);
+  const usage = useAgentUsage(active.id).data;
+  const status = useSessionStatus(active.id).data;
+  const reconnect = useReconnectSession(active.id);
+  const interrupt = useInterruptTurn(active.id);
   const setGate = useSetGate();
   const { navigate } = useNavigation();
   const [removing, setRemoving] = useState(false);
@@ -106,11 +124,11 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const [rewindTo, setRewindTo] = useState<{ messageId: string; caption: string } | null>(null);
   const [forkFrom, setForkFrom] = useState<string | null>(null);
   // A sub-agent card opens its output in the stream, or stops it (AL-261).
-  const stopSubagent = useStopSubagent(ticket.id);
+  const stopSubagent = useStopSubagent(active.id);
   const subAgentActions = {
     onSelect: (node: { id: string }) => {
       setTicketPageTab(ticket.id, 'output');
-      requestOutputScroll(ticket.id, node.id);
+      requestOutputScroll(active.id, node.id);
     },
     onStop: (node: { id: string; name: string }) =>
       stopSubagent.mutate(node.id, { onError: (error) => toast({ id: `stop-subagent:${node.id}`, tone: 'error', title: `Couldn't stop ${node.name}`, body: error.message }) }),
@@ -132,24 +150,26 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
         workItem={workItem.data}
         note={ticket.ado === null ? 'No Azure DevOps work item' : workItem.isError ? 'Azure DevOps details unavailable' : undefined}
         session={{
-          id: status?.sessionId ?? record?.sessionId ?? null,
-          startedAt: sessionStartedAt(history),
+          id: status?.sessionId ?? activeRecord?.sessionId ?? null,
+          startedAt: activeCompanion ? activeCompanion.createdAt : sessionStartedAt(history),
           now,
           usage,
           status,
-          onReconnect: () => reconnect.mutate(undefined, { onError: (error) => toast({ id: `reconnect:${ticket.id}`, tone: 'error', title: "Couldn't reconnect", body: error.message }) }),
+          onReconnect: () => reconnect.mutate(undefined, { onError: (error) => toast({ id: `reconnect:${active.id}`, tone: 'error', title: "Couldn't reconnect", body: error.message }) }),
           reconnecting: reconnect.isPending,
-          onAssign: () => setAssigning(true),
+          ...(activeCompanion ? {} : { onAssign: () => setAssigning(true) }),
         }}
         trailing={
           <>
             <PlanLimitsPill testID="ticket-plan-limits" />
             <UsageStrip usage={usage} />
             <AgentMenu
-              ticketId={ticket.id}
+              ticketId={active.id}
               extraItems={[
                 // Assign new agent (AL-263): ends this agent and starts another in the same worktree.
                 { key: ASSIGN_AGENT_KEY, label: 'Assign new agent…', detail: 'Ends this agent and starts another here, with a hand-over brief or fresh.', icon: 'add-agent', section: 'Agent' },
+                // Add agent (AL-266): a second agent beside the lead.
+                { key: ADD_AGENT_KEY, label: 'Add agent…', detail: 'A read-only reviewer in this worktree, or a helper on its own sub-branch.', icon: 'add-agent', section: 'Agent' },
                 // Move to stage… (AL-264, AL-270): the user's own lane move; the agent is told at its next turn.
                 { key: MOVE_STAGE_KEY, label: 'Move to stage…', detail: `Now ${LANE_LABELS[ticket.stage]}`, icon: 'branch', section: 'Agent' },
                 { key: SHOW_THINKING_KEY, label: 'Show thinking', detail: "The agent's reasoning, collapsed in the output.", icon: 'thinking', selected: showThinking, section: 'Output' },
@@ -160,8 +180,10 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
                 else if (key === SHOW_THINKING_KEY) useUiPrefs.getState().setShowThinking(!showThinking);
                 else if (key === MOVE_STAGE_KEY) setMovingStage(true);
                 else if (key === ASSIGN_AGENT_KEY) setAssigning(true);
+                else if (key === ADD_AGENT_KEY) setAdding(true);
               }}
             />
+            <AddAgentModal ticketId={ticket.id} skills={record?.skills ?? []} visible={adding} onClose={() => setAdding(false)} onAdded={setAgentId} />
             <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
             <MoveStageModal visible={movingStage} ticketId={ticket.id} title={ticket.title} stage={ticket.stage} onClose={() => setMovingStage(false)} />
             <AssignAgentModal
@@ -198,9 +220,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           </Text>
         ) : null}
         {/* A tool call outside the permission policy waits for the user (AL-109); at its output row when that row is drawn (AL-260). */}
-        {promptAtRow && waitingRow === 'visible' ? null : <PermissionPrompt ticketId={ticket.id} variant={promptAtRow ? 'compact' : 'banner'} />}
+        {promptAtRow && waitingRow === 'visible' ? null : <PermissionPrompt ticketId={active.id} variant={promptAtRow ? 'compact' : 'banner'} />}
         {/* Waiting for a free slot in its repo, with Start now (AL-111). */}
-        <QueuedNotice ticketId={ticket.id} />
+        <QueuedNotice ticketId={active.id} />
       </View>
     </ErrorBoundary>
   );
@@ -212,17 +234,19 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
           <BuildLog ticketId={ticket.id} style={styles.buildLog} />
         ) : tab === 'output' ? (
           <>
-            <PanelErrorBoundary panel="output" ticketId={ticket.id}>
+            <PanelErrorBoundary panel="output" ticketId={active.id}>
               <OutputStream
-                ticketId={ticket.id}
+                key={active.id}
+                ticketId={active.id}
                 style={styles.output}
                 testID="ticket-tab-output"
                 waitingToolUseId={waitingToolUseId}
-                renderWaitingRow={(row) => <PermissionPrompt ticketId={ticket.id} variant="inline" toolUseIds={row.toolUseIds} testID={`permission-${ticket.id}-inline`} />}
+                renderWaitingRow={(row) => <PermissionPrompt ticketId={active.id} variant="inline" toolUseIds={row.toolUseIds} testID={`permission-${active.id}-inline`} />}
                 onWaitingRow={setWaitingRow}
                 showThinking={showThinking}
                 renderUserActions={(row) =>
-                  row.messageId && row.source !== 'app-note' ? (
+                  // Rewind and fork (AL-265) act on the lead's session.
+                  row.messageId && row.source !== 'app-note' && !activeCompanion ? (
                     <UserMessageActions
                       messageId={row.messageId}
                       onRewind={(messageId) => setRewindTo({ messageId, caption: userCaption(row) })}
@@ -237,11 +261,12 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             </PanelErrorBoundary>
             {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}
             <Composer
-              ticketId={ticket.id}
+              key={active.id}
+              ticketId={active.id}
               repo={ticket.repo}
-              skills={record?.skills ?? []}
-              switching={ticket.switching !== null}
-              tools={<ModelEffortControls ticket={ticket} compact />}
+              skills={activeRecord?.skills ?? []}
+              switching={active.switching !== null}
+              tools={<ModelEffortControls ticket={active} compact />}
               style={styles.composer}
             />
           </>
@@ -254,9 +279,17 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
     </TabPanel>
   );
 
+  // The agent switcher (AL-266): Lead, then each second agent, beside the tab bar once there is one.
+  const agentOptions = useMemo(
+    () => [{ value: ticket.id, label: 'Lead' }, ...companions.map((companion) => ({ value: companion.id, label: companion.companion ? companionLabel(companion.companion) : companion.id }))],
+    [companions, ticket.id],
+  );
   const main = (
     <View style={[styles.main, wide && styles.mainWide]}>
-      <TicketTabBar ticketId={ticket.id} value={tab} idPrefix={TABS_ID} style={styles.tabs} />
+      <View style={styles.tabsRow}>
+        <TicketTabBar ticketId={ticket.id} value={tab} idPrefix={TABS_ID} style={styles.tabs} />
+        {companions.length > 0 ? <SegmentedControl label="Agent" value={activeId} onChange={setAgentId} options={agentOptions} style={styles.switcher} testID="agent-switcher" /> : null}
+      </View>
       {panel}
     </View>
   );
@@ -270,8 +303,17 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
       <AgentsPanel
         actions={subAgentActions}
         ticket={ticket}
-        leadTokens={usage?.leadTokens}
-        footer={<Button size="sm" variant="secondary" icon="add-agent" label="Assign new agent" onPress={() => setAssigning(true)} testID="assign-agent-open" />}
+        leadTokens={activeCompanion ? undefined : usage?.leadTokens}
+        companions={companions}
+        activeId={activeId}
+        onOpenCompanion={setAgentId}
+        footer={
+          <View style={styles.agentButtons}>
+            <Button size="sm" variant="secondary" icon="add-agent" label="Assign new agent" onPress={() => setAssigning(true)} testID="assign-agent-open" />
+            {/* Add agent (AL-266): a second agent beside the lead. */}
+            <Button size="sm" variant="secondary" icon="plus" label="Add agent" onPress={() => setAdding(true)} testID="add-agent-open" />
+          </View>
+        }
       />
       <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
     </View>
@@ -396,10 +438,24 @@ const styles = StyleSheet.create({
     ...column(),
     flexShrink: 1,
   },
-  tabs: {
-    alignSelf: 'flex-start',
+  tabsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: space.md,
     // The tab bar sits close over the output card (artboard 3).
     marginBottom: -space.sm,
+  },
+  tabs: {
+    alignSelf: 'flex-start',
+  },
+  switcher: {
+    marginBottom: space.sm,
+  },
+  agentButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.sm,
   },
   tabPanel: {
     overflow: 'hidden',

@@ -37,8 +37,10 @@ export interface ArchiveService {
 
 export interface ArchiveServiceOptions {
   git: Pick<GitService, 'run' | 'status' | 'worktrees' | 'aheadBehind' | 'ensureSupported'>;
-  tickets: Pick<TicketRecordStore, 'get' | 'delete'>;
+  tickets: Pick<TicketRecordStore, 'get' | 'delete' | 'list'>;
   archive: Pick<TicketArchive, 'add'>;
+  /** Ends a second agent's session before its lead's worktrees go (AL-266). */
+  stopSession?: (ticketId: string) => Promise<unknown>;
   now?: () => number;
   log?: { info(message: string): void; warn(message: string): void };
   /** Waits between attempts to remove a locked worktree; tests pass zeros. */
@@ -155,6 +157,10 @@ export function createArchiveService(options: ArchiveServiceOptions): ArchiveSer
       return err('VALIDATION', `${parts.join('; ')}. Confirm again to archive anyway.`, { reason: 'unmerged-work', ...unmerged });
     }
 
+    // Second agents (AL-266) run in these worktrees: their sessions end first, their records go with the ticket's.
+    const companions = (await tickets.list({ repo })).filter((other) => other.companion?.of === record.id);
+    for (const companion of companions) await options.stopSession?.(companion.id).catch(() => undefined);
+
     // Sub-worktrees first: they branch off the ticket branch.
     const paths = [...record.subBranches.map((sub) => sub.worktreePath), record.worktreePath];
     const removedWorktrees: string[] = [];
@@ -193,6 +199,7 @@ export function createArchiveService(options: ArchiveServiceOptions): ArchiveSer
 
     const archived = { archivedAt: now(), record, deletedBranches, keptBranches };
     await options.archive.add(archived);
+    for (const companion of companions) await tickets.delete(companion.id);
     const removed = await tickets.delete(record.id);
     if (!removed.ok) return removed;
     log.info(`Ticket ${record.id}: archived; removed ${removedWorktrees.length} worktree(s), deleted ${deletedBranches.length} merged branch(es).`);
@@ -203,6 +210,14 @@ export function createArchiveService(options: ArchiveServiceOptions): ArchiveSer
     async archive(ticketId, { discardUnmerged = false, deleteMergedBranches = false } = {}) {
       const record = await tickets.get(ticketId);
       if (!record) return err('VALIDATION', `There is no ticket ${ticketId}.`, { reason: 'ticket-not-found', ticketId });
+      // A second agent on its own (AL-266): only its record goes. A reviewer's worktree is the lead's; a
+      // helper's sub-worktree and branch stay recorded on the lead and go when the lead is archived.
+      if (record.companion) {
+        const removed = await tickets.delete(record.id);
+        if (!removed.ok) return removed;
+        log.info(`Ticket ${record.id}: the ${record.companion.role} "${record.companion.name}" was removed from #${record.companion.of}.`);
+        return ok({ status: 'archived', archived: { archivedAt: now(), record, deletedBranches: [], keptBranches: record.companion.role === 'helper' ? [record.branch] : [] } });
+      }
       try {
         await git.ensureSupported();
         return await queue(repoPathKey(record.repo), async (): Promise<Result<ArchiveTicketResult>> => {

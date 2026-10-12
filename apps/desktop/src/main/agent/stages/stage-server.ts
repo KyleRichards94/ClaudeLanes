@@ -43,6 +43,14 @@ export const STAGE_PROTOCOL = [
 ].join('\n');
 
 /** Said once in the first user turn, so the protocol is in front of the agent from the start. */
+/** What a second agent (AL-266) gets instead of the stage protocol: it reports activity and has no stages. */
+export const COMPANION_PROTOCOL = [
+  '# Agent Lanes',
+  "You are running inside Agent Lanes as a second agent on a ticket, beside its lead agent. The lead agent owns the ticket's stages; you have none.",
+  `- Use \`report_activity\` of the \`${STAGE_SERVER_NAME}\` MCP server to say in a few words what you are doing now.`,
+  '- Say what you did, and what you found, in your replies: the user reads them in your own output.',
+].join('\n');
+
 export const STAGE_PROTOCOL_REMINDER = `You are in the Planning stage. Report each stage change with ${STAGE_SERVER_TOOLS[0]} as the Agent Lanes stage protocol in your system prompt describes.`;
 
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
@@ -185,6 +193,15 @@ export function sdkStageServer(loadSdk: () => Promise<ClaudeSdkModule>): StageSe
  */
 export function stageSessionExtras(options: StageSessionExtrasOptions): (record: TicketRecord) => Promise<SessionExtras> {
   return async (record) => {
+    // A second agent (AL-266) has no stages: only `report_activity`, and a shorter protocol.
+    if (record.companion) {
+      const tools = stageServerTools(record.id, options.stages).filter((tool) => tool.name === 'report_activity');
+      return {
+        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer(tools) },
+        allowedTools: [STAGE_SERVER_TOOLS[1]],
+        systemPromptAppend: COMPANION_PROTOCOL,
+      };
+    }
     await options.stages.sessionStarting(record.id);
     return {
       mcpServers: { [STAGE_SERVER_NAME]: await options.createServer(stageServerTools(record.id, options.stages, options.designSpecs)) },

@@ -24,6 +24,16 @@ describe('session extras (AL-100 D539, AL-084)', () => {
     expect((await combineSessionExtras([() => ({})])(record)).hooks).toBeUndefined();
   });
 
+  it('merges disallowed tools without repeats and passes them to the SDK options (AL-266)', async () => {
+    const record = await (await memoryTickets({ id: '71273' })).get('71273');
+    if (!record) throw new Error('no record');
+    const merged = await combineSessionExtras([() => ({ disallowedTools: ['Edit', 'Write'] }), () => ({ disallowedTools: ['Write', 'NotebookEdit'] })])(record);
+    expect(merged.disallowedTools).toEqual(['Edit', 'Write', 'NotebookEdit']);
+    expect((await combineSessionExtras([() => ({})])(record)).disallowedTools).toBeUndefined();
+    expect(sessionOptions(record, new AbortController(), { disallowedTools: ['Edit'] }).disallowedTools).toEqual(['Edit']);
+    expect(sessionOptions(record, new AbortController(), {}).disallowedTools).toBeUndefined();
+  });
+
   it('passes the hooks to the SDK options, and none when there are none', async () => {
     const record = await (await memoryTickets({ id: '71273' })).get('71273');
     if (!record) throw new Error('no record');

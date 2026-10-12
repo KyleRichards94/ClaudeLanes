@@ -30,7 +30,8 @@ export function createAgentHandlers({
   assignments,
   settings,
   rewinds,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions' | 'assignments' | 'settings' | 'rewinds'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  companions,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions' | 'assignments' | 'settings' | 'rewinds' | 'companions'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -90,6 +91,8 @@ export function createAgentHandlers({
     'agent:assign': (request) => assignments.assign(request),
     // Rewind to here (AL-265).
     'agent:rewind': (request) => rewinds.rewind(request),
+    // Add agent (AL-266): a reviewer or helper beside the lead, as a companion record.
+    'agent:addAgent': (request) => companions.add(request),
     // The ticket's own permission mode (AL-264): saved on the record and applied to a live session at once.
     'agent:setPermissionMode': async ({ ticketId, mode }) => {
       const saved = await tickets.update(ticketId, (record) => {

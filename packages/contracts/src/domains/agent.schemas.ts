@@ -3,7 +3,7 @@ import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
 import { AgentPermissionModeSchema, StageGatesSchema } from './settings.schemas';
-import { TicketPrActivitySchema } from './tickets.schemas';
+import { TicketCompanionRoleSchema, TicketPrActivitySchema } from './tickets.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
 import { LaunchFromAdoRequestSchema, LaunchFromAdoResponseSchema, UndoLaunchRequestSchema, UndoLaunchResponseSchema } from './agent.launch-from-ado';
@@ -532,6 +532,25 @@ export const AssignAgentResponseSchema = z.object({
 });
 export type AssignAgentResponse = z.infer<typeof AssignAgentResponseSchema>;
 
+/** `agent:addAgent` (AL-266): a second session on the ticket, a read-only reviewer in its worktree or a helper on its own sub-branch. */
+export const AddAgentRequestSchema = z.strictObject({
+  ticketId: TicketIdSchema,
+  role: TicketCompanionRoleSchema,
+  name: z.string().min(1).max(60),
+  model: ModelSchema,
+  effort: EffortSchema,
+  skills: z.array(z.string().min(1).max(200)).max(64),
+  /** The agent's task; its first turn also says who it is and where it works. */
+  prompt: z.string().min(1).max(20_000),
+});
+export type AddAgentRequest = z.infer<typeof AddAgentRequestSchema>;
+export const AddAgentResponseSchema = z.object({
+  /** The companion's record id (`71273-reviewer-eyes`): what its output, composer and Stop are keyed by. */
+  companionId: TicketIdSchema,
+  status: AgentSessionStatusSchema,
+});
+export type AddAgentResponse = z.infer<typeof AddAgentResponseSchema>;
+
 /** `agent:setPermissionMode` (AL-264): the ticket's own permission mode, applied to its live session; null follows Settings again. */
 export const SetPermissionModeRequestSchema = z.strictObject({ ticketId: TicketIdSchema, mode: AgentPermissionModeSchema.nullable() });
 export type SetPermissionModeRequest = z.infer<typeof SetPermissionModeRequestSchema>;
@@ -613,6 +632,7 @@ export const agentInvokeContracts = {
   'agent:assign': { request: AssignAgentRequestSchema, response: AssignAgentResponseSchema },
   'agent:setPermissionMode': { request: SetPermissionModeRequestSchema, response: SetPermissionModeResponseSchema },
   'agent:rewind': { request: RewindRequestSchema, response: RewindResponseSchema },
+  'agent:addAgent': { request: AddAgentRequestSchema, response: AddAgentResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

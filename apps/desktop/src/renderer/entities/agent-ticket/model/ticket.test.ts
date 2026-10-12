@@ -33,6 +33,7 @@ describe('ticketFromRecord', () => {
     expect(ticketFromRecord(record)).toEqual({
       id: '71273',
       title: 'Cutover frmJobControl to Blazor',
+      companion: null,
       ado: { orgUrl: 'https://dev.azure.com/contoso', project: 'OnSite Companion', workItemId: 71273 },
       repo: 'C:\\src\\onsite-companion',
       branch: '71273-cutover-frmjobcontrol-to',

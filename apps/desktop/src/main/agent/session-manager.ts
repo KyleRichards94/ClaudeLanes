@@ -157,6 +157,8 @@ export interface SessionExtras {
   mcpServers?: Record<string, McpServerConfig>;
   /** Tools the session may use without asking (e.g. `mcp__agent_lanes__set_stage`). */
   allowedTools?: string[];
+  /** Tools the session does not get at all: a read-only reviewer's Edit and Write (AL-266). */
+  disallowedTools?: string[];
   /** Appended to Claude Code's system prompt (the stage protocol, AL-103). */
   systemPromptAppend?: string;
   /** Sections added to a new session's first user turn. */
@@ -266,6 +268,7 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
     ...(extras.canUseTool ? { canUseTool: extras.canUseTool } : {}),
     ...(extras.mcpServers && Object.keys(extras.mcpServers).length > 0 ? { mcpServers: extras.mcpServers } : {}),
     ...(extras.allowedTools && extras.allowedTools.length > 0 ? { allowedTools: extras.allowedTools } : {}),
+    ...(extras.disallowedTools && extras.disallowedTools.length > 0 ? { disallowedTools: extras.disallowedTools } : {}),
     ...(extras.hooks && Object.keys(extras.hooks).length > 0 ? { hooks: extras.hooks } : {}),
     ...(record.sessionId ? { resume: record.sessionId } : {}),
   };
