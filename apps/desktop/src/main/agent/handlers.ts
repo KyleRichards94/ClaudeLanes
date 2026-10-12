@@ -1,6 +1,7 @@
-import { SESSION_ENDED_BY_USER_MESSAGE, err, ok, type AGENT_INVOKE_CHANNELS, type AgentSessionState } from '@agent-lanes/contracts';
+import { SESSION_ENDED_BY_USER_MESSAGE, agentPermissionMode, agentPermissionPolicy, err, ok, type AGENT_INVOKE_CHANNELS, type AgentSessionState } from '@agent-lanes/contracts';
 
 import { LANE_LABELS } from './stages/stage-rules';
+import { sdkPermissionMode } from './permissions/permission-service';
 
 /** Session states with a `claude` process that takes messages. */
 const LIVE_SESSION_STATES: ReadonlySet<AgentSessionState> = new Set(['starting', 'running', 'idle', 'paused']);
@@ -27,7 +28,8 @@ export function createAgentHandlers({
   tickets,
   nextActions,
   assignments,
-}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions' | 'assignments'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
+  settings,
+}: Pick<Services, 'sessions' | 'transcripts' | 'stages' | 'mcpStatus' | 'permissions' | 'subagents' | 'usage' | 'recovery' | 'launches' | 'adoLauncher' | 'launchUndo' | 'planLimits' | 'tickets' | 'nextActions' | 'assignments' | 'settings'>): HandlersFor<(typeof AGENT_INVOKE_CHANNELS)[number]> {
   return {
     // A queued ticket reads as `queued` with "Waiting for a free slot" (AL-111).
     'agent:getStatus': ({ ticketId }) => ok(launches.status(ticketId)),
@@ -85,6 +87,18 @@ export function createAgentHandlers({
     'agent:nextActions': (request) => nextActions.generate(request),
     // Assign new agent (AL-263): hand over with a brief, or start fresh.
     'agent:assign': (request) => assignments.assign(request),
+    // The ticket's own permission mode (AL-264): saved on the record and applied to a live session at once.
+    'agent:setPermissionMode': async ({ ticketId, mode }) => {
+      const saved = await tickets.update(ticketId, (record) => {
+        const { permissionMode: _previous, ...rest } = record;
+        return mode === null ? rest : { ...rest, permissionMode: mode };
+      });
+      if (!saved.ok) return saved;
+      const effective = saved.data.permissionMode ?? agentPermissionMode(agentPermissionPolicy(settings.get()));
+      const applied = await sessions.setPermissionModeFor(ticketId, sdkPermissionMode(effective));
+      if (!applied.ok) return applied;
+      return ok({ mode: effective, override: saved.data.permissionMode !== undefined, applied: applied.data });
+    },
     // Stop one sub-agent (AL-261): its SDK task is stopped; the lead agent's turn goes on.
     'agent:stopSubagent': async ({ ticketId, nodeId }) => {
       const node = subagents.get(ticketId).nodes.find((entry) => entry.id === nodeId);

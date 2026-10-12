@@ -7,7 +7,7 @@ import { WorkItemIdSchema } from './ado.ids';
 import { BuildDiagnosticSchema } from './build.schemas';
 import { DesignCanvasRefSchema } from './design.canvas';
 import { TicketPullRequestSchema } from './pr.schemas';
-import { StageGatesSchema } from './settings.schemas';
+import { AgentPermissionModeSchema, StageGatesSchema } from './settings.schemas';
 import type { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './tickets.names';
 
 // ── Ticket records (AL-101, design §6, R2, Decision D8) ───────────────────────────────────────────
@@ -202,6 +202,8 @@ export const TicketRecordSchema = z
     pastSessions: z.array(TicketPastSessionSchema).max(50).optional(),
     /** "What should the agent do?" as the launch gave it (AL-263), so a new agent can start fresh from it; absent on older records. */
     job: z.string().max(20_000).optional(),
+    /** This ticket's permission mode (AL-264), overriding Settings › Agent permissions; absent follows Settings. */
+    permissionMode: AgentPermissionModeSchema.optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

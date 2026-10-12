@@ -174,3 +174,10 @@ test('Stop turn and End session answer over IPC when no session runs (AL-253)', 
   expect(await invoke(page, 'agent:stop', { ticketId: '71273' })).toMatchObject({ ok: true, data: { stopped: false, status: { ticketId: '71273', state: 'none' } } });
   expect(await invoke(page, 'agent:stop', { ticketId: 'NOT A TICKET' })).toMatchObject({ ok: false, code: 'VALIDATION' });
 });
+
+test("a ticket's own permission mode is saved on its record and cleared back to Settings (AL-264)", async () => {
+  expect(await invoke(page, 'agent:setPermissionMode', { ticketId: '71273', mode: 'ask' })).toMatchObject({ ok: true, data: { mode: 'ask', override: true, applied: false } });
+  expect((await invoke<{ record: { permissionMode?: string } | null }>(page, 'tickets:get', { ticketId: '71273' }) as { data: { record: { permissionMode?: string } } }).data.record.permissionMode).toBe('ask');
+  expect(await invoke(page, 'agent:setPermissionMode', { ticketId: '71273', mode: null })).toMatchObject({ ok: true, data: { override: false } });
+  expect((await invoke<{ record: { permissionMode?: string } | null }>(page, 'tickets:get', { ticketId: '71273' }) as { data: { record: { permissionMode?: string } } }).data.record.permissionMode).toBeUndefined();
+});

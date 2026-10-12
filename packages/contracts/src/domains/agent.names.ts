@@ -30,6 +30,7 @@ export const AGENT_INVOKE_CHANNELS = [
   'agent:moveStage', // AL-270
   'agent:nextActions', // AL-272
   'agent:assign', // AL-263
+  'agent:setPermissionMode', // AL-264
 ] as const;
 export const AGENT_EVENT_CHANNELS = [
   'agent:output',

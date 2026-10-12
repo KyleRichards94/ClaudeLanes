@@ -269,7 +269,8 @@ export function createPermissionService(options: PermissionServiceOptions): Perm
       bashPrefixes.set(record.id, prefixes);
       repoByTicket.set(record.id, record.repo);
       return {
-        permissionMode: sdkPermissionMode(agentPermissionMode(policy)),
+        // The ticket's own mode (AL-264) wins over Settings.
+        permissionMode: sdkPermissionMode(record.permissionMode ?? agentPermissionMode(policy)),
         allowedTools: bashAllowRules(prefixes),
         canUseTool: canUseTool(record.id),
         hooks: { PreToolUse: [{ matcher: '^mcp__', hooks: [commentHook(record.id)] }] },

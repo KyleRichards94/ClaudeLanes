@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Decoding every icon entry is CPU-bound; under the full suite it passes 5 s.
+vi.setConfig({ testTimeout: 30_000 });
 import { color } from '@agent-lanes/tokens';
 import { ICON_SIZES, buildResourcesDir, renderLogoMark, type RgbaImage } from './app-icon.mjs';
 

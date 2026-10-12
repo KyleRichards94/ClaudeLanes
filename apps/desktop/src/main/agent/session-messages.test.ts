@@ -1,6 +1,6 @@
 import type { Services } from '../services';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { SESSION_ENDED_BY_USER_MESSAGE, skillCommand } from '@agent-lanes/contracts';
+import { SESSION_ENDED_BY_USER_MESSAGE, skillCommand, defaultSettings } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
 import { createClaudeLauncher } from './claude-sdk';
@@ -48,6 +48,7 @@ async function setup() {
     tickets,
     nextActions: { generate: () => Promise.reject(new Error('not in this test')) },
     assignments: { assign: () => Promise.reject(new Error('not in this test')) },
+    settings: { get: () => defaultSettings() } as never,
     transcripts,
     stages,
     mcpStatus: createMcpStatusMonitor({ sessions, emit: recordingEmit().emit, intervalMs: 0 }),

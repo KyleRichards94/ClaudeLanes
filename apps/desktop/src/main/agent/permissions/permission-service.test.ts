@@ -309,3 +309,17 @@ describe('permission prompts at the waiting row (AL-260)', () => {
     await sessions.dispose();
   });
 });
+
+describe("the ticket's own permission mode (AL-264)", () => {
+  it('wins over Settings for that ticket only', async () => {
+    const permissions = createPermissionService({
+      settings: { get: () => ({ ...defaultSettings(), agentPermissions: { ...defaultAgentPermissions(), mode: 'auto' } }) },
+      buildCommands: { forRepo: async () => ({ ok: true, data: dotnet }) },
+      emit: recordingEmit().emit,
+    });
+    const tickets = await memoryTickets({ id: '71273' }, { id: '71274' });
+    await tickets.update('71273', (record) => ({ ...record, permissionMode: 'ask' }));
+    expect((await permissions.sessionExtras((await tickets.get('71273'))!)).permissionMode).toBe('default');
+    expect((await permissions.sessionExtras((await tickets.get('71274'))!)).permissionMode).toBe('auto');
+  });
+});

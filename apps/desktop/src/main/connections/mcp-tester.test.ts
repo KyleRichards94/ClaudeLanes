@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+// Each case spawns a node process; under the full suite it passes 5 s.
+vi.setConfig({ testTimeout: 30_000 });
 import { createMcpConnectionTester } from './mcp-tester';
 import { startFakeMcpHttpServer, type FakeMcpHttpServer } from './testing';
 import type { DraftOf } from './testers';

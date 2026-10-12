@@ -1,4 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
+import { defaultSettings } from '@agent-lanes/contracts';
 import type { Services } from '../services';
 import { describe, expect, it } from 'vitest';
 import { handleInvoke } from '../ipc/handle-invoke';
@@ -40,6 +41,7 @@ function handlersFor(sessions: SessionManager, tickets: TicketRecordStore, now =
     // Next actions (AL-272) have their own tests.
     nextActions: {} as Services['nextActions'],
     assignments: {} as Services['assignments'],
+    settings: { get: () => defaultSettings() } as Services['settings'],
     // Plan limits (AL-258) have their own tests.
     planLimits: { get: () => ({ available: false, fiveHour: null, sevenDay: null, status: 'allowed' as const, limitedWindow: null, waitingTickets: [], updatedAt: null }), holdReason: () => null, dispose: () => undefined },
     }),
@@ -234,6 +236,28 @@ describe('agent:moveStage (AL-270)', () => {
     await fake.calls[0]!.sentCount(2);
     expect(JSON.stringify(fake.calls[0]!.sent[1])).toContain('moved this ticket to Code review');
     await expect(handleInvoke('agent:moveStage', { ticketId: '71273', stage: 'queued' }, handlers['agent:moveStage'])).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
+    await sessions.dispose();
+  });
+});
+
+describe('agent:setPermissionMode (AL-264)', () => {
+  it('saves the mode on the record, applies it to a live session, and clears it back to Settings', async () => {
+    const fake = createFakeClaude({ live: true, messages: [fakeInit('session-a')] });
+    const claude = createClaudeLauncher({ executable: () => 'C:\\claude.exe', query: () => fake.query });
+    const tickets = await memoryTickets({ id: '71273' });
+    const sessions = createSessionManager({ claude, connections: fakeClaudeConnections(), tickets, emit: recordingEmit().emit });
+    const { handlers } = handlersFor(sessions, tickets);
+
+    await expect(handleInvoke('agent:setPermissionMode', { ticketId: '71273', mode: 'ask' }, handlers['agent:setPermissionMode'])).resolves.toEqual({ ok: true, data: { mode: 'ask', override: true, applied: false } });
+    expect((await tickets.get('71273'))?.permissionMode).toBe('ask');
+
+    await sessions.start({ ticketId: '71273', jobDescription: 'Cut it over' });
+    await fake.calls[0]!.sentCount(1);
+    await expect(handleInvoke('agent:setPermissionMode', { ticketId: '71273', mode: 'accept-edits' }, handlers['agent:setPermissionMode'])).resolves.toEqual({ ok: true, data: { mode: 'accept-edits', override: true, applied: true } });
+    expect(fake.calls[0]!.permissionModes).toEqual(['acceptEdits']);
+    await expect(handleInvoke('agent:setPermissionMode', { ticketId: '71273', mode: null }, handlers['agent:setPermissionMode'])).resolves.toEqual({ ok: true, data: { mode: 'auto', override: false, applied: true } });
+    expect((await tickets.get('71273'))?.permissionMode).toBeUndefined();
+    expect(fake.calls[0]!.permissionModes).toEqual(['acceptEdits', 'auto']);
     await sessions.dispose();
   });
 });

@@ -210,7 +210,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -237,7 +237,7 @@ export function createServices(options: ServiceOptions): Services {
         void launches.refresh();
         // A new permission mode reaches running agents too, not only new sessions.
         const mode = agentPermissionMode(agentPermissionPolicy(result.data));
-        if (mode !== modeBefore) void sessions.setPermissionMode(sdkPermissionMode(mode));
+        if (mode !== modeBefore) void sessions.setPermissionMode(sdkPermissionMode(mode), async (ticketId) => (await late.tickets?.get(ticketId))?.permissionMode === undefined);
       }
       return result;
     },
@@ -249,6 +249,7 @@ export function createServices(options: ServiceOptions): Services {
     rootDir: ticketsRootDir(options.appDataDir),
     warn: (message) => log.child('tickets').warn(message),
   });
+  late.tickets = tickets;
 
   const git = createGitService();
   const builds = createBuildService({

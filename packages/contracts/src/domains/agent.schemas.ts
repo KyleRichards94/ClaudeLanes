@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema, TicketEventEnvelopeSchema, TicketIdSchema } from '../events';
 import { EffortSchema, GateSchema, LaneSchema, ModelSchema, StageSchema, type Model } from '../vocabulary';
-import { StageGatesSchema } from './settings.schemas';
+import { AgentPermissionModeSchema, StageGatesSchema } from './settings.schemas';
 import { TicketPrActivitySchema } from './tickets.schemas';
 import { AgentUsageEventSchema, AgentUsageSchema } from './agent.usage';
 import { AgentSessionStateSchema, AgentSessionStatusSchema } from './agent.status';
@@ -530,6 +530,19 @@ export const AssignAgentResponseSchema = z.object({
 });
 export type AssignAgentResponse = z.infer<typeof AssignAgentResponseSchema>;
 
+/** `agent:setPermissionMode` (AL-264): the ticket's own permission mode, applied to its live session; null follows Settings again. */
+export const SetPermissionModeRequestSchema = z.strictObject({ ticketId: TicketIdSchema, mode: AgentPermissionModeSchema.nullable() });
+export type SetPermissionModeRequest = z.infer<typeof SetPermissionModeRequestSchema>;
+export const SetPermissionModeResponseSchema = z.object({
+  /** The mode the ticket runs with now. */
+  mode: AgentPermissionModeSchema,
+  /** True when the ticket overrides Settings. */
+  override: z.boolean(),
+  /** True when a live session took the mode at once; false when it waits for the next session. */
+  applied: z.boolean(),
+});
+export type SetPermissionModeResponse = z.infer<typeof SetPermissionModeResponseSchema>;
+
 /** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
 export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
 export type StopSubagentRequest = z.infer<typeof StopSubagentRequestSchema>;
@@ -583,6 +596,7 @@ export const agentInvokeContracts = {
   'agent:moveStage': { request: MoveStageRequestSchema, response: MoveStageResponseSchema },
   'agent:nextActions': { request: NextActionsRequestSchema, response: NextActionsResponseSchema },
   'agent:assign': { request: AssignAgentRequestSchema, response: AssignAgentResponseSchema },
+  'agent:setPermissionMode': { request: SetPermissionModeRequestSchema, response: SetPermissionModeResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

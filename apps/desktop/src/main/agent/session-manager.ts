@@ -76,7 +76,9 @@ export interface SessionManager {
    * Switches every live session to another permission mode (Settings › Permission mode); new sessions
    * take it from their extras. Resolves the tickets whose session could not switch (it keeps its mode).
    */
-  setPermissionMode(mode: PermissionMode): Promise<string[]>;
+  setPermissionMode(mode: PermissionMode, applies?: (ticketId: string) => Promise<boolean>): Promise<string[]>;
+  /** One ticket's live session takes a permission mode (AL-264); false when it has no live session. */
+  setPermissionModeFor(ticketId: string, mode: PermissionMode): Promise<Result<boolean>>;
   /** Closes the ticket's session and its `claude` process. Resolves `false` when none was live. `reason` is shown as the stopped status's message (AL-253). */
   stop(ticketId: string, options?: { reason?: string }): Promise<Result<boolean>>;
   status(ticketId: string): AgentSessionStatus;
@@ -669,10 +671,24 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
       return ok(modelStateOf(session));
     },
 
-    async setPermissionMode(mode) {
+    async setPermissionModeFor(ticketId, mode) {
+      const session = sessions.get(ticketId);
+      if (!session || !LIVE_STATES.has(session.state) || !session.query) return ok(false);
+      try {
+        await session.query.setPermissionMode(mode);
+        log?.info(`Ticket ${ticketId}: permission mode is now ${mode}`);
+        return ok(true);
+      } catch (error) {
+        return err('INTERNAL', `The permission mode could not be changed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    async setPermissionMode(mode, applies) {
       const failed: string[] = [];
       for (const [ticketId, session] of sessions) {
         if (!LIVE_STATES.has(session.state) || !session.query) continue;
+        // A ticket with its own mode (AL-264) keeps it.
+        if (applies && !(await applies(ticketId))) continue;
         try {
           await session.query.setPermissionMode(mode);
           log?.info(`Ticket ${ticketId}: permission mode is now ${mode}`);
