@@ -75,3 +75,17 @@ describe('assign new agent (AL-263)', () => {
     expect(newAgentLine({ model: 'haiku', effort: 'xhigh', mode: 'fresh' })).toBe('New agent · Haiku · XHigh · started fresh');
   });
 });
+
+describe('fork from a message (AL-265)', () => {
+  it('forks the old session up to the message and resumes the copy as the new agent', async () => {
+    const { service, launches, tickets, transcripts } = await setup({ job: 'Cut it over.' });
+    const fork = vi.fn(async () => ({ sessionId: 'session-fork' }));
+    const forking = createAssignAgentService({ ...(service as never as Record<string, never>), sessions: { status: () => status('idle'), stop: async () => ok(true) }, launches, tickets, transcripts, stages: { pendingGate: () => null, moveTo: async () => ok({ from: 'planning' as const, to: 'planning' as const, changed: false }) }, fork, now: () => 5_000 });
+    const result = await forking.assign({ ticketId: '71273', model: 'opus', effort: 'high', skills: [], mode: 'fork', forkFromMessageId: 'u-7' });
+    expect(result).toMatchObject({ ok: true, data: { previousSessionId: 'session-a' } });
+    expect(fork).toHaveBeenCalledWith('session-a', { dir: (await tickets.get('71273'))!.worktreePath, upToMessageId: 'u-7' });
+    expect((await tickets.get('71273'))?.sessionId).toBe('session-fork');
+    expect(transcripts.appendSystem).toHaveBeenCalledWith('71273', 'New agent · Opus · High · forked from an earlier message');
+    await expect(forking.assign({ ticketId: '71273', model: 'opus', effort: 'high', skills: [], mode: 'fork' })).resolves.toMatchObject({ ok: false, code: 'VALIDATION', details: { reason: 'nothing-to-fork' } });
+  });
+});

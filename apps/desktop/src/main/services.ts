@@ -15,6 +15,7 @@ import { createSubagentTracker, type SubagentTracker } from './agent/subagents/s
 import { createPrActivityTracker, type PrActivityTracker } from './agent/pr-activity';
 import { createNextActionsService, type NextActionsService } from './agent/next-actions';
 import { createAssignAgentService, type AssignAgentService } from './agent/assign/assign-agent';
+import { createRewindService, type RewindService } from './agent/rewind';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
@@ -163,6 +164,8 @@ export interface Services {
   readonly nextActions: NextActionsService;
   /** Assign new agent (AL-263). */
   readonly assignments: AssignAgentService;
+  /** Rewind to here (AL-265). */
+  readonly rewinds: RewindService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -478,7 +481,18 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.adoLauncher = adoLauncher;
   const launchUndo = createLaunchUndo({ launcher: adoLauncher, sessions, launches, worktrees, ado, emit: options.emit, log: log.child('launch') });
-  const assignments = createAssignAgentService({ sessions, launches, tickets, transcripts, stages, diffs, log: log.child('agent') });
+  const assignments = createAssignAgentService({
+    sessions,
+    launches,
+    tickets,
+    transcripts,
+    stages,
+    diffs,
+    // Fork from here (AL-265): the SDK copies the session file up to that message.
+    fork: async (sessionId, forkOptions) => (await loadClaudeSdk()).forkSession(sessionId, forkOptions),
+    log: log.child('agent'),
+  });
+  const rewinds = createRewindService({ sessions, tickets, transcripts, git, log: log.child('agent') });
 
   return {
     backlogWindow: options.backlogWindow ?? createBacklogWindowController(() => null),
@@ -523,6 +537,7 @@ export function createServices(options: ServiceOptions): Services {
     prActivity,
     nextActions,
     assignments,
+    rewinds,
     reconcile,
     pullRequests,
     designSpecs,

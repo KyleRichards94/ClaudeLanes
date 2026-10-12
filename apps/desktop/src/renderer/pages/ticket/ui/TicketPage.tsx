@@ -3,13 +3,14 @@ import { ScrollView, StyleSheet, View, useWindowDimensions, type KeyDownEvent } 
 import type { TicketRecord } from '@agent-lanes/contracts';
 import { color, radius, shadow, space } from '@agent-lanes/tokens';
 import { Button, TabPanel, Text } from '@agent-lanes/ui';
-import { OutputStream, requestOutputScroll, type WaitingRowState } from '@/entities/agent-output';
+import { OutputStream, requestOutputScroll, userCaption, type WaitingRowState } from '@/entities/agent-output';
 import { agentTickets, ticketFromRecord, useAgentTicket, useSetGate, type AgentTicket } from '@/entities/agent-ticket';
 import { BuildLog } from '@/entities/build-log';
 import { AgentMenu } from '@/features/agent-menu';
 import { REMOVE_TICKET_KEY, RemoveTicketModal } from '@/features/remove-ticket';
 import { MoveStageModal } from '@/features/ticket-actions';
 import { ASSIGN_AGENT_KEY, AssignAgentModal } from '@/features/assign-agent';
+import { RewindModal, UserMessageActions } from '@/features/rewind-fork';
 import { ModelEffortControls } from '@/features/change-model';
 import { Composer } from '@/features/send-message';
 import { GateActions } from '@/features/resolve-gate';
@@ -101,6 +102,9 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
   const showThinking = useShowThinking();
   const [movingStage, setMovingStage] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  // Rewind to here / Fork from here on one of the user's messages (AL-265).
+  const [rewindTo, setRewindTo] = useState<{ messageId: string; caption: string } | null>(null);
+  const [forkFrom, setForkFrom] = useState<string | null>(null);
   // A sub-agent card opens its output in the stream, or stops it (AL-261).
   const stopSubagent = useStopSubagent(ticket.id);
   const subAgentActions = {
@@ -160,7 +164,17 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
             />
             <RemoveTicketModal ticketId={ticket.id} visible={removing} onClose={() => setRemoving(false)} onRemoved={() => navigate(routes.board())} />
             <MoveStageModal visible={movingStage} ticketId={ticket.id} title={ticket.title} stage={ticket.stage} onClose={() => setMovingStage(false)} />
-            <AssignAgentModal ticketId={ticket.id} skills={record?.skills ?? []} visible={assigning} onClose={() => setAssigning(false)} />
+            <AssignAgentModal
+              ticketId={ticket.id}
+              skills={record?.skills ?? []}
+              visible={assigning}
+              fork={forkFrom}
+              onClose={() => {
+                setAssigning(false);
+                setForkFrom(null);
+              }}
+            />
+            <RewindModal ticketId={ticket.id} messageId={rewindTo?.messageId ?? null} caption={rewindTo?.caption ?? ''} onClose={() => setRewindTo(null)} />
           </>
         }
       />
@@ -207,6 +221,18 @@ function TicketFrame({ ticket, record }: { ticket: AgentTicket; record: TicketRe
                 renderWaitingRow={(row) => <PermissionPrompt ticketId={ticket.id} variant="inline" toolUseIds={row.toolUseIds} testID={`permission-${ticket.id}-inline`} />}
                 onWaitingRow={setWaitingRow}
                 showThinking={showThinking}
+                renderUserActions={(row) =>
+                  row.messageId && row.source !== 'app-note' ? (
+                    <UserMessageActions
+                      messageId={row.messageId}
+                      onRewind={(messageId) => setRewindTo({ messageId, caption: userCaption(row) })}
+                      onFork={(messageId) => {
+                        setForkFrom(messageId);
+                        setAssigning(true);
+                      }}
+                    />
+                  ) : null
+                }
               />
             </PanelErrorBoundary>
             {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}

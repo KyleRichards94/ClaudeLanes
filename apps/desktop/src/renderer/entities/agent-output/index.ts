@@ -11,5 +11,6 @@ export { openTicketOutput } from './model/backfill';
 export { useAgentOutput } from './model/hooks';
 export { agentOutputEventHandlers, createAgentOutputEventHandlers } from './model/event-handlers';
 export { OutputStream, type OutputStreamProps, type WaitingRowState } from './ui/OutputStream';
-export { findToolUse, latestLine, outputRows, proseSpans, statSpans, withoutThinking, type OutputRow, type ProseSpan, type StatSpan, type SubagentLane } from './model/rows';
+export { type RenderUserActions } from './ui/OutputRowView';
+export { findToolUse, latestLine, outputRows, proseSpans, statSpans, userCaption, withoutThinking, type OutputRow, type ProseSpan, type StatSpan, type SubagentLane } from './model/rows';
 export { clearOutputScroll, requestOutputScroll, resetOutputScrollRequests, useOutputScrollRequest } from './model/scroll-request';

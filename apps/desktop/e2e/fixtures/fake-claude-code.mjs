@@ -54,6 +54,8 @@ const record = {
   pid: process.pid,
   // AL-222: what each scripted tool call answered.
   tools: [],
+  // AL-265: rewind requests, dry runs included.
+  rewinds: [],
 };
 
 /** The SDK MCP servers the host runs in-process, from its `initialize` request. */
@@ -284,6 +286,12 @@ lines.on('line', (line) => {
     if (message.request?.subtype === 'initialize') sdkMcpServers = message.request.sdkMcpServers ?? [];
     // Stop a held sub-agent (AL-261).
     if (message.request?.subtype === 'stop_task') stopWaiters.get(message.request.task_id)?.();
+    // Rewind to here (AL-265): says one file would go back, and records the call.
+    if (message.request?.subtype === 'rewind_files') {
+      record.rewinds.push({ userMessageId: message.request.user_message_id, dryRun: message.request.dry_run === true });
+      send({ type: 'control_response', response: { subtype: 'success', request_id: message.request_id, response: { canRewind: true, filesChanged: ['src/JobGrid.razor'], insertions: 3, deletions: 1 } } });
+      return;
+    }
     const response =
       message.request?.subtype === 'initialize'
         ? { commands: state.commands ?? [], agents: [], output_style: 'default', available_output_styles: ['default'], models: [], account: account() }

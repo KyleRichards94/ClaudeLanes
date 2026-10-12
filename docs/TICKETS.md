@@ -186,7 +186,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-262 | Thinking blocks | E15 | S | AL-255 | done |
 | AL-263 | Assign new agent | E15 | L | AL-253 | done |
 | AL-264 | Agent menu: permission mode, stage, archive | E15 | M | AL-253 | done |
-| AL-265 | Rewind and fork | E15 | L | AL-251 | todo |
+| AL-265 | Rewind and fork | E15 | L | AL-251 | done |
 | AL-266 | Second agent on a ticket | E15 | L | AL-263 | todo |
 | AL-267 | Open worktree folder | E16 | S | — | done |
 | AL-268 | Message a ticket without a live session | E16 | M | AL-110 | done |
@@ -1360,9 +1360,9 @@ Source: the "Ticket view UX audit" doc (https://claude.ai/code/artifact/353d84bb
 - **Design:** UXA Agent control · **Depends on:** AL-251
 - **Scope:** Launch sessions with file checkpointing on. Each of your messages gets Rewind to here (calls `rewindFiles(userMessageId)`, restoring the worktree to that point, confirm first, shows the files it restores) and Fork from here (`forkSession` at that message, opening it through Assign new agent's flow with Start from fork). Rewind refuses with a reason when the worktree has commits after that point that are pushed.
 - **Acceptance criteria:**
-  - [ ] Rewind restores edited files and the output marks the rewind.
-  - [ ] Fork starts a new session whose history ends at that message.
-  - [ ] Unit tests on the fake SDK; `rewind.spec.ts`.
+  - [x] Rewind restores edited files and the output marks the rewind.
+  - [x] Fork starts a new session whose history ends at that message.
+  - [x] Unit tests on the fake SDK; `rewind.spec.ts`.
 
 #### AL-266 · Second agent on a ticket
 - **Design:** UXA Decisions; Kyle 2026-10-09 · **Depends on:** AL-263
@@ -2241,6 +2241,8 @@ the main checkout has checked out and does not push.
 | D794 | AL-263: Assign new agent builds the hand-over brief in main before the old session ends (ticket, original job, stage history, the open gate, what the output said, the diff against the base branch, the previous agent's last five messages), ends the session (or drops its queued launch), records it on the ticket as a past session, saves the new model/effort/skills, moves the stage when asked, writes the divider and launches a fresh session whose first turn is the brief ("Handed over" bubble) or the original job (Start fresh). The job is kept on the record from the first launch; the transcript reads past sessions' histories before the current one | Kyle (2026-10-09): hand over by default; the earlier output must stay readable | 2026-10-12 |
 | D795 | AL-263: the "lost" case is covered by the assign service's unit test (status lost → stop answers false → a fresh session still starts); the e2e covers running and ended, as the fake claude cannot be killed mid-run without losing its log | The log is written when the fake's stdin closes | 2026-10-12 |
 | D796 | AL-264: a ticket's permission mode lives on its record (`permissionMode`), wins over Settings in `sessionExtras`, is applied to a live session at once (`setPermissionModeFor`), and a Settings change no longer touches tickets that override it. The Agent menu lists Follow Settings and the three modes with the current one ticked. Move to stage… landed with AL-270 and Archive is AL-274's Remove from board | A per-ticket mode must survive a restart and a global change; the menu is where the user changes it mid-run | 2026-10-12 |
+| D797 | AL-265: sessions run with the SDK's file checkpointing; each of the user's messages (not the app's notes) shows Rewind to here and Fork from here while the pointer is over it. Rewind opens on a dry run (`agent:rewind`, `rewindFiles`) that lists the files, confirms, then restores them and writes "Kyle rewound the worktree to 14:02 · 2 files restored (+12 −3)"; it is refused when commits made after that message are already on origin. Fork goes through Assign new agent with "Start from fork": the SDK's `forkSession` copies the old session up to that message and the new agent resumes the copy | The SDK owns both operations; routing the fork through the assign dialog keeps one way to start a replacement agent | 2026-10-12 |
+| D798 | AL-265: the e2e covers Rewind against the fake `claude` (which answers `rewind_files`); Fork is unit-tested with a fake `forkSession`, because the real one reads session files the fake never writes | No session file exists for the fake | 2026-10-12 |
 
 ---
 
@@ -2326,6 +2328,7 @@ the main checkout has checked out and does not push.
 | 2026-10-12 | AL-272: Digest on the board header — every ticket ranked by what it needs with Open/Resume, and Generate next actions (one Sonnet session, JSON) with Send to agent per suggestion. |
 | 2026-10-12 | AL-263: Assign new agent — Agent menu item, Agents card button and the ended/lost session pill open a dialog (model, effort, skills, stage, Hand over / Start fresh); `agent:assign`, hand-over brief, past sessions on the record, transcript history across them; assign-agent.spec.ts. |
 | 2026-10-12 | AL-264: per-ticket permission mode in the Agent menu (`agent:setPermissionMode`, record `permissionMode`, applied live; Settings changes skip overriding tickets). |
+| 2026-10-12 | AL-265: Rewind to here (dry-run preview, pushed-commit refusal, output line) and Fork from here (Assign new agent · Start from fork) on the user's messages; file checkpointing on; rewind.spec.ts. |
 ---
 
 ## 7. Parallel build rules

@@ -352,3 +352,18 @@ describe('thinking blocks (AL-262)', () => {
     expect(screen.getByTestId('output-thinking').textContent).toContain('Thinking…');
   });
 });
+
+describe('actions on the user\'s messages (AL-265)', () => {
+  it('draws the actions a page renders for a user row, and none for the agent\'s rows', () => {
+    render(<OutputStream ticketId="71273" store={store} renderUserActions={(row) => <div data-testid={`actions-${row.messageId}`}>act</div>} />);
+    act(() =>
+      store.receive([
+        itemEvent(1, { kind: 'user', messageId: 'u-1', text: 'Start the grid', priority: null, source: 'composer', ...lead }),
+        itemEvent(2, { kind: 'text', streamId: 'm', text: 'On it.', ...lead }),
+      ]),
+    );
+    expect(screen.getByTestId('actions-u-1')).toBeTruthy();
+    expect(screen.getByTestId('output-user-actions')).toBeTruthy();
+    expect(screen.queryAllByTestId(/^actions-/)).toHaveLength(1);
+  });
+});

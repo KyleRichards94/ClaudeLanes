@@ -6,9 +6,13 @@ export const ASSIGN_MODE_OPTIONS: readonly { value: AssignAgentMode; label: stri
   { value: 'fresh', label: 'Start fresh' },
 ];
 
+/** Fork from here (AL-265): offered only when the dialog opened from a message. */
+export const FORK_MODE_OPTION = { value: 'fork', label: 'Start from fork' } as const;
+
 export const ASSIGN_MODE_HELP: Readonly<Record<AssignAgentMode, string>> = {
   'hand-over': "The new agent's first turn is a brief: the ticket, the original job, its stages, the changes against the base branch and the previous agent's last messages.",
   fresh: 'The new agent gets the original job again and nothing else; it reads the worktree itself.',
+  fork: "The new agent continues a copy of this session that ends at the message you picked; everything after it is left behind.",
 };
 
 /** Skill names typed with or without the slash, separated by spaces or commas; each once. */

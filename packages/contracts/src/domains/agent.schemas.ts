@@ -508,7 +508,7 @@ export const NextActionsResponseSchema = z.object({
 export type NextActionsResponse = z.infer<typeof NextActionsResponseSchema>;
 
 /** Assign new agent (AL-263): hand over with a brief (the default), or start fresh from the original job. */
-export const ASSIGN_AGENT_MODES = ['hand-over', 'fresh'] as const;
+export const ASSIGN_AGENT_MODES = ['hand-over', 'fresh', 'fork'] as const;
 export const AssignAgentModeSchema = z.enum(ASSIGN_AGENT_MODES);
 export type AssignAgentMode = z.infer<typeof AssignAgentModeSchema>;
 
@@ -521,6 +521,8 @@ export const AssignAgentRequestSchema = z.strictObject({
   /** The stage the new agent starts from; the ticket's current one when left out. */
   stage: StageSchema.optional(),
   mode: AssignAgentModeSchema,
+  /** `fork` (AL-265): the user message the new session's history ends at. */
+  forkFromMessageId: z.string().min(1).max(200).optional(),
 });
 export type AssignAgentRequest = z.infer<typeof AssignAgentRequestSchema>;
 export const AssignAgentResponseSchema = z.object({
@@ -542,6 +544,19 @@ export const SetPermissionModeResponseSchema = z.object({
   applied: z.boolean(),
 });
 export type SetPermissionModeResponse = z.infer<typeof SetPermissionModeResponseSchema>;
+
+/** `agent:rewind` (AL-265): restores the worktree's tracked files to one of the user's messages; `dryRun` only lists them. */
+export const RewindRequestSchema = z.strictObject({ ticketId: TicketIdSchema, messageId: z.string().min(1).max(200), dryRun: z.boolean().optional() });
+export type RewindRequest = z.infer<typeof RewindRequestSchema>;
+export const RewindResponseSchema = z.object({
+  canRewind: z.boolean(),
+  error: z.string().nullable(),
+  filesChanged: z.array(z.string()).max(5_000),
+  insertions: z.int().nonnegative(),
+  deletions: z.int().nonnegative(),
+  dryRun: z.boolean(),
+});
+export type RewindResponse = z.infer<typeof RewindResponseSchema>;
 
 /** `agent:stopSubagent` (AL-261): stops one sub-agent's task; the lead agent's turn goes on. */
 export const StopSubagentRequestSchema = z.strictObject({ ticketId: TicketIdSchema, nodeId: z.string().min(1).max(200) });
@@ -597,6 +612,7 @@ export const agentInvokeContracts = {
   'agent:nextActions': { request: NextActionsRequestSchema, response: NextActionsResponseSchema },
   'agent:assign': { request: AssignAgentRequestSchema, response: AssignAgentResponseSchema },
   'agent:setPermissionMode': { request: SetPermissionModeRequestSchema, response: SetPermissionModeResponseSchema },
+  'agent:rewind': { request: RewindRequestSchema, response: RewindResponseSchema },
   /** Interrupts the turn; later messages wait for Resume. */
   'agent:pause': { request: AgentTicketRequestSchema, response: AgentSessionStatusSchema },
   /** Delivers the messages held while paused, or a "continue" turn when there are none. */

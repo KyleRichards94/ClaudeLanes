@@ -7,7 +7,7 @@ import { useAgentTicket } from '@/entities/agent-ticket';
 import { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS } from '@/shared/config';
 import { toast } from '@/shared/model';
 import { useAssignAgent } from '../api/assign';
-import { ASSIGN_MODE_HELP, ASSIGN_MODE_OPTIONS, defaultStage, formatSkills, parseSkillNames } from '../model/draft';
+import { ASSIGN_MODE_HELP, ASSIGN_MODE_OPTIONS, FORK_MODE_OPTION, defaultStage, formatSkills, parseSkillNames } from '../model/draft';
 
 /** The Agent menu item that opens the dialog. */
 export const ASSIGN_AGENT_KEY = 'assign-agent';
@@ -22,6 +22,8 @@ export interface AssignAgentModalProps {
   skills: readonly string[];
   visible: boolean;
   onClose(): void;
+  /** Fork from here (AL-265): the user message the new session's history ends at; the dialog then starts on "Start from fork". */
+  fork?: string | null;
   testID?: string;
 }
 
@@ -30,27 +32,28 @@ export interface AssignAgentModalProps {
  * the new agent gets a hand-over brief (the default) or starts fresh. The dialog's state starts from
  * the ticket each time it opens.
  */
-export function AssignAgentModal({ ticketId, skills, visible, onClose, testID = 'assign-agent' }: AssignAgentModalProps) {
-  return visible ? <AssignAgentDialog ticketId={ticketId} skills={skills} onClose={onClose} testID={testID} /> : null;
+export function AssignAgentModal({ ticketId, skills, visible, onClose, fork = null, testID = 'assign-agent' }: AssignAgentModalProps) {
+  return visible ? <AssignAgentDialog ticketId={ticketId} skills={skills} onClose={onClose} fork={fork} testID={testID} /> : null;
 }
 
-function AssignAgentDialog({ ticketId, skills: initialSkills, onClose, testID }: Omit<AssignAgentModalProps, 'visible'> & { testID: string }) {
+function AssignAgentDialog({ ticketId, skills: initialSkills, onClose, fork = null, testID }: Omit<AssignAgentModalProps, 'visible'> & { testID: string }) {
   const ticket = useAgentTicket(ticketId);
   const assign = useAssignAgent(ticketId);
   const [model, setModel] = useState<Model>(ticket?.model ?? 'opus');
   const [effort, setEffort] = useState<Effort>(ticket?.effort ?? 'high');
   const [skills, setSkills] = useState(() => formatSkills(initialSkills));
   const [stage, setStage] = useState<Stage>(defaultStage(ticket?.stage));
-  const [mode, setMode] = useState<AssignAgentMode>('hand-over');
+  const [mode, setMode] = useState<AssignAgentMode>(fork ? 'fork' : 'hand-over');
+  const modeOptions = fork ? [FORK_MODE_OPTION, ...ASSIGN_MODE_OPTIONS] : ASSIGN_MODE_OPTIONS;
   const [failure, setFailure] = useState<string | null>(null);
 
   const submit = () => {
     setFailure(null);
     assign.mutate(
-      { model, effort, skills: parseSkillNames(skills), stage, mode },
+      { model, effort, skills: parseSkillNames(skills), stage, mode, ...(mode === 'fork' && fork ? { forkFromMessageId: fork } : {}) },
       {
         onSuccess: () => {
-          toast({ id: `assign:${ticketId}`, tone: 'success', title: `New ${MODEL_LABELS[model]} agent on ${ticket?.ado ? `#${ticket.ado.workItemId}` : ticketId}`, body: mode === 'hand-over' ? 'It starts from a hand-over brief.' : 'It starts fresh from the original job.' });
+          toast({ id: `assign:${ticketId}`, tone: 'success', title: `New ${MODEL_LABELS[model]} agent on ${ticket?.ado ? `#${ticket.ado.workItemId}` : ticketId}`, body: mode === 'hand-over' ? 'It starts from a hand-over brief.' : mode === 'fork' ? 'It continues from the forked session.' : 'It starts fresh from the original job.' });
           onClose();
         },
         onError: (error) => setFailure(error.message),
@@ -108,7 +111,7 @@ function AssignAgentDialog({ ticketId, skills: initialSkills, onClose, testID }:
           <Text variant="meta" size="sm">
             Context
           </Text>
-          <SegmentedControl<AssignAgentMode> label="Context" value={mode} onChange={setMode} options={ASSIGN_MODE_OPTIONS} fill disabled={assign.isPending} testID={`${testID}-mode`} />
+          <SegmentedControl<AssignAgentMode> label="Context" value={mode} onChange={setMode} options={modeOptions} fill disabled={assign.isPending} testID={`${testID}-mode`} />
           <Text variant="body" size="sm" color={color.muted} testID={`${testID}-mode-help`}>
             {ASSIGN_MODE_HELP[mode]}
           </Text>

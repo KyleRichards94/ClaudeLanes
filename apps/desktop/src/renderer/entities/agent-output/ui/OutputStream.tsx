@@ -18,7 +18,7 @@ import { findToolUse, outputRows, withoutThinking, type OutputRow } from '../mod
 import { clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
 import type { AgentOutputStore } from '../model/store';
 import { rowOffsets, windowFor } from '../model/virtual';
-import { OutputRowView } from './OutputRowView';
+import { OutputRowView, type RenderUserActions } from './OutputRowView';
 
 /** Where the tool row a permission request waits on is (AL-260): not drawn yet, in view, or scrolled away. */
 export type WaitingRowState = 'absent' | 'visible' | 'hidden';
@@ -37,6 +37,8 @@ export interface OutputStreamProps {
   onWaitingRow?: (state: WaitingRowState) => void;
   /** Whether the agent's thinking rows are drawn (AL-262); on by default. */
   showThinking?: boolean;
+  /** Actions on the user's own messages (AL-265: Rewind to here, Fork from here). */
+  renderUserActions?: RenderUserActions;
 }
 
 /** Viewport assumed before the first layout (and in tests, where layout never comes). */
@@ -57,7 +59,7 @@ const PAD_Y = space.lg;
  *   scrolling back to the end (or the button) follows again.
  * - Rows are in normal flow inside one scroll view, so text can be selected across rows and copied.
  */
-export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true }: OutputStreamProps) {
+export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true, renderUserActions }: OutputStreamProps) {
   const events = useAgentOutput(ticketId, store);
   const allRows = outputRows(events);
   const rows = showThinking ? allRows : withoutThinking(allRows);
@@ -143,7 +145,7 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
     const waiting = index === waitingIndex;
     drawn.push(
       <View key={row.key} onLayout={(event) => onRowLayout(row.key, event.nativeEvent.layout.height)}>
-        <OutputRowView row={row} ticketId={ticketId} waiting={waiting} />
+        <OutputRowView row={row} ticketId={ticketId} waiting={waiting} {...(renderUserActions ? { renderUserActions } : {})} />
         {waiting && row.type === 'tool' ? renderWaitingRow?.(row) : null}
       </View>,
     );

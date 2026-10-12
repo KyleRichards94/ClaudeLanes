@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { color, font, fontSize, fontWeight, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, Text } from '@agent-lanes/ui';
@@ -13,7 +13,10 @@ import { CopyButton, Markdown, markdownPlainText } from './Markdown';
  * chip, mono detail and stats, a paragraph of prose with bold names, or the line being written with
  * its caret. Text is selectable, so output can be copied.
  */
-export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputRow; ticketId: string; waiting?: boolean }) {
+/** A user row's actions (AL-265: Rewind to here, Fork from here), drawn in the bubble while the pointer is over it. */
+export type RenderUserActions = (row: Extract<OutputRow, { type: 'user' }>) => ReactNode;
+
+export function OutputRowView({ row, ticketId, waiting = false, renderUserActions }: { row: OutputRow; ticketId: string; waiting?: boolean; renderUserActions?: RenderUserActions }) {
   switch (row.type) {
     case 'system':
       return (
@@ -52,18 +55,7 @@ export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputR
         </View>
       );
     case 'user':
-      return (
-        <View style={[styles.row, styles.userRow]} testID="output-user">
-          <View style={[styles.bubble, row.source === 'skill' && styles.bubbleSkill, row.source === 'app-note' && styles.bubbleNote]}>
-            <Text variant="meta" size="xs" color={row.source === 'app-note' ? color.muted : color.claudeText}>
-              {userCaption(row)}
-            </Text>
-            <Text variant={row.source === 'skill' || row.source === 'app-note' ? 'mono' : 'body'} size={row.source === 'app-note' ? 'sm' : 'md'} selectable style={styles.prose}>
-              {row.text}
-            </Text>
-          </View>
-        </View>
-      );
+      return <UserRow row={row} actions={renderUserActions?.(row) ?? null} />;
     case 'tool':
       return <ToolRow row={row} ticketId={ticketId} waiting={waiting} />;
     case 'prose':
@@ -79,6 +71,28 @@ export function OutputRowView({ row, ticketId, waiting = false }: { row: OutputR
         <ProseRow text={row.text} />
       );
   }
+}
+
+/** One of the user's messages (AL-251), with its actions (AL-265) shown while the pointer is over it. */
+function UserRow({ row, actions }: { row: Extract<OutputRow, { type: 'user' }>; actions: ReactNode }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <Pressable role="group" aria-label={userCaption(row)} focusable={false} onHoverIn={() => setHovered(true)} onHoverOut={() => setHovered(false)} style={[styles.row, styles.userRow]} testID="output-user">
+      <View style={[styles.bubble, row.source === 'skill' && styles.bubbleSkill, row.source === 'app-note' && styles.bubbleNote]}>
+        <Text variant="meta" size="xs" color={row.source === 'app-note' ? color.muted : color.claudeText}>
+          {userCaption(row)}
+        </Text>
+        <Text variant={row.source === 'skill' || row.source === 'app-note' ? 'mono' : 'body'} size={row.source === 'app-note' ? 'sm' : 'md'} selectable style={styles.prose}>
+          {row.text}
+        </Text>
+        {actions ? (
+          <View style={!hovered && styles.actionsHidden} testID="output-user-actions">
+            {actions}
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
 }
 
 /** A finished message as Markdown (AL-255), with Copy for the whole message shown while the pointer is over it. */
@@ -318,6 +332,9 @@ const styles = StyleSheet.create({
     backgroundColor: color.surface,
   },
   messageCopyHidden: {
+    opacity: 0,
+  },
+  actionsHidden: {
     opacity: 0,
   },
   thinkingHead: {

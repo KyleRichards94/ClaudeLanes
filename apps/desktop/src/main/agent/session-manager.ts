@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { CanUseTool, McpServerConfig, McpServerStatus, Options, PermissionMode, SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, McpServerConfig, McpServerStatus, Options, PermissionMode, SDKMessage, SDKUserMessage, RewindFilesResult } from '@anthropic-ai/claude-agent-sdk';
 import {
   APPLY_MODEL_NOW_MESSAGE,
   SDK_MODEL_IDS,
@@ -60,6 +60,8 @@ export interface SessionManager {
   interrupt(ticketId: string): Promise<Result<void>>;
   /** Stops one sub-agent's task (AL-261); the lead agent's turn goes on. */
   stopTask(ticketId: string, taskId: string): Promise<Result<void>>;
+  /** Restores the worktree's tracked files to one of the user's messages (AL-265, file checkpointing). */
+  rewindFiles(ticketId: string, messageId: string, options: { dryRun: boolean }): Promise<Result<RewindFilesResult>>;
   /**
    * Saves the model on the ticket and, when its session is live, switches the session to it (D10).
    * The change is pending (`agent:model`) until the next assistant message reports the new model or
@@ -255,6 +257,8 @@ export function sessionOptions(record: TicketRecord, abortController: AbortContr
     thinking: { type: 'adaptive' },
     settingSources: ['user', 'project', 'local'],
     includePartialMessages: true,
+    // Rewind to here (AL-265) needs the SDK's file checkpoints.
+    enableFileCheckpointing: true,
     abortController,
     systemPrompt: { type: 'preset', preset: 'claude_code', ...(extras.systemPromptAppend ? { append: extras.systemPromptAppend } : {}) },
     // Edits in the ticket's own worktree go ahead (D18) unless the policy says otherwise (AL-109).
@@ -643,6 +647,17 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
         return ok(undefined);
       } catch (error) {
         return err('INTERNAL', `The agent could not be interrupted: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    },
+
+    async rewindFiles(ticketId, messageId, { dryRun }) {
+      const found = live(ticketId);
+      if (!found.ok) return found;
+      if (!found.data.query) return err('VALIDATION', `The agent session of ticket ${ticketId} is still starting.`);
+      try {
+        return ok(await found.data.query.rewindFiles(messageId, { dryRun }));
+      } catch (error) {
+        return err('INTERNAL', `The worktree could not be rewound: ${error instanceof Error ? error.message : String(error)}`);
       }
     },
 

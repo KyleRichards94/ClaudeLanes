@@ -31,6 +31,8 @@ export interface FakeClaudeScript {
    * or close.
    */
   live?: boolean;
+  /** What `rewindFiles()` answers (AL-265). */
+  rewind?: { canRewind: boolean; error?: string; filesChanged?: string[]; insertions?: number; deletions?: number };
   /** What a live session answers each sent user message with (e.g. an assistant reply and a result). */
   onSend?: (message: SDKUserMessage, call: FakeClaudeCall) => SDKMessage[];
   /** What `mcpServerStatus()` answers (AL-108); change `call.mcpStatus` to change later answers. */
@@ -56,6 +58,8 @@ export interface FakeClaudeCall {
   interrupts: number;
   /** Task ids passed to `stopTask()` (AL-261). */
   stoppedTasks: string[];
+  /** `rewindFiles()` calls (AL-265). */
+  rewinds: { messageId: string; dryRun: boolean }[];
   /** Arguments of each `setModel()` call. */
   models: Array<string | undefined>;
   /** Arguments of each `setPermissionMode()` call. */
@@ -89,6 +93,7 @@ export type FakeClaudeEntry =
   | ({ kind: 'input' } & FakeClaudeInput)
   | { kind: 'interrupt' }
   | { kind: 'stopTask'; taskId: string }
+  | { kind: 'rewindFiles'; messageId: string; dryRun: boolean }
   | { kind: 'setModel'; model: string | undefined }
   | { kind: 'setPermissionMode'; mode: string }
   | { kind: 'applyFlagSettings'; settings: Record<string, unknown> }
@@ -148,6 +153,7 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       },
       interrupts: 0,
       stoppedTasks: [],
+      rewinds: [],
       models: [],
       permissionModes: [],
       flagSettings: [],
@@ -224,6 +230,12 @@ export function createFakeClaude(script: FakeClaudeScript | ((call: FakeClaudeCa
       stopTask: async (taskId: string) => {
         call.stoppedTasks.push(taskId);
         call.log.push({ kind: 'stopTask', taskId });
+      },
+      rewindFiles: async (messageId: string, rewindOptions?: { dryRun?: boolean }) => {
+        const dryRun = rewindOptions?.dryRun === true;
+        call.rewinds.push({ messageId, dryRun });
+        call.log.push({ kind: 'rewindFiles', messageId, dryRun });
+        return plan.rewind ?? { canRewind: true, filesChanged: [], insertions: 0, deletions: 0 };
       },
       setModel: async (model?: string) => {
         call.models.push(model);

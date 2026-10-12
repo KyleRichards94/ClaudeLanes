@@ -55,6 +55,7 @@ function interactiveClaude(respond: Responder, tools: string[] = ['ClaudeDesign'
       },
       interrupt: async () => undefined,
       stopTask: async () => undefined,
+      rewindFiles: async () => ({ canRewind: false }),
       setModel: async () => undefined,
       setPermissionMode: async () => undefined,
       applyFlagSettings: async () => undefined,

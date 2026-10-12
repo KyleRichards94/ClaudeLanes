@@ -27,6 +27,13 @@ export default defineConfig([
     },
   },
   {
+    files: ['./apps/desktop/src/renderer/features/rewind-fork/**'],
+    rules: {
+      // Rewind to here and Fork from here (AL-265) act on the drill-in's output alone.
+      'fsd/insignificant-slice': 'off',
+    },
+  },
+  {
     rules: {
       // Design §5 keeps the processes layer for flows across pages (first run, AL-047; new ticket).
       'fsd/no-processes': 'off',

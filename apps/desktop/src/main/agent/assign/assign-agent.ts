@@ -27,6 +27,8 @@ export interface AssignAgentOptions {
   stages: Pick<StageService, 'pendingGate' | 'moveTo'>;
   /** The diff against the base branch for the brief; without it the brief has no diff section. */
   diffs?: Pick<DiffService, 'files'>;
+  /** The SDK's `forkSession` (AL-265): a copy of the old session up to one message, resumable. */
+  fork?: (sessionId: string, options: { dir: string; upToMessageId: string }) => Promise<{ sessionId: string }>;
   log?: Pick<Logger, 'info' | 'warn'>;
   now?: () => number;
 }
@@ -43,7 +45,8 @@ const EFFORT_WORDS: Readonly<Record<Effort, string>> = { low: 'Low', medium: 'Me
 
 /** The output's divider: "New agent · Sonnet · High · handed over" / "… · started fresh". */
 export function newAgentLine(request: Pick<AssignAgentRequest, 'model' | 'effort' | 'mode'>): string {
-  return `New agent · ${MODEL_WORDS[request.model]} · ${EFFORT_WORDS[request.effort]} · ${request.mode === 'hand-over' ? 'handed over' : 'started fresh'}`;
+  const how = request.mode === 'hand-over' ? 'handed over' : request.mode === 'fork' ? 'forked from an earlier message' : 'started fresh';
+  return `New agent · ${MODEL_WORDS[request.model]} · ${EFFORT_WORDS[request.effort]} · ${how}`;
 }
 
 export function createAssignAgentService(options: AssignAgentOptions): AssignAgentService {
@@ -71,18 +74,30 @@ export function createAssignAgentService(options: AssignAgentOptions): AssignAge
           ? buildHandOverBrief({ record, events: (await options.transcripts.get(ticketId)).events, diff: await readDiff(ticketId), pendingGate: options.stages.pendingGate(ticketId) })
           : null;
       const previousSessionId = options.sessions.status(ticketId).sessionId ?? record.sessionId;
+      if (request.mode === 'fork' && (!previousSessionId || !request.forkFromMessageId)) return err('VALIDATION', 'A fork needs a session and the message to fork from.', { reason: 'nothing-to-fork' });
 
       // The old agent goes first: a queued launch is dropped, a live session is closed.
       options.launches.cancel(ticketId);
       const stopped = await options.sessions.stop(ticketId, { reason: SESSION_REPLACED_MESSAGE });
       if (!stopped.ok) return stopped;
 
+      // A fork (AL-265): a copy of the old session up to that message, which the new agent resumes.
+      let forkedSessionId: string | null = null;
+      if (request.mode === 'fork' && previousSessionId && request.forkFromMessageId) {
+        if (!options.fork) return err('VALIDATION', 'Forking is not available here.');
+        try {
+          forkedSessionId = (await options.fork(previousSessionId, { dir: record.worktreePath, upToMessageId: request.forkFromMessageId })).sessionId;
+        } catch (error) {
+          return err('INTERNAL', `The session could not be forked: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
       const saved = await options.tickets.update(ticketId, (current) => ({
         ...current,
         model: request.model,
         effort: request.effort,
         skills: request.skills,
-        sessionId: null,
+        sessionId: forkedSessionId,
         ...(previousSessionId
           ? {
               pastSessions: [...(current.pastSessions ?? []), { sessionId: previousSessionId, model: current.model, effort: current.effort, endedAt: now(), reason: 'assigned' as const }].slice(
@@ -100,6 +115,7 @@ export function createAssignAgentService(options: AssignAgentOptions): AssignAge
       options.transcripts.appendSystem(ticketId, newAgentLine(request));
 
       const job = brief ?? saved.data.job?.trim() ?? '';
+      // A forked session resumes where its copy ends; the launch sends no first turn.
       const started = await options.launches.launch({
         ticketId,
         jobDescription: job || `Continue the work on ${saved.data.title}.`,
