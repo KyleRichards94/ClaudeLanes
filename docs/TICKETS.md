@@ -196,6 +196,16 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-272 | Board digest and next actions | E16 | L | AL-269 | done |
 | AL-273 | App notes in the output | E16 | S | AL-251 | done |
 | AL-274 | Drag agent cards to any lane | E16 | M | AL-270 | done |
+| AL-275 | Ticket layout slider and view store | E17 | M | AL-250 | done |
+| AL-276 | Changed files with authors (`diff:files`) | E17 | L | AL-089 | done |
+| AL-277 | Review findings (`review:findings`) | E17 | M | AL-276 | done |
+| AL-278 | Agent colours, activity and turns | E17 | M | AL-107 | done |
+| AL-279 | Flight deck layout | E17 | L | AL-275, AL-276, AL-278 | partial |
+| AL-280 | `layoutCity` | E17 | M | — | done |
+| AL-281 | Code City scene | E17 | L | AL-280 | done |
+| AL-282 | Code City overlays and panels | E17 | L | AL-281, AL-276, AL-277, AL-278 | partial |
+| AL-283 | Code City interaction, accessibility and states | E17 | M | AL-282, AL-275 | partial |
+| AL-284 | E2E: ticket layouts | E17 | M | AL-279, AL-283 | done |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1440,6 +1450,85 @@ the main checkout has checked out and does not push.
   - [x] Keyboard: Space picks a card up, arrows choose a lane, Enter drops.
   - [x] Drag-rule unit tests; `drag-to-lane.spec.ts` extended.
 
+### E17 — Ticket screen layouts: Flight deck and Code City (handoff 2026-10-13)
+
+Kyle's handoff ("Handoff — Ticket screen: Flight deck + Code City layouts", a Claude Doc): the ticket
+screen gets two layouts over the same data, switched by a slider in the header. Flight deck (direction A)
+is the default: workflow card with stage cards and a turn strip, grouped output, a change map over the
+diff with an author stripe, an agent donut and the worktree card. Code City (direction D) is an isometric
+CSS 3D city: a building per changed file, folder districts, red rubble for removed lines, agent pins over
+the files running agents touch. Both read one `ticketView` store, so selection, Follow agent, diff mode and
+the composer draft carry across. Adaptations to this repo are in Decisions D815–D822.
+
+#### AL-275 · Ticket layout slider and view store
+- **Design:** handoff "Layout slider" · **Depends on:** AL-250
+- **Scope:** `ticketLayout` and `codeCityLegendDismissed` in the UI prefs (settings `ui`); the `ticketView` store (`selectedFilePath`, `followAgent`, `diffMode`, `selectedTurn`, per ticket); `LayoutSlider` (radiogroup, 260×40 track, sliding thumb with drag-to-snap, arrows, Ctrl+Shift+L) in the header; `LayoutSwitch` (fade and 24 px slide, 280 ms, instant under reduced motion; Code City is `React.lazy`, kept mounted after the first visit); the slider is hidden on a native target. `TicketPage` becomes the frame: header, then one layout.
+- **Acceptance criteria:**
+  - [x] The choice survives a restart and applies to every ticket; Flight deck is the default.
+  - [x] Click, drag-to-snap, Left/Right and Ctrl+Shift+L switch; the header does not re-render on a switch.
+  - [x] Selection, Follow agent, diff mode and the composer draft carry across.
+  - [x] `layout-slider.test.tsx`.
+
+#### AL-276 · Changed files with authors (`diff:files`)
+- **Design:** handoff "Data contracts and IPC", "Agent attribution" · **Depends on:** AL-089
+- **Scope:** `diff:files` (`ChangedFile`: kind, added, removed, `authorAgentId`, `touchedBy`, `uncommitted`, plus review status per file), built from `git:diff` and a per-file attribution worked out from the Edit / MultiEdit / Write calls in the ticket's transcripts (lead, sub-agents, second agents), by most lines written; a file with no recorded call is `null` ("you or a merge"). Replayed from the saved transcripts, nothing new on disk. Renderer: `entities/diff-file` (`useDiffFiles`, refetched when an Edit or Write settles, debounced 1 s, never polled faster than every 5 s) and the extracted per-file diff renderer.
+- **Acceptance criteria:**
+  - [x] Most lines wins; a tie goes to the first editor; a user edit gives `null`; replay gives the same map.
+  - [x] Committed and working-tree changes merge by path; renames and binary files.
+  - [x] `attribution.test.ts`, handler test, `useDiffFiles` test.
+
+#### AL-277 · Review findings (`review:findings`)
+- **Design:** handoff "Review status and findings" · **Depends on:** AL-276
+- **Scope:** the reviewer's instruction ends each file with a fenced JSON block; `review:findings` parses them from the transcripts and `diff:files` derives `inReview` / `passed` / `changesRequested`. `entities/review-finding` (`useReviewFindings`).
+- **Acceptance criteria:**
+  - [x] Blocks parse into findings with stable ids; a malformed block is ignored.
+  - [x] Parser unit tests; the reviewer prompt carries the instruction.
+
+#### AL-278 · Agent colours, activity and turns
+- **Design:** handoff "Flight deck › Agent colours", "Active file per agent" · **Depends on:** AL-107
+- **Scope:** an agent view (lead, sub-agents, second agents) with a colour assigned once in spawn order (lead `#5B4BC4`, then `#0369A1, #0D9488, #7C3AED, #B45309, #DB2777, #64748B`, repeating), `activeFile` and `activeKind`; a `Turn` list; both derived from the output stream, so they replay after a restart (D816).
+- **Acceptance criteria:**
+  - [x] Colours stable across both layouts; activity cleared on idle or session end; a turn's lead agent is the one with most tool calls.
+  - [x] Unit tests.
+
+#### AL-279 · Flight deck layout
+- **Design:** handoff "Flight deck layout (default)" · **Depends on:** AL-275, AL-276, AL-278
+- **Scope:** workflow card (stage cards with gate chips and progress, turn strip), grouped output (collapsed finished turns, live turn expanded, composer pinned), diff column with change map, file header and author stripe, right rail with the agent donut and worktree card.
+- **Acceptance criteria:**
+  - [x] A turn click sets `selectedTurn`; a tile click sets `selectedFilePath`; donut counts by state.
+  - [x] Existing Output & diff, composer, Merge, Build/Run behaviour unchanged.
+  - [x] `flight-deck.test.tsx`.
+
+#### AL-280 · `layoutCity`
+- **Design:** handoff "City layout algorithm" · **Depends on:** —
+- **Scope:** the pure, deterministic layout (districts, buildings, rubble, 40-file cap, shelf packing) and its golden test.
+- **Acceptance criteria:**
+  - [x] The worked example matches; shuffled input gives the same output; cap at 40 plus overflow; deleted, binary, renamed and root-level files.
+
+#### AL-281 · Code City scene
+- **Design:** handoff "3D rendering spec" · **Depends on:** AL-280
+- **Scope:** `code-city.css` as specified, `CityScene.web`, `Building.web` (face colours from `shade()` in shared/lib), fit-to-panel, district plots, rubble, skeleton plane.
+- **Acceptance criteria:**
+  - [x] Buildings stand up from the ground, darker face on the right; faces use the author colour; heights grow with a 400 ms transition.
+
+#### AL-282 · Code City overlays and panels
+- **Design:** handoff "Anchors, labels and pins", "Code City panels" · **Depends on:** AL-281, AL-276, AL-277, AL-278
+- **Scope:** anchors projected from the top faces, label layer with overlap nudging, district and rubble labels, agent pins, crew panel, how-to card, stage track, compact composer, inspector rail (building card, blueprint diff, inspector's notes, worktree card).
+- **Acceptance criteria:**
+  - [x] Labels sit above their top face and do not overlap; a running agent's pin appears over its active file; the rail shows stats, diff and notes.
+
+#### AL-283 · Code City interaction, accessibility and states
+- **Design:** handoff "Interaction, keyboard and accessibility", "States and edge cases" · **Depends on:** AL-282, AL-275
+- **Scope:** shared selection and Follow agent, listbox keyboard model (one Tab stop, arrows, Home/End, Enter/Space, Esc), accessible names, tooltips, live region for pin moves, reduced motion, every row of the states table.
+- **Acceptance criteria:**
+  - [x] `code-city.test.tsx` covers keyboard model, names, inspector, empty and error states.
+
+#### AL-284 · E2E: ticket layouts
+- **Design:** handoff "Acceptance criteria and tests" · **Depends on:** AL-279, AL-283
+- **Scope:** fixture `ticket-11726` (five files, five agents, seven turns), `ticket-layouts.spec.ts`: Flight deck by default, toggle to Code City, click the tallest building, the inspector shows `FailedSyncFiles.razor +120 −0`; the choice persists across a restart.
+- **Acceptance criteria:**
+  - [x] Spec passes alone.
+
 ---
 ## 4. Decisions
 
@@ -2260,6 +2349,15 @@ the main checkout has checked out and does not push.
 | D813 | Kyle's request: Remove all on Done and the single-step lanes (header button shown on hover or focus; under the collapsed Done strip, always shown). `BulkRemoveModal` (features/remove-ticket) removes the lane's cards one after another the way Remove does: `agent:stop`, then `tickets:archive`; tickets with unmerged work are held back on the first pass and listed, and "Remove these anyway" archives them with `discardUnmerged`. Workflow lanes have no Remove all | Clearing finished and single-step cards one by one was slow; no new IPC channel, so every safety check stays in main | 2026-10-13 |
 | D814 | Kyle's request (accountability, engagement with the code): Output and Diff are one view, Output & diff. The output and composer sit beside the diff with a draggable, keyboard-movable divider (`SplitView`, shared/ui; side by side at 1200 px and wider, stacked below), Hide diff / Show diff beside the tabs. The diff is read again 400 ms after each tool call or turn settles (`useLiveDiff` from the agent-output store, no new IPC), files the agent's Edit or Write just changed carry "Changed just now" for two minutes and always open, and Follow agent scrolls the pane to each edited file. Files open expanded (the first 40, plus recent ones); Unified / Side by side, Expand all and Collapse all are in the toolbar. Layout, view and Follow are kept for the session in memory. The `diff` tab id still exists: asking for it (Review changes, View conflicts) opens Output & diff with the diff shown | One place to read what the agent writes as it writes it | 2026-10-13 |
 
+| D815 | E17 follows the handoff but not its file layout: `TicketPage` stays in `pages/ticket`; the view store is `shared/model/ticket-view.ts` (widgets cannot import pages), `LayoutSwitch` is in `pages/ticket/ui` (widgets cannot import each other), and `LayoutSlider` is the only widget that is just a control (`widgets/layout-slider`). Both layouts are presentational widgets that get page-level things (composer, worktree and merge cards, the diff renderer, gate actions) as slots or props | FSD: pages import widgets, widgets never import pages or each other | 2026-10-13 |
+| D816 | No `agent:activity` or `turn:update` events. The renderer derives each agent's active file and the turns from the `agent:output` stream (tool rows carry paths, `result` rows end turns, `parentToolUseId` names the sub-agent); a settle counter (`shared/model/output-settle`, live events only) drives the 1 s debounced refetch of `diff:files` and `review:findings`. Replay after a restart is free, and nothing new crosses IPC | The stream already holds everything the handoff's events would carry | 2026-10-13 |
+| D817 | `diff:files` reuses `git:diff` (`DiffService.files`) for numstat, renames, binaries and untracked files instead of a new `numstat.ts`; `uncommitted` comes from `git status`. The type is `ChangedFile` (not `DiffFile`, which `git:diff` already uses). Attribution (`main/agent/attribution`) replays the lead's and second agents' transcripts, so it survives a restart and is limited to their last 5,000 events. Edit counts the lines of `after`, Write the `+N` stat, MultiEdit the clipped input JSON; Bash edits are not seen, so those files read "you or a merge" | The numstat and the transcripts already exist; no git blame needed | 2026-10-13 |
+| D818 | Review findings: the reviewer is told, in the stage protocol, the Reviewer companion brief and the Review only step, to end each file with a fenced JSON block; `review:findings` and `reviewStatus` parse them from the lead, its sub-agents and second agents (a later block for a file replaces an earlier one; malformed blocks are ignored). `prThreadId` stays optional and is never set until /pr-comment-actioner reports a thread id back | Handoff "Review status and findings"; the PR link has no source yet | 2026-10-13 |
+| D819 | A turn's cost is the change in the session's running total (`result.costUsd` is cumulative), as the output rows' turn-end already showed; finished turns collapse in the output, including the newest finished one, and only the live turn is open. `deriveTurns` and `groupTurns` number turns the same way | Per-turn costs that add up to the session cost | 2026-10-13 |
+| D820 | Flight deck replaces `StageStepper`, `DiffPane`, `FlightDeckBody` and `live-diff` (removed); the gate toggle is now the stage card's gate chip (`role="switch"`, same `stage-gate-{stage}` testID); the Agents card is the donut plus a flat spawn-ordered list (sub-agent nesting dropped, testIDs kept); the page frame is 14/18/18 padding for both layouts; the rail order is Agents, then Worktree. `DiffTab` (with the sub-branch compare) stays but only its test uses it. The three-column grid has no splitter; Hide diff / Show diff remain. Esc with no running turn clears the selected file | Handoff "Flight deck layout"; the old pieces had no caller left | 2026-10-13 |
+| D821 | Code City details the handoff left open: a modified file that only removes lines stands at the 14 px minimum (so it can be clicked); a deleted file has `side 0` and its rubble tile is its listbox option; district labels sit below the plot's front-left corner; pins stack 32 px apart on one file; label overlap uses a character-width estimate; label chips are mouse-only (one Tab stop, the listbox options carry the names); the roads leaving the current stage split at its progress (50% when unknown). The blueprint diff card never shrinks under 280 px: the rail grows and the page scrolls | Handoff silent or ambiguous | 2026-10-13 |
+| D822 | Partly done: Flight deck has no sub-branch compare, "Changed just now" marks or review findings; its Implementing bar uses `ticket.progress` (no plan steps to count) and future-stage copy is generic. Code City's "Posted to PR" link is not wired (`onOpenPrThread`); a pin can cross a neighbouring label chip; reduced motion is CSS and hooks, untested. Specs edited for the new page but not run: `rewind`, `assign-agent`, `permissions`, `second-agent`, `subagents` (Kyle asked for no broad e2e runs); `ticket-layouts`, `ticket-layout`, `ticket-diff` and `ticket-page` pass | Honest scope of AL-279, AL-282, AL-283 | 2026-10-13 |
+
 ---
 
 ## 5. Open questions
@@ -2352,6 +2450,7 @@ the main checkout has checked out and does not push.
 | 2026-10-13 | No-current-sprint 404 handled; PR drops on a branch a ticket already has go to that ticket; Settings › Drops rows for single-step lanes, initial prompt per row, lane header settings button. D810–D812. |
 | 2026-10-13 | Remove all on Done and the single-step lanes. D813. |
 | 2026-10-13 | Output & diff: output and live diff side by side with a splitter, unified or side-by-side diffs, files expanded, Follow agent. D814. |
+| 2026-10-13 | E17 (AL-275–AL-284): ticket screen layouts. Header slider (Flight deck default, Code City, Ctrl+Shift+L, saved as `ticketLayout`); `diff:files` with agent attribution and `review:findings`; Flight deck (workflow card, turn strip, grouped output, change map with author stripe, agent donut); Code City (`layoutCity`, CSS 3D scene, labels and pins, crew, stage track, inspector rail, keyboard listbox); `ticket-layouts.spec.ts` and fixture `ticket-11726`. D815–D822. |
 ---
 
 ## 7. Parallel build rules
