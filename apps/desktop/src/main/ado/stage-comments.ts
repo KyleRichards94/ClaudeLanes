@@ -63,6 +63,10 @@ const LANE_NAMES: Record<Lane, string> = {
   qa: 'QA',
   'create-pr': 'Create PR',
   done: 'Done',
+  'review-only': 'Code review only',
+  'qa-only': 'QA only',
+  'pr-only': 'Create PR only',
+  'comments-only': 'Resolve PR comments',
 };
 
 /** What the gate approved, as the comment says it ("plan approved by Kyle"). */

@@ -1,4 +1,4 @@
-import { err, ok, type Result } from '@agent-lanes/contracts';
+import { err, ok, type Err, type Result } from '@agent-lanes/contracts';
 import { z } from 'zod';
 import type { AdoCallOptions, AdoClient } from './client';
 import { isAdoErrorDetails } from './errors';
@@ -141,15 +141,57 @@ export interface AssignmentChange {
   expectedRev: number;
   /** Whom to assign (a sign-in name, or a person whose names are tried in turn), or null to leave it unassigned. */
   assignee: string | AssigneeIdentity | null;
-  state: string;
+  /** The state to move it to; null leaves the state alone. */
+  state: string | null;
+  /** Other fields written in the same revision, e.g. the team's board column field. */
+  fields?: Readonly<Record<string, string>>;
 }
 
-/** Azure DevOps refused the `System.AssignedTo` value as an identity it does not know. */
+/** Azure DevOps refused the `System.AssignedTo` value as an identity it does not know (or could not resolve). */
 export function isUnknownIdentity(failure: Result<unknown>): boolean {
   if (failure.ok) return false;
   const details = isAdoErrorDetails(failure.details) ? failure.details : undefined;
   const text = `${failure.message} ${details?.adoMessage ?? ''} ${details?.adoTypeKey ?? ''}`;
-  return /unknown identity|WorkItemFieldInvalidException|not a valid identity/i.test(text);
+  return /unknown identity|WorkItemFieldInvalidException|not a valid identity|identit(y|ies)\b.*\b(not found|could not be resolved|ambiguous)|System\.AssignedTo|Assigned To/i.test(text);
+}
+
+/** Where a drop moves the item: the state, and the board column when the board names its column field. */
+export interface StartTarget {
+  state: string;
+  column?: { field: string; name: string } | null;
+}
+
+/**
+ * Assign to me and move to In Progress, as reliably as the server allows: assignee, state and board
+ * column in one guarded revision; when the server refuses that (a process rule on the transition, a
+ * read-only column field), the same without the column; and when that is refused too, the assignment
+ * alone, so the item is at least yours. `stateMoved` and `columnMoved` say what was written. Someone
+ * else's change in between (`details.reason: 'changed'`) stops it at once. Never throws.
+ */
+export async function assignAndStart(
+  client: AdoClient,
+  ref: AssignmentRef,
+  change: { expectedRev: number; assignee: AssigneeIdentity; target: StartTarget },
+  options: AssignmentCallOptions = {},
+): Promise<Result<WorkItemAssignment & { stateMoved: boolean; columnMoved: boolean }>> {
+  const { target } = change;
+  const attempts: Array<Pick<AssignmentChange, 'state' | 'fields'>> = [
+    ...(target.column ? [{ state: target.state, fields: { [target.column.field]: target.column.name } }] : []),
+    { state: target.state },
+    { state: null },
+  ];
+  let first: Err | undefined;
+  for (const attempt of attempts) {
+    const written = await setWorkItemAssignment(client, ref, { expectedRev: change.expectedRev, assignee: change.assignee, ...attempt }, options);
+    if (written.ok) return ok({ ...written.data, stateMoved: attempt.state !== null, columnMoved: attempt.fields !== undefined });
+    if (isRecordWithReason(written.details, 'changed')) return written;
+    first ??= written;
+  }
+  return first ?? err('INTERNAL', 'The assignment was not written.');
+}
+
+function isRecordWithReason(details: unknown, reason: string): boolean {
+  return typeof details === 'object' && details !== null && (details as { reason?: unknown }).reason === reason;
 }
 
 /**
@@ -180,7 +222,8 @@ async function writeAssignment(client: AdoClient, ref: AssignmentRef, assignee: 
   const patch = [
     { op: 'test', path: '/rev', value: change.expectedRev },
     assignee === null ? { op: 'remove', path: '/fields/System.AssignedTo' } : { op: 'add', path: '/fields/System.AssignedTo', value: assignee },
-    { op: 'add', path: '/fields/System.State', value: change.state },
+    ...(change.state === null ? [] : [{ op: 'add', path: '/fields/System.State', value: change.state }]),
+    ...Object.entries(change.fields ?? {}).map(([field, value]) => ({ op: 'add', path: `/fields/${field}`, value })),
   ];
   const updated = await client.request({
     ...options,

@@ -1,4 +1,4 @@
-import { LANES, defaultSettings, type ActivePullRequestList, type TeamBoard as TeamBoardData, type TeamBoardItem } from '@agent-lanes/contracts';
+import { PIPELINE_LANES, SOLO_LANES, defaultSettings, type ActivePullRequestList, type TeamBoard as TeamBoardData, type TeamBoardItem } from '@agent-lanes/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
@@ -80,8 +80,11 @@ function rect(left: number, top: number, width: number, height: number): DOMRect
 const originalRect = Element.prototype.getBoundingClientRect;
 let store: AgentTicketStore;
 let onLaunch: Mock<LaunchFromLane>;
+/** How far the board has scrolled down: lanes above the window are off screen. */
+let scrolledBy = 0;
 
 beforeEach(() => {
+  scrolledBy = 0;
   resetDragToLane();
   resetTeamBoardSession();
   installFakeSettings(defaultSettings(), {
@@ -96,8 +99,11 @@ beforeEach(() => {
   onLaunch = vi.fn<LaunchFromLane>().mockResolvedValue({ ticketId: '1' });
   Element.prototype.getBoundingClientRect = function (this: Element) {
     const id = this.getAttribute('data-testid') ?? '';
-    const lane = LANES.findIndex((name) => id === `lane-${name}`);
-    if (lane !== -1) return rect(lane * 220, 100, 200, 400);
+    // As on the board: the single-step lanes in a row above the workflow's.
+    const solo = SOLO_LANES.findIndex((name) => id === `lane-${name}`);
+    if (solo !== -1) return rect(solo * 220, 100 - scrolledBy, 200, 400);
+    const lane = PIPELINE_LANES.findIndex((name) => id === `lane-${name}`);
+    if (lane !== -1) return rect(lane * 220, 550 - scrolledBy, 200, 400);
     if (/^team-(pr|card)-\d+$/.test(id)) return rect(1000, 700, 200, 100);
     // dnd-kit measures the drag overlay by its only child, the preview, once: where the card was.
     if (id === 'drag-preview') return rect(1000, 700, 200, 100);
@@ -140,7 +146,7 @@ async function nextTick() {
 const hint = (lane: string) => screen.queryByTestId(`lane-${lane}-drop-hint`);
 
 describe('drag to lane (AL-235)', () => {
-  it('lights Implementing and Code review only while PR !10571 is picked up with Space, and announces each lane (artboard 09)', async () => {
+  it('lights Code review only, Implementing and Code review while PR !10571 is picked up with Space, and announces each lane (artboard 09)', async () => {
     const card = await renderBoard();
     expect(card.getAttribute('role')).toBe('button');
     expect(card.getAttribute('aria-roledescription')).toBe('draggable card');
@@ -155,8 +161,14 @@ describe('drag to lane (AL-235)', () => {
     // Lit lanes change border style as well as colour; the others fade.
     expect(getComputedStyle(screen.getByTestId('lane-implementing')).borderStyle).toBe('dashed');
     expect(getComputedStyle(screen.getByTestId('lane-planning')).opacity).toBe('0.45');
-    await waitFor(() => expect(dndAnnouncement()).toContain('Picked up !10571. Implementing and Code review take it.'));
+    expect(hint('review-only')?.textContent).toContain('Review only');
+    await waitFor(() => expect(dndAnnouncement()).toContain('Picked up !10571. Code review only, Resolve PR comments, Implementing and Code review take it.'));
 
+    // Reading order: the single-step row first, then the workflow.
+    fireEvent.keyDown(document, { code: 'ArrowRight', key: 'ArrowRight' });
+    await waitFor(() => expect(dndAnnouncement()).toBe('Over Code review only: review it, nothing else'));
+    fireEvent.keyDown(document, { code: 'ArrowRight', key: 'ArrowRight' });
+    await waitFor(() => expect(dndAnnouncement()).toBe('Over Resolve PR comments: resolve its PR comments'));
     fireEvent.keyDown(document, { code: 'ArrowRight', key: 'ArrowRight' });
     await waitFor(() => expect(dndAnnouncement()).toBe('Over Implementing: answer 6 comments'));
     expect(getComputedStyle(screen.getByTestId('lane-implementing')).borderStyle).toBe('solid');
@@ -174,7 +186,9 @@ describe('drag to lane (AL-235)', () => {
     expect(hint('code-review')).toBeNull();
   });
 
-  it('Escape cancels a keyboard drag without launching anything', async () => {
+  it('Escape cancels a keyboard drag without launching anything; the first arrow skips lanes scrolled away above', async () => {
+    // The single-step row is above the window: the first arrow starts at the workflow.
+    scrolledBy = 500;
     const card = await renderBoard();
     act(() => card.focus());
     fireEvent.keyDown(card, { code: 'Space', key: ' ' });
@@ -195,6 +209,8 @@ describe('drag to lane (AL-235)', () => {
     const menu = await screen.findByRole('menu', { name: 'Send !10571 to a lane' });
     const items = within(menu).getAllByRole('menuitem');
     expect(items.map((entry) => entry.getAttribute('aria-label'))).toEqual([
+      expect.stringMatching(/^Code review only: review it, nothing else\./),
+      expect.stringMatching(/^Resolve PR comments: resolve its PR comments\./),
       expect.stringMatching(/^Implementing: answer 6 comments\./),
       expect.stringMatching(/^Code review: start agentic review\./),
     ]);
@@ -202,7 +218,7 @@ describe('drag to lane (AL-235)', () => {
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(items[1]);
 
-    fireEvent.click(items[0]!);
+    fireEvent.click(items[2]!);
     await waitFor(() => expect(onLaunch).toHaveBeenCalledWith({ source: { kind: 'pull-request', id: 10571, team: 'osc' }, lane: 'implementing' }, expect.anything()));
     expect(screen.queryByRole('menu')).toBeNull();
     expect(screen.getByTestId('drag-to-lane-announcement')?.textContent).toContain('Sent !10571 to Implementing: answer 6 comments');

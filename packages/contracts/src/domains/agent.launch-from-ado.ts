@@ -86,8 +86,11 @@ export const LaunchFromAdoResponseSchema = z.object({
   status: AgentSessionStatusSchema,
   /** What changed in Azure DevOps; null for every drop but a To Do or Failed item on Planning or Implementing. */
   adoChange: LaunchAdoChangeSchema.nullable(),
-  /** For `agent:undoLaunch` (AL-237); valid for LAUNCH_UNDO_WINDOW_MS or until the first turn ends. */
-  undoId: z.string().min(16).max(128),
+  /**
+   * For `agent:undoLaunch` (AL-237); valid for LAUNCH_UNDO_WINDOW_MS or until the first turn ends. Null when
+   * the drop handed the job to the ticket that already has the PR's branch: nothing was created to undo.
+   */
+  undoId: z.string().min(16).max(128).nullable(),
   /** The success toast: "#71318 assigned to you and moved to In Progress · agent started in Planning". */
   summary: z.string().max(500),
 });

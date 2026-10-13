@@ -10,10 +10,29 @@ export const STAGES = ['planning', 'implementing', 'code-review', 'qa', 'create-
 export const StageSchema = z.enum(STAGES);
 export type Stage = z.infer<typeof StageSchema>;
 
-/** Board lanes, left to right: Queued, the five stages, then Done (artboard 1). */
-export const LANES = ['queued', ...STAGES, 'done'] as const;
+/** The workflow's lanes, left to right: Queued, the five stages, then Done (artboard 1). */
+export const PIPELINE_LANES = ['queued', ...STAGES, 'done'] as const;
+
+/**
+ * Single-step lanes, shown in a row above the workflow: the agent only reviews, only QAs, only
+ * opens the pull request, or only resolves a PR's comments, then stops. It never moves itself on to another stage.
+ */
+export const SOLO_LANES = ['review-only', 'qa-only', 'pr-only', 'comments-only'] as const;
+export type SoloLane = (typeof SOLO_LANES)[number];
+
+/** Every lane in reading order: the single-step row above the workflow, then the workflow's. */
+export const LANES = [...SOLO_LANES, ...PIPELINE_LANES] as const;
 export const LaneSchema = z.enum(LANES);
 export type Lane = z.infer<typeof LaneSchema>;
+
+export function isSoloLane(lane: Lane | null | undefined): lane is SoloLane {
+  return (SOLO_LANES as readonly string[]).includes(lane ?? '');
+}
+
+/** The workflow stage a single-step lane does (`review-only` → `code-review`); a stage maps to itself. */
+export function stageOfLane(lane: Lane): Lane {
+  return lane === 'review-only' ? 'code-review' : lane === 'qa-only' ? 'qa' : lane === 'pr-only' ? 'create-pr' : lane === 'comments-only' ? 'implementing' : lane;
+}
 
 /** Model cards on artboard 2. The SDK model ids live with the session manager (Decision D10). */
 export const MODELS = ['opus', 'sonnet', 'haiku'] as const;

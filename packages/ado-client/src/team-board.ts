@@ -165,6 +165,36 @@ async function boardSettings(client: AdoClient, project: string, team: TeamRef, 
   return ok({ board: board.data, area: teamFieldClause(teamField.data) });
 }
 
+/** The board's In Progress column for one work item type: its name, the state it maps the type to, and the field that holds the column. */
+export interface InProgressColumn {
+  column: string;
+  state: string;
+  /** The team's `WEF_…_Kanban.Column` field; null when the board settings don't name it (then only the state is written). */
+  field: string | null;
+}
+
+/**
+ * Where an item goes when an agent starts work on it: the team board's first In Progress column that
+ * shows `type`, with the state that column maps the type to. Null when the board has no such column
+ * (the caller falls back to the type's first In Progress-category state). Never throws.
+ */
+export function inProgressColumnOf(client: AdoClient, project: string, team: string | undefined, type: string, options: TeamCallOptions = {}): Promise<Result<InProgressColumn | null>> {
+  return guarded('read the team board columns', async () => {
+    const call = callOptions(options);
+    const teamRef = await resolveTeam(client, project, team, call);
+    if (!teamRef.ok) return teamRef;
+    const settings = await boardSettings(client, project, teamRef.data, call);
+    if (!settings.ok) return settings;
+    const { board } = settings.data;
+    for (const column of board.columns) {
+      if (boardColumnKind(column) !== 'in-progress') continue;
+      const mapping = Object.entries(column.stateMappings ?? {}).find(([candidate]) => sameText(candidate, type));
+      if (mapping) return ok({ column: column.name, state: mapping[1], field: board.fields?.columnField?.referenceName ?? null });
+    }
+    return ok(null);
+  });
+}
+
 // ── Items ───────────────────────────────────────────────────────────────────────────────────────
 
 const identitySchema = z.object({ id: z.string().nullish(), displayName: z.string(), uniqueName: z.string().nullish() });

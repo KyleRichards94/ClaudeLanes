@@ -86,7 +86,7 @@ test('talks to the design side during Planning, and keeps the thread across tab 
   await expect(thread.getByTestId('design-thread-user')).toHaveCount(1);
   await expect(input).toHaveValue('');
 
-  await page.getByRole('tab', { name: 'Output' }).click();
+  await page.getByRole('tab', { name: 'Output & diff' }).click();
   await expect(page.getByTestId('design-tab-page')).toBeHidden();
   await page.getByRole('tab', { name: /Claude Design/ }).click();
   await expect(page.getByRole('log', { name: 'Design thread messages' }).getByText('Design side: Make the filter panel narrower')).toBeVisible();

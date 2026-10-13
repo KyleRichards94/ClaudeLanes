@@ -1,4 +1,4 @@
-import type { Lane, Stage, StageGates } from '@agent-lanes/contracts';
+import { isSoloLane, type Lane, type Stage, type StageGates } from '@agent-lanes/contracts';
 
 /**
  * Which stage moves an agent may make with `set_stage` (AL-103, design §9 diagram):
@@ -16,8 +16,13 @@ export const LANE_LABELS: Record<Lane, string> = {
   qa: 'QA',
   'create-pr': 'Create PR',
   done: 'Done',
+  'review-only': 'Code review only',
+  'qa-only': 'QA only',
+  'pr-only': 'Create PR only',
+  'comments-only': 'Resolve PR comments',
 };
 
+/** Single-step lanes have no next stage: the agent does that one step and stops. */
 const NEXT: Record<Lane, readonly Stage[]> = {
   queued: ['planning'],
   planning: ['implementing'],
@@ -26,6 +31,10 @@ const NEXT: Record<Lane, readonly Stage[]> = {
   qa: ['create-pr', 'implementing'],
   'create-pr': [],
   done: [],
+  'review-only': [],
+  'qa-only': [],
+  'pr-only': [],
+  'comments-only': [],
 };
 
 /** Stages `set_stage` may move a ticket in `from` to. */
@@ -67,7 +76,7 @@ export const GATE_SUBJECTS: Record<Stage, string> = {
  * Going back to Implementing, and the session start (Queued → Planning), are never gated.
  */
 export function gateFor(gates: StageGates, from: Lane, to: Stage): Stage | null {
-  if (from === 'queued' || from === 'done' || (to === 'implementing' && (from === 'code-review' || from === 'qa'))) return null;
+  if (from === 'queued' || from === 'done' || isSoloLane(from) ||(to === 'implementing' && (from === 'code-review' || from === 'qa'))) return null;
   if (to === 'create-pr' && gates['create-pr'] === 'approval') return 'create-pr';
   return gates[from] === 'approval' ? from : null;
 }

@@ -1,4 +1,4 @@
-import { LANES, type Effort, type Lane, type Model, type Stage, type SubagentNode, type SubagentStatus } from '@agent-lanes/contracts';
+import { LANES, stageOfLane, type Effort, type Lane, type Model, type Stage, type SubagentNode, type SubagentStatus } from '@agent-lanes/contracts';
 import { EFFORT_LABELS, LANE_LABELS, MODEL_LABELS } from '@/shared/config';
 
 /** A sub-agent with the ones it spawned, for the panel's tree (artboard 3). */
@@ -41,7 +41,7 @@ export function stageOf(node: Pick<SubagentNode, 'agentType' | 'name'>): Stage |
 }
 
 function before(stage: Lane, target: Stage): boolean {
-  return LANES.indexOf(stage) < LANES.indexOf(target);
+  return LANES.indexOf(stageOfLane(stage)) < LANES.indexOf(target);
 }
 
 /** What a sub-agent row says, read off artboard 3's Sub-agents column. */

@@ -56,7 +56,7 @@ describe('backlogGroups (artboard 11)', () => {
     const mine = rowView(backlogItem(2, { assignee: KR }), ME, null);
     expect(mine.lock).toBeNull();
     expect(mine.drag).toMatchObject({ key: 'backlog:2', source: { kind: 'backlog-item', id: 2 } });
-    expect(Object.keys(activeDrag(mine.drag!, 'pointer').allowed)).toEqual(['planning', 'implementing']);
+    expect(Object.keys(activeDrag(mine.drag!, 'pointer').allowed)).toEqual(['qa-only', 'planning', 'implementing']);
     const taken = rowView(backlogItem(3), ME, 'planning');
     expect(taken).toMatchObject({ agentTag: 'Agent in Planning', lock: null, drag: null });
   });

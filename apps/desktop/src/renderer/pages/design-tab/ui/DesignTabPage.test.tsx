@@ -228,7 +228,7 @@ describe('DesignTabPage', () => {
 
   it('goes back to the drill-in on the tab picked', async () => {
     const { router } = renderPage(fakeTicketRecord());
-    fireEvent.click(await screen.findByRole('tab', { name: 'Diff' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'Build log' }));
     expect(selectRoute(router.getState())).toEqual(routes.ticket('71273'));
   });
 

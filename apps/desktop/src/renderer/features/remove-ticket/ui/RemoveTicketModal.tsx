@@ -4,8 +4,9 @@ import type { UnmergedWork } from '@agent-lanes/contracts';
 import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Modal, Switch, Text } from '@agent-lanes/ui';
 import { useAgentTicket, useArchiveTicket } from '@/entities/agent-ticket';
-import { IpcError, useStopSession } from '@/shared/api';
+import { useStopSession } from '@/shared/api';
 import { toast } from '@/shared/model';
+import { unmergedOf } from '../model/unmerged';
 
 export interface RemoveTicketModalProps {
   ticketId: string;
@@ -14,17 +15,6 @@ export interface RemoveTicketModalProps {
   /** The ticket is off the board: the page it was on goes back to the board. */
   onRemoved?(): void;
   testID?: string;
-}
-
-/** Unmerged work the archive refused over, from the VALIDATION `unmerged-work` details (AL-088). */
-function unmergedOf(error: unknown): UnmergedWork | null {
-  if (!(error instanceof IpcError) || error.code !== 'VALIDATION') return null;
-  const details = error.details as { reason?: unknown; branches?: unknown; dirtyWorktrees?: unknown } | undefined;
-  if (details?.reason !== 'unmerged-work') return null;
-  return {
-    branches: Array.isArray(details.branches) ? (details.branches as UnmergedWork['branches']) : [],
-    dirtyWorktrees: Array.isArray(details.dirtyWorktrees) ? (details.dirtyWorktrees as string[]) : [],
-  };
 }
 
 /**

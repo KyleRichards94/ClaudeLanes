@@ -1,8 +1,10 @@
 import {
   DROP_KINDS,
+  DROP_PROMPT_MAX,
   dropDefaultsOf,
   type DropDefaults,
   type DropKind,
+  type LaneDropDefaults,
   BUILD_QUEUE_SIZE_LIMIT,
   MAX_CONCURRENT_AGENTS_LIMIT,
   agentPermissionMode,
@@ -72,6 +74,8 @@ export interface DropDraft {
   skills: string;
   model: Model;
   effort: Effort;
+  /** Added to the agent's first turn after the app's own job text. */
+  prompt: string;
 }
 
 export interface PermissionsDraft {
@@ -131,9 +135,27 @@ export function draftFromSettings(settings: Settings): SettingsDraft {
 }
 
 function dropsDraft(defaults: DropDefaults): Record<DropKind, DropDraft> {
-  return Object.fromEntries(
-    DROP_KINDS.map((kind) => [kind, { skills: defaults[kind].skills.map((skill) => `/${skill}`).join(' '), model: defaults[kind].model, effort: defaults[kind].effort }]),
-  ) as Record<DropKind, DropDraft>;
+  return Object.fromEntries(DROP_KINDS.map((kind) => [kind, dropDraftOf(defaults[kind])])) as Record<DropKind, DropDraft>;
+}
+
+/** A saved drop row as its fields show it: skills as "/code-review /pr-comment-actioner". */
+export function dropDraftOf(row: LaneDropDefaults): DropDraft {
+  return { skills: row.skills.map((skill) => `/${skill}`).join(' '), model: row.model, effort: row.effort, prompt: row.prompt ?? '' };
+}
+
+/** The row a drop draft saves. */
+export function dropRowOf(draft: DropDraft): LaneDropDefaults {
+  return { skills: parseSkills(draft.skills), model: draft.model, effort: draft.effort, prompt: draft.prompt.trim() };
+}
+
+/** Why a drop row can't be saved, per field. */
+export function dropRowErrors(draft: DropDraft): { skills?: string; prompt?: string } {
+  const skills = parseSkills(draft.skills);
+  const bad = skills.find((name) => !SKILL_NAME.test(name));
+  return {
+    ...(bad ? { skills: `"${bad}" is not a skill name. Use names like /code-review.` } : skills.length > 16 ? { skills: 'Enter at most 16 skills.' } : {}),
+    ...(draft.prompt.trim().length > DROP_PROMPT_MAX ? { prompt: `Keep the initial prompt to ${DROP_PROMPT_MAX} characters.` } : {}),
+  };
 }
 
 function permissionsDraft(policy: AgentPermissions): PermissionsDraft {
@@ -206,6 +228,11 @@ export function dropErrorKey(kind: DropKind): string {
   return `drops:${kind}`;
 }
 
+/** The error key of a drop row's initial prompt. */
+export function dropPromptErrorKey(kind: DropKind): string {
+  return `drops:${kind}:prompt`;
+}
+
 export function repoErrorKey(repo: Pick<RepoSettings, 'path'>, field: RepoTextField): string {
   return `${repo.path}:${field}`;
 }
@@ -219,10 +246,9 @@ export function validateDraft(draft: SettingsDraft, repos: readonly RepoSettings
   const badSkill = parseSkills(draft.skills).find((name) => !SKILL_NAME.test(name));
   if (badSkill) errors['skills'] = `"${badSkill}" is not a skill name. Use names like /code-review.`;
   for (const kind of DROP_KINDS) {
-    const skills = parseSkills(draft.drops[kind].skills);
-    const bad = skills.find((name) => !SKILL_NAME.test(name));
-    if (bad) errors[dropErrorKey(kind)] = `"${bad}" is not a skill name. Use names like /code-review.`;
-    else if (skills.length > 16) errors[dropErrorKey(kind)] = 'Enter at most 16 skills.';
+    const rowErrors = dropRowErrors(draft.drops[kind]);
+    if (rowErrors.skills) errors[dropErrorKey(kind)] = rowErrors.skills;
+    if (rowErrors.prompt) errors[dropPromptErrorKey(kind)] = rowErrors.prompt;
   }
   const commands = parseCommandPrefixes(draft.permissions.bashAllow);
   const chained = commands.find((command) => /[;&|`$<>]/.test(command));
@@ -318,9 +344,9 @@ export function draftToPatch(draft: SettingsDraft, settings: Settings): Settings
 
   const savedDrops = dropDefaultsOf(settings);
   const drops = Object.fromEntries(
-    DROP_KINDS.map((kind) => [kind, { skills: parseSkills(draft.drops[kind].skills), model: draft.drops[kind].model, effort: draft.drops[kind].effort }]),
+    DROP_KINDS.map((kind) => [kind, dropRowOf(draft.drops[kind])]),
   ) as DropDefaults;
-  if (DROP_KINDS.some((kind) => !sameList(drops[kind].skills, savedDrops[kind].skills) || drops[kind].model !== savedDrops[kind].model || drops[kind].effort !== savedDrops[kind].effort)) {
+  if (DROP_KINDS.some((kind) => !sameList(drops[kind].skills, savedDrops[kind].skills) || drops[kind].model !== savedDrops[kind].model || drops[kind].effort !== savedDrops[kind].effort || drops[kind].prompt !== (savedDrops[kind].prompt ?? ''))) {
     patch.dropDefaults = drops;
   }
 

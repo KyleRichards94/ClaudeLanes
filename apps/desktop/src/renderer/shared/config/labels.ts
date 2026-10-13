@@ -30,6 +30,10 @@ export const LANE_LABELS: Readonly<Record<Lane, string>> = {
   qa: 'QA',
   'create-pr': 'Create PR',
   done: 'Done',
+  'review-only': 'Code review only',
+  'qa-only': 'QA only',
+  'pr-only': 'Create PR only',
+  'comments-only': 'Resolve PR comments',
 };
 
 export function stageLabel(stage: Stage): string {

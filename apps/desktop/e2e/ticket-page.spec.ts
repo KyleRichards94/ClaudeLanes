@@ -48,7 +48,7 @@ test('lays out the drill-in at 1440 wide with the rail on the right', async () =
   await expect(page.getByTestId('ticket-breadcrumb')).toHaveText('onsite-companion / #71273');
   await expect(page.getByTestId('session-pill')).toContainText('Session cc-71273');
   await expect(page.getByLabel('Planning, done, 12m')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Output & diff' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('ticket-body-wide')).toBeVisible();
   // No session has run in this app, so the sub-agent tree from `agent:getSubagents` is empty (AL-177).
   await expect(page.getByTestId('sub-agents-counts')).toHaveText('None yet');
@@ -77,15 +77,15 @@ test('stacks the rail under the output below 1200 wide', async () => {
 });
 
 test('switches tabs and opens Claude Design on its own page', async () => {
-  await page.getByRole('tab', { name: 'Diff' }).click();
-  await expect(page.getByTestId('ticket-tab-diff')).toBeVisible();
+  await page.getByRole('tab', { name: 'Build log' }).click();
+  await expect(page.getByTestId('ticket-tab-diff')).toHaveCount(0);
 
   await page.getByRole('tab', { name: 'Claude Design' }).click();
   await expect(page.getByTestId('design-tab-page')).toBeVisible();
 
   await page.keyboard.press('Alt+ArrowLeft');
   // Back on the drill-in, on the tab it was left on.
-  await expect(page.getByTestId('ticket-tab-diff')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Build log' })).toHaveAttribute('aria-selected', 'true');
 });
 
 test('offers Open worktree folder, which says when the worktree is gone (AL-267)', async () => {

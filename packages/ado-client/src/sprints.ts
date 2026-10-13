@@ -2,7 +2,7 @@ import { ok, type AdoTeam, type Result, type Sprint, type SprintList, type Sprin
 import { z } from 'zod';
 import type { AdoCallOptions, AdoClient } from './client';
 import { DEFAULT_MAX_PAGES } from './constants';
-import { adoErr } from './errors';
+import { adoErr, isAdoErrorDetails } from './errors';
 import { adoPath } from './path';
 
 /**
@@ -116,10 +116,11 @@ export async function listSprints(client: AdoClient, scope: TeamScope, options: 
     client.get(path, currentIterationsSchema, { ...call, query: { $timeframe: 'current' } }),
   ]);
   if (!all.ok) return all;
-  if (!current.ok) return current;
+  // Azure DevOps Server answers 404 when no sprint contains today (between sprints): no current sprint, not a failure.
+  if (!current.ok && !isNoCurrentIteration(current)) return current;
 
   const iterations: Iteration[] = [...all.data];
-  const currentIteration = current.data[0];
+  const currentIteration = current.ok ? current.data[0] : undefined;
   if (currentIteration && !iterations.some((iteration) => iteration.id === currentIteration.id) && hasPath(currentIteration)) {
     // Selected for the team between the two requests: still show it.
     iterations.push(currentIteration);
@@ -163,6 +164,13 @@ function iterationsPath({ project, team }: TeamScope): string {
   return team === undefined
     ? adoPath`/${project.trim()}/_apis/work/teamsettings/iterations`
     : adoPath`/${project.trim()}/${team.trim()}/_apis/work/teamsettings/iterations`;
+}
+
+/** `CurrentIterationDoesNotExistException`: "No current iteration was found. No iteration contains today's date." */
+function isNoCurrentIteration(failure: Result<unknown>): boolean {
+  if (failure.ok || !isAdoErrorDetails(failure.details)) return false;
+  const { status, adoTypeKey, adoMessage } = failure.details;
+  return status === 404 && (adoTypeKey === 'CurrentIterationDoesNotExistException' || /no current iteration/i.test(adoMessage ?? ''));
 }
 
 function hasPath(iteration: CurrentIteration): iteration is Iteration {

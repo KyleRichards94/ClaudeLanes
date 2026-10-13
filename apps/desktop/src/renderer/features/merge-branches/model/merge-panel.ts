@@ -1,5 +1,4 @@
-import type { BranchStatus, SubBranchStatus } from '@agent-lanes/contracts';
-import type { AgentTicket } from '@/entities/agent-ticket';
+import type { BranchStatus, SubBranchStatus } from '@agent-lanes/contracts';import type { AgentTicket } from '@/entities/agent-ticket';
 
 export type MergePanelTicket = Pick<AgentTicket, 'branch' | 'baseBranch' | 'stage'>;
 
@@ -7,6 +6,8 @@ export type MergePanelTicket = Pick<AgentTicket, 'branch' | 'baseBranch' | 'stag
 export interface MergeAction {
   label: string;
   disabledReason: string | null;
+  /** Said under an enabled button, e.g. that uncommitted changes will be committed first. */
+  note?: string;
 }
 
 /**
@@ -55,24 +56,42 @@ export function mergePanel(ticket: MergePanelTicket, state: BranchStatusState, o
   // AL-271: the default target is the main checkout's branch; the modal names it and offers the base branch too.
   const mainLabel = 'Merge worktree → main checkout';
 
+  const toMain: MergeAction = { label: mainLabel, disabledReason: mainReason(ticket, state, options) };
+  if (toMain.disabledReason === null && state.status === 'success' && state.data.ticket.dirty) {
+    const files = state.data.ticket.changedFiles;
+    toMain.note = `${files ? plural(files, 'uncommitted change') : 'Uncommitted changes'} will be committed first.`;
+  }
+
   const shared = sharedReason(ticket, state);
   if (shared !== null || state.status !== 'success') {
-    const reason = shared ?? 'Checking the branches…';
     return {
-      subBranches: { label: subLabel, disabledReason: reason },
-      toMain: { label: mainLabel, disabledReason: reason },
+      subBranches: { label: subLabel, disabledReason: shared ?? 'Checking the branches…' },
+      toMain,
       conflicted: state.status === 'success' && state.data.ticket.conflicted,
       readyCount,
     };
   }
 
-  const status = state.data;
   return {
     subBranches: { label: subLabel, disabledReason: readyCount > 0 ? null : nothingReadyReason(subs, unmerged) },
-    toMain: { label: mainLabel, disabledReason: options.agentBusy ? AGENT_BUSY_REASON : mainReason(status, ticket) },
+    toMain,
     conflicted: false,
     readyCount,
   };
+}
+
+/**
+ * Merge worktree → main is on unless it truly can't run: the ticket is done, the worktree is gone or
+ * stopped on conflicts, or the agent is mid-turn. Uncommitted changes don't stop it (the modal commits
+ * them first), and with nothing new on the branch it still moves the card to Done.
+ */
+function mainReason(ticket: MergePanelTicket, state: BranchStatusState, options: MergePanelOptions): string | null {
+  if (ticket.stage === 'done') return 'The ticket is done.';
+  if (state.status === 'success') {
+    if (!state.data.ticket.present) return 'The worktree is missing.';
+    if (state.data.ticket.conflicted) return 'A merge is stopped on conflicts.';
+  }
+  return options.agentBusy ? AGENT_BUSY_REASON : null;
 }
 
 /** Reasons that stop both merges: the ticket is done, the status is unknown, the worktree can't be merged. */
@@ -98,10 +117,4 @@ function nothingReadyReason(subs: readonly SubBranchStatus[], unmerged: readonly
   const dirty = unmerged.filter((sub) => sub.dirty === true || !sub.present).length;
   if (dirty > 0) return `${plural(dirty, 'sub-branch', 'sub-branches')} ${dirty === 1 ? 'has' : 'have'} uncommitted changes.`;
   return 'Nothing new on the sub-branches.';
-}
-
-function mainReason(status: BranchStatus, ticket: MergePanelTicket): string | null {
-  if (status.ticket.ahead === null) return `${ticket.branch} or ${ticket.baseBranch} is missing.`;
-  if (status.ticket.ahead === 0) return `No commits to merge into ${ticket.baseBranch} yet.`;
-  return null;
 }

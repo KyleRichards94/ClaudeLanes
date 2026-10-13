@@ -10,6 +10,6 @@ describe('drop-rules re-export (AL-230)', () => {
 
   it('lights up Code review for any open PR', () => {
     const card = { kind: 'pull-request', id: 10598, author: { displayName: 'TY', id: 'ty' }, unresolvedThreads: 4, sourceBranch: 'b' } as const;
-    expect(Object.keys(allowedLanes(card, { id: 'kr' }))).toEqual(['code-review']);
+    expect(Object.keys(allowedLanes(card, { id: 'kr' }))).toEqual(['review-only', 'code-review']);
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { assigneeValues, getSignedInUser, getWorkItemAssignment, inProgressStateOf, isUnknownIdentity, setWorkItemAssignment, signInName } from './assignment';
+import { assignAndStart, assigneeValues, getSignedInUser, getWorkItemAssignment, inProgressStateOf, isUnknownIdentity, setWorkItemAssignment, signInName } from './assignment';
+import { inProgressColumnOf } from './team-board';
 import { createAdoClient } from './client';
-import { ON_PREM_IDENTITY, createFakeTeamOrg, FAKE_TEAM_PROJECT, PEOPLE, type FakeTeamOrgOptions } from './testing/fake-team';
+import { ON_PREM_IDENTITY, OSC_AREA, createFakeTeamOrg, FAKE_TEAM_PROJECT, PEOPLE, type FakeTeamOrgOptions } from './testing/fake-team';
+import { FAKE_KANBAN_COLUMN_FIELD, SPRINT_42 } from './testing/fake-work-items';
 
 function setup(options: FakeTeamOrgOptions = {}) {
   const org = createFakeTeamOrg(options);
@@ -73,5 +75,46 @@ describe('assigning on Azure DevOps Server (Windows identities)', () => {
     expect(nobody.ok).toBe(false);
     expect(org.state.refusedAssignees.slice(1)).toEqual(['Kyle.Richards', 'COMPANION\\ghost', 'ghost', 'Ghost']);
     expect(org.state.workItems.items.find((item) => item.id === 71335)?.rev).toBe(4);
+  });
+});
+
+describe('assign and start: the board column, and a refused state (drag into action)', () => {
+  const failedButActive = () => [{ id: 71400, project: FAKE_TEAM_PROJECT, type: 'Bug', title: 'Sent back by UAT', state: 'Active', boardColumn: 'Failed', iterationPath: SPRINT_42, areaPath: OSC_AREA, changedDate: '2026-10-07T09:00:00Z' }];
+
+  it("finds the board's In Progress column and the state it maps the type to", async () => {
+    const { client } = setup();
+    expect(await inProgressColumnOf(client, FAKE_TEAM_PROJECT, 'OSC Developers', 'Bug')).toEqual({
+      ok: true,
+      data: { column: 'In Progress', state: 'Active', field: FAKE_KANBAN_COLUMN_FIELD },
+    });
+  });
+
+  it('moves a Failed card that is already Active across to In Progress by writing the column', async () => {
+    const { client, org } = setup({ items: failedButActive() });
+    const result = await assignAndStart(client, ref(71400), {
+      expectedRev: 3,
+      assignee: { id: PEOPLE.KR.id, displayName: 'Kyle Richards', uniqueName: PEOPLE.KR.uniqueName },
+      target: { state: 'Active', column: { field: FAKE_KANBAN_COLUMN_FIELD, name: 'In Progress' } },
+    });
+    expect(result).toMatchObject({ ok: true, data: { state: 'Active', stateMoved: true, columnMoved: true } });
+    expect(org.state.workItems.items.find((item) => item.id === 71400)).toMatchObject({ boardColumn: 'In Progress', assignedTo: PEOPLE.KR });
+  });
+
+  it('still assigns you when a process rule refuses the state, and says the state did not move', async () => {
+    const { client, org } = setup({ refuseStates: ['Active'] });
+    const result = await assignAndStart(client, ref(71335), {
+      expectedRev: 3,
+      assignee: { id: PEOPLE.KR.id, displayName: 'Kyle Richards', uniqueName: PEOPLE.KR.uniqueName },
+      target: { state: 'Active', column: { field: FAKE_KANBAN_COLUMN_FIELD, name: 'In Progress' } },
+    });
+    expect(result).toMatchObject({ ok: true, data: { state: 'New', stateMoved: false, columnMoved: false, assignee: { displayName: 'Kyle Richards' } } });
+    expect(org.state.workItems.items.find((item) => item.id === 71335)).toMatchObject({ state: 'New', boardColumn: 'To Do', assignedTo: PEOPLE.KR, rev: 4 });
+  });
+
+  it("stops at once when someone else changed the item", async () => {
+    const { client, org } = setup();
+    const result = await assignAndStart(client, ref(71335), { expectedRev: 2, assignee: { displayName: 'Kyle Richards', uniqueName: PEOPLE.KR.uniqueName }, target: { state: 'Active' } });
+    expect(result).toMatchObject({ ok: false, details: { reason: 'changed' } });
+    expect(org.state.requests.filter((line) => line.startsWith('PATCH'))).toHaveLength(1);
   });
 });

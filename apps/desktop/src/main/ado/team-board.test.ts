@@ -92,9 +92,9 @@ describe('ado:listTeams and ado:teamBoard (AL-231)', () => {
         branch: item.branch,
       };
     };
-    expect(Object.keys(allowedLanes(card(71318), me))).toEqual(['planning', 'implementing']);
+    expect(Object.keys(allowedLanes(card(71318), me))).toEqual(['qa-only', 'planning', 'implementing']);
     expect(allowedLanes(card(71341), me)).toEqual({});
-    expect(Object.keys(allowedLanes(card(71298), me))).toEqual(['code-review']);
+    expect(Object.keys(allowedLanes(card(71298), me))).toEqual(['review-only', 'code-review']);
   });
 
   it('refuses a request with an unknown field, and reports a team ADO does not know', async () => {
@@ -128,8 +128,8 @@ describe('ado:activePrs (AL-232)', () => {
       const pr = listed.data.pullRequests.find((candidate) => candidate.id === id)!;
       return { kind: 'pull-request' as const, id, author: pr.author, unresolvedThreads: pr.unresolvedThreads, sourceBranch: pr.sourceBranch, repoRegistered: pr.repoRegistered };
     };
-    expect(Object.keys(allowedLanes(card(10571), me))).toEqual(['implementing', 'code-review']);
-    expect(Object.keys(allowedLanes(card(10598), me))).toEqual(['code-review']);
+    expect(Object.keys(allowedLanes(card(10571), me))).toEqual(['review-only', 'comments-only', 'implementing', 'code-review']);
+    expect(Object.keys(allowedLanes(card(10598), me))).toEqual(['review-only', 'code-review']);
     expect(dragLock(card(10590), me)).toBe('Add repo');
   });
 

@@ -130,11 +130,17 @@ test('the keyboard picks a card up with Space, moves between the lanes that take
   await card.focus();
   await page.keyboard.press('Space');
   await sensorListening();
-  await expect(announcement()).toContainText('Picked up !10571. Implementing and Code review take it.');
+  await expect(announcement()).toContainText('Picked up !10571. Code review only, Resolve PR comments, Implementing and Code review take it.');
+  await expect(page.getByTestId('lane-review-only-drop-hint')).toBeVisible();
   await expect(page.getByTestId('lane-code-review-drop-hint')).toBeVisible();
   await expect(page.getByTestId('lane-implementing-drop-hint')).toBeVisible();
 
-  await page.keyboard.press('ArrowRight');
+  // The first arrow goes to the first lane on screen: Code review only when the single-step row is in view.
+  // Past the single-step lanes that take it (Code review only, Resolve PR comments) when they are on screen.
+  for (let presses = 0; presses < 3 && !(await announcement().textContent())?.startsWith('Over Implementing'); presses += 1) {
+    await page.keyboard.press('ArrowRight');
+    await expect(announcement()).toHaveText(/^Over /);
+  }
   await expect(announcement()).toHaveText('Over Implementing: answer 6 comments');
   await page.keyboard.press('ArrowRight');
   await expect(announcement()).toHaveText('Over Code review: start agentic review');
@@ -152,9 +158,13 @@ test('Enter opens "Send to lane" with only the lanes that take the card; Escape 
   await page.keyboard.press('Enter');
   const menu = page.getByRole('menu', { name: 'Send !10571 to a lane' });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem')).toHaveCount(2);
-  await expect(page.getByTestId('send-to-lane-implementing')).toBeFocused();
+  await expect(menu.getByRole('menuitem')).toHaveCount(4);
+  await expect(page.getByTestId('send-to-lane-review-only')).toBeFocused();
   await expect(page.getByTestId('send-to-lane-code-review')).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('send-to-lane-comments-only')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('send-to-lane-implementing')).toBeFocused();
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('send-to-lane-code-review')).toBeFocused();
 

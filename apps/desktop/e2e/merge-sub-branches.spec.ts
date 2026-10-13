@@ -116,9 +116,9 @@ test('the Merge panel merges sub-branches and opens the conflict view (AL-174)',
   await expect(mergeSubs).toHaveText(/Merge 3 sub-branches/, { timeout: 30_000 });
   await expect(page.getByTestId('merge-sub-branches-target')).toHaveText('→ 71273-cutover-job-control');
   await expect(mergeSubs).toBeEnabled();
-  // Nothing is on the ticket branch itself yet, so Merge worktree → main is off and says why.
-  await expect(page.getByTestId('merge-to-main')).toBeDisabled();
-  await expect(page.getByTestId('merge-disabled-reasons')).toHaveText('No commits to merge into main yet.');
+  // Merge worktree → main stays on even with nothing new on the ticket branch (the modal says so).
+  await expect(page.getByTestId('merge-to-main')).toBeEnabled();
+  await expect(page.getByTestId('merge-disabled-reasons')).toHaveCount(0);
 
   await mergeSubs.click();
   const dialog = page.getByRole('dialog', { name: 'Merge stopped on a conflict' });

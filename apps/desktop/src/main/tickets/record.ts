@@ -23,6 +23,8 @@ export interface NewTicketRecord {
   skills: string[];
   /** Lane the card starts in; Queued unless given. */
   stage?: Lane;
+  /** The lane the session enters when it starts; Planning when left out. */
+  startLane?: Lane;
   /** A second agent's record (AL-266). */
   companion?: TicketCompanion;
 }
@@ -50,6 +52,7 @@ export function createTicketRecord(input: NewTicketRecord, now: number): TicketR
     lastBuild: null,
     lastRun: null,
     design: { canvas: null, lastViewUrl: null, specs: [] },
+    ...(input.startLane ? { startLane: input.startLane } : {}),
     ...(input.companion ? { companion: { ...input.companion } } : {}),
     createdAt: now,
     updatedAt: now,

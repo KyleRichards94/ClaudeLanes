@@ -18,7 +18,7 @@ const BACK = new Set(['ArrowLeft', 'ArrowUp']);
 const BELOW_LANE_HEADER = 56;
 
 /**
- * Arrow keys jump between the lanes that take the card, left to right (lanes that refuse it are
+ * Arrow keys jump between the lanes that take the card in reading order, row by row and left to right (lanes that refuse it are
  * disabled drop targets and skipped). From the team board, the first arrow goes to the first such
  * lane (Left: the last). The card is centred on the lane under its header, so it overlaps that lane
  * most and the lane becomes the drop target. While the agent board is collapsed, the arrows go through
@@ -38,12 +38,15 @@ export const laneKeyboardCoordinates: KeyboardCoordinateGetter = (event, { conte
       const rect = droppableRects.get(container.id);
       return rect ? [{ id: container.id, rect }] : [];
     })
-    .sort((a, b) => a.rect.left - b.rect.left);
+    // Reading order: row by row (the single-step lanes sit above the workflow), left to right in each.
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
   if (lanes.length === 0) return undefined;
 
   const index = over ? lanes.findIndex((lane) => lane.id === over.id) : -1;
   let next: number;
-  if (index === -1) next = event.code === 'ArrowLeft' ? lanes.length - 1 : 0;
+  // From the team board the first arrow goes to the first lane on screen: the single-step row may be scrolled away above.
+  const onScreen = lanes.findIndex((lane) => lane.rect.top >= 0 && lane.rect.top < window.innerHeight);
+  if (index === -1) next = event.code === 'ArrowLeft' ? lanes.length - 1 : Math.max(onScreen, 0);
   else next = forward ? Math.min(index + 1, lanes.length - 1) : Math.max(index - 1, 0);
   if (next === index) return undefined;
 

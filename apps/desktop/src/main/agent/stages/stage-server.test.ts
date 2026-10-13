@@ -10,7 +10,18 @@ import { createDesignSpecFiles } from '../../design/spec-store';
 import { fakeSpec } from '../../design/testing/specs';
 import { createDesignSpecService } from '../../design/specs';
 import { createMemoryRecordFs, newTicketInput } from '../../tickets/testing';
-import { COMPANION_PROTOCOL, DESIGN_SPEC_TOOLS, STAGE_PROTOCOL, STAGE_PROTOCOL_REMINDER, STAGE_SERVER_TOOLS, sdkStageServer, stageServerTools, stageSessionExtras } from './stage-server';
+import {
+  COMPANION_PROTOCOL,
+  DESIGN_SPEC_TOOLS,
+  OPEN_PULL_REQUEST_TOOL,
+  STAGE_PROTOCOL,
+  STAGE_PROTOCOL_REMINDER,
+  STAGE_SERVER_TOOLS,
+  sdkStageServer,
+  soloProtocol,
+  stageServerTools,
+  stageSessionExtras,
+} from './stage-server';
 import { createStageService } from './stage-service';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the handlers take each tool's own input
@@ -289,5 +300,59 @@ describe('a second agent (AL-266)', () => {
     // No stage move for a companion, whatever its record says.
     expect((await tickets.get('71273-reviewer-eyes'))?.stage).toBe('queued');
     expect(events.of('agent:stage')).toEqual([]);
+  });
+});
+
+describe('single-step lanes', () => {
+  function capture() {
+    const servers: AnyTool[][] = [];
+    const createServer = (tools: SdkMcpToolDefinition[]) => {
+      servers.push(tools as AnyTool[]);
+      return { type: 'sdk', name: 'agent_lanes', instance: {} } as unknown as McpServerConfig;
+    };
+    return { servers, createServer };
+  }
+
+  it('a QA only ticket starts in its lane from the record, with no set_stage and a one-step protocol', async () => {
+    const tickets = await memoryTickets({ id: '71273', stage: 'queued', gates: ALL_AUTO, startLane: 'qa-only' });
+    const events = recordingEmit();
+    const stages = createStageService({ tickets, emit: events.emit, userName: () => 'Kyle' });
+    const { servers, createServer } = capture();
+
+    const extras = await stageSessionExtras({ stages, createServer })((await tickets.get('71273'))!);
+
+    expect((await tickets.get('71273'))?.stage).toBe('qa-only');
+    expect(servers[0]!.map((tool) => tool.name)).toEqual(['report_activity']);
+    expect(extras.allowedTools).toEqual(['mcp__agent_lanes__report_activity']);
+    expect(extras.systemPromptAppend).toBe(soloProtocol('qa-only'));
+    expect(extras.systemPromptAppend).toContain('Your only job is QA');
+    expect(extras.firstTurnAppendix).toBeUndefined();
+  });
+
+  it('a Create PR only ticket gets open_pull_request, which opens the PR through the app', async () => {
+    const tickets = await memoryTickets({ id: '71273', stage: 'pr-only', gates: ALL_AUTO });
+    const stages = createStageService({ tickets, emit: recordingEmit().emit, userName: () => 'Kyle' });
+    const { servers, createServer } = capture();
+    const opened: string[] = [];
+    const extras = await stageSessionExtras({
+      stages,
+      createServer,
+      openPullRequest: async (ticketId, title) => {
+        opened.push(`${ticketId} ${title}`);
+        return { ok: true, data: { id: 10612, webUrl: 'https://dev.azure.com/contoso/_git/osc/pullrequest/10612', created: true } };
+      },
+    })((await tickets.get('71273'))!);
+
+    expect(servers[0]!.map((tool) => tool.name)).toEqual(['report_activity', 'open_pull_request']);
+    expect(extras.allowedTools).toEqual(['mcp__agent_lanes__report_activity', OPEN_PULL_REQUEST_TOOL]);
+    const reply = await servers[0]!.find((tool) => tool.name === 'open_pull_request')!.handler({ title: 'Cut over JobControl', description: 'Grid and filters' }, {});
+    expect(opened).toEqual(['71273 Cut over JobControl']);
+    expect(reply).toEqual({ content: [{ type: 'text', text: 'Opened PR !10612. https://dev.azure.com/contoso/_git/osc/pullrequest/10612' }] });
+  });
+
+  it('an agent in a single-step lane cannot move itself on', async () => {
+    const tickets = await memoryTickets({ id: '71273', stage: 'review-only', gates: ALL_AUTO });
+    const stages = createStageService({ tickets, emit: recordingEmit().emit });
+    await expect(stages.setStage('71273', 'qa', 'done')).resolves.toMatchObject({ ok: false, code: 'VALIDATION' });
   });
 });

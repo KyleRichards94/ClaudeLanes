@@ -28,7 +28,7 @@ function drag(card: DropCard, label: string): LaneDragCard {
 const PR_10571 = drag({ kind: 'pull-request', id: 10571, author: KR, unresolvedThreads: 6, sourceBranch: '71240-job-notes-editor', repoRegistered: true }, '!10571');
 
 describe('laneDropState (AL-235, artboard 09)', () => {
-  it('lights Implementing and Code review only while PR !10571 is dragged; the rest dim', () => {
+  it('lights Implementing, Code review and Review only while PR !10571 is dragged; the rest dim', () => {
     const active = activeDrag(PR_10571, 'pointer');
     const states = Object.fromEntries(LANES.map((lane) => [lane, laneDropState(active, lane, null).kind]));
     expect(states).toEqual({
@@ -39,6 +39,10 @@ describe('laneDropState (AL-235, artboard 09)', () => {
       qa: 'refuse',
       'create-pr': 'refuse',
       done: 'refuse',
+      'review-only': 'accept',
+      'qa-only': 'refuse',
+      'pr-only': 'refuse',
+      'comments-only': 'accept',
     });
     expect(laneDropState(active, 'implementing', null)).toMatchObject({ kind: 'accept', over: false, action: { title: 'Answer PR comments', label: 'answer 6 comments' } });
     expect(laneDropState(active, 'code-review', 'code-review')).toMatchObject({ kind: 'accept', over: true, action: { title: 'Review this PR' } });
@@ -65,9 +69,9 @@ describe('laneDropState (AL-235, artboard 09)', () => {
 
 describe('allowedLaneList', () => {
   it('lists the lanes that take the card, left to right, for the Send to lane menu', () => {
-    expect(allowedLaneList(PR_10571).map(({ lane, action }) => `${lane}: ${action.label}`)).toEqual(['implementing: answer 6 comments', 'code-review: start agentic review']);
+    expect(allowedLaneList(PR_10571).map(({ lane, action }) => `${lane}: ${action.label}`)).toEqual(['review-only: review it, nothing else', 'comments-only: resolve its PR comments', 'implementing: answer 6 comments', 'code-review: start agentic review']);
     const failed = drag({ kind: 'board-item', id: 71318, column: 'failed', assignee: KR, agentLane: null, pullRequestId: null, branch: null }, '#71318');
-    expect(allowedLaneList(failed).map(({ lane }) => lane)).toEqual(['planning', 'implementing']);
+    expect(allowedLaneList(failed).map(({ lane }) => lane)).toEqual(['qa-only', 'planning', 'implementing']);
   });
 });
 
@@ -75,9 +79,9 @@ describe('announcements (TB§7)', () => {
   it('says what each lane does as the card moves over it, and what happened at the end', () => {
     const keyboard = activeDrag(PR_10571, 'keyboard');
     expect(pickUpAnnouncement(keyboard)).toBe(
-      'Picked up !10571. Implementing and Code review take it. Use the arrow keys to move between them, Space to drop, Escape to cancel.',
+      'Picked up !10571. Code review only, Resolve PR comments, Implementing and Code review take it. Use the arrow keys to move between them, Space to drop, Escape to cancel.',
     );
-    expect(pickUpAnnouncement(activeDrag(PR_10571, 'pointer'))).toBe('Picked up !10571. Implementing and Code review take it.');
+    expect(pickUpAnnouncement(activeDrag(PR_10571, 'pointer'))).toBe('Picked up !10571. Code review only, Resolve PR comments, Implementing and Code review take it.');
     expect(overAnnouncement(keyboard, 'code-review')).toBe('Over Code review: start agentic review');
     expect(overAnnouncement(keyboard, 'implementing')).toBe('Over Implementing: answer 6 comments');
     expect(overAnnouncement(keyboard, null)).toBe('!10571 is not over a lane that takes it.');
@@ -89,7 +93,7 @@ describe('announcements (TB§7)', () => {
 
   it('names one accepting lane in the singular, and says when none takes the card', () => {
     const theirs = drag({ kind: 'pull-request', id: 10598, author: MD, unresolvedThreads: 4, sourceBranch: 'x', repoRegistered: true }, '!10598');
-    expect(pickUpAnnouncement(activeDrag(theirs, 'pointer'))).toBe('Picked up !10598. Code review takes it.');
+    expect(pickUpAnnouncement(activeDrag(theirs, 'pointer'))).toBe('Picked up !10598. Code review only and Code review take it.');
     const unregistered = drag({ kind: 'pull-request', id: 10590, author: KR, unresolvedThreads: 0, sourceBranch: 'x', repoRegistered: false }, '!10590');
     expect(pickUpAnnouncement(activeDrag(unregistered, 'pointer'))).toBe('Picked up !10590. No lane takes it.');
     expect(dragStatusText(activeDrag(unregistered, 'pointer'))).toBe('No lane takes !10590');
@@ -110,16 +114,17 @@ describe('group drags (AL-239, TB§5, artboard 12)', () => {
   const pair = [backlog(71360), backlog(71335, KR)];
   const group: LaneDragCard = { ...pair[0]!, group: pair };
 
-  it('lights only Planning and Implementing for two backlog rows, titled for several', () => {
+  it('lights only Planning, Implementing and QA only for two backlog rows, titled for several', () => {
     const active = activeDrag(group, 'pointer');
     expect(active.card.label).toBe('2 items');
-    expect(LANES.filter((lane) => active.allowed[lane])).toEqual(['planning', 'implementing']);
+    expect(LANES.filter((lane) => active.allowed[lane])).toEqual(['qa-only', 'planning', 'implementing']);
     expect(active.allowed.planning).toMatchObject({ title: 'Plan these', detail: 'Assigns you · moves it to In Progress · starts planning' });
     expect(active.allowed.implementing).toMatchObject({ title: 'Skip to implementing' });
-    expect(dragStatusText(active)).toBe('Dragging 2 items — drop on Planning or Implementing');
-    expect(pickUpAnnouncement(active)).toBe('Picked up 2 items. Planning and Implementing take it.');
+    expect(dragStatusText(active)).toBe('Dragging 2 items — drop on QA only, Planning or Implementing');
+    expect(pickUpAnnouncement(active)).toBe('Picked up 2 items. QA only, Planning and Implementing take it.');
     expect(dragLabel(group)).toBe('2 items');
     expect(allowedLaneList(group).map(({ lane, action }) => [lane, action.title])).toEqual([
+      ['qa-only', 'QA only'],
       ['planning', 'Plan these'],
       ['implementing', 'Skip to implementing'],
     ]);
@@ -128,7 +133,8 @@ describe('group drags (AL-239, TB§5, artboard 12)', () => {
   it('goes only to lanes that take every card of the group', () => {
     const testing = drag({ kind: 'board-item', id: 71318, column: 'testing', assignee: null, agentLane: null, pullRequestId: null, branch: null }, '#71318');
     const mixed: LaneDragCard = { ...pair[0]!, group: [pair[0]!, testing] };
-    expect(LANES.filter((lane) => activeDrag(mixed, 'pointer').allowed[lane])).toEqual([]);
+    // A backlog row and a Testing item share only QA only.
+    expect(LANES.filter((lane) => activeDrag(mixed, 'pointer').allowed[lane])).toEqual(['qa-only']);
   });
 
   it('is an ordinary drag for a group of one', () => {
@@ -144,7 +150,7 @@ describe('agent board cards (AL-274)', () => {
   it('a work item card goes to any lane but Queued and its own; a PR card only to Done', () => {
     const ticket = agentTicketDrag({ id: '71273', title: 'Cutover frmJobControl to Blazor', stage: 'implementing', ado: { orgUrl: 'https://dev.azure.com/contoso', project: 'OnSite Companion', workItemId: 71273 } });
     expect(ticket).toMatchObject({ key: 'ticket:71273', label: '#71273', card: { kind: 'agent-ticket', ticketId: '71273' }, source: { kind: 'agent-ticket', ticketId: '71273' } });
-    expect(allowedLaneList(ticket).map((entry) => entry.lane)).toEqual(['planning', 'code-review', 'qa', 'create-pr', 'done']);
+    expect(allowedLaneList(ticket).map((entry) => entry.lane)).toEqual(['review-only', 'qa-only', 'pr-only', 'comments-only', 'planning', 'code-review', 'qa', 'create-pr', 'done']);
     const active = activeDrag(ticket, 'pointer');
     expect(laneDropState(active, 'done', 'done')).toEqual({ kind: 'accept', action: expect.objectContaining({ title: 'Move to Done', changesAdo: false }), over: true });
     expect(laneDropState(active, 'queued', null)).toEqual({ kind: 'refuse', reason: null });

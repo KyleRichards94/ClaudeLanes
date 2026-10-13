@@ -88,6 +88,29 @@ describe('merge worktree → main', () => {
     expect((await tickets.get('71273'))?.stage).toBe('create-pr');
   });
 
+  it('commits the uncommitted changes first when asked, then merges them in', async () => {
+    await repo.write('src/JobControl.razor', '<h1>Changed</h1>\n', ticketPath);
+    await repo.write('notes.txt', 'wip\n', ticketPath);
+
+    const result = await service().merge('71273', { target: 'base', commitChanges: true });
+
+    expect(result).toMatchObject({ ok: true, data: { record: { stage: 'done' } } });
+    expect(await repo.exec(['status', '--porcelain'], ticketPath)).toBe('');
+    expect(await repo.exec(['log', '-1', '--format=%s', BRANCH])).toBe('#71273: commit 2 uncommitted changes before merging');
+    expect(await repo.exec(['show', 'main:notes.txt'])).toBe('wip');
+  });
+
+  it('commits nothing while the QA warning is unanswered', async () => {
+    await moveTo('implementing');
+    await repo.write('notes.txt', 'wip\n', ticketPath);
+    const head = await repo.exec(['rev-parse', BRANCH]);
+
+    const result = await service().merge('71273', { commitChanges: true });
+
+    expect(result).toMatchObject({ ok: false, details: { reason: 'qa-not-passed' } });
+    expect(await repo.exec(['rev-parse', BRANCH])).toBe(head);
+  });
+
   it('warns when QA has not passed, and merges once the user accepts the warning', async () => {
     await moveTo('implementing');
 
@@ -270,5 +293,11 @@ describe('merge worktree → the main checkout (AL-271)', () => {
     await expect(service().preview('71273')).resolves.toMatchObject({ ok: true, data: { checkoutBranch: 'main', checkoutClean: false } });
     await expect(service().merge('71273')).resolves.toMatchObject({ ok: false, code: 'GIT_DIRTY', details: { reason: 'base-checkout-dirty' } });
     expect((await tickets.get('71273'))?.stage).toBe('create-pr');
+
+    // A dirty main checkout stops the merge before the worktree's changes are committed.
+    await repo.write('notes.txt', 'wip\n', ticketPath);
+    const head = await repo.exec(['rev-parse', BRANCH]);
+    await expect(service().merge('71273', { commitChanges: true })).resolves.toMatchObject({ ok: false, details: { reason: 'base-checkout-dirty' } });
+    expect(await repo.exec(['rev-parse', BRANCH])).toBe(head);
   });
 });

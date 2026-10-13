@@ -115,6 +115,7 @@ async function setUp(options: SetUpOptions = {}) {
       launch: vi.fn(async ({ ticketId }: { ticketId: string; jobDescription?: string }) => options.start?.(ticketId) ?? ok<AgentSessionStatus>({ ticketId, state: 'running', sessionId: null, message: null })),
     },
     tickets: { get: async (id: string) => saveds.get(id), list: async () => [...saveds.values()] },
+    continueTicket: vi.fn(async (ticketId: string) => ok<AgentSessionStatus>({ ticketId, state: 'running', sessionId: 'session-1', message: null })),
   };
   const launcher = createAdoLauncher({
     ado,
@@ -166,7 +167,7 @@ describe('launch from the team board (AL-236)', () => {
     expect(input.checkout).toBeUndefined();
     expect(input.gates?.planning).toBe('approval');
     expect(launcher.startLane('71318')).toBe('planning');
-    expect(result.ok && launcher.undoEntry(result.data.undoId)).toMatchObject({ ticketId: '71318', ado: { workItemId: 71318, previousState: 'Failed UAT', previousAssignee: null } });
+    expect(result.ok && launcher.undoEntry(result.data.undoId!)).toMatchObject({ ticketId: '71318', ado: { workItemId: 71318, previousState: 'Failed UAT', previousAssignee: null } });
   });
 
   it('To Do item on Implementing: same ADO change, and the plan gate is skipped', async () => {
@@ -181,10 +182,35 @@ describe('launch from the team board (AL-236)', () => {
     expect(launcher.startLane('71335')).toBe('implementing');
   });
 
+  it('your In Progress item on Planning or Implementing is assigned to you and put in the In Progress column, on its branch', async () => {
+    for (const lane of ['planning', 'implementing'] as const) {
+      const { launcher, deps, item, writes } = await setUp();
+      const result = await launcher.launch({ source: board(71273), lane, repo: REPO });
+      expect(result, lane).toMatchObject({ ok: true, data: { adoChange: { workItemId: 71273, state: 'Active' } } });
+      expect(item(71273), lane).toMatchObject({ state: 'Active', boardColumn: 'In Progress', assignedTo: PEOPLE.KR });
+      expect(writes(), lane).toHaveLength(1);
+      expect(deps.worktrees.create.mock.calls[0]![0], lane).toMatchObject({ checkout: { branch: '71273-cutover-frmjobcontrol-to' }, startLane: lane });
+    }
+  });
+
+  it("adds the lane's initial prompt from Settings › Drops after the job", async () => {
+    const { launcher, deps } = await setUp({ laneDefaults: () => ({ skills: ['cs-qa-wip'], model: 'sonnet', effort: 'medium', prompt: '  Test on the Liink QA database.  ' }) });
+    await launcher.launch({ source: board(71310), lane: 'qa-only', repo: REPO });
+    const job = deps.launches.launch.mock.calls[0]![0].jobDescription!;
+    expect(job.startsWith('QA work item #71310')).toBe(true);
+    expect(job.endsWith('fix nothing, then stop.\n\nTest on the Liink QA database.')).toBe(true);
+  });
+
+  it('single-step lanes start their one step and keep the lane on the record', async () => {
+    const { launcher, deps } = await setUp();
+    const result = await launcher.launch({ source: board(71310), lane: 'qa-only', repo: REPO });
+    expect(result).toMatchObject({ ok: true, data: { adoChange: null, summary: '#71310 · agent started in QA only' } });
+    expect(deps.worktrees.create.mock.calls[0]![0]).toMatchObject({ checkout: { branch: '71310-timesheet-export' }, startLane: 'qa-only', skills: ['cs-qa-wip'] });
+    expect(deps.launches.launch.mock.calls[0]![0].jobDescription).toContain('Only QA');
+  });
+
   it('no other drop ever writes to ADO (every other TB§3 row)', async () => {
     const rows: Array<{ name: string; request: LaunchFromAdoRequest; worktree: Partial<CreateTicketWorktreeInput> }> = [
-      { name: 'your In Progress item on Planning, on its branch', request: { source: board(71273), lane: 'planning', repo: REPO }, worktree: { checkout: { branch: '71273-cutover-frmjobcontrol-to' } } },
-      { name: 'your In Progress item on Implementing', request: { source: board(71273), lane: 'implementing', repo: REPO }, worktree: { checkout: { branch: '71273-cutover-frmjobcontrol-to' } } },
       { name: "someone's Code Review item on Code review", request: { source: board(71298), lane: 'code-review', repo: REPO }, worktree: { checkout: { branch: 'users/ty/71298-invoice-matching', detached: true } } },
       { name: 'any open PR on Code review', request: { source: { kind: 'pull-request', id: 10598 }, lane: 'code-review' }, worktree: { checkout: { branch: 'users/ty/71298-invoice-matching', detached: true } } },
       { name: 'your PR with comments on Implementing', request: { source: { kind: 'pull-request', id: 10571 }, lane: 'implementing' }, worktree: { checkout: { branch: '71240-job-notes-editor', detached: false } } },
@@ -269,6 +295,18 @@ describe('launch from the team board (AL-236)', () => {
 });
 
 describe('pull request launches (AL-238)', () => {
+  it("a PR whose source branch is already a ticket's goes to that ticket's agent: no second worktree, nothing to undo", async () => {
+    const owner = recordFor({ repo: REPO, subject: { kind: 'work-item', ado: { orgUrl: FAKE_TEAM_ORG_URL, project: FAKE_TEAM_PROJECT, workItemId: 71240 }, title: 'Job notes' }, gates: { planning: 'approval', implementing: 'auto', 'code-review': 'auto', qa: 'auto', 'create-pr': 'approval' }, model: 'opus', effort: 'high' });
+    const { launcher, deps } = await setUp({ records: [{ ...owner, branch: '71240-job-notes-editor', stage: 'done', stageHistory: [{ stage: 'done', at: 1 }] }] });
+
+    const result = await launcher.launch({ source: { kind: 'pull-request', id: 10571 }, lane: 'comments-only' });
+
+    expect(result).toMatchObject({ ok: true, data: { ticketId: '71240', undoId: null, adoChange: null, summary: '!10571 · handed to ticket 71240, which has its branch · Resolve PR comments' } });
+    expect(deps.worktrees.create).not.toHaveBeenCalled();
+    expect(deps.launches.launch).not.toHaveBeenCalled();
+    expect(deps.continueTicket).toHaveBeenCalledWith('71240', 'comments-only', expect.stringContaining('has 6 open comment threads'));
+  });
+
   it('Code review: a read-only review that runs /code-review and posts its findings with /pr-comment-actioner', async () => {
     const { launcher, deps, writes } = await setUp();
     const result = await launcher.launch({ source: { kind: 'pull-request', id: 10598 }, lane: 'code-review' });

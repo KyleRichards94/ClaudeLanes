@@ -52,10 +52,47 @@ beforeEach(() => {
 });
 
 describe('BoardLanes', () => {
-  it('shows the six stage lanes in order with their counts, then Done collapsed to a strip', () => {
+  it('offers Remove all on Done (under its strip) and on single-step lanes with cards, not on workflow lanes', () => {
+    renderLanes();
+    expect(screen.queryByTestId('lane-implementing-remove-all')).toBeNull();
+    // The single-step lanes are empty in this board, and Done too: nothing to remove.
+    expect(screen.queryByTestId('lane-done-remove-all')).toBeNull();
+    expect(screen.queryByTestId('lane-qa-only-remove-all')).toBeNull();
+  });
+
+  it('shows Remove all under the collapsed Done strip and on a single-step lane once they have cards', async () => {
+    store.load([
+      ...BOARD,
+      fakeTicketRecord({ id: '71200', stage: 'done', stageEnteredAt: 90 }),
+      fakeTicketRecord({ id: '71201', stage: 'done', stageEnteredAt: 95 }),
+      fakeTicketRecord({ id: '71310', stage: 'qa-only', stageEnteredAt: 150 }),
+    ]);
+    renderLanes();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove all 2 from Done' }));
+    expect(await screen.findByRole('dialog', { name: 'Remove all 2 tickets from Done?' })).toBeTruthy();
+    expect(screen.getByTestId('lane-qa-only-remove-all').getAttribute('aria-label')).toBe('Remove all 1 from QA only');
+  });
+
+  it('gives each lane that starts agents a settings button, faded in on hover', () => {
+    renderLanes();
+    for (const lane of ['planning', 'implementing', 'code-review', 'qa', 'review-only', 'qa-only', 'pr-only', 'comments-only']) {
+      expect(screen.getByRole('button', { name: `${screen.getByTestId(`lane-${lane}`).querySelector('[role=heading]')?.textContent} settings` })).toBeTruthy();
+    }
+    for (const lane of ['queued', 'create-pr']) expect(screen.queryByTestId(`lane-${lane}-settings`)).toBeNull();
+    const button = screen.getByTestId('lane-planning-settings');
+    expect(getComputedStyle(button).opacity).toBe('0');
+    fireEvent.pointerEnter(button.parentElement!);
+    expect(getComputedStyle(button).opacity).toBe('1');
+  });
+
+  it('shows the single-step lanes, then the six stage lanes in order with their counts, then Done collapsed to a strip', () => {
     renderLanes();
 
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Code review only',
+      'QA only',
+      'Create PR only',
+      'Resolve PR comments',
       'Queued',
       'Planning',
       'Implementing',

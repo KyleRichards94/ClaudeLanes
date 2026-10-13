@@ -218,6 +218,8 @@ export const TicketRecordSchema = z
     permissionMode: AgentPermissionModeSchema.optional(),
     /** Set on a second agent's record (AL-266): the board hides it, its lead's drill-in switches to it. Absent on a lead. */
     companion: TicketCompanionSchema.optional(),
+    /** The lane a Queued ticket enters when its session starts (a team board drop, e.g. QA only); absent means Planning. */
+    startLane: LaneSchema.optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

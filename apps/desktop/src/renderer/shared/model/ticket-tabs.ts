@@ -18,11 +18,51 @@ export function useTicketPageTab(ticketId: string): TicketPageTab {
   return useTicketTabs((state) => state.byTicket[ticketId] ?? 'output');
 }
 
-export function setTicketPageTab(ticketId: string, tab: TicketPageTab): void {
+/**
+ * Shows a drill-in tab. The diff is part of the Output & diff view: asking for `diff` (Review changes,
+ * Open diff) shows that view with its diff pane open.
+ */
+export function setTicketPageTab(ticketId: string, requested: TicketPageTab): void {
+  const tab: TicketPageTab = requested === 'diff' ? 'output' : requested;
+  if (requested === 'diff') useOutputDiffLayoutStore.setState({ diffShown: true });
   useTicketTabs.setState(({ byTicket }) => (byTicket[ticketId] === tab ? {} : { byTicket: { ...byTicket, [ticketId]: tab } }));
 }
 
 /** Forgets every ticket's tab (tests). */
 export function resetTicketPageTabs(): void {
   useTicketTabs.setState({ byTicket: {} });
+}
+
+/** How the drill-in's diff is drawn: one column with + and − lines, or old and new side by side. */
+export type DiffView = 'unified' | 'split';
+
+/** The Output & diff view's layout, shared by every ticket and kept for the session (in memory). */
+export interface OutputDiffLayout {
+  /** The diff pane is shown next to the output. */
+  readonly diffShown: boolean;
+  /** The output pane's share of the width (or height when stacked), 0–1. */
+  readonly ratio: number;
+  readonly diffView: DiffView;
+  /** The diff pane scrolls to each file the agent edits. */
+  readonly follow: boolean;
+}
+
+const useOutputDiffLayoutStore = create<OutputDiffLayout>()(() => ({ diffShown: true, ratio: 0.5, diffView: 'unified', follow: true }));
+
+export function useOutputDiffLayout(): OutputDiffLayout {
+  return useOutputDiffLayoutStore();
+}
+
+export function setOutputDiffLayout(change: Partial<OutputDiffLayout>): void {
+  useOutputDiffLayoutStore.setState(change);
+}
+
+/** Back to the defaults (tests). */
+export function resetOutputDiffLayout(): void {
+  useOutputDiffLayoutStore.setState({ diffShown: true, ratio: 0.5, diffView: 'unified', follow: true });
+}
+
+/** The layout now, outside React (tests, recovery actions). */
+export function outputDiffLayout(): OutputDiffLayout {
+  return useOutputDiffLayoutStore.getState();
 }

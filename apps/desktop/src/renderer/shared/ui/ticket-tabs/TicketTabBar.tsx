@@ -14,16 +14,16 @@ export interface TicketTabBarProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const LABELS: Record<TicketTab, string> = {
-  output: 'Output',
-  diff: 'Diff',
+/** The diff is part of the Output & diff view (a pane beside the output), so it has no tab of its own. */
+const LABELS: Record<Exclude<TicketTab, 'diff'>, string> = {
+  output: 'Output & diff',
   'build-log': 'Build log',
   ado: 'ADO',
   design: 'Claude Design',
 };
 
 /**
- * Output / Diff / Build log / ADO / Claude Design (artboards 3 and 4). The first four are panels of
+ * Output & diff / Build log / ADO / Claude Design (artboards 3 and 4). The first four are panels of
  * the drill-in (`ticket/:id`); Claude Design is its own route (`ticket/:id/design`), shown with ↗
  * from the drill-in. Picking a drill-in tab from the design tab goes back to the drill-in on it.
  * Claude Design carries a dot while the design thread has replies the user hasn't seen (AL-200).
@@ -33,7 +33,7 @@ export function TicketTabBar({ ticketId, value, idPrefix, style }: TicketTabBarP
   const onDesignPage = value === 'design';
   const designStatus = useUnreadDesignStatus(ticketId, onDesignPage);
 
-  const tabs: TabItem<TicketTab>[] = (Object.keys(LABELS) as TicketTab[]).map((tab) => ({
+  const tabs: TabItem<TicketTab>[] = (Object.keys(LABELS) as Array<keyof typeof LABELS>).map((tab) => ({
     value: tab,
     label: LABELS[tab],
     opensElsewhere: tab === 'design' && !onDesignPage,
@@ -49,7 +49,7 @@ export function TicketTabBar({ ticketId, value, idPrefix, style }: TicketTabBarP
     if (onDesignPage) navigate(routes.ticket(ticketId));
   };
 
-  return <Tabs tabs={tabs} value={value} onChange={onChange} label="Ticket views" idPrefix={idPrefix} style={style} testID="ticket-tabs" />;
+  return <Tabs tabs={tabs} value={value === 'diff' ? 'output' : value} onChange={onChange} label="Ticket views" idPrefix={idPrefix} style={style} testID="ticket-tabs" />;
 }
 
 /** "2 unread replies" on the Claude Design tab; on the design tab itself every reply is read. */

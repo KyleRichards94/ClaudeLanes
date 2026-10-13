@@ -21,8 +21,8 @@ function plural(count: number, one: string, many = `${one}s`): string {
 
 /**
  * Merge worktree → main's confirm (AL-174, design §9 step 5, R9): names what merges into what,
- * warns when QA has not passed (the button becomes "Merge anyway"), and refuses a worktree with
- * uncommitted changes. A conflict is listed here; nothing was changed by it.
+ * warns when QA has not passed (the button becomes "Merge anyway"), and says that a worktree's
+ * uncommitted changes are committed first. A conflict is listed here; nothing was changed by it.
  */
 export function MergeToMainModal({ visible, ticket, store = agentTickets, onClose }: MergeToMainModalProps) {
   // The preview is read each time the modal opens, so the warnings are current.
@@ -43,15 +43,16 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
   };
 
   const dirtyFiles = failure?.code === 'GIT_DIRTY' ? failure.files : [];
-  const dirty = data?.worktree.dirty === true || failure?.code === 'GIT_DIRTY';
+  // Uncommitted changes in the worktree are committed as part of the merge, not a reason to refuse it.
+  const dirty = data?.worktree.dirty === true || (failure?.code === 'GIT_DIRTY' && failure.reason === 'worktree-dirty');
   const missing = data !== undefined && !data.worktree.present;
   const qaWarning = data !== undefined && !data.qaPassed;
   const checkoutBlocked = targetKind === 'checkout' && (checkoutUnavailable || data?.checkoutClean === false);
-  const blocked = data === undefined || dirty || missing || data.worktree.conflicted || checkoutBlocked;
+  const blocked = data === undefined || missing || data.worktree.conflicted || checkoutBlocked;
 
   const onConfirm = () =>
     merge.mutate(
-      { ticketId: ticket.id, target: targetKind, ...(qaWarning ? { acceptQaWarning: true } : {}) },
+      { ticketId: ticket.id, target: targetKind, commitChanges: true, ...(qaWarning ? { acceptQaWarning: true } : {}) },
       {
         onSuccess: (result) => {
           toast({
@@ -127,20 +128,21 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
             {targetKind === 'checkout' && data.checkoutBranch !== null && !data.checkoutClean ? (
               <Notice tone="danger" title="The main checkout has uncommitted changes" body={`Commit or stash them in ${data.repo} before merging into ${data.checkoutBranch}.`} testID="merge-to-main-checkout-dirty" />
             ) : null}
-            {dirty ? (
-              <Notice
-                tone="danger"
-                title="The worktree has uncommitted changes"
-                body={`Commit or discard ${data.worktree.changedFiles ? plural(data.worktree.changedFiles, 'change') : 'them'} before merging.`}
-                files={dirtyFiles}
-                testID="merge-to-main-dirty"
-              />
-            ) : missing ? (
+            {missing ? (
               <Notice tone="danger" title="The worktree is missing" body="Its folder was deleted outside Agent Lanes." testID="merge-to-main-missing" />
             ) : data.worktree.conflicted ? (
               <Notice tone="danger" title="A merge is stopped on conflicts" body="Resolve it before merging into main." testID="merge-to-main-conflicted" />
             ) : null}
-            {qaWarning && !dirty ? (
+            {dirty && !missing ? (
+              <Notice
+                tone="attention"
+                title="The worktree has uncommitted changes"
+                body={`${data.worktree.changedFiles ? plural(data.worktree.changedFiles, 'change is', 'changes are') : 'They are'} committed to ${data.source} first, then merged.`}
+                files={dirtyFiles}
+                testID="merge-to-main-dirty"
+              />
+            ) : null}
+            {qaWarning ? (
               <Notice
                 tone="attention"
                 title="QA has not passed"
@@ -156,7 +158,7 @@ export function MergeToMainModal({ visible, ticket, store = agentTickets, onClos
                 files={failure.files}
                 testID="merge-to-main-conflict"
               />
-            ) : failure && failure.code !== 'GIT_DIRTY' ? (
+            ) : failure && failure.reason !== 'worktree-dirty' ? (
               <Notice tone="danger" title="The merge didn't go through" body={failure.message} testID="merge-to-main-error" />
             ) : null}
           </>

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, agentPermissionPolicy, dropDefaultsOf, dropKindOf, launchHoldPercentOf } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, err, ok, agentPermissionPolicy, dropDefaultsOf, dropKindOf, launchHoldPercentOf } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -18,6 +18,7 @@ import { createAssignAgentService, type AssignAgentService } from './agent/assig
 import { createAddAgentService, type AddAgentService } from './agent/companions/add-agent';
 import { createRewindService, type RewindService } from './agent/rewind';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
+import { createSendToTicket } from './agent/send-to-ticket';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
 import { createBuildContext } from './agent/build-context';
@@ -458,6 +459,7 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   late.launches = launches;
+  const sendToTicket = createSendToTicket({ sessions, launches, recovery, tickets });
   const planLimits = createPlanLimitsService({
     sessions,
     emit: options.emit,
@@ -467,7 +469,16 @@ export function createServices(options: ServiceOptions): Services {
     log: log.child('agent'),
   });
   late.planLimits = planLimits;
-  const stageExtras = stageSessionExtras({ stages, designSpecs, createServer: sdkStageServer(loadClaudeSdk) });
+  const stageExtras = stageSessionExtras({
+    stages,
+    designSpecs,
+    createServer: sdkStageServer(loadClaudeSdk),
+    // A Create PR only ticket's agent opens its PR the way the drill-in does.
+    openPullRequest: async (ticketId, title, description) => {
+      const opened = await pullRequests.create({ ticketId, title, description });
+      return opened.ok ? { ok: true, data: { id: opened.data.pullRequest.id, webUrl: opened.data.pullRequest.webUrl, created: opened.data.created } } : opened;
+    },
+  });
   const usage = createUsageService({ sessions, emit: options.emit, log: log.child('agent') });
   const skills = createSkillDiscovery({ claude, connections, settings, log: log.child('skills') });
   const permissions = createPermissionService({ settings, tickets, buildCommands, emit: options.emit, transcripts, log: log.child('agent') });
@@ -492,7 +503,16 @@ export function createServices(options: ServiceOptions): Services {
     settings,
     repoForPullRequest: (orgUrl, pullRequest) => findRegisteredRepo(settings.get().repos, git.run, orgUrl, pullRequest.repository),
     // Settings › Drops (AL-240), read at each drop.
+    // Each lane's row, single-step lanes included, with its initial prompt.
     laneDefaults: (action) => dropDefaultsOf(settings.get())[dropKindOf(action)],
+    // A PR whose source branch is already a ticket's: that ticket moves to the lane and its agent takes the job.
+    continueTicket: async (ticketId, lane, job) => {
+      if (lane === 'queued') return err('VALIDATION', 'Queued fills only at the agent limit.');
+      const moved = await stages.moveTo(ticketId, lane);
+      if (!moved.ok) return moved;
+      const sent = await sendToTicket(ticketId, { text: job, source: 'composer' });
+      return sent.ok ? ok(launches.status(ticketId)) : sent;
+    },
     log: log.child('launch'),
   });
   late.adoLauncher = adoLauncher;

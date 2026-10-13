@@ -237,11 +237,20 @@ describe('Settings › Drops (AL-240)', () => {
     expect(qa.getByRole('radio', { name: 'Med' }).getAttribute('aria-checked')).toBe('true');
 
     type('settings-drop-qa-skills', '/cs-qa-wip, cs-smoke');
+    type('settings-drop-qa-prompt', '  Use the Liink QA database.  ');
     fireEvent.click(qa.getByRole('radio', { name: 'Haiku' }));
     fireEvent.click(save());
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(fake.updates).toEqual([{ dropDefaults: { ...defaultDropDefaults(), qa: { skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku', effort: 'medium' } } }]);
+    expect(fake.updates).toEqual([{ dropDefaults: { ...defaultDropDefaults(), qa: { skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku', effort: 'medium', prompt: 'Use the Liink QA database.' } } }]);
+  });
+
+  it('has a row for each single-step lane', async () => {
+    renderPanel({ section: 'drops' });
+    await screen.findByTestId('settings-drops');
+    expect(input('settings-drop-comments-only-skills').value).toBe('/pr-comment-actioner');
+    expect(input('settings-drop-review-only-skills').value).toBe('/code-review');
+    expect(input('settings-drop-pr-only-prompt').value).toBe('');
   });
 
   it('blocks Save on a skill name that is not one', async () => {

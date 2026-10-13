@@ -83,10 +83,12 @@ export {
   gitLinksOf,
   listMyTeams,
   MY_TEAMS_PAGE_SIZE,
+  inProgressColumnOf,
   resolveTeam,
   TEAM_BOARD_MAX_ITEMS,
   teamFieldClause,
   toPerson,
+  type InProgressColumn,
   type TeamBoardOptions,
   type TeamCallOptions,
 } from './team-board';
@@ -103,13 +105,16 @@ export {
 export { BACKLOG_MAX_ITEMS, backlogQuery, getBacklog, groupByFeature, type BacklogOptions } from './backlog';
 export {
   getSignedInUser,
+  assignAndStart,
   getWorkItemAssignment,
   inProgressStateOf,
+  isUnknownIdentity,
   setWorkItemAssignment,
   type AdoPerson,
   type AssignmentCallOptions,
   type AssignmentChange,
   type AssignmentRef,
+  type StartTarget,
   type WorkItemAssignment,
 } from './assignment';
 export { listOpenThreads, type OpenThread } from './pr-threads';

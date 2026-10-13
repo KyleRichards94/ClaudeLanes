@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffStats, diffStatus, fileCount, formatBytes, parseUnifiedDiff } from './diff-lines';
+import { diffStats, diffStatus, fileCount, formatBytes, parseUnifiedDiff, toSplitRows, type DiffLine } from './diff-lines';
 
 const patch = [
   'diff --git a/Pages/Jobs/JobControl.razor b/Pages/Jobs/JobControl.razor',
@@ -54,5 +54,30 @@ describe('diff labels', () => {
     expect(formatBytes(512)).toBe('512 B');
     expect(formatBytes(256 * 1024)).toBe('256 KB');
     expect(formatBytes(1.4 * 1024 * 1024)).toBe('1.4 MB');
+  });
+});
+
+describe('toSplitRows (side by side)', () => {
+  const line = (kind: DiffLine['kind'], text: string, oldLine: number | null, newLine: number | null): DiffLine => ({ kind, text, oldLine, newLine });
+
+  it('puts context on both sides, pairs removed with added lines in order, and spans hunk headers', () => {
+    const hunk = line('hunk', '@@ -1,4 +1,4 @@', null, null);
+    const same = line('context', 'a', 1, 1);
+    const old1 = line('remove', 'b', 2, null);
+    const old2 = line('remove', 'c', 3, null);
+    const new1 = line('add', 'B', null, 2);
+    const tail = line('context', 'd', 4, 3);
+    expect(toSplitRows([hunk, same, old1, old2, new1, tail])).toEqual([
+      { kind: 'full', line: hunk },
+      { kind: 'pair', left: same, right: same },
+      { kind: 'pair', left: old1, right: new1 },
+      { kind: 'pair', left: old2, right: null },
+      { kind: 'pair', left: tail, right: tail },
+    ]);
+  });
+
+  it('leaves the left side blank for added lines with nothing removed', () => {
+    const added = line('add', 'new', null, 5);
+    expect(toSplitRows([added])).toEqual([{ kind: 'pair', left: null, right: added }]);
   });
 });

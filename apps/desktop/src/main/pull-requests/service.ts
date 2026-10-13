@@ -124,7 +124,7 @@ export function createPullRequestService(options: PullRequestServiceOptions): Pu
   }
 
   function blockedReason(record: TicketRecord): string | null {
-    if (record.stage !== 'create-pr') return 'The ticket reaches Create PR once its earlier stages and gates are done.';
+    if (record.stage !== 'create-pr' && record.stage !== 'pr-only') return 'The ticket reaches Create PR once its earlier stages and gates are done.';
     if (record.ado === null) return 'This ticket has no Azure DevOps work item to link the pull request to.';
     return null;
   }

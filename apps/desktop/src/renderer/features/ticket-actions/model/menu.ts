@@ -71,4 +71,4 @@ export function descriptionText(html: string): string {
 }
 
 /** The lanes a ticket can be moved to by hand (AL-270, AL-274): every lane but Queued. */
-export const MOVE_TARGETS: readonly Exclude<Lane, 'queued'>[] = ['planning', 'implementing', 'code-review', 'qa', 'create-pr', 'done'];
+export const MOVE_TARGETS: readonly Exclude<Lane, 'queued'>[] = ['planning', 'implementing', 'code-review', 'qa', 'create-pr', 'done', 'review-only', 'qa-only', 'pr-only', 'comments-only'];

@@ -1,5 +1,5 @@
 import type { McpServerConfig, SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
-import { STAGES, type TicketRecord } from '@agent-lanes/contracts';
+import { STAGES, isSoloLane, type Result, type SoloLane, type TicketRecord } from '@agent-lanes/contracts';
 import { z } from 'zod';
 import { specForAgent, specStatusText, type DesignSpecService } from '../../design/specs';
 import type { ClaudeSdkModule } from '../claude-sdk';
@@ -51,7 +51,29 @@ export const COMPANION_PROTOCOL = [
   '- Say what you did, and what you found, in your replies: the user reads them in your own output.',
 ].join('\n');
 
-export const STAGE_PROTOCOL_REMINDER = `You are in the Planning stage. Report each stage change with ${STAGE_SERVER_TOOLS[0]} as the Agent Lanes stage protocol in your system prompt describes.`;
+/** What the agent is asked to do, and nothing more, in each single-step lane. */
+const SOLO_STEPS: Record<SoloLane, string> = {
+  'review-only':
+    'Your only job is a code review: review the changes and report what you find. Do not change, commit or push code, and do not go on to implementing, QA or a pull request.',
+  'qa-only':
+    'Your only job is QA: build the work and check each acceptance criterion, reporting pass or fail with evidence. Do not fix what you find, and do not go on to a pull request.',
+  'pr-only': `Your only job is to open the pull request: commit any uncommitted work on the ticket branch, check it builds, then call \`open_pull_request\` of the \`${STAGE_SERVER_NAME}\` MCP server with a title and a description of the change. Do not implement, review or QA beyond that.`,
+  'comments-only':
+    "Your only job is to resolve the pull request's open comment threads with /pr-comment-actioner: fix what is worth fixing on the PR's source branch, commit and push, reply to each thread, and resolve the ones you settled. Do not take on other work.",
+};
+
+/** What a ticket in a single-step lane gets instead of the stage protocol: one step, then stop. */
+export function soloProtocol(lane: SoloLane): string {
+  return [
+    '# Agent Lanes',
+    `You are running inside Agent Lanes, which shows this ticket in its "${LANE_LABELS[lane]}" lane. This ticket is a single step, not the full Planning → Implementing → Code review → QA → Create PR workflow.`,
+    `- ${SOLO_STEPS[lane]}`,
+    `- Use \`report_activity\` of the \`${STAGE_SERVER_NAME}\` MCP server to say in a few words what you are doing now, with your progress as a percentage.`,
+    '- When the step is done, say what you did and what you found in your reply, then stop. The user moves the ticket on from here.',
+  ].join('\n');
+}
+
+export const STAGE_PROTOCOL_REMINDER =`You are in the Planning stage. Report each stage change with ${STAGE_SERVER_TOOLS[0]} as the Agent Lanes stage protocol in your system prompt describes.`;
 
 type ToolResult = Awaited<ReturnType<SdkMcpToolDefinition['handler']>>;
 
@@ -98,7 +120,39 @@ const ackDesignSpecShape = {
   note: z.string().max(1000).describe('One line on how you used it, e.g. "Built JobGrid.razor from JobControl · desktop".'),
 };
 
-type StageToolShape = typeof setStageShape | typeof reportActivityShape | typeof getDesignSpecShape | typeof listDesignSpecsShape | typeof ackDesignSpecShape;
+const openPullRequestShape = {
+  title: z.string().min(1).max(400).describe('The pull request title, e.g. "Cut over frmJobControl to Blazor".'),
+  description: z.string().max(4000).describe('What changed and why, in Markdown; the work item is linked for you.'),
+};
+
+type StageToolShape =
+  | typeof setStageShape
+  | typeof reportActivityShape
+  | typeof getDesignSpecShape
+  | typeof listDesignSpecsShape
+  | typeof ackDesignSpecShape
+  | typeof openPullRequestShape;
+
+/** Opens the ticket's pull request the way the drill-in's Create PR does: pushes the branch, opens it, links the work item. */
+export type OpenPullRequest = (ticketId: string, title: string, description: string) => Promise<Result<{ id: number; webUrl: string | null; created: boolean }>>;
+
+export const OPEN_PULL_REQUEST_TOOL = `mcp__${STAGE_SERVER_NAME}__open_pull_request`;
+
+/** `open_pull_request` for a Create PR only ticket. */
+export function openPullRequestTool(ticketId: string, open: OpenPullRequest): SdkMcpToolDefinition<StageToolShape> {
+  const tool: SdkMcpToolDefinition<typeof openPullRequestShape> = {
+    name: 'open_pull_request',
+    description: "Push the ticket branch and open its pull request into the base branch in Azure DevOps, linked to the ticket's work item.",
+    inputSchema: openPullRequestShape,
+    handler: async ({ title, description }) => {
+      const opened = await open(ticketId, title, description);
+      if (!opened.ok) return reply(opened.message, true);
+      const where = opened.data.webUrl ? ` ${opened.data.webUrl}` : '';
+      return reply(opened.data.created ? `Opened PR !${opened.data.id}.${where}` : `PR !${opened.data.id} was already open for this branch.${where}`);
+    },
+  };
+  return tool as SdkMcpToolDefinition<StageToolShape>;
+}
 
 /**
  * The design-spec tools for one ticket (AL-198, D16): the agent pulls a shipped spec, which marks it
@@ -179,6 +233,8 @@ export interface StageSessionExtrasOptions {
   designSpecs?: DesignSpecService;
   /** Builds the in-process server; the SDK's `createSdkMcpServer` by default (tests pass a stand-in). */
   createServer: (tools: SdkMcpToolDefinition<StageToolShape>[]) => McpServerConfig | Promise<McpServerConfig>;
+  /** Opens a Create PR only ticket's pull request; without it that lane's agent has no `open_pull_request`. */
+  openPullRequest?: OpenPullRequest;
 }
 
 /** The SDK's `createSdkMcpServer`, for `createServer`. */
@@ -202,7 +258,17 @@ export function stageSessionExtras(options: StageSessionExtrasOptions): (record:
         systemPromptAppend: COMPANION_PROTOCOL,
       };
     }
-    await options.stages.sessionStarting(record.id);
+    const lane = await options.stages.sessionStarting(record.id);
+    // A single-step lane (review, QA or PR only): one step and no stages to move through.
+    if (isSoloLane(lane)) {
+      const base = stageServerTools(record.id, options.stages, options.designSpecs).filter((tool) => tool.name !== 'set_stage');
+      const pr = lane === 'pr-only' && options.openPullRequest ? [openPullRequestTool(record.id, options.openPullRequest)] : [];
+      return {
+        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer([...base, ...pr]) },
+        allowedTools: [STAGE_SERVER_TOOLS[1], ...(options.designSpecs ? DESIGN_SPEC_TOOLS : []), ...(pr.length > 0 ? [OPEN_PULL_REQUEST_TOOL] : [])],
+        systemPromptAppend: soloProtocol(lane),
+      };
+    }
     return {
       mcpServers: { [STAGE_SERVER_NAME]: await options.createServer(stageServerTools(record.id, options.stages, options.designSpecs)) },
       allowedTools: [...STAGE_SERVER_TOOLS, ...(options.designSpecs ? DESIGN_SPEC_TOOLS : [])],

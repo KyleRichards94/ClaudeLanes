@@ -2,9 +2,12 @@ import { randomBytes } from 'node:crypto';
 import {
   listOpenThreads,
   getSignedInUser,
+  assignAndStart,
   getWorkItemAssignment,
+  inProgressColumnOf,
   inProgressStateOf,
   setWorkItemAssignment,
+  type StartTarget,
   type AdoClient,
   type AdoPerson,
   type WorkItemAssignment,
@@ -16,6 +19,7 @@ import {
   err,
   ok,
   type ActivePullRequest,
+  type AgentSessionStatus,
   type AdoConnectionSummary,
   type AdoScope,
   type DropAction,
@@ -39,6 +43,7 @@ import type { SettingsService } from '../settings/service';
 import type { TicketRecordStore } from '../tickets';
 import type { CreateTicketWorktreeInput, TicketWorktreeService } from '../worktrees';
 import { createKeyedQueue } from '../worktrees/keyed-queue';
+import { isSameRepoPath } from '../repos/repo-paths';
 import type { SessionWorkItem } from './first-turn';
 import type { LaunchQueue } from './launch-queue';
 import { answerCommentsJob, reviewJob } from './pr-launch';
@@ -100,6 +105,8 @@ export interface AdoRestore {
   previousState: string;
   /** The revision the drop's own change produced; a restore is refused when someone changed it since. */
   rev: number;
+  /** The board column it was in, when the drop moved the column; absent or null leaves the column to ADO. */
+  previousColumn?: { field: string; name: string } | null;
 }
 
 export interface AdoLauncherOptions {
@@ -112,7 +119,13 @@ export interface AdoLauncherOptions {
   /** The registered repo whose origin is the PR's repository (AL-232's remotes); null when none is. */
   repoForPullRequest: (orgUrl: string, pullRequest: ActivePullRequest) => Promise<string | null>;
   /** The lane's skills, model and effort for a drop (TB§3; Settings › Drops, AL-240). The action's own by default. */
-  laneDefaults?: (action: DropAction) => Pick<DropAction, 'skills' | 'model' | 'effort'>;
+  laneDefaults?: (action: DropAction) => Pick<DropAction, 'skills' | 'model' | 'effort'> & { prompt?: string };
+  /**
+   * Hands a job to an existing ticket instead of starting a new one: moves it to `lane` and gives its agent
+   * `job` (resuming or starting its session). Used when a PR's source branch is already a ticket's branch,
+   * which git will not check out in a second worktree.
+   */
+  continueTicket?: (ticketId: string, lane: Lane, job: string) => Promise<Result<AgentSessionStatus>>;
   log?: Pick<Logger, 'info' | 'warn'>;
   now?: () => number;
 }
@@ -175,7 +188,7 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
       const item: TeamBoardItem | undefined = board.data.items.find((candidate) => candidate.id === source.id);
       if (!item) return refusal('not-found', `#${source.id} is no longer on the ${board.data.sprint.name} board — refreshed`);
       let pullRequest: ActivePullRequest | null = null;
-      if (request.lane === 'code-review' && item.pullRequestId !== null) {
+      if ((request.lane === 'code-review' || request.lane === 'review-only' || request.lane === 'comments-only') && item.pullRequestId !== null) {
         const prs = await ado.activePrs({ org, project, team: source.team });
         if (!prs.ok) return prs;
         pullRequest = prs.data.pullRequests.find((pr) => pr.id === item.pullRequestId) ?? null;
@@ -259,14 +272,40 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     return found?.path ?? null;
   }
 
-  async function assign(client: AdoClient, project: string, workItemId: number, me: AdoPerson & { id: string }): Promise<Result<{ before: WorkItemAssignment; after: WorkItemAssignment }>> {
+  /**
+   * Where the item goes: the team board's In Progress column and the state it maps the item's type to,
+   * so an item already in that state (a Failed card is usually Active too) still moves across the board;
+   * else the type's first In Progress-category state.
+   */
+  async function startTargetOf(client: AdoClient, project: string, team: string | undefined, type: string): Promise<Result<StartTarget>> {
+    const board = await inProgressColumnOf(client, project, team, type);
+    if (!board.ok) log?.warn(`Could not read the board's In Progress column for ${type}: ${board.message}`);
+    if (board.ok && board.data) {
+      const { state, column, field } = board.data;
+      return ok({ state, column: field ? { field, name: column } : null });
+    }
+    const state = await inProgressStateOf(client, project, type);
+    return state.ok ? ok({ state: state.data, column: null }) : state;
+  }
+
+  async function assign(
+    client: AdoClient,
+    project: string,
+    team: string | undefined,
+    workItemId: number,
+    me: AdoPerson & { id: string },
+  ): Promise<Result<{ before: WorkItemAssignment; after: WorkItemAssignment; column: StartTarget['column'] }>> {
     const before = await getWorkItemAssignment(client, { project, workItemId });
     if (!before.ok) return before;
-    const state = await inProgressStateOf(client, project, before.data.type);
-    if (!state.ok) return state;
-    // Every name the person is known by is tried: Azure DevOps Server refuses a bare account name (AL-236 on-prem fix).
-    const after = await setWorkItemAssignment(client, { project, workItemId }, { expectedRev: before.data.rev, assignee: me, state: state.data });
-    return after.ok ? ok({ before: before.data, after: after.data }) : after;
+    const target = await startTargetOf(client, project, team, before.data.type);
+    if (!target.ok) return target;
+    // Every name the person is known by is tried (Azure DevOps Server refuses a bare account name), and a
+    // state or column the server refuses still leaves the item assigned to you.
+    const after = await assignAndStart(client, { project, workItemId }, { expectedRev: before.data.rev, assignee: me, target: target.data });
+    if (!after.ok) return after;
+    const { stateMoved, columnMoved, ...written } = after.data;
+    if (!stateMoved) log?.warn(`#${workItemId} was assigned, but Azure DevOps refused the move to ${target.data.state}`);
+    return ok({ before: before.data, after: written, column: columnMoved ? (target.data.column ?? null) : null });
   }
 
   function worktreeInput(request: LaunchFromAdoRequest, fresh: FreshCard, action: DropAction, repo: string, orgUrl: string, defaults: Pick<DropAction, 'skills' | 'model' | 'effort'>): CreateTicketWorktreeInput {
@@ -278,6 +317,8 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
       gates: gatesFor(action, overrides.gates),
       skills: [...new Set((overrides.skills ?? defaults.skills).map(skillName))],
       stage: 'queued' as const,
+      // Kept on the record, so a ticket queued at the cap still starts in its lane after a restart.
+      startLane: request.lane,
     };
     const pr = fresh.pullRequest;
     if (pr && (action.worktree === 'pr-source-branch' || action.worktree === 'pr-branch-read-only')) {
@@ -317,8 +358,25 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     return ok(workItemJob(action, fresh));
   }
 
+  /** The ticket whose own branch is the PR's source branch, in this repo; it already has it checked out. */
+  async function branchOwner(repo: string, fresh: FreshCard, action: DropAction): Promise<TicketRecord | null> {
+    const pr = fresh.pullRequest;
+    if (!pr || action.worktree !== 'pr-source-branch') return null;
+    const records = await tickets.list();
+    return records.find((record) => !record.companion && record.branch === pr.sourceBranch && isSameRepoPath(record.repo, repo)) ?? null;
+  }
+
   function workItemJob(action: DropAction, fresh: FreshCard): string {
     const id = fresh.workItem ? `#${fresh.workItem.id}` : `!${fresh.card.id}`;
+    if (action.lane === 'review-only') {
+      return `Review the changes on work item ${id}'s branch against its base with /code-review. Only review: report what you find and change nothing, then stop.`;
+    }
+    if (action.lane === 'qa-only') {
+      return `QA work item ${id}: build it and check each acceptance criterion with /cs-qa-wip. Only QA: report pass or fail per criterion with evidence and fix nothing, then stop.`;
+    }
+    if (action.lane === 'pr-only') {
+      return `Open the pull request for work item ${id}: commit any uncommitted work on its branch, check it builds, then call open_pull_request with a title and a description of the change. Do nothing else, then stop.`;
+    }
     if (action.lane === 'qa') return `QA work item ${id} on its branch: build it and check each acceptance criterion.`;
     if (action.lane === 'implementing') return `Plan and implement work item ${id}. No plan approval is needed: go straight on to building it.`;
     return `Read work item ${id}, explore the code, and write a plan. Ask for plan approval before implementing.`;
@@ -348,6 +406,12 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     const verdict = dropVerdict(fresh.data.card, request.lane, me);
     if (!verdict.ok) return refused(request, fresh.data, verdict.refusal.reason);
     const action = verdict.action;
+    // Resolving an item's PR comments needs the PR yours, with threads open: the PR's own rules, on the PR main just read.
+    const pr = fresh.data.pullRequest;
+    if (request.lane === 'comments-only' && fresh.data.card.kind === 'board-item' && pr) {
+      const prVerdict = dropVerdict({ kind: 'pull-request', id: pr.id, author: pr.author, unresolvedThreads: pr.unresolvedThreads, sourceBranch: pr.sourceBranch, repoRegistered: pr.repoRegistered }, 'comments-only', me);
+      if (!prVerdict.ok) return refused(request, fresh.data, prVerdict.refusal.reason);
+    }
 
     const scope = scopeFor(action);
     if (scope && connection.missingScopes.includes(scope)) {
@@ -377,15 +441,29 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     // The first turn, read before anything changes (a PR's open threads).
     const job = await jobFor(client.data, action, fresh.data);
     if (!job.ok) return job;
+    // The lane's initial prompt from Settings › Drops follows the app's own job text.
+    const defaults = options.laneDefaults?.(action) ?? action;
+    const prompt = 'prompt' in defaults ? defaults.prompt?.trim() : undefined;
+    const firstTurn = prompt ? `${job.data}\n\n${prompt}` : job.data;
 
     // 2. The only ADO change a drop makes (T5).
+    if (!action.changesAdo && fresh.data.workItem) {
+      const card = fresh.data.card;
+      const column = card.kind === 'board-item' ? `${card.column} column "${fresh.data.workItem.columnName ?? '?'}"` : card.kind;
+      const assignee = card.kind === 'pull-request' ? '' : `, assigned to ${card.assignee?.displayName ?? 'nobody'}`;
+      log?.warn(`#${fresh.data.workItem.id} (${column}${assignee}) dropped on ${request.lane}: this drop makes no Azure DevOps change`);
+    }
     let restoreInfo: AdoRestore | null = null;
     let adoChange: LaunchAdoChange | null = null;
     if (action.changesAdo && fresh.data.workItem) {
-      const changed = await assign(client.data, fresh.data.project, fresh.data.workItem.id, identity.data);
+      // A board card names its team; a backlog row uses the profile's default team's board.
+      const team = request.source.kind === 'board-item' ? request.source.team : undefined;
+      const changed = await assign(client.data, fresh.data.project, team, fresh.data.workItem.id, identity.data);
       if (!changed.ok) return changed;
-      const { before, after } = changed.data;
-      restoreInfo = { project: fresh.data.project, workItemId: before.workItemId, previousAssignee: before.assignee, previousState: before.state, rev: after.rev };
+      const { before, after, column } = changed.data;
+      const columnName = fresh.data.workItem.columnName;
+      const previousColumn = column && columnName ? { field: column.field, name: columnName } : null;
+      restoreInfo = { project: fresh.data.project, workItemId: before.workItemId, previousAssignee: before.assignee, previousState: before.state, rev: after.rev, previousColumn };
       adoChange = { workItemId: before.workItemId, previousAssignee: before.assignee?.displayName ?? null, previousState: before.state, state: after.state };
     }
 
@@ -396,8 +474,23 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
       return { adoRestored: restored.ok, ...(restored.ok ? {} : { adoRestoreError: restored.message }) };
     };
 
-    // 3. The worktree and the ticket.
-    const defaults = options.laneDefaults?.(action) ?? action;
+    // 3. The worktree and the ticket. A PR whose source branch already has a ticket goes to that ticket's agent:
+    // git checks a branch out in one worktree only.
+    const owner = await branchOwner(repo, fresh.data, action);
+    if (owner && options.continueTicket) {
+      const continued = await options.continueTicket(owner.id, request.lane, firstTurn);
+      if (!continued.ok) return continued;
+      const record = (await tickets.get(owner.id)) ?? owner;
+      log?.info(`Handed !${fresh.data.card.id} on ${request.lane} to ticket ${owner.id}, which has its branch ${owner.branch}`);
+      return ok({
+        ticketId: owner.id,
+        record,
+        status: continued.data,
+        adoChange: null,
+        undoId: null,
+        summary: `!${fresh.data.card.id} · handed to ticket ${owner.id}, which has its branch · ${LANE_NAMES[request.lane]}`,
+      });
+    }
     const created = await worktrees
       .create(worktreeInput(request, fresh.data, action, repo, client.data.orgUrl, defaults))
       .catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
@@ -410,7 +503,7 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
     // 4. The session, entering the dropped lane as it starts (or Queued at the cap).
     startLanes.set(ticketId, request.lane);
     const started = await launches
-      .launch({ ticketId, jobDescription: job.data, workItem: sessionItem })
+      .launch({ ticketId, jobDescription: firstTurn, workItem: sessionItem })
       .catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
     if (!started.ok) {
       startLanes.delete(ticketId);
@@ -442,9 +535,15 @@ export function createAdoLauncher(options: AdoLauncherOptions): AdoLauncher {
   return {
     launch: (request) => {
       const key = `${request.source.kind === 'pull-request' ? 'pr' : 'wi'}:${request.source.id}`;
-      return perCard(key, () =>
-        launch(request).catch((cause: unknown) => err('INTERNAL', `Launching from Azure DevOps failed unexpectedly: ${cause instanceof Error ? cause.message : String(cause)}`)),
-      );
+      return perCard(key, async () => {
+        const result = await launch(request).catch((cause: unknown) => err('INTERNAL', `Launching from Azure DevOps failed unexpectedly: ${cause instanceof Error ? cause.message : String(cause)}`));
+        // Said in the diagnostics, so a drop that did nothing in Azure DevOps shows why.
+        if (!result.ok) {
+          const reason = isRecord(result.details) && typeof result.details['reason'] === 'string' ? ` (${result.details['reason']})` : '';
+          log?.warn(`Drop of ${key} on ${request.lane} did not start: ${result.code}${reason} · ${result.message}`);
+        }
+        return result;
+      });
     },
     startLane: (ticketId) => startLanes.get(ticketId),
     undoEntryForTicket: (ticketId) => [...undo.values()].find((entry) => entry.ticketId === ticketId),
@@ -462,7 +561,12 @@ export async function restoreAssignment(client: AdoClient, change: AdoRestore): 
   const restored = await setWorkItemAssignment(
     client,
     { project: change.project, workItemId: change.workItemId },
-    { expectedRev: change.rev, assignee: change.previousAssignee, state: change.previousState },
+    {
+      expectedRev: change.rev,
+      assignee: change.previousAssignee,
+      state: change.previousState,
+      ...(change.previousColumn ? { fields: { [change.previousColumn.field]: change.previousColumn.name } } : {}),
+    },
   );
   return restored.ok ? ok(undefined) : restored;
 }

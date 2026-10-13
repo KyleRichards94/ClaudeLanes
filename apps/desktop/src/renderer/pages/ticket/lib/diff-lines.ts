@@ -97,3 +97,40 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** One row of the side-by-side view: the old file's line on the left, the new file's on the right. */
+export type SplitRow =
+  | { kind: 'full'; line: DiffLine }
+  | { kind: 'pair'; left: DiffLine | null; right: DiffLine | null };
+
+/**
+ * Unified lines → side-by-side rows. Context sits on both sides; a run of removed lines is paired, in
+ * order, with the run of added lines that follows it, and the longer run leaves blanks on the other
+ * side. Hunk headers and notes span both sides.
+ */
+export function toSplitRows(lines: readonly DiffLine[]): SplitRow[] {
+  const rows: SplitRow[] = [];
+  let removed: DiffLine[] = [];
+  let added: DiffLine[] = [];
+  const flush = () => {
+    for (let index = 0; index < Math.max(removed.length, added.length); index += 1) {
+      rows.push({ kind: 'pair', left: removed[index] ?? null, right: added[index] ?? null });
+    }
+    removed = [];
+    added = [];
+  };
+  for (const line of lines) {
+    if (line.kind === 'remove') {
+      // A removal after additions starts a new change block.
+      if (added.length > 0) flush();
+      removed.push(line);
+    } else if (line.kind === 'add') {
+      added.push(line);
+    } else {
+      flush();
+      rows.push(line.kind === 'context' ? { kind: 'pair', left: line, right: line } : { kind: 'full', line });
+    }
+  }
+  flush();
+  return rows;
+}

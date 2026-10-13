@@ -191,12 +191,17 @@ test('6 · #71273 dropped on Planning with the keyboard alone, and announced (TB
   await page.keyboard.press('Space');
   // The keyboard sensor listens from the next task (D729).
   await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
-  await page.keyboard.press('ArrowRight');
-  await expect(page.locator('[id^="DndLiveRegion"]')).toHaveText('Over Planning: plan it');
+  // Reading order: past the single-step lanes on screen (Code review only, QA only, Create PR only) to Planning.
+  const live = page.locator('[id^="DndLiveRegion"]');
+  for (let presses = 0; presses < 4 && !(await live.textContent())?.startsWith('Over Planning'); presses += 1) {
+    await page.keyboard.press('ArrowRight');
+    await expect(live).toHaveText(/^Over /);
+  }
+  await expect(live).toHaveText('Over Planning: plan it');
   await page.keyboard.press('Space');
   await expect(page.locator('[id^="DndLiveRegion"]')).toHaveText('Dropped #71273 on Planning: plan it');
 
-  // An In Progress item of yours changes nothing in ADO; its agent works on the item's branch.
+  // An In Progress item of yours stays yours and In Progress; its agent works on the item's branch.
   await expect.poll(() => stageOf('71273'), { timeout: 30_000 }).toMatch(/planning|queued/);
   const ticket = (await board.tickets()).find((entry) => entry.id === '71273')!;
   expect(ticket.branch).toBe('71273-cutover-frmjobcontrol-to');

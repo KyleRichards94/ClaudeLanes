@@ -57,10 +57,10 @@ describe('mergePanel (AL-174)', () => {
     });
   });
 
-  it('turns both off with the reason while the worktree is dirty', () => {
+  it('turns Merge sub-branches off while the worktree is dirty; Merge → main stays on and will commit them first', () => {
     const view = mergePanel(ticket, status({ dirty: true, changedFiles: 2 }));
     expect(view.subBranches.disabledReason).toBe('The worktree has 2 uncommitted changes.');
-    expect(view.toMain.disabledReason).toBe('The worktree has 2 uncommitted changes.');
+    expect(view.toMain).toEqual({ label: 'Merge worktree → main checkout', disabledReason: null, note: '2 uncommitted changes will be committed first.' });
   });
 
   it('turns Merge sub-branches off when nothing is ready, saying why', () => {
@@ -89,9 +89,8 @@ describe('mergePanel (AL-174)', () => {
     expect(mergePanel(ticket, status({}, [])).subBranches.label).toBe('Merge sub-branches');
   });
 
-  it('turns Merge worktree → main off when the ticket branch has nothing new', () => {
-    expect(mergePanel(ticket, status({ ahead: 0 })).toMain.disabledReason).toBe('No commits to merge into main yet.');
-    expect(mergePanel(ticket, status({ ahead: null })).toMain.disabledReason).toBe('71273-cutover-job-control or main is missing.');
+  it('keeps Merge worktree → main on when the ticket branch has nothing new (the modal says so)', () => {
+    expect(mergePanel(ticket, status({ ahead: 0 })).toMain.disabledReason).toBeNull();
   });
 
   it('reports a stopped merge and keeps both off until it is resolved', () => {
@@ -101,8 +100,9 @@ describe('mergePanel (AL-174)', () => {
     expect(view.toMain.disabledReason).toBe('A merge is stopped on conflicts.');
   });
 
-  it('is off while the status loads, when it fails, when the worktree is missing and when the ticket is done', () => {
-    expect(mergePanel(ticket, { status: 'pending' }).toMain.disabledReason).toBe('Checking the branches…');
+  it('is off when the worktree is missing and when the ticket is done; Merge → main does not wait for the status', () => {
+    expect(mergePanel(ticket, { status: 'pending' }).subBranches.disabledReason).toBe('Checking the branches…');
+    expect(mergePanel(ticket, { status: 'pending' }).toMain.disabledReason).toBeNull();
     expect(mergePanel(ticket, { status: 'error' }).subBranches.disabledReason).toBe("Couldn't read the branches.");
     expect(mergePanel(ticket, status({ present: false, dirty: null })).toMain.disabledReason).toBe('The worktree is missing.');
     expect(mergePanel({ ...ticket, stage: 'done' }, status()).toMain.disabledReason).toBe('The ticket is done.');

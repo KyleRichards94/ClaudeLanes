@@ -33,7 +33,7 @@ export interface StageService {
   /** The agent's `report_activity`; `progress` is 0 to 1. */
   reportActivity(ticketId: string, text: string, progress: number | null): Promise<Result<void>>;
   /** A session is starting: a Queued ticket moves to Planning (design §9 step 1), or the lane a team board drop chose (AL-236). */
-  sessionStarting(ticketId: string): Promise<void>;
+  sessionStarting(ticketId: string): Promise<Lane | null>;
 
   /** The user's decision on the ticket's waiting gate (`agent:resolveGate`). False when none waits. */
   resolveGate(ticketId: string, decision: GateDecision): boolean;
@@ -231,10 +231,12 @@ export function createStageService(options: StageServiceOptions): StageService {
     sessionStarting: (ticketId) =>
       queue(ticketId, async () => {
         const record = await tickets.get(ticketId);
-        if (record?.stage !== 'queued') return;
-        const lane = options.startLane?.(ticketId) ?? 'planning';
+        if (!record) return null;
+        if (record.stage !== 'queued') return record.stage;
+        const lane = options.startLane?.(ticketId) ?? record.startLane ?? 'planning';
         const moved = await move(ticketId, lane, null);
         if (!moved.ok) options.log?.warn(`Could not move ticket ${ticketId} to ${LANE_LABELS[lane]}: ${moved.message}`);
+        return moved.ok ? lane : record.stage;
       }),
 
     resolveGate(ticketId, decision) {

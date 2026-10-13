@@ -1,4 +1,4 @@
-import type { Effort, Lane, Model } from './vocabulary';
+import { isSoloLane, type Effort, type Lane, type Model, type SoloLane } from './vocabulary';
 
 /**
  * Drop rules for the team board (AL-230, TB§3, TB§6): which agent lanes take a team-board card, a
@@ -6,8 +6,9 @@ import type { Effort, Lane, Model } from './vocabulary';
  * only), so the renderer's drag highlighting, the keyboard "Send to lane" menu and the main
  * process's recheck before a launch (AL-236) all run this same code.
  *
- * Only a To Do, Failed or backlog item dropped on Planning or Implementing changes Azure DevOps
- * (T5, T9): it is assigned to you and moved to In Progress.
+ * A work item an agent starts work on changes Azure DevOps (T5, T9): a To Do, Failed, backlog, or
+ * your own or unassigned In Progress item dropped on Planning, Implementing or a single-step lane is
+ * assigned to you and moved to In Progress. Items in Code Review or Testing, and PRs, are left as they are.
  */
 
 /** The team board's columns as the app knows them (T1); a board column ADO names otherwise is `other`. */
@@ -80,7 +81,7 @@ export interface DropAction {
   label: string;
   /** What happens, in one line: "Assigns you · moves it to In Progress · starts planning". */
   detail: string;
-  /** True only for a To Do, Failed or backlog item on Planning or Implementing. */
+  /** True when the drop assigns the item to you and moves it to In Progress. */
   changesAdo: boolean;
   adoChanges: readonly DropAdoChange[];
   worktree: DropWorktreeSource;
@@ -100,7 +101,8 @@ export interface DropRefusal {
 
 export type DropVerdict = { ok: true; action: DropAction } | { ok: false; refusal: DropRefusal };
 
-const LANE_ORDER: readonly Lane[] = ['queued', 'planning', 'implementing', 'code-review', 'qa', 'create-pr', 'done'];
+// Reading order, as the board shows them: the single-step row, then the workflow.
+const LANE_ORDER: readonly Lane[] = ['review-only', 'qa-only', 'pr-only', 'comments-only', 'queued', 'planning', 'implementing', 'code-review', 'qa', 'create-pr', 'done'];
 
 const LANE_TITLES: Readonly<Record<Lane, string>> = {
   queued: 'Queued',
@@ -110,6 +112,10 @@ const LANE_TITLES: Readonly<Record<Lane, string>> = {
   qa: 'QA',
   'create-pr': 'Create PR',
   done: 'Done',
+  'review-only': 'Code review only',
+  'qa-only': 'QA only',
+  'pr-only': 'Create PR only',
+  'comments-only': 'Resolve PR comments',
 };
 
 /** Refusal reasons the UI may match on. */
@@ -124,6 +130,7 @@ export const DROP_REFUSALS = {
   notYours: 'Not assigned to you',
   notThisLane: 'This lane does not take this card',
   unknownColumn: 'Not from a column the app knows',
+  noBranch: 'No branch yet',
 } as const;
 
 /** True when the person is the signed-in user: by identity id, else by sign-in name. */
@@ -205,12 +212,80 @@ function qaAction(worktree: DropWorktreeSource): DropAction {
   };
 }
 
+/** The start of a detail line for a drop that may assign the item. */
+function assigning(assign: boolean, rest: string): string {
+  return assign ? `Assigns you · moves it to In Progress · ${rest}` : `${rest}. No ADO changes`;
+}
+
+/** A single-step lane's action: the agent does that one step and stops (no stages to move through). */
+function soloAction(lane: SoloLane, assign: boolean, worktree: DropWorktreeSource, fields: Pick<DropAction, 'title' | 'label' | 'skills' | 'model' | 'effort'> & { does: string }): DropAction {
+  const { does, ...rest } = fields;
+  return {
+    ...rest,
+    lane,
+    detail: assigning(assign, `${does}, then stops`),
+    changesAdo: assign,
+    adoChanges: assign ? ASSIGN_AND_MOVE : [],
+    worktree,
+    planGate: null,
+  };
+}
+
+function reviewOnlyAction(assign: boolean, worktree: DropWorktreeSource): DropAction {
+  return soloAction('review-only', assign, worktree, {
+    title: 'Review only',
+    label: 'review it, nothing else',
+    does: worktree === 'pr-branch-read-only' ? 'Runs /code-review on the PR' : "Runs /code-review on the item's branch",
+    skills: ['/code-review'],
+    model: 'opus',
+    effort: 'high',
+  });
+}
+
+function qaOnlyAction(assign: boolean, worktree: DropWorktreeSource): DropAction {
+  return soloAction('qa-only', assign, worktree, {
+    title: 'QA only',
+    label: 'QA it, nothing else',
+    does: 'Builds it and checks each acceptance criterion with /cs-qa-wip',
+    skills: ['/cs-qa-wip'],
+    model: 'sonnet',
+    effort: 'medium',
+  });
+}
+
+function prOnlyAction(assign: boolean): DropAction {
+  return soloAction('pr-only', assign, 'item-branch', {
+    title: 'Create PR only',
+    label: 'open its pull request',
+    does: "Commits the item's branch and opens its PR",
+    skills: [],
+    model: 'sonnet',
+    effort: 'medium',
+  });
+}
+
+function commentsOnlyAction(assign: boolean): DropAction {
+  return soloAction('comments-only', assign, 'pr-source-branch', {
+    title: 'Resolve PR comments',
+    label: 'resolve its PR comments',
+    does: "Works through the PR's open threads on its source branch with /pr-comment-actioner",
+    skills: ['/pr-comment-actioner'],
+    model: 'sonnet',
+    effort: 'high',
+  });
+}
+
 const allow = (action: DropAction): DropVerdict => ({ ok: true, action });
 const refuse = (lane: Lane, reason: string): DropVerdict => ({ ok: false, refusal: { lane, reason } });
 
 function pullRequestVerdict(card: PullRequestCard, lane: Lane, me: DropMe): DropVerdict {
-  if (lane !== 'code-review' && lane !== 'implementing') return refuse(lane, DROP_REFUSALS.notThisLane);
+  if (lane !== 'code-review' && lane !== 'implementing' && lane !== 'review-only' && lane !== 'comments-only') return refuse(lane, DROP_REFUSALS.notThisLane);
   if (card.repoRegistered === false) return refuse(lane, DROP_REFUSALS.addRepo);
+  if (lane === 'review-only') return allow(reviewOnlyAction(false, 'pr-branch-read-only'));
+  if (lane === 'comments-only') {
+    if (!isMe(card.author, me)) return refuse(lane, DROP_REFUSALS.notAuthor);
+    return card.unresolvedThreads > 0 ? allow(commentsOnlyAction(false)) : refuse(lane, DROP_REFUSALS.noComments);
+  }
   // Anyone can review an open PR, several people at once (T7).
   if (lane === 'code-review') return allow(reviewAction());
   if (!isMe(card.author, me)) return refuse(lane, DROP_REFUSALS.notAuthor);
@@ -229,21 +304,38 @@ function itemVerdict(card: BoardItemCard | BacklogItemCard, lane: Lane, me: Drop
   const column = card.kind === 'backlog-item' ? 'to-do' : card.column;
   if (column === 'other') return refuse(lane, card.agentLane ? `Agent in ${LANE_TITLES[card.agentLane]}` : DROP_REFUSALS.unknownColumn);
 
-  // A Code Review item can be reviewed by anyone (TB§3); every other column needs it yours or unassigned.
-  const lock = itemLock(card, me, column === 'code-review');
+  // A Code Review item can be reviewed by anyone (TB§3); every other drop needs it yours or unassigned.
+  const lock = itemLock(card, me, column === 'code-review' && (lane === 'code-review' || lane === 'review-only'));
   if (lock) return refuse(lane, lock);
 
   const branch = card.kind === 'board-item' ? card.branch : null;
   const itemOrMain: DropWorktreeSource = branch ? 'item-branch' : 'main';
+  // Starting work on a To Do, Failed or In Progress item that is yours or nobody's takes it: assigned to you, In Progress.
+  const assign = (column === 'to-do' || column === 'failed' || column === 'in-progress') && (card.assignee === null || isMe(card.assignee, me));
+
+  if (isSoloLane(lane)) {
+    const pullRequestId = card.kind === 'board-item' ? card.pullRequestId : null;
+    switch (lane) {
+      case 'review-only':
+        if (pullRequestId !== null) return allow(reviewOnlyAction(assign, 'pr-branch-read-only'));
+        return branch ? allow(reviewOnlyAction(assign, 'item-branch')) : refuse(lane, DROP_REFUSALS.noBranch);
+      case 'qa-only':
+        return allow(qaOnlyAction(assign, itemOrMain));
+      case 'pr-only':
+        return branch ? allow(prOnlyAction(assign)) : refuse(lane, DROP_REFUSALS.noBranch);
+      case 'comments-only':
+        // The item's linked PR; main reads its threads before the agent starts.
+        return pullRequestId !== null ? allow(commentsOnlyAction(false)) : refuse(lane, DROP_REFUSALS.noLinkedPr);
+    }
+  }
 
   switch (column) {
     case 'to-do':
     case 'failed':
       return lane === 'planning' || lane === 'implementing' ? allow(planAction(lane, true, 'main')) : refuse(lane, DROP_REFUSALS.notThisLane);
     case 'in-progress':
-      // Yours only: an unassigned In Progress item is not picked up here.
-      if (!isMe(card.assignee, me)) return refuse(lane, DROP_REFUSALS.notYours);
-      return lane === 'planning' || lane === 'implementing' ? allow(planAction(lane, false, itemOrMain)) : refuse(lane, DROP_REFUSALS.notThisLane);
+      // Yours or nobody's: an unassigned one is assigned to you; someone else's is refused by the lock above.
+      return lane === 'planning' || lane === 'implementing' ? allow(planAction(lane, assign, itemOrMain)) : refuse(lane, DROP_REFUSALS.notThisLane);
     case 'code-review': {
       if (lane !== 'code-review') return refuse(lane, DROP_REFUSALS.notThisLane);
       const pullRequestId = card.kind === 'board-item' ? card.pullRequestId : null;
@@ -290,6 +382,7 @@ export function refusedLanes(card: DropCard, me: DropMe): Partial<Record<Lane, s
 export function dragLock(card: DropCard, me: DropMe): string | null {
   if (Object.keys(allowedLanes(card, me)).length > 0) return null;
   const refused = refusedLanes(card, me);
-  const reasons = (['planning', 'implementing', 'code-review', 'qa'] as const).map((lane) => refused[lane]);
+  // The workflow lane a card's column belongs to speaks first ("No linked PR" on a Code Review card).
+  const reasons = (['code-review', 'qa', 'planning', 'implementing', 'review-only', 'qa-only', 'pr-only', 'comments-only'] as const).map((lane) => refused[lane]);
   return reasons.find((reason) => reason !== undefined && reason !== DROP_REFUSALS.notThisLane) ?? DROP_REFUSALS.notThisLane;
 }

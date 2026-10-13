@@ -178,7 +178,7 @@ describe('undo after a real drop (AL-237): ADO and disk exactly as before', () =
       expect(item()).toMatchObject({ state: 'Active', assignedTo: PEOPLE.KR });
       expect((await disk()).records).toEqual(['71318']);
 
-      await expect(undo.undo(launched.data.undoId)).resolves.toMatchObject({ ok: true, data: { worktreeRemoved: true, adoRestored: true } });
+      await expect(undo.undo(launched.data.undoId!)).resolves.toMatchObject({ ok: true, data: { worktreeRemoved: true, adoRestored: true } });
       expect({ ...item() }).toEqual({ ...adoBefore, rev: 5 });
       expect(await disk()).toEqual(diskBefore);
     } finally {

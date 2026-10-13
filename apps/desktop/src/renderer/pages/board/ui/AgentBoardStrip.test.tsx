@@ -38,7 +38,7 @@ beforeEach(() => {
 describe('AgentBoardStrip', () => {
   it('shows one cell per lane with its count and its cards as chips, +N past three', () => {
     renderStrip(true);
-    expect(screen.getAllByRole('button', { name: /Show the agent board$/ })).toHaveLength(8);
+    expect(screen.getAllByRole('button', { name: /Show the agent board$/ })).toHaveLength(12);
 
     const implementing = screen.getByTestId('strip-lane-implementing');
     expect(within(implementing).getByRole('button', { name: 'Implementing, 5 tickets. Show the agent board' })).toBeTruthy();

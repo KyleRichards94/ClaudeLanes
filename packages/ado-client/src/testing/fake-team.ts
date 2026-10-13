@@ -293,6 +293,8 @@ export interface FakeTeamOrgOptions {
    * the on-prem "unknown identity" 400).
    */
   identities?: 'any' | 'on-prem';
+  /** States a process rule refuses to move into (`TF401320`), e.g. one that needs a field the drop does not set. */
+  refuseStates?: readonly string[];
 }
 
 /** What the on-prem fixture's `connectionData` says about Kyle: the account without its domain. */
@@ -480,6 +482,14 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
       if (operations.some((operation) => operation.op === 'test' && operation.path === '/rev' && operation.value !== (item.rev ?? 3))) {
         return adoError(412, 'TF26071: This work item has been changed by someone else since you opened it.');
       }
+      let columnWrite: string | null = null;
+      // A refused operation writes nothing, as in Azure DevOps: the item is put back as it was.
+      const before = { ...item };
+      const refused = (response: Response) => {
+        for (const key of Object.keys(item)) if (!(key in before)) delete (item as unknown as Record<string, unknown>)[key];
+        Object.assign(item, before);
+        return response;
+      };
       for (const operation of operations) {
         if (operation.path === '/fields/System.AssignedTo') {
           if (operation.op === 'remove') delete item.assignedTo;
@@ -492,12 +502,22 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
             // Azure DevOps Server knows an identity by id or display name; a bare or domain account is refused.
             if (options.identities === 'on-prem' && (!person || sameText(person.uniqueName, value))) {
               state.refusedAssignees.push(value);
-              return adoError(400, `The identity value '${value}' for field 'Assigned To' is an unknown identity.`, 'WorkItemFieldInvalidException');
+              return refused(adoError(400, `The identity value '${value}' for field 'Assigned To' is an unknown identity.`, 'WorkItemFieldInvalidException'));
             }
             item.assignedTo = person ?? value;
           }
+        } else if (operation.path === `/fields/${FAKE_KANBAN_COLUMN_FIELD}` && operation.op === 'add') {
+          // The team's column field moves the card itself, within the columns its state maps to.
+          const named = state.boardColumns.find((column) => sameText(column.name, String(operation.value)));
+          if (!named) return refused(adoError(400, `TF401326: Invalid field status 'InvalidListValue' for field '${FAKE_KANBAN_COLUMN_FIELD}'.`, 'WorkItemFieldInvalidException'));
+          columnWrite = named.name;
         } else if (operation.path === '/fields/System.State' && operation.op === 'add') {
           const next = String(operation.value);
+          if (options.refuseStates?.some((refused) => sameText(refused, next))) {
+            return refused(adoError(400, `TF401320: Rule Error for field Activated By. Error code: Required, HasValues, LimitedToValues, AllowsOldValue, InvalidEmpty.`, 'RuleValidationException'));
+          }
+          // An unchanged state leaves the card where it is (a Failed card is often Active already).
+          if (sameText(next, item.state)) continue;
           // ADO moves the card to the first column mapped to the new state; a state no column maps goes back where it was.
           if (item.boardColumn) columnBefore.set(`${item.id}\n${item.state}`, item.boardColumn);
           const mapped = state.boardColumns.find((column) => sameText((column.stateMappings as Record<string, string>)[item.type], next));
@@ -507,6 +527,7 @@ export function createFakeTeamOrg(options: FakeTeamOrgOptions = {}): FakeTeamOrg
           item.state = next;
         }
       }
+      if (columnWrite) item.boardColumn = columnWrite;
       item.rev = (item.rev ?? 3) + 1;
       return HttpResponse.json(assignmentFields(item));
     }),

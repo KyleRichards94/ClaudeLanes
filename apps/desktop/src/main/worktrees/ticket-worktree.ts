@@ -121,6 +121,8 @@ export interface CreateTicketWorktreeInput {
   skills?: string[];
   /** Lane the card starts in; Queued unless given. */
   stage?: Lane;
+  /** The lane the session enters when it starts (a team board drop); Planning when left out. */
+  startLane?: Lane;
   /** Stops waiting and git calls; whatever was created is rolled back. */
   signal?: AbortSignal;
 }
@@ -396,6 +398,7 @@ export function createTicketWorktreeService(options: TicketWorktreeServiceOption
           gates: input.gates ?? defaults.stageGates,
           skills: input.skills ?? defaults.skills,
           stage: input.stage,
+          ...(input.startLane ? { startLane: input.startLane } : {}),
         })
         .catch((cause: unknown) => err('INTERNAL', cause instanceof Error ? cause.message : String(cause)));
       if (!created.ok) {

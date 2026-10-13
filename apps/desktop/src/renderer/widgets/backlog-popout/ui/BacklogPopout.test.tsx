@@ -150,6 +150,7 @@ describe('Backlog popout (AL-239, TB§5, artboard 11)', () => {
     fireEvent.keyDown(row(71335), { key: 'Enter', code: 'Enter' });
     const menu = await screen.findByRole('menu', { name: 'Send 2 items to a lane' });
     expect(within(menu).getAllByRole('menuitem').map((item) => item.getAttribute('aria-label'))).toEqual([
+      expect.stringMatching(/^QA only: QA it, nothing else\./),
       expect.stringMatching(/^Planning: plan it\./),
       expect.stringMatching(/^Implementing: implement it\./),
     ]);

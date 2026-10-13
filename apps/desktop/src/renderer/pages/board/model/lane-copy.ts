@@ -12,6 +12,10 @@ export const EMPTY_LANE_COPY: Readonly<Record<Lane, { title: string; body: strin
   qa: { title: 'Nothing in QA', body: 'Tickets land here once code review passes.' },
   'create-pr': { title: 'Nothing in Create PR', body: 'Tickets land here once QA passes.' },
   done: { title: 'Nothing done yet', body: 'Merged tickets land here.' },
+  'review-only': { title: 'No reviews', body: 'Drop a PR or an item with a branch: the agent only reviews it.' },
+  'qa-only': { title: 'No QA runs', body: 'Drop an item: the agent only QAs it against its criteria.' },
+  'pr-only': { title: 'No PRs to open', body: 'Drop an item with a branch: the agent only opens its PR.' },
+  'comments-only': { title: 'No PR comments to resolve', body: 'Drop your PR, or an item with its PR: the agent works through the open threads with /pr-comment-actioner.' },
 };
 
 /** The vertical label of a collapsed lane; Done says what it holds. */

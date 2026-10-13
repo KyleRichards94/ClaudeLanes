@@ -11,6 +11,7 @@ import {
   draftReducer,
   draftToPatch,
   dropErrorKey,
+  dropPromptErrorKey,
   isEmptyPatch,
   repoErrorKey,
   repoValues,
@@ -19,6 +20,7 @@ import {
   type DraftErrors,
   type SettingsDraft,
 } from '../model/settings-draft';
+import { DropRowFields } from './DropRowFields';
 
 export type SettingsSection = 'defaults' | 'drops' | 'repos';
 
@@ -163,25 +165,16 @@ function DropsSection({ draft, errors, dispatch }: SectionProps) {
       <Text variant="meta" size="sm">
         Hold Alt while you drop to change these for one drop.
       </Text>
-      {DROP_KINDS.map((kind) => {
-        const row = draft.drops[kind];
-        const label = `${DROP_KIND_LABELS[kind].lane} · ${DROP_KIND_LABELS[kind].what}`;
-        return (
-          <View key={kind} style={styles.gates} testID={`settings-drop-${kind}`}>
-            <TextField
-              label={label}
-              value={row.skills}
-              onChangeText={(skills) => dispatch({ type: 'drop', kind, change: { skills } })}
-              placeholder="No skills"
-              help="Skills, in the order they run; then the model and effort."
-              error={errors[dropErrorKey(kind)]}
-              testID={`settings-drop-${kind}-skills`}
-            />
-            <SegmentedControl label={`${label}: model`} options={MODEL_OPTIONS} value={row.model} onChange={(model) => dispatch({ type: 'drop', kind, change: { model } })} fill />
-            <SegmentedControl label={`${label}: effort`} options={EFFORT_OPTIONS} value={row.effort} onChange={(effort) => dispatch({ type: 'drop', kind, change: { effort } })} fill />
-          </View>
-        );
-      })}
+      {DROP_KINDS.map((kind) => (
+        <DropRowFields
+          key={kind}
+          label={`${DROP_KIND_LABELS[kind].lane} · ${DROP_KIND_LABELS[kind].what}`}
+          row={draft.drops[kind]}
+          onChange={(change) => dispatch({ type: 'drop', kind, change })}
+          errors={{ skills: errors[dropErrorKey(kind)], prompt: errors[dropPromptErrorKey(kind)] }}
+          testID={`settings-drop-${kind}`}
+        />
+      ))}
     </View>
   );
 }

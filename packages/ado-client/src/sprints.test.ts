@@ -273,6 +273,22 @@ describe('listSprints', () => {
     expect(await listSprints(client, { project: PROJECT, team: TEAM })).toMatchObject({ ok: false, code: 'ADO_SCOPE_MISSING' });
   });
 
+  it('lists the sprints with none current when Azure DevOps Server says no sprint contains today', async () => {
+    server.use(
+      http.get(ITERATIONS_ROUTE, ({ request }) =>
+        new URL(request.url).searchParams.has('$timeframe')
+          ? HttpResponse.json(
+              { message: "No current iteration was found. No iteration contains today's date.", typeKey: 'CurrentIterationDoesNotExistException' },
+              { status: 404 },
+            )
+          : HttpResponse.json({ count: 1, value: [sprint42] }),
+      ),
+    );
+    const { client } = createTestClient();
+    const result = await listSprints(client, { project: PROJECT, team: TEAM });
+    expect(result).toMatchObject({ ok: true, data: { currentId: null, sprints: [{ id: sprint42.id }] } });
+  });
+
   it('refuses iterations in an unexpected shape', async () => {
     const badDate = { ...sprint42, attributes: { startDate: 'next Tuesday', finishDate: null } };
     server.use(iterationsHandler([badDate], []));

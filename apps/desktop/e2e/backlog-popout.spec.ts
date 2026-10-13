@@ -101,7 +101,7 @@ test('dragging two selected rows onto Planning starts two agents; the second wai
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(from.x + 10, from.y - 10, { steps: 3 });
-  await expect(page.getByTestId('drag-status')).toHaveText('Dragging 2 items — drop on Planning or Implementing');
+  await expect(page.getByTestId('drag-status')).toHaveText('Dragging 2 items — drop on QA only, Planning or Implementing');
   // TB§5: the modal fades to 35 % and lets the pointer through to the lanes.
   await expect(popout()).toHaveCSS('opacity', '0.35');
   await expect(popout()).toHaveCSS('pointer-events', 'none');
@@ -109,8 +109,9 @@ test('dragging two selected rows onto Planning starts two agents; the second wai
   await expect(page.getByTestId('lane-implementing-drop-hint')).toContainText('Skip to implementing');
   await expect(page.getByTestId('lane-code-review-drop-hint')).toHaveCount(0);
 
-  const planning = await center(page.getByTestId('lane-planning'));
-  await page.mouse.move(planning.x, planning.y - 60, { steps: 8 });
+  // Near the lane's bottom edge: with the single-step row above, its top half sits under the pinned header.
+  const lane = (await page.getByTestId('lane-planning').boundingBox())!;
+  await page.mouse.move(lane.x + lane.width / 2, lane.y + lane.height - 40, { steps: 8 });
   await expect(page.getByTestId('lane-planning')).toHaveCSS('border-top-style', 'solid');
   await page.screenshot({ path: test.info().outputPath('backlog-dragging-1440x960.png') });
   await page.mouse.up();

@@ -84,7 +84,7 @@ export function digestEntry(ticket: AgentTicket, now: number): DigestEntry {
   if (ticket.prActivity && (ticket.prActivity.comments > 0 || ticket.prActivity.threads > 0)) {
     reasons.push(ticket.prActivity.threads > 0 ? `${plural(ticket.prActivity.threads, 'thread')} actioned` : `${plural(ticket.prActivity.comments, 'comment')} posted`);
   }
-  if (kind === 'finished' && ticket.stage === 'create-pr' && !ticket.pullRequest) reasons.push('Ready to merge or open a PR');
+  if (kind === 'finished' && (ticket.stage === 'create-pr' || ticket.stage === 'pr-only') && !ticket.pullRequest) reasons.push('Ready to merge or open a PR');
   if (kind === 'working' && ticket.activity?.text) reasons.push(ticket.activity.text);
 
   return {

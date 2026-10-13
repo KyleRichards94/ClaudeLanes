@@ -45,8 +45,8 @@ describe('drop rules (AL-230, TB§3)', () => {
       ['Backlog, yours', backlog({ assignee: KR })],
     ] as const;
 
-    it.each(cards)('%s lights up Planning and Implementing only', (_, card) => {
-      expect(lanesOf(allowedLanes(card, ME))).toEqual(['implementing', 'planning']);
+    it.each(cards)('%s lights up Planning, Implementing and QA only (no branch to review or open a PR from)', (_, card) => {
+      expect(lanesOf(allowedLanes(card, ME))).toEqual(['implementing', 'planning', 'qa-only']);
       expect(dragLock(card, ME)).toBeNull();
     });
 
@@ -79,22 +79,21 @@ describe('drop rules (AL-230, TB§3)', () => {
     });
   });
 
-  describe('row 3: In Progress item, assigned to you → Planning or Implementing, no ADO change', () => {
+  describe('row 3: In Progress item, yours or unassigned → Planning or Implementing, assigned to you and kept In Progress', () => {
     it("starts on the item's branch when it has one", () => {
       const allowed = allowedLanes(item('in-progress', { assignee: KR, branch: '71273-cutover-job-control' }), ME);
-      expect(lanesOf(allowed)).toEqual(['implementing', 'planning']);
-      expect(allowed.planning).toMatchObject({ changesAdo: false, adoChanges: [], worktree: 'item-branch', planGate: true, model: 'opus', effort: 'high' });
-      expect(allowed.implementing).toMatchObject({ changesAdo: false, worktree: 'item-branch', planGate: false });
+      expect(lanesOf(allowed)).toEqual(['implementing', 'planning', 'pr-only', 'qa-only', 'review-only']);
+      expect(allowed.planning).toMatchObject({ changesAdo: true, adoChanges: ['assign-to-me', 'move-to-in-progress'], worktree: 'item-branch', planGate: true, model: 'opus', effort: 'high' });
+      expect(allowed.implementing).toMatchObject({ changesAdo: true, worktree: 'item-branch', planGate: false });
     });
 
     it('starts from main when it has no branch', () => {
       const allowed = allowedLanes(item('in-progress', { assignee: KR }), ME);
-      expect(allowed.planning).toMatchObject({ worktree: 'main', changesAdo: false });
+      expect(allowed.planning).toMatchObject({ worktree: 'main', changesAdo: true });
     });
 
-    it('is refused when unassigned or assigned to someone else', () => {
-      expect(allowedLanes(item('in-progress'), ME)).toEqual({});
-      expect(dragLock(item('in-progress'), ME)).toBe(DROP_REFUSALS.notYours);
+    it("an unassigned one is assigned to you; someone else's is refused", () => {
+      expect(allowedLanes(item('in-progress'), ME).planning).toMatchObject({ changesAdo: true, detail: 'Assigns you · moves it to In Progress · starts planning' });
       expect(allowedLanes(item('in-progress', { assignee: MD }), ME)).toEqual({});
       expect(dragLock(item('in-progress', { assignee: MD }), ME)).toBe('Assigned to MD');
     });
@@ -117,14 +116,19 @@ describe('drop rules (AL-230, TB§3)', () => {
       ['yours', KR],
       ['unassigned', null],
       ["someone else's", MD],
-    ] as const)('a Code Review item with a linked PR, %s, goes to Code review only', (_, assignee) => {
+    ] as const)('a Code Review item with a linked PR, %s, goes to Code review and Review only', (_, assignee) => {
       const allowed = allowedLanes(item('code-review', { assignee, pullRequestId: 10598 }), ME);
-      expect(lanesOf(allowed)).toEqual(['code-review']);
+      expect(lanesOf(allowed).filter((lane) => lane !== 'qa-only' && lane !== 'comments-only')).toEqual(['code-review', 'review-only']);
+      // Resolving its PR's comments needs it yours or nobody's, as QA only does.
+      expect(allowed['comments-only'] !== undefined).toBe(assignee !== MD);
       expect(allowed['code-review']).toMatchObject(review);
+      expect(allowed['review-only']).toMatchObject({ changesAdo: false, worktree: 'pr-branch-read-only', skills: ['/code-review'] });
+      // QA only needs it yours or nobody's.
+      expect(allowed['qa-only'] !== undefined).toBe(assignee !== MD);
     });
 
-    it('a Code Review item with no linked PR is refused with "No linked PR"', () => {
-      const card = item('code-review', { assignee: KR });
+    it('a Code Review item with no linked PR is refused by Code review with "No linked PR"', () => {
+      const card = item('code-review', { assignee: MD });
       expect(allowedLanes(card, ME)).toEqual({});
       expect(refusedLanes(card, ME)['code-review']).toBe('No linked PR');
       expect(dragLock(card, ME)).toBe('No linked PR');
@@ -142,7 +146,7 @@ describe('drop rules (AL-230, TB§3)', () => {
   describe('row 5: your open PR with comments → Implementing', () => {
     it('answers the open threads on the source branch with /pr-comment-actioner, Sonnet High', () => {
       const allowed = allowedLanes(pr({ unresolvedThreads: 4 }), ME);
-      expect(lanesOf(allowed)).toEqual(['code-review', 'implementing']);
+      expect(lanesOf(allowed)).toEqual(['code-review', 'comments-only', 'implementing', 'review-only']);
       expect(allowed.implementing).toMatchObject({
         title: 'Answer PR comments',
         label: 'answer 4 comments',
@@ -178,7 +182,8 @@ describe('drop rules (AL-230, TB§3)', () => {
       ['unassigned', null],
     ] as const)('%s builds the branch and checks the criteria with /cs-qa-wip, Sonnet Med', (_, assignee) => {
       const allowed = allowedLanes(item('testing', { assignee, branch: '71310-timesheet-export' }), ME);
-      expect(lanesOf(allowed)).toEqual(['qa']);
+      expect(lanesOf(allowed)).toEqual(['pr-only', 'qa', 'qa-only', 'review-only']);
+      expect(allowed['qa-only']).toMatchObject({ changesAdo: false, worktree: 'item-branch', skills: ['/cs-qa-wip'] });
       expect(allowed.qa).toMatchObject({ changesAdo: false, worktree: 'item-branch', skills: ['/cs-qa-wip'], model: 'sonnet', effort: 'medium' });
     });
 
@@ -243,11 +248,52 @@ describe('drop rules (AL-230, TB§3)', () => {
       }
     });
 
-    it('only To Do, Failed and backlog items change ADO', () => {
+    it('only To Do, Failed, In Progress and backlog items change ADO', () => {
       for (const card of everyCard) {
         const changes = Object.values(allowedLanes(card, ME)).some((action) => action.changesAdo);
-        expect(changes).toBe(card.kind === 'backlog-item' || (card.kind === 'board-item' && (card.column === 'to-do' || card.column === 'failed')));
+        expect(changes).toBe(card.kind === 'backlog-item' || (card.kind === 'board-item' && (card.column === 'to-do' || card.column === 'failed' || card.column === 'in-progress')));
       }
+    });
+  });
+
+  describe('single-step lanes: Review only, QA only, Create PR only', () => {
+    it("Review only reviews a PR, or an item's branch, and needs one of them", () => {
+      expect(allowedLanes(pr({ author: MD }), ME)['review-only']).toMatchObject({ lane: 'review-only', title: 'Review only', worktree: 'pr-branch-read-only', planGate: null, changesAdo: false });
+      expect(allowedLanes(item('to-do', { branch: '71341-x' }), ME)['review-only']).toMatchObject({ worktree: 'item-branch', changesAdo: true });
+      expect(refusedLanes(item('to-do'), ME)['review-only']).toBe(DROP_REFUSALS.noBranch);
+    });
+
+    it('QA only takes any item that is yours or unassigned, from its branch or main', () => {
+      expect(allowedLanes(backlog(), ME)['qa-only']).toMatchObject({ worktree: 'main', skills: ['/cs-qa-wip'], model: 'sonnet', changesAdo: true });
+      expect(allowedLanes(item('testing', { assignee: KR, branch: 'b' }), ME)['qa-only']).toMatchObject({ worktree: 'item-branch', changesAdo: false });
+      expect(refusedLanes(item('to-do', { assignee: MD }), ME)['qa-only']).toBe('Assigned to MD');
+      expect(refusedLanes(pr(), ME)['qa-only']).toBe(DROP_REFUSALS.notThisLane);
+    });
+
+    it('Resolve PR comments takes your PR with open threads, or an item with a linked PR, on the PR source branch', () => {
+      expect(allowedLanes(pr({ unresolvedThreads: 4 }), ME)['comments-only']).toMatchObject({
+        lane: 'comments-only',
+        title: 'Resolve PR comments',
+        worktree: 'pr-source-branch',
+        skills: ['/pr-comment-actioner'],
+        changesAdo: false,
+        planGate: null,
+      });
+      expect(refusedLanes(pr({ author: MD }), ME)['comments-only']).toBe(DROP_REFUSALS.notAuthor);
+      expect(refusedLanes(pr({ unresolvedThreads: 0 }), ME)['comments-only']).toBe(DROP_REFUSALS.noComments);
+      expect(allowedLanes(item('code-review', { assignee: KR, pullRequestId: 10598 }), ME)['comments-only']).toMatchObject({ worktree: 'pr-source-branch' });
+      expect(refusedLanes(item('code-review', { assignee: MD, pullRequestId: 10598 }), ME)['comments-only']).toBe('Assigned to MD');
+      expect(refusedLanes(item('in-progress', { assignee: KR }), ME)['comments-only']).toBe(DROP_REFUSALS.noLinkedPr);
+    });
+
+    it("Create PR only opens a PR from the item's branch, and is refused without one", () => {
+      expect(allowedLanes(item('in-progress', { assignee: KR, branch: 'b' }), ME)['pr-only']).toMatchObject({
+        title: 'Create PR only',
+        worktree: 'item-branch',
+        detail: "Assigns you · moves it to In Progress · Commits the item's branch and opens its PR, then stops",
+      });
+      expect(refusedLanes(item('to-do'), ME)['pr-only']).toBe(DROP_REFUSALS.noBranch);
+      expect(refusedLanes(pr(), ME)['pr-only']).toBe(DROP_REFUSALS.notThisLane);
     });
   });
 

@@ -7,7 +7,9 @@ import {
   getConnectionsModal,
   getToasts,
   resetConnectionsModal,
+  outputDiffLayout,
   resetTicketPageTabs,
+  setOutputDiffLayout,
   showErrorRecovery,
   useTicketPageTab,
   type RecoverableError,
@@ -108,12 +110,15 @@ describe('error recovery actions (AL-211)', () => {
     expect(alert.textContent).toContain('Files: Grid.razor.');
     await user.click(within(alert).getByRole('button', { name: 'View conflicts' }));
     expect(selectRoute(router.getState())).toEqual(routes.ticket('71273'));
-    expect(screen.getByTestId('tab-probe').textContent).toBe('diff');
+    // The diff is a pane of Output & diff: asking for it shows that view.
+    expect(screen.getByTestId('tab-probe').textContent).toBe('output');
   });
 
-  it('GIT_DIRTY: Review changes opens the Diff tab on the uncommitted changes', async () => {
+  it('GIT_DIRTY: Review changes opens Output & diff with the diff pane on the uncommitted changes', async () => {
+    setOutputDiffLayout({ diffShown: false });
     await recover({ code: 'GIT_DIRTY', message: 'Uncommitted changes.', details: { files: ['a.cs'], fileCount: 1 } }, { ticketId: '71273' }, 'Review changes');
-    expect(screen.getByTestId('tab-probe').textContent).toBe('diff');
+    expect(screen.getByTestId('tab-probe').textContent).toBe('output');
+    expect(outputDiffLayout().diffShown).toBe(true);
   });
 
   it.each(['VALIDATION', 'INTERNAL'] as const)('%s: shows the details and copies diagnostics', async (code) => {

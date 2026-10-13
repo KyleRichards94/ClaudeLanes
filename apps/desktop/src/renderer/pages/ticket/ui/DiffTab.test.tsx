@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { GitDiff, GitDiffFile, GitDiffFileRequest, GitDiffRequest, TicketSubBranch } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { installFakeBridge } from '@/shared/testing';
-import { DIFF_LINES_PAGE, DiffTab } from './DiffTab';
+import type { DiffView } from '@/shared/model';
+import { AUTO_EXPAND_FILES, DIFF_LINES_PAGE, DiffTab } from './DiffTab';
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -41,7 +42,7 @@ function fileReply(request: GitDiffFileRequest): GitDiffFile {
   return { kind: 'text', path: request.path, patch: smallPatch };
 }
 
-function setup({ subBranches = [], diff }: { subBranches?: TicketSubBranch[]; diff?: Partial<GitDiff> } = {}) {
+function setup({ subBranches = [], diff, view = 'unified', recent }: { subBranches?: TicketSubBranch[]; diff?: Partial<GitDiff>; view?: DiffView; recent?: ReadonlyMap<string, number> } = {}) {
   const bridge = installFakeBridge();
   bridge.invoke = vi.fn(async (channel: string, request: unknown) => {
     if (channel === 'git:diff') return { ok: true, data: diffOf(request as GitDiffRequest, diff) };
@@ -51,15 +52,18 @@ function setup({ subBranches = [], diff }: { subBranches?: TicketSubBranch[]; di
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <DiffTab ticketId="71273" branch="71273-cutover-job-control" subBranches={subBranches} />
+      <DiffTab ticketId="71273" branch="71273-cutover-job-control" subBranches={subBranches} view={view} {...(recent ? { recent } : {})} />
     </QueryClientProvider>,
   );
   const fileCalls = () => vi.mocked(bridge.invoke).mock.calls.filter(([channel]) => channel === 'git:diffFile');
   return { bridge, fileCalls };
 }
 
+/** One file's card: its header button's parent. */
+const fileCard = (path: string) => screen.getByTestId(`diff-file-${path}`).parentElement!;
+
 describe('DiffTab (AL-179)', () => {
-  it('lists the changed files with their stats and loads no file diff until one is opened', async () => {
+  it('lists the changed files with their stats, each opened with its diff loaded', async () => {
     const { fileCalls } = setup();
 
     expect(await screen.findAllByTestId('diff-file')).toHaveLength(4);
@@ -69,15 +73,16 @@ describe('DiffTab (AL-179)', () => {
     expect(screen.getByRole('button', { name: 'Pages/Jobs/JobControl.razor, added, +214 −0' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Data/old-seed.json → Data/seed.json, renamed, +1 −1' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'wwwroot/logo.png, modified, binary' })).toBeTruthy();
-    expect(fileCalls()).toHaveLength(0);
+    expect(screen.getByTestId('diff-file-OnSite/Forms/frmJobControl.vb').getAttribute('aria-expanded')).toBe('true');
+    await waitFor(() => expect(fileCalls()).toHaveLength(4));
   });
 
-  it('loads one file on demand and draws it as a unified diff with add and remove tints', async () => {
+  it('draws a file as a unified diff with add and remove tints, and collapses and reopens it from the cache', async () => {
     const { fileCalls } = setup();
-    fireEvent.click(await screen.findByTestId('diff-file-OnSite/Forms/frmJobControl.vb'));
+    await screen.findByTestId('diff-file-OnSite/Forms/frmJobControl.vb');
 
-    const lines = await screen.findByTestId('diff-file-lines');
-    expect(fileCalls()).toEqual([['git:diffFile', { ticketId: '71273', against: { kind: 'base' }, path: 'OnSite/Forms/frmJobControl.vb' }]]);
+    const lines = await within(fileCard('OnSite/Forms/frmJobControl.vb')).findByTestId('diff-file-lines');
+    expect(fileCalls()).toContainEqual(['git:diffFile', { ticketId: '71273', against: { kind: 'base' }, path: 'OnSite/Forms/frmJobControl.vb' }]);
     expect(within(lines).getAllByTestId('diff-line-hunk')).toHaveLength(1);
     expect(within(lines).getByTestId('diff-line-remove').textContent).toContain('Public Class frmJobControl');
     expect(within(lines).getByTestId('diff-line-add').textContent).toContain('Public Class frmJobControlLegacy');
@@ -85,16 +90,16 @@ describe('DiffTab (AL-179)', () => {
 
     // Closing and reopening draws the cached diff straight away.
     fireEvent.click(screen.getByTestId('diff-file-OnSite/Forms/frmJobControl.vb'));
-    expect(screen.queryByTestId('diff-file-lines')).toBeNull();
+    expect(within(fileCard('OnSite/Forms/frmJobControl.vb')).queryByTestId('diff-file-lines')).toBeNull();
     fireEvent.click(screen.getByTestId('diff-file-OnSite/Forms/frmJobControl.vb'));
-    expect(screen.getByTestId('diff-file-lines')).toBeTruthy();
-    expect(screen.queryByTestId('diff-file-loading')).toBeNull();
+    expect(within(fileCard('OnSite/Forms/frmJobControl.vb')).getByTestId('diff-file-lines')).toBeTruthy();
+    expect(within(fileCard('OnSite/Forms/frmJobControl.vb')).queryByTestId('diff-file-loading')).toBeNull();
   });
 
   it('draws a long file a page of lines at a time', async () => {
     setup();
-    fireEvent.click(await screen.findByTestId('diff-file-Pages/Jobs/JobControl.razor'));
-    const lines = await screen.findByTestId('diff-file-lines');
+    await screen.findByTestId('diff-file-Pages/Jobs/JobControl.razor');
+    const lines = await within(fileCard('Pages/Jobs/JobControl.razor')).findByTestId('diff-file-lines');
     expect(within(lines).getAllByTestId('diff-line-add')).toHaveLength(DIFF_LINES_PAGE - 1);
 
     fireEvent.click(screen.getByRole('button', { name: `Show ${DIFF_LINES_PAGE} more of ${1_001 - DIFF_LINES_PAGE} lines` }));
@@ -103,8 +108,6 @@ describe('DiffTab (AL-179)', () => {
 
   it('shows placeholders, not content, for binary and too-large files', async () => {
     setup();
-    fireEvent.click(await screen.findByTestId('diff-file-wwwroot/logo.png'));
-    fireEvent.click(screen.getByTestId('diff-file-Data/seed.json'));
     expect((await screen.findByTestId('diff-file-binary')).textContent).toBe('Binary file not shown.');
     expect((await screen.findByTestId('diff-file-too-large')).textContent).toBe('Diff too large to show (2.0 MB). Open the file in your editor to see it.');
   });
@@ -121,6 +124,37 @@ describe('DiffTab (AL-179)', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'sub/71273-grid vs 71273-cutover-job-control' }));
     await waitFor(() => expect(screen.getByTestId('diff-refs').textContent).toBe('sub/71273-grid vs 71273-cutover-job-control @ abcdef0'));
     expect(bridge.invoke).toHaveBeenCalledWith('git:diff', { ticketId: '71273', against: { kind: 'sub-branch', branch: 'sub/71273-grid' } });
+  });
+
+  it('draws old and new side by side, with blanks where one side has no line', async () => {
+    setup({ view: 'split' });
+    await screen.findByTestId('diff-file-OnSite/Forms/frmJobControl.vb');
+    const card = within(fileCard('OnSite/Forms/frmJobControl.vb'));
+    await card.findByTestId('diff-file-lines');
+    expect(card.getAllByTestId('diff-split-row')).toHaveLength(2);
+    expect(card.getByTestId('diff-split-old-remove').textContent).toContain('Public Class frmJobControl');
+    expect(card.getByTestId('diff-split-new-add').textContent).toContain('Public Class frmJobControlLegacy');
+    expect(card.getByTestId('diff-split-old-context').textContent).toContain('Imports System');
+  });
+
+  it('collapses and expands every file at once', async () => {
+    setup();
+    await screen.findAllByTestId('diff-file');
+    fireEvent.click(screen.getByTestId('diff-collapse-all'));
+    for (const file of files) expect(screen.getByTestId(`diff-file-${file.path}`).getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(screen.getByTestId('diff-expand-all'));
+    for (const file of files) expect(screen.getByTestId(`diff-file-${file.path}`).getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('opens the first files of a large change set, and always the ones the agent just changed', async () => {
+    const many = Array.from({ length: AUTO_EXPAND_FILES + 2 }, (_, index) => ({ path: `src/File${index}.cs`, oldPath: null, status: 'modified' as const, additions: 1, deletions: 1, binary: false }));
+    const last = many.at(-1)!.path;
+    setup({ diff: { files: many, totals: { files: many.length, additions: many.length, deletions: many.length } }, recent: new Map([[last, Date.now()]]) });
+    await screen.findAllByTestId('diff-file');
+    expect(screen.getByTestId(`diff-file-src/File${AUTO_EXPAND_FILES - 1}.cs`).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId(`diff-file-src/File${AUTO_EXPAND_FILES}.cs`).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByTestId(`diff-file-${last}`).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId(`diff-file-${last}-recent`).textContent).toBe('Changed just now');
   });
 
   it('says when there is nothing to show or the list was cut short', async () => {

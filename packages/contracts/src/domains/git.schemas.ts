@@ -170,6 +170,8 @@ export const MergeToMainRequestSchema = z.strictObject({
   acceptQaWarning: z.boolean().optional(),
   /** `checkout` when left out (AL-271). */
   target: MergeTargetSchema.optional(),
+  /** Commit the ticket worktree's uncommitted changes (tracked and untracked) first, instead of refusing with `worktree-dirty`. */
+  commitChanges: z.boolean().optional(),
 });
 export type MergeToMainRequest = z.infer<typeof MergeToMainRequestSchema>;
 

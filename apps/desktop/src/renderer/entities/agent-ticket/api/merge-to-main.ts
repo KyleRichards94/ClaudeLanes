@@ -37,7 +37,7 @@ export function useMergeToMainPreview(ticketId: string, options: { enabled?: boo
 export function useMergeToMain(store: AgentTicketStore = agentTickets) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (request: { ticketId: string; acceptQaWarning?: boolean; target?: MergeTarget }) =>
+    mutationFn: async (request: { ticketId: string; acceptQaWarning?: boolean; target?: MergeTarget; commitChanges?: boolean }) =>
       unwrap(await invoke('git:mergeToMain', { ...request, confirmed: true })),
     onSuccess: (result: MergeToMainResult) => {
       const { record } = result;

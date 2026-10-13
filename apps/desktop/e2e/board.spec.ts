@@ -176,7 +176,7 @@ test('a right-click on a card opens its menu, and Move to stage… moves the car
   const modal = page.getByTestId('move-stage-modal');
   await expect(modal).toBeVisible();
   // QA, not Done: the Done lane is collapsed by default and draws no cards.
-  await modal.getByRole('radio', { name: 'QA' }).click();
+  await modal.getByRole('radio', { name: 'QA', exact: true }).click();
   await modal.getByTestId('move-stage-confirm').click();
   await expect(modal).toBeHidden();
   await expect(page.getByTestId('lane-qa').getByRole('button', { name: /^#71288/ })).toBeVisible();

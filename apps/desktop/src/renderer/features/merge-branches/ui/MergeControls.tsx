@@ -22,9 +22,9 @@ function plural(count: number, one: string, many = `${one}s`): string {
 
 /**
  * The Merge panel's body (AL-174, artboard 3, design §9 steps 4–5, R9): "Merge N sub-branches →
- * <ticket branch>" and the dark "Merge worktree → main". Each is off with its reason when nothing is
- * ready or the worktree is dirty. Merge worktree → main asks first in a confirm modal (QA warning,
- * dirty refusal); a sub-branch merge that stops on a conflict opens the conflict view with "Hand to
+ * <ticket branch>" and the dark "Merge worktree → main". Merge sub-branches is off with its reason when
+ * nothing is ready or the worktree is dirty; Merge worktree → main stays on with a dirty worktree and
+ * asks first in a confirm modal (QA warning, commits the uncommitted changes first); a sub-branch merge that stops on a conflict opens the conflict view with "Hand to
  * lead agent" and "Open in editor", which stays one press away until the conflict is resolved.
  */
 export function MergeControls({ ticket, store = agentTickets }: MergeControlsProps) {
@@ -137,15 +137,24 @@ export function MergeControlsView({ view, target, merging = false, onMergeSubBra
             View
           </Text>
         </Pressable>
-      ) : reasons.length > 0 ? (
-        <View testID="merge-disabled-reasons">
-          {reasons.map((reason) => (
-            <Text key={reason} variant="meta">
-              {reason}
+      ) : (
+        <>
+          {reasons.length > 0 ? (
+            <View testID="merge-disabled-reasons">
+              {reasons.map((reason) => (
+                <Text key={reason} variant="meta">
+                  {reason}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {view.toMain.note ? (
+            <Text variant="meta" testID="merge-to-main-note">
+              {view.toMain.note}
             </Text>
-          ))}
-        </View>
-      ) : null}
+          ) : null}
+        </>
+      )}
     </View>
   );
 }

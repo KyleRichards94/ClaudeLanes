@@ -1,4 +1,4 @@
-import { STAGES, type Lane } from '@agent-lanes/contracts';
+import { SOLO_LANES, STAGES, type Lane } from '@agent-lanes/contracts';
 import type { AgentTicketsState } from './store';
 import type { AgentTicket } from './types';
 
@@ -65,7 +65,7 @@ export function selectTicketTotal(state: AgentTicketsState): number {
 export const AGENT_TICKET_COUNTS = ['running', 'needs-you', 'queued', 'sub-agents-running', 'builds-running'] as const;
 export type AgentTicketCount = (typeof AGENT_TICKET_COUNTS)[number];
 
-const stageLanes = new Set<Lane>(STAGES);
+const stageLanes = new Set<Lane>([...STAGES, ...SOLO_LANES]);
 
 /**
  * - `running`: cards in a stage lane (Planning to Create PR) that don't need the user ("4 running").

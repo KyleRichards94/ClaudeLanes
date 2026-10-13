@@ -1,4 +1,4 @@
-import { STAGES, type Lane, type Stage, type TicketStageEntry } from '@agent-lanes/contracts';
+import { STAGES, stageOfLane, type Lane, type Stage, type TicketStageEntry } from '@agent-lanes/contracts';
 
 export interface StageStep {
   readonly stage: Stage;
@@ -13,7 +13,7 @@ export interface StageStep {
  * stage done. A stage's duration runs from its last entry to the entry after it in the history.
  */
 export function stageSteps(lane: Lane, history: readonly TicketStageEntry[]): StageStep[] {
-  const currentIndex = lane === 'queued' ? -1 : lane === 'done' ? STAGES.length : STAGES.indexOf(lane);
+  const currentIndex = lane === 'queued' ? -1 : lane === 'done' ? STAGES.length : STAGES.indexOf(stageOfLane(lane) as Stage);
 
   return STAGES.map((stage, index) => {
     const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'upcoming';

@@ -93,11 +93,12 @@ describe('MergeControls (AL-174)', () => {
     expect(screen.queryByTestId('merge-disabled-reasons')).toBeNull();
   });
 
-  it('disables both with the reason when the worktree is dirty', async () => {
+  it('disables Merge sub-branches when the worktree is dirty, and keeps Merge → main on, saying the changes are committed first', async () => {
     setup({ 'branches:status': { ok: true, data: branchStatus({ dirty: true, changedFiles: 2 }) } });
     await waitFor(() => expect(screen.getByTestId('merge-disabled-reasons').textContent).toBe('The worktree has 2 uncommitted changes.'));
     expect(subButton().getAttribute('aria-disabled')).toBe('true');
-    expect(mainButton().getAttribute('aria-disabled')).toBe('true');
+    expect(mainButton().getAttribute('aria-disabled')).toBeNull();
+    expect(screen.getByTestId('merge-to-main-note').textContent).toBe('2 uncommitted changes will be committed first.');
   });
 
   it('disables Merge sub-branches with a reason when nothing is ready', async () => {
@@ -205,7 +206,7 @@ describe('MergeControls (AL-174)', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Merge anyway' }));
     // AL-271: the main checkout's branch is the default target.
-    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('git:mergeToMain', { ticketId: '71273', target: 'checkout', acceptQaWarning: true, confirmed: true }));
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('git:mergeToMain', { ticketId: '71273', target: 'checkout', commitChanges: true, acceptQaWarning: true, confirmed: true }));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Merge worktree → main' })).toBeNull());
     expect(getToasts().at(-1)).toMatchObject({ tone: 'success', title: 'Merged into main · 15:20' });
     expect(selectTicket(store.getState(), '71273')?.stage).toBe('done');
@@ -222,37 +223,22 @@ describe('MergeControls (AL-174)', () => {
     expect(bridge.invoke).not.toHaveBeenCalledWith('git:mergeToMain', expect.anything());
   });
 
-  it('refuses a dirty worktree in the confirm, from the preview or from the merge', async () => {
-    setup({
+  it('a preview that finds the worktree dirty still offers the merge, and asks for the changes to be committed first', async () => {
+    const { bridge } = setup({
       'branches:status': { ok: true, data: branchStatus() },
-      'git:mergeToMainPreview': { ok: true, data: preview() },
+      'git:mergeToMainPreview': { ok: true, data: preview({ worktree: { worktreePath: 'C:/wt/71273', present: true, dirty: true, changedFiles: 3, conflicted: false } }) },
       'git:mergeToMain': {
-        ok: false,
-        code: 'GIT_DIRTY',
-        message: 'The worktree has uncommitted changes.',
-        details: { reason: 'worktree-dirty', files: ['Pages/Jobs/JobControl.razor'] },
+        ok: true,
+        data: { record: fakeTicketRecord({ id: '71273', stage: 'done' }), target: 'main', targetKind: 'checkout', mergeCommit: 'm1', pushed: false, mergedAt: new Date(2026, 9, 8, 15, 20).getTime() },
       },
     });
     await waitFor(() => expect(mainButton().getAttribute('aria-disabled')).toBeNull());
     fireEvent.click(mainButton());
     const dialog = await screen.findByRole('dialog', { name: 'Merge worktree → main' });
-    const confirm = () => within(dialog).getByRole('button', { name: 'Merge into main' });
-    await waitFor(() => expect(confirm().getAttribute('aria-disabled')).toBeNull());
-    fireEvent.click(confirm());
-
-    await waitFor(() => expect(within(dialog).getByTestId('merge-to-main-dirty').textContent).toContain('Pages/Jobs/JobControl.razor'));
-    expect(confirm().getAttribute('aria-disabled')).toBe('true');
-  });
-
-  it('a preview that finds the worktree dirty never offers the merge', async () => {
-    setup({
-      'branches:status': { ok: true, data: branchStatus() },
-      'git:mergeToMainPreview': { ok: true, data: preview({ worktree: { worktreePath: 'C:/wt/71273', present: true, dirty: true, changedFiles: 3, conflicted: false } }) },
-    });
-    await waitFor(() => expect(mainButton().getAttribute('aria-disabled')).toBeNull());
-    fireEvent.click(mainButton());
-    const dialog = await screen.findByRole('dialog', { name: 'Merge worktree → main' });
-    await waitFor(() => expect(within(dialog).getByTestId('merge-to-main-dirty').textContent).toContain('Commit or discard 3 changes before merging.'));
-    expect(within(dialog).getByRole('button', { name: 'Merge into main' }).getAttribute('aria-disabled')).toBe('true');
+    await waitFor(() => expect(within(dialog).getByTestId('merge-to-main-dirty').textContent).toContain('3 changes are committed to 71273-cutover-job-control first, then merged.'));
+    const confirm = within(dialog).getByRole('button', { name: 'Merge into main' });
+    expect(confirm.getAttribute('aria-disabled')).toBeNull();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('git:mergeToMain', { ticketId: '71273', target: 'checkout', commitChanges: true, confirmed: true }));
   });
 });

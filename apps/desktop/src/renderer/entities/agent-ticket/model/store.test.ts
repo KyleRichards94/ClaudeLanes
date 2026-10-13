@@ -44,6 +44,10 @@ describe('agent ticket store', () => {
       qa: ['71310'],
       'create-pr': ['71266'],
       done: [],
+      'review-only': [],
+      'qa-only': [],
+      'pr-only': [],
+      'comments-only': [],
     });
     expect(selectTicket(store.getState(), '71273')?.title).toBe('Cutover frmJobControl to Blazor');
     expect(selectTicket(store.getState(), 'constructor')).toBeUndefined();

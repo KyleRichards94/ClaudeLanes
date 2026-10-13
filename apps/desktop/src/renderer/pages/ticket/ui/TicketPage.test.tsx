@@ -133,18 +133,26 @@ describe('TicketPage', () => {
     }
     expect(await screen.findByText('Merge 1 sub-branch')).toBeTruthy();
     expect(screen.getByTestId('merge-sub-branches-target').textContent).toBe('→ 71273-cutover-frmjobcontrol-to');
-    expect(screen.getByText('sub/71273-filter')).toBeTruthy();
+    expect(within(screen.getByTestId('ticket-side-column')).getByText('sub/71273-filter')).toBeTruthy();
   });
 
   it('switches tabs in place and opens Claude Design on its own route', async () => {
     const router = renderPage();
     await screen.findByTestId('ticket-title');
 
-    expect(screen.getByRole('tab', { name: 'Output' }).getAttribute('aria-selected')).toBe('true');
+    // Output & diff: the output and the diff side by side in one view.
+    expect(screen.getByRole('tab', { name: 'Output & diff' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByTestId('ticket-tab-output')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Diff' }));
     expect(await screen.findByTestId('ticket-tab-diff')).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Diff' })).toBeNull();
+
+    fireEvent.click(screen.getByTestId('toggle-diff-pane'));
+    expect(screen.queryByTestId('ticket-tab-diff')).toBeNull();
+    fireEvent.click(screen.getByTestId('toggle-diff-pane'));
+    expect(await screen.findByTestId('ticket-tab-diff')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Build log' }));
+    expect(screen.queryByTestId('ticket-tab-output')).toBeNull();
     expect(selectRoute(router.getState())).toEqual(routes.ticket('71273'));
 
     fireEvent.click(screen.getByRole('tab', { name: 'Claude Design' }));

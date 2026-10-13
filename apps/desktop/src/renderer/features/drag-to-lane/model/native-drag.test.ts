@@ -22,7 +22,7 @@ describe('native backlog drags (AL-239, TB§5 pop out)', () => {
       { kind: 'backlog-item', id: 71335 },
     ]);
     expect(card?.group?.[0]).toMatchObject({ label: '#71360', title: 'Backlog 71360', card: { kind: 'backlog-item', id: 71360, assignee: null, agentLane: null } });
-    expect(Object.keys(activeDrag(card!, 'pointer').allowed)).toEqual(['planning', 'implementing']);
+    expect(Object.keys(activeDrag(card!, 'pointer').allowed)).toEqual(['qa-only', 'planning', 'implementing']);
   });
 
   it('decodes one row without a group', () => {
@@ -45,6 +45,6 @@ describe('native backlog drags (AL-239, TB§5 pop out)', () => {
   });
 
   it('lights the backlog lanes while a native drag is over the window', () => {
-    expect(Object.keys(activeDrag(nativeBacklogPlaceholder(), 'pointer').allowed)).toEqual(['planning', 'implementing']);
+    expect(Object.keys(activeDrag(nativeBacklogPlaceholder(), 'pointer').allowed)).toEqual(['qa-only', 'planning', 'implementing']);
   });
 });

@@ -41,6 +41,12 @@ function withoutUndo(id: string, launched: LaunchFromAdoResponse): void {
  */
 export function showLaunchToast(launched: LaunchFromAdoResponse, deps: LaunchToastDeps): () => void {
   const id = launchToastId(launched.ticketId);
+  // Handed to the ticket that already has the PR's branch: nothing was created, so nothing to undo.
+  const { undoId } = launched;
+  if (undoId === null) {
+    toast({ id, tone: 'success', title: launchToastTitle(launched), body: launched.summary });
+    return () => undefined;
+  }
   let done = false;
   let unsubscribe: () => void = () => undefined;
   const finish = () => {
@@ -52,7 +58,7 @@ export function showLaunchToast(launched: LaunchFromAdoResponse, deps: LaunchToa
 
   const undo = async () => {
     finish();
-    const result = await invoke('agent:undoLaunch', { undoId: launched.undoId });
+    const result = await invoke('agent:undoLaunch', { undoId });
     deps.refresh();
     if (!result.ok) {
       toast({ id, tone: 'warning', title: 'Undo is no longer available', body: result.message });

@@ -22,3 +22,4 @@ export {
 } from './work-item-colors';
 export { ActionMenu, MenuPopover, type ActionMenuItem, type ActionMenuProps, type MenuAnchor, type MenuPopoverProps } from './action-menu';
 export { PLAN_LIMIT_DANGER_PERCENT, PLAN_LIMIT_WARN_PERCENT, PlanLimitsPill, planLimitsView } from './plan-limits';
+export { SPLIT_KEY_STEP, SplitView, clampRatio, type SplitViewProps } from './split-view';

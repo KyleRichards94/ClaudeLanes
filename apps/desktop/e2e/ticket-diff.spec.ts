@@ -49,18 +49,16 @@ test.afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-test('lists the ticket branch changes and loads a file diff when it is opened', async () => {
+test('lists the ticket branch changes beside the output, each file open with its diff', async () => {
   await page.evaluate("window.location.hash = '#/ticket/71273'");
-  await page.getByRole('tab', { name: 'Diff' }).click();
+  // Output & diff: the diff is a pane beside the output, open by default.
+  await expect(page.getByRole('tab', { name: 'Output & diff' })).toHaveAttribute('aria-selected', 'true');
 
   const tab = page.getByTestId('ticket-tab-diff');
   await expect(tab.getByTestId('diff-file')).toHaveCount(2, { timeout: 15_000 });
   await expect(tab.getByTestId('diff-totals')).toHaveText('2 files · +3 −1');
   await expect(tab.getByText('Includes uncommitted changes')).toBeVisible();
-  await expect(tab.getByTestId('diff-file-lines')).toHaveCount(0);
-
-  await tab.getByTestId('diff-file-frmJobControl.vb').click();
-  const lines = tab.getByTestId('diff-file-lines');
+  const lines = tab.getByTestId('diff-file-frmJobControl.vb').locator('..').getByTestId('diff-file-lines');
   await expect(lines.getByTestId('diff-line-remove')).toContainText('Public Class frmJobControl');
   await expect(lines.getByTestId('diff-line-add')).toContainText('Public Class frmJobControlLegacy');
   await tab.screenshot({ path: test.info().outputPath('diff-tab.png') });
