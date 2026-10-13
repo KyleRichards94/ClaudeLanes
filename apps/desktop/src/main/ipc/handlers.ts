@@ -3,6 +3,7 @@ import { createAgentHandlers } from '../agent/handlers';
 import { createAppHandlers } from '../app/handlers';
 import { createBacklogWindowHandlers } from '../app/backlog-window';
 import { createBuildHandlers } from '../build/handlers';
+import { createChangesHandlers } from '../changes/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
 import { createDesignHandlers } from '../design/handlers';
 import { createDiagnosticsHandlers } from '../diagnostics/handlers';
@@ -37,5 +38,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createSkillsHandlers(services),
     ...createPrHandlers(services),
     ...createBacklogWindowHandlers(services),
+    ...createChangesHandlers(services),
   };
 }

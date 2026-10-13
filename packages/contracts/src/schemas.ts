@@ -4,6 +4,7 @@ import { adoEventContracts, adoInvokeContracts } from './domains/ado.schemas';
 import { agentEventContracts, agentInvokeContracts } from './domains/agent.schemas';
 import { appEventContracts, appInvokeContracts } from './domains/app.schemas';
 import { buildEventContracts, buildInvokeContracts } from './domains/build.schemas';
+import { changesEventContracts, changesInvokeContracts } from './domains/changes.schemas';
 import { connectionsEventContracts, connectionsInvokeContracts } from './domains/connections.schemas';
 import { designEventContracts, designInvokeContracts } from './domains/design.schemas';
 import { gitEventContracts, gitInvokeContracts } from './domains/git.schemas';
@@ -29,6 +30,7 @@ export const invokeContracts = {
   ...designInvokeContracts,
   ...skillsInvokeContracts,
   ...prInvokeContracts,
+  ...changesInvokeContracts,
 } as const satisfies Record<InvokeChannel, InvokeContract>;
 
 /** Every event payload schema, by channel. */
@@ -45,6 +47,7 @@ export const eventContracts = {
   ...designEventContracts,
   ...skillsEventContracts,
   ...prEventContracts,
+  ...changesEventContracts,
 } as const satisfies Record<EventChannel, z.ZodType>;
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeContracts)[C]['request']>;

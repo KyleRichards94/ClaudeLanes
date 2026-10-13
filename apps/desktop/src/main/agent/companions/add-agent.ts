@@ -4,6 +4,7 @@ import type { TicketRecordStore } from '../../tickets';
 import type { SubWorktreeService } from '../../worktrees/sub-worktree';
 import type { LaunchQueue } from '../launch-queue';
 import type { TranscriptService } from '../output/transcript';
+import { REVIEW_FINDINGS_INSTRUCTION } from '../review/findings';
 
 /**
  * Add agent (AL-266, Kyle 2026-10-09: a ticket may run a second agent). A companion is a ticket
@@ -50,7 +51,7 @@ export function companionBrief(lead: TicketRecord, role: TicketCompanionRole, na
   const ticket = lead.ado ? `work item #${lead.ado.workItemId} "${lead.title}"` : `ticket ${lead.id} "${lead.title}"`;
   const sections = [
     role === 'reviewer'
-      ? `You are the reviewer "${name}" on ${ticket}, working beside its lead agent, which keeps working in the same worktree. You share the lead's worktree at ${place.worktreePath} on branch ${place.branch}. You are read-only: you cannot edit files, and shell commands that change the worktree are refused; reading files, git reads and the repo's build and test commands are allowed. Report what you find, and what you would change, in your replies.`
+      ? `You are the reviewer "${name}" on ${ticket}, working beside its lead agent, which keeps working in the same worktree. You share the lead's worktree at ${place.worktreePath} on branch ${place.branch}. You are read-only: you cannot edit files, and shell commands that change the worktree are refused; reading files, git reads and the repo's build and test commands are allowed. Report what you find, and what you would change, in your replies. ${REVIEW_FINDINGS_INSTRUCTION}`
       : `You are the helper "${name}" on ${ticket}, working beside its lead agent. You have your own worktree at ${place.worktreePath} on branch ${place.branch}, branched from the ticket branch ${lead.branch}. Commit your work on your branch; the lead agent or the user merges it into the ticket branch, so do not merge or push it yourself.`,
     ...(lead.job ? [`The ticket's original job, which the lead agent works on:\n${lead.job.trim()}`] : []),
     `Your task:\n${prompt.trim()}`,

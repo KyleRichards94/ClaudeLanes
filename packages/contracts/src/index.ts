@@ -22,6 +22,7 @@ export * from './domains/agent.plan-limits';
 export * from './domains/app.schemas';
 export * from './domains/build.schemas';
 export * from './domains/build.display';
+export * from './domains/changes.schemas';
 export * from './domains/connections.schemas';
 export * from './domains/connections.claude';
 export * from './domains/connections.display';

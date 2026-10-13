@@ -87,6 +87,16 @@ describe('SettingsService', () => {
     expect(service.get().repos).toEqual([repo]);
   });
 
+  it('stores the ticket layout and the dismissed Code City legend (AL-275) and refuses an unknown layout', () => {
+    const { service } = start();
+    const result = service.update({ ui: { ticketLayout: 'codeCity', codeCityLegendDismissed: true } });
+
+    expect(result.ok && result.data.ui).toMatchObject({ ticketLayout: 'codeCity', codeCityLegendDismissed: true });
+    const refused = service.update({ ui: { ticketLayout: 'orbit' } } as unknown as SettingsPatch);
+    expect(!refused.ok && refused.code).toBe('VALIDATION');
+    expect(service.get().ui.ticketLayout).toBe('codeCity');
+  });
+
   it('ignores fields sent as undefined', () => {
     const { service } = start();
     service.update({ ui: { lastRepo: repoPath } });

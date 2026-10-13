@@ -111,6 +111,10 @@ export const UiPrefsSchema = z.object({
   composerDrafts: z.record(z.string().min(1), z.string().max(20_000)).optional(),
   /** Whether the output shows the agent's thinking, collapsed (AL-262); unset means shown. */
   showThinking: z.boolean().optional(),
+  /** The ticket screen's layout (AL-275): Flight deck by default, or Code City. Applies to every ticket. */
+  ticketLayout: z.enum(['flightDeck', 'codeCity']).optional(),
+  /** The Code City "how to read it" card was closed and stays closed (AL-275). */
+  codeCityLegendDismissed: z.boolean().optional(),
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 

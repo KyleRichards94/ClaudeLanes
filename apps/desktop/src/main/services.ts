@@ -75,6 +75,7 @@ import { createTicketArchive, ticketsArchiveDir, type TicketArchive } from './ti
 import { createReconcileService, ignoredWorktreesFile, type ReconcileService } from './tickets/reconcile';
 import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
 import { createBacklogWindowController, type BacklogWindowController } from './app/backlog-window';
+import { createChangesService, type ChangesService } from './changes/service';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -170,6 +171,8 @@ export interface Services {
   readonly rewinds: RewindService;
   /** Add agent (AL-266): a second session on a ticket, as a companion record. */
   readonly companions: AddAgentService;
+  /** The ticket's changed files with their author agents and review status, and the reviewer's findings (AL-276, AL-277). */
+  readonly changes: ChangesService;
   /** Start-up reconciliation: the board from ticket records checked against git's worktrees; Adopt / Ignore orphans (AL-090). */
   readonly reconcile: ReconcileService;
   /** The Create PR stage: drafts, pushes and opens the ticket's PR, watches it until it closes and moves the ticket to Done (AL-181). */
@@ -530,6 +533,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   const rewinds = createRewindService({ sessions, tickets, transcripts, git, log: log.child('agent') });
   const companions = createAddAgentService({ tickets, launches, subWorktrees, transcripts, log: log.child('agent') });
+  const changes = createChangesService({ diffs, git, tickets, transcripts, log: log.child('agent') });
 
   return {
     backlogWindow: options.backlogWindow ?? createBacklogWindowController(() => null),
@@ -576,6 +580,7 @@ export function createServices(options: ServiceOptions): Services {
     assignments,
     rewinds,
     companions,
+    changes,
     reconcile,
     pullRequests,
     designSpecs,

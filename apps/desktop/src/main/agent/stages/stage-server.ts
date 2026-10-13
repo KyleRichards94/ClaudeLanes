@@ -3,6 +3,7 @@ import { STAGES, isSoloLane, type Result, type SoloLane, type TicketRecord } fro
 import { z } from 'zod';
 import { specForAgent, specStatusText, type DesignSpecService } from '../../design/specs';
 import type { ClaudeSdkModule } from '../claude-sdk';
+import { REVIEW_FINDINGS_INSTRUCTION } from '../review/findings';
 import type { SessionExtras } from '../session-manager';
 import { LANE_LABELS } from './stage-rules';
 import type { StageChange, StageService } from './stage-service';
@@ -40,6 +41,9 @@ export const STAGE_PROTOCOL = [
   '- Follow the spec in the stage you are in: in Planning, fold it into the plan you ask the user to approve; while Implementing, adjust course to it; in Code review and QA, check the work against it.',
   '- A later version supersedes earlier ones: where they differ, follow the latest.',
   '- Once you have taken a spec into account, call `ack_design_spec` with its version and a one-line note, and mention the version ("Design v2") in your next message. Sub-agents that build UI can call `get_design_spec` too.',
+  '',
+  '## Review findings',
+  `- In the Code review stage: ${REVIEW_FINDINGS_INSTRUCTION}`,
 ].join('\n');
 
 /** Said once in the first user turn, so the protocol is in front of the agent from the start. */
@@ -54,7 +58,7 @@ export const COMPANION_PROTOCOL = [
 /** What the agent is asked to do, and nothing more, in each single-step lane. */
 const SOLO_STEPS: Record<SoloLane, string> = {
   'review-only':
-    'Your only job is a code review: review the changes and report what you find. Do not change, commit or push code, and do not go on to implementing, QA or a pull request.',
+    `Your only job is a code review: review the changes and report what you find. Do not change, commit or push code, and do not go on to implementing, QA or a pull request. ${REVIEW_FINDINGS_INSTRUCTION}`,
   'qa-only':
     'Your only job is QA: build the work and check each acceptance criterion, reporting pass or fail with evidence. Do not fix what you find, and do not go on to a pull request.',
   'pr-only': `Your only job is to open the pull request: commit any uncommitted work on the ticket branch, check it builds, then call \`open_pull_request\` of the \`${STAGE_SERVER_NAME}\` MCP server with a title and a description of the change. Do not implement, review or QA beyond that.`,
