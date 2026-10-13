@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { emptyAgentUsage, type AgentSubagents, type SubagentNode } from '@agent-lanes/contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { ticketFromRecord } from '@/entities/agent-ticket';
+import { agentTickets, ticketFromRecord } from '@/entities/agent-ticket';
 import { subAgentEventHandlers } from '@/entities/sub-agent';
 import { fakeTicketRecord, installFakeBridge } from '@/shared/testing';
 import { AgentsPanel } from './TicketPanels';
@@ -43,7 +43,9 @@ const tree: AgentSubagents = {
 function renderPanel(stage: 'implementing' | 'code-review' = 'implementing') {
   installFakeBridge({ 'agent:getSubagents': { ok: true, data: tree } });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const ticket = ticketFromRecord(fakeTicketRecord({ id: '71273', stage, model: 'opus', effort: 'xhigh' }));
+  const record = fakeTicketRecord({ id: '71273', stage, model: 'opus', effort: 'xhigh' });
+  agentTickets.load([record]);
+  const ticket = ticketFromRecord(record);
   render(
     <QueryClientProvider client={client}>
       <AgentsPanel ticket={ticket} />
@@ -52,7 +54,7 @@ function renderPanel(stage: 'implementing' | 'code-review' = 'implementing') {
   return { client };
 }
 
-describe('AgentsPanel (AL-177)', () => {
+describe('AgentsPanel (AL-177, AL-279)', () => {
   it('shows the lead agent, the counts and each sub-agent as on artboard 3', async () => {
     renderPanel();
     expect(await screen.findByText('2 running · 1 done · 1 queued')).toBeTruthy();
@@ -129,24 +131,30 @@ describe('AgentsPanel (AL-177)', () => {
     });
     const onOpen = vi.fn();
     const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const lead = fakeTicketRecord({ id: '71273' });
     const companions = [
       fakeTicketRecord({ id: '71273-reviewer-eyes', ado: null, companion: { of: '71273', role: 'reviewer', name: 'Eyes' } }),
       fakeTicketRecord({ id: '71273-helper-docs', ado: null, branch: 'sub/71273-docs', companion: { of: '71273', role: 'helper', name: 'Docs' } }),
     ];
+    agentTickets.load([lead, ...companions]);
+    agentTickets.setSession('71273-reviewer-eyes', 'running');
+    agentTickets.setSession('71273-helper-docs', 'stopped');
     render(
       <QueryClientProvider client={client}>
-        <AgentsPanel ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} companions={companions} activeId="71273" onOpenCompanion={onOpen} />
+        <AgentsPanel ticket={ticketFromRecord(lead)} companions={companions} activeId="71273" onOpenCompanion={onOpen} />
       </QueryClientProvider>,
     );
     const reviewer = screen.getByTestId('companion-71273-reviewer-eyes');
-    expect(within(reviewer).getByText('Eyes · Reviewer')).toBeTruthy();
+    expect(within(reviewer).getByText('Eyes')).toBeTruthy();
+    expect(within(reviewer).getByText('Reviewer')).toBeTruthy();
     expect(within(reviewer).getByText('Read-only, in the ticket worktree')).toBeTruthy();
-    expect(await within(reviewer).findByText('Running')).toBeTruthy();
+    expect(within(reviewer).getByText('Running')).toBeTruthy();
     expect(await within(reviewer).findByText('12k tokens')).toBeTruthy();
     const helper = screen.getByTestId('companion-71273-helper-docs');
-    expect(within(helper).getByText('Docs · Helper')).toBeTruthy();
+    expect(within(helper).getByText('Docs')).toBeTruthy();
+    expect(within(helper).getByText('Helper')).toBeTruthy();
     expect(within(helper).getByText('sub/71273-docs')).toBeTruthy();
-    expect(await within(helper).findByText('Stopped')).toBeTruthy();
+    expect(within(helper).getByText('Done')).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('companion-71273-reviewer-eyes-open'));
     expect(onOpen).toHaveBeenCalledWith('71273-reviewer-eyes');
@@ -159,6 +167,7 @@ describe('AgentsPanel (AL-177)', () => {
   it('says none yet before any sub-agent', async () => {
     installFakeBridge({ 'agent:getSubagents': { ok: true, data: { ...tree, leadTokens: 0, nodes: [], counts: { running: 0, done: 0, queued: 0, failed: 0 } } } });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    agentTickets.load([fakeTicketRecord({ id: '71273' })]);
     render(
       <QueryClientProvider client={client}>
         <AgentsPanel ticket={ticketFromRecord(fakeTicketRecord({ id: '71273' }))} />

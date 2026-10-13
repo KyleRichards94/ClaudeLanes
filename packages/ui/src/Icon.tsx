@@ -10,7 +10,9 @@ import ArrowUpRight from 'lucide-react-native/icons/arrow-up-right';
 import AtSign from 'lucide-react-native/icons/at-sign';
 import Bot from 'lucide-react-native/icons/bot';
 import Brain from 'lucide-react-native/icons/brain';
+import BuildingComplex from 'lucide-react-native/icons/building-complex';
 import Check from 'lucide-react-native/icons/check';
+import Columns3 from 'lucide-react-native/icons/columns-3';
 import Copy from 'lucide-react-native/icons/copy';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
@@ -106,6 +108,9 @@ const glyphs = {
   show: { component: Eye },
   hide: { component: EyeOff },
   edit: { component: SquarePen },
+  /** The ticket layout slider (AL-275): Flight deck (three columns) and Code city (buildings). */
+  'layout-columns': { component: Columns3 },
+  buildings: { component: BuildingComplex },
 } as const satisfies Record<string, Glyph>;
 
 export type IconName = keyof typeof glyphs;

@@ -7,10 +7,9 @@ import {
   type KeyDownEvent,
 } from "react-native";
 import type { TicketRecord } from "@agent-lanes/contracts";
-import { color, radius, shadow, space } from "@agent-lanes/tokens";
-import { Button, SegmentedControl, TabPanel, Text } from "@agent-lanes/ui";
+import { color, space } from "@agent-lanes/tokens";
+import { Button, SegmentedControl, Text } from "@agent-lanes/ui";
 import {
-  OutputStream,
   requestOutputScroll,
   userCaption,
   type WaitingRowState,
@@ -51,6 +50,8 @@ import {
   useWorkItem,
 } from "@/shared/api";
 import {
+  clearSelection,
+  getTicketView,
   setOutputDiffLayout,
   setTicketPageTab,
   toast,
@@ -64,19 +65,19 @@ import { LANE_LABELS } from "@/shared/config";
 import { routes, useNavigation } from "@/shared/routing";
 import {
   ErrorBoundary,
-  PanelErrorBoundary,
   PlanLimitsPill,
-  SplitView,
   TicketTabBar,
 } from "@/shared/ui";
 import { companionLabel, companionsOf } from "../lib/companions";
-import { sessionStartedAt, stageSteps } from "../lib/stage-steps";
+import { sessionStartedAt } from "../lib/stage-steps";
+import { useLayoutShortcut } from "../model/layout-shortcut";
 import { useNow } from "../model/use-now";
 import { CreatePullRequestPanel } from "./CreatePullRequestPanel";
 import { AdoTab } from "./AdoTab";
-import { DiffPane } from "./DiffPane";
-import { StageStepper } from "./StageStepper";
+import { FlightDeckPanel } from "./FlightDeckPanel";
+import { LayoutSwitch } from "./LayoutSwitch";
 import { TicketHeaderBand } from "./TicketHeader";
+import { TicketLayoutSlider } from "./TicketLayoutSlider";
 import { UsageStrip } from "./UsageStrip";
 import {
   AgentsPanel,
@@ -91,8 +92,6 @@ export interface TicketPageProps {
 
 /** Below this window width the rail moves under the transcript and the page scrolls as a whole (AL-170, AL-250). */
 export const SIDE_COLUMN_BREAKPOINT = 1200;
-/** The rail's width beside the transcript (artboard 3). */
-export const RAIL_WIDTH = 400;
 /** The transcript's height when the page scrolls as a whole: the window less the bands, never under this. */
 export const STACKED_PANEL_MIN_HEIGHT = 480;
 const STACKED_PANEL_CHROME = 200;
@@ -100,13 +99,18 @@ const TABS_ID = "ticket-tabs";
 const SHOW_THINKING_KEY = "show-thinking";
 const MOVE_STAGE_KEY = "move-stage";
 const ADD_AGENT_KEY = "add-agent";
+/** One element for the life of the page: the header keeps it across renders, and the slider reads the layout itself. */
+const LAYOUT_SLIDER = <TicketLayoutSlider />;
 
 /**
  * Route `ticket/:id`, the ticket drill-in (AL-250, artboard 3 reshaped for an output-first page): a
- * header band (breadcrumb, work item chip, title, session pill, agent controls), the stage stepper on
- * a band under it, then the tab bar and its panel filling the rest of the window with the composer
- * pinned to its bottom, and the rail (Worktree, Merge, Agents, Sub-branches) on the right. Below
- * 1200 px the rail stacks under the panel and the page scrolls.
+ * header band (breadcrumb, work item chip, title, layout slider, session pill, agent controls), then
+ * `LayoutSwitch` (AL-275), which shows one of two layouts over the same state: Flight deck, or Code City.
+ * Flight deck (AL-279, `FlightDeckPanel`): the workflow card with its turn strip, the tab bar, then the grouped
+ * output with the composer pinned under it, the change map and diff, and the 330 px rail (Agents, Worktree,
+ * Merge, Sub-branches). Below 1200 px the rail stacks under the diff and the page scrolls.
+ * This component keeps the state both layouts share (the active agent, modals, the live session) and
+ * never reads the layout, so switching it re-renders the layouts and the slider, not the header.
  *
  * Live fields come from the agent ticket store; fields only the record keeps (session id,
  * sub-branches) come from `tickets:get`. A ticket the store has not loaded yet is added to it from
@@ -154,6 +158,7 @@ function TicketFrame({
 }) {
   const { width, height } = useWindowDimensions();
   const wide = width >= SIDE_COLUMN_BREAKPOINT;
+  useLayoutShortcut();
   const tab = useTicketPageTab(ticket.id);
   const outputDiff = useOutputDiffLayout();
   // Second agents (AL-266): the page shows one agent's output, composer, status and usage at a time; the lead by default.
@@ -227,15 +232,16 @@ function TicketFrame({
       : null,
   };
 
-  // Esc stops the running turn, as in Claude Code (AL-253); a menu or modal that is open takes Esc first.
+  // Esc stops the running turn, as in Claude Code (AL-253); a menu or modal that is open takes Esc first. With no
+  // turn running it clears the file selection (Flight deck then shows the biggest change again).
   const onKeyDown = (event: KeyDownEvent) => {
-    if (
-      event.nativeEvent.key !== "Escape" ||
-      status?.state !== "running" ||
-      interrupt.isPending
-    )
+    if (event.nativeEvent.key !== "Escape") return;
+    if (status?.state === "running") {
+      if (!interrupt.isPending) interrupt.mutate();
       return;
-    interrupt.mutate();
+    }
+    if (getTicketView(ticket.id).selectedFilePath !== null)
+      clearSelection(ticket.id);
   };
 
   const header = (
@@ -273,6 +279,7 @@ function TicketFrame({
           reconnecting: reconnect.isPending,
           ...(activeCompanion ? {} : { onAssign: () => setAssigning(true) }),
         }}
+        layout={LAYOUT_SLIDER}
         trailing={
           <>
             <PlanLimitsPill testID="ticket-plan-limits" />
@@ -375,137 +382,24 @@ function TicketFrame({
     </ErrorBoundary>
   );
 
-  const stepper = (
-    <ErrorBoundary name="ticket:stepper" label="the stage stepper">
-      <View style={styles.stepperBand} testID="ticket-stepper-band">
-        <StageStepper
-          steps={stageSteps(ticket.stage, history)}
-          progress={ticket.progress}
-          gates={ticket.gates}
-          onGateChange={(stage, gate) =>
-            setGate.mutate({ ticketId: ticket.id, stage, gate })
-          }
-          waitingStage={ticket.gate?.stage ?? null}
-          gateActions={<GateActions ticketId={ticket.id} placement="stepper" />}
+  // What needs the user above the body, inside the workflow card: a failed gate change, a tool call outside the
+  // permission policy that waits (AL-109; at its output row when that row is drawn, AL-260), and a queued agent (AL-111).
+  const notices = (
+    <>
+      {setGate.error ? (
+        <Text variant="body" size="sm" color={color.danger} role="alert">
+          {`The gate couldn't be changed: ${setGate.error.message}`}
+        </Text>
+      ) : null}
+      {promptAtRow && waitingRow === "visible" ? null : (
+        <PermissionPrompt
+          ticketId={active.id}
+          variant={promptAtRow ? "compact" : "banner"}
         />
-        {setGate.error ? (
-          <Text variant="body" size="sm" color={color.danger} role="alert">
-            {`The gate couldn't be changed: ${setGate.error.message}`}
-          </Text>
-        ) : null}
-        {/* A tool call outside the permission policy waits for the user (AL-109); at its output row when that row is drawn (AL-260). */}
-        {promptAtRow && waitingRow === "visible" ? null : (
-          <PermissionPrompt
-            ticketId={active.id}
-            variant={promptAtRow ? "compact" : "banner"}
-          />
-        )}
-        {/* Waiting for a free slot in its repo, with Start now (AL-111). */}
-        <QueuedNotice ticketId={active.id} />
-      </View>
-    </ErrorBoundary>
-  );
-
-  const panel = (
-    <TabPanel
-      idPrefix={TABS_ID}
-      value={tab}
-      style={[
-        styles.tabPanel,
-        wide ? styles.tabPanelWide : stackedPanel(height),
-      ]}
-      testID="ticket-tab-panel"
-    >
-      <ErrorBoundary
-        key={tab}
-        name={`ticket:tab:${tab}`}
-        label={`the ${TAB_TITLES[tab]} tab`}
-      >
-        {tab === "build-log" ? (
-          <BuildLog ticketId={ticket.id} style={styles.buildLog} />
-        ) : tab === "output" || tab === "diff" ? (
-          // Output & diff: the agent's output and composer beside the ticket's changes, read again as it works.
-          <SplitView
-            direction={wide ? "row" : "column"}
-            ratio={outputDiff.ratio}
-            onRatioChange={(ratio) => setOutputDiffLayout({ ratio })}
-            label="Resize the output and the diff"
-            testID="output-diff"
-            second={
-              outputDiff.diffShown ? (
-                <ErrorBoundary name="ticket:diff-pane" label="the diff">
-                  <DiffPane
-                    ticketId={ticket.id}
-                    branch={ticket.branch}
-                    subBranches={subBranches}
-                  />
-                </ErrorBoundary>
-              ) : null
-            }
-            first={
-              <View style={styles.outputColumn}>
-                <PanelErrorBoundary panel="output" ticketId={active.id}>
-                  <OutputStream
-                    key={active.id}
-                    ticketId={active.id}
-                    style={styles.output}
-                    testID="ticket-tab-output"
-                    waitingToolUseId={waitingToolUseId}
-                    renderWaitingRow={(row) => (
-                      <PermissionPrompt
-                        ticketId={active.id}
-                        variant="inline"
-                        toolUseIds={row.toolUseIds}
-                        testID={`permission-${active.id}-inline`}
-                      />
-                    )}
-                    onWaitingRow={setWaitingRow}
-                    showThinking={showThinking}
-                    renderUserActions={(row) =>
-                      // Rewind and fork (AL-265) act on the lead's session.
-                      row.messageId &&
-                      row.source !== "app-note" &&
-                      !activeCompanion ? (
-                        <UserMessageActions
-                          messageId={row.messageId}
-                          onRewind={(messageId) =>
-                            setRewindTo({
-                              messageId,
-                              caption: userCaption(row),
-                            })
-                          }
-                          onFork={(messageId) => {
-                            setForkFrom(messageId);
-                            setAssigning(true);
-                          }}
-                        />
-                      ) : null
-                    }
-                  />
-                </PanelErrorBoundary>
-                {/* Skills, message box, Pause / Resume and Send under the stream (AL-176). */}
-                <Composer
-                  key={active.id}
-                  ticketId={active.id}
-                  repo={ticket.repo}
-                  skills={activeRecord?.skills ?? []}
-                  switching={active.switching !== null}
-                  tools={<ModelEffortControls ticket={active} compact />}
-                  style={styles.composer}
-                />
-              </View>
-            }
-          />
-        ) : (
-          <ScrollView
-            style={styles.tabScroll}
-            contentContainerStyle={styles.tabContent}
-          >
-            <AdoTab ticket={ticket} />
-          </ScrollView>
-        )}
-      </ErrorBoundary>
-    </TabPanel>
+      )}
+      {/* Waiting for a free slot in its repo, with Start now (AL-111). */}
+      <QueuedNotice ticketId={active.id} />
+    </>
   );
 
   // The agent switcher (AL-266): Lead, then each second agent, beside the tab bar once there is one.
@@ -521,47 +415,60 @@ function TicketFrame({
     ],
     [companions, ticket.id],
   );
-  const main = (
-    <View style={[styles.main, wide && styles.mainWide]}>
-      <View style={styles.tabsRow}>
-        <TicketTabBar
-          ticketId={ticket.id}
-          value={tab}
-          idPrefix={TABS_ID}
-          style={styles.tabs}
+  const tabs = (
+    <View style={styles.tabsRow}>
+      <TicketTabBar
+        ticketId={ticket.id}
+        value={tab}
+        idPrefix={TABS_ID}
+        style={styles.tabs}
+      />
+      {tab === "output" || tab === "diff" ? (
+        <Button
+          size="sm"
+          variant="soft"
+          icon={outputDiff.diffShown ? "hide" : "show"}
+          label={outputDiff.diffShown ? "Hide diff" : "Show diff"}
+          onPress={() =>
+            setOutputDiffLayout({ diffShown: !outputDiff.diffShown })
+          }
+          testID="toggle-diff-pane"
         />
-        {tab === "output" || tab === "diff" ? (
-          <Button
-            size="sm"
-            variant="soft"
-            icon={outputDiff.diffShown ? "hide" : "show"}
-            label={outputDiff.diffShown ? "Hide diff" : "Show diff"}
-            onPress={() =>
-              setOutputDiffLayout({ diffShown: !outputDiff.diffShown })
-            }
-            testID="toggle-diff-pane"
-          />
-        ) : null}
-        {companions.length > 0 ? (
-          <SegmentedControl
-            label="Agent"
-            value={activeId}
-            onChange={setAgentId}
-            options={agentOptions}
-            style={styles.switcher}
-            testID="agent-switcher"
-          />
-        ) : null}
-      </View>
-      {panel}
+      ) : null}
+      {companions.length > 0 ? (
+        <SegmentedControl
+          label="Agent"
+          value={activeId}
+          onChange={setAgentId}
+          options={agentOptions}
+          testID="agent-switcher"
+        />
+      ) : null}
     </View>
   );
 
-  const rail = (
-    <View
-      style={styles.railCards}
-      testID={wide ? undefined : "ticket-side-column"}
+  // The Build log and ADO tabs take the place of the output and diff columns.
+  const other = (
+    <ErrorBoundary
+      key={tab}
+      name={`ticket:tab:${tab}`}
+      label={`the ${TAB_TITLES[tab]} tab`}
     >
+      {tab === "build-log" ? (
+        <BuildLog ticketId={ticket.id} style={styles.buildLog} />
+      ) : (
+        <ScrollView
+          style={styles.tabScroll}
+          contentContainerStyle={styles.tabContent}
+        >
+          <AdoTab ticket={ticket} />
+        </ScrollView>
+      )}
+    </ErrorBoundary>
+  );
+
+  const rail = (
+    <>
       {/* The Create PR stage (AL-181): from entering Create PR, and for as long as the ticket has a PR. */}
       {ticket.stage === "create-pr" ||
       ticket.stage === "pr-only" ||
@@ -569,8 +476,6 @@ function TicketFrame({
       record?.pullRequest ? (
         <CreatePullRequestPanel ticket={ticket} saved={record?.pullRequest} />
       ) : null}
-      <WorktreePanel ticket={ticket} />
-      <MergePanel ticket={ticket} />
       <AgentsPanel
         actions={subAgentActions}
         ticket={ticket}
@@ -600,25 +505,106 @@ function TicketFrame({
           </View>
         }
       />
+      <WorktreePanel ticket={ticket} />
+      <MergePanel ticket={ticket} />
       <SubBranchesPanel ticket={ticket} subBranches={subBranches} />
-    </View>
+    </>
+  );
+
+  // Flight deck is wired by `FlightDeckPanel`; Code City, and the swap between them, are `LayoutSwitch`'s.
+  const body = (
+    <LayoutSwitch
+      stacked={!wide}
+      codeCity={{
+        ticket,
+        companions,
+        history,
+        composer: (
+          <Composer
+            key={active.id}
+            ticketId={active.id}
+            repo={ticket.repo}
+            skills={activeRecord?.skills ?? []}
+            switching={active.switching !== null}
+            tools={<ModelEffortControls ticket={active} compact />}
+          />
+        ),
+        worktree: (
+          <View style={styles.railCards}>
+            <WorktreePanel ticket={ticket} />
+            <MergePanel ticket={ticket} />
+          </View>
+        ),
+      }}
+      flightDeck={
+        <FlightDeckPanel
+          ticket={ticket}
+          companions={companions}
+          history={history}
+          activeId={active.id}
+          wide={wide}
+          stackedHeight={stackedPanelHeight(height)}
+          tab={tab}
+          tabIdPrefix={TABS_ID}
+          diffShown={outputDiff.diffShown}
+          tabs={tabs}
+          stream={{
+            waitingToolUseId,
+            renderWaitingRow: (row) => (
+              <PermissionPrompt
+                ticketId={active.id}
+                variant="inline"
+                toolUseIds={row.toolUseIds}
+                testID={`permission-${active.id}-inline`}
+              />
+            ),
+            onWaitingRow: setWaitingRow,
+            showThinking,
+            renderUserActions: (row) =>
+              // Rewind and fork (AL-265) act on the lead's session.
+              row.messageId &&
+              row.source !== "app-note" &&
+              !activeCompanion ? (
+                <UserMessageActions
+                  messageId={row.messageId}
+                  onRewind={(messageId) =>
+                    setRewindTo({ messageId, caption: userCaption(row) })
+                  }
+                  onFork={(messageId) => {
+                    setForkFrom(messageId);
+                    setAssigning(true);
+                  }}
+                />
+              ) : null,
+          }}
+          composer={
+            // Skills, message box, Pause / Resume and Send under the stream (AL-176).
+            <Composer
+              key={active.id}
+              ticketId={active.id}
+              repo={ticket.repo}
+              skills={activeRecord?.skills ?? []}
+              switching={active.switching !== null}
+              tools={<ModelEffortControls ticket={active} compact />}
+            />
+          }
+          other={other}
+          gateActions={<GateActions ticketId={ticket.id} placement="stepper" />}
+          notices={notices}
+          onGateChange={(stage, gate) =>
+            setGate.mutate({ ticketId: ticket.id, stage, gate })
+          }
+          rail={rail}
+        />
+      }
+    />
   );
 
   if (wide) {
     return (
       <View style={styles.page} onKeyDown={onKeyDown} testID="ticket-page">
         {header}
-        {stepper}
-        <View style={styles.bodyWide} testID="ticket-body-wide">
-          {main}
-          <ScrollView
-            style={styles.rail}
-            contentContainerStyle={styles.railContent}
-            testID="ticket-side-column"
-          >
-            {rail}
-          </ScrollView>
-        </View>
+        {body}
       </View>
     );
   }
@@ -630,11 +616,7 @@ function TicketFrame({
       testID="ticket-page"
     >
       {header}
-      {stepper}
-      <View style={styles.bodyStacked} testID="ticket-body-stacked">
-        {main}
-        {rail}
-      </View>
+      {body}
     </ScrollView>
   );
 }
@@ -645,12 +627,6 @@ export function stackedPanelHeight(windowHeight: number): number {
     STACKED_PANEL_MIN_HEIGHT,
     Math.round(windowHeight) - STACKED_PANEL_CHROME,
   );
-}
-
-// A fixed basis, not `flex: 1`: inside the scrolling page a 0% basis would collapse the panel to its content.
-function stackedPanel(windowHeight: number) {
-  const height = stackedPanelHeight(windowHeight);
-  return { height, flexBasis: height, flexGrow: 0, flexShrink: 0 };
 }
 
 const TAB_TITLES: Record<TicketPageTab, string> = {
@@ -707,73 +683,35 @@ function column(): { flex: number; minHeight: number } {
   return { flex: 1, minHeight: 0 };
 }
 
+const PAGE_PADDING = { paddingTop: 14, paddingHorizontal: 18, paddingBottom: 18 } as const;
+
 const styles = StyleSheet.create({
+  // Flight deck frame (handoff): 14 px above, 18 px at the sides and below, 12 px between the rows.
   page: {
     ...column(),
-    padding: space.lg,
+    ...PAGE_PADDING,
     gap: space.md,
   },
   scroll: {
     flex: 1,
   },
   pageStacked: {
-    padding: space.lg,
+    ...PAGE_PADDING,
     gap: space.md,
-  },
-  stepperBand: {
-    gap: space.sm,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-  },
-  bodyWide: {
-    ...column(),
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: space.lg,
-  },
-  bodyStacked: {
-    gap: space.lg,
-  },
-  main: {
-    minWidth: 0,
-  },
-  mainWide: {
-    ...column(),
-    flexShrink: 1,
   },
   tabsRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: space.md,
-    // The tab bar sits close over the output card (artboard 3).
-    marginBottom: -space.sm,
   },
   tabs: {
     alignSelf: "flex-start",
-  },
-  switcher: {
-    marginBottom: space.sm,
   },
   agentButtons: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: space.sm,
-  },
-  tabPanel: {
-    overflow: "hidden",
-    borderRadius: radius.panel,
-    borderWidth: 1,
-    borderColor: color.line,
-    backgroundColor: color.surface,
-    boxShadow: shadow.card,
-  },
-  tabPanelWide: {
-    ...column(),
   },
   tabScroll: {
     flex: 1,
@@ -788,29 +726,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderRadius: 0,
     boxShadow: "none",
-  },
-  output: {
-    flex: 1,
-    minHeight: 0,
-  },
-  // The output and its composer, the first pane of Output & diff.
-  outputColumn: {
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
-  },
-  // The composer closes the card (artboard 3 footer).
-  composer: {
-    borderBottomLeftRadius: radius.panel,
-    borderBottomRightRadius: radius.panel,
-  },
-  rail: {
-    width: RAIL_WIDTH,
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  railContent: {
-    paddingBottom: space.lg,
   },
   railCards: {
     gap: space.lg,

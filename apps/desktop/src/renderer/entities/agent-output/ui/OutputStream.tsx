@@ -13,15 +13,34 @@ import {
 import { space } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentOutput } from '../model/hooks';
-import { expandRow } from '../model/expanded';
-import { findToolUse, outputRows, withoutThinking, type OutputRow } from '../model/rows';
-import { clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
+import { expandRow, toggleRowExpanded, useExpandedKeys } from '../model/expanded';
+import { displayRows, findToolUse, groupTurns, outputRows, turnRowKey, withoutThinking, type OutputRow, type StreamRow, type TurnHeaderRow } from '../model/rows';
+import { TURN_SCROLL_PREFIX, clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
 import type { AgentOutputStore } from '../model/store';
 import { rowOffsets, windowFor } from '../model/virtual';
 import { OutputRowView, type RenderUserActions } from './OutputRowView';
 
 /** Where the tool row a permission request waits on is (AL-260): not drawn yet, in view, or scrolled away. */
 export type WaitingRowState = 'absent' | 'visible' | 'hidden';
+
+/** What a turn's header row says and does in the grouped stream. */
+export interface TurnHeader {
+  /** 1-based, as the turn strip numbers turns. */
+  readonly index: number;
+  /** The turn is still going: open, with a pulsing dot. */
+  readonly live: boolean;
+  /** Its rows are drawn under the header. */
+  readonly expanded: boolean;
+  /** How many rows the turn holds. */
+  readonly rowCount: number;
+  /** Opens or closes the turn (the live turn stays open). */
+  toggle(): void;
+}
+
+/** Grouped output (AL-279): finished turns collapse to one header row each, the live turn is always open. */
+export interface OutputGrouping {
+  renderHeader(header: TurnHeader): ReactNode;
+}
 
 export interface OutputStreamProps {
   ticketId: string;
@@ -39,6 +58,8 @@ export interface OutputStreamProps {
   showThinking?: boolean;
   /** Actions on the user's own messages (AL-265: Rewind to here, Fork from here). */
   renderUserActions?: RenderUserActions;
+  /** Collapses each finished turn to a header row you can open (Flight deck); off, the stream is flat as ever. */
+  grouping?: OutputGrouping;
 }
 
 /** Viewport assumed before the first layout (and in tests, where layout never comes). */
@@ -59,10 +80,15 @@ const PAD_Y = space.lg;
  *   scrolling back to the end (or the button) follows again.
  * - Rows are in normal flow inside one scroll view, so text can be selected across rows and copied.
  */
-export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true, renderUserActions }: OutputStreamProps) {
+export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true, renderUserActions, grouping }: OutputStreamProps) {
   const events = useAgentOutput(ticketId, store);
   const allRows = outputRows(events);
-  const rows = showThinking ? allRows : withoutThinking(allRows);
+  const openKeys = useExpandedKeys(ticketId);
+  // Turns are cut from every row, thinking included, so their numbers match the turn strip's; thinking is dropped after.
+  const groups = grouping
+    ? groupTurns(allRows).map((group) => (showThinking ? group : { ...group, rows: withoutThinking(group.rows) }))
+    : null;
+  const rows: StreamRow[] = groups ? displayRows(groups, openKeys) : showThinking ? allRows : withoutThinking(allRows);
   const scrollRef = useRef<ScrollViewInstance>(null);
   // Heights of rows drawn so far, by row key; a new map on each change so the offsets follow it.
   const [measured, setMeasured] = useState<ReadonlyMap<string, number>>(() => new Map());
@@ -86,18 +112,32 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
   const scrollRequest = useOutputScrollRequest(ticketId);
   useLayoutEffect(() => {
     if (scrollRequest === null) return;
-    const target = findToolUse(rows, scrollRequest);
-    if (!target) return;
-    for (const key of target.expandKeys) expandRow(ticketId, key);
+    let index: number;
+    if (scrollRequest.startsWith(TURN_SCROLL_PREFIX)) {
+      // The turn strip asked for a turn: its header row.
+      index = rows.findIndex((row) => row.type === 'turn-header' && row.key === scrollRequest);
+      if (index === -1) return;
+    } else {
+      const plain = rows.filter((row): row is OutputRow => row.type !== 'turn-header');
+      const target = findToolUse(plain, scrollRequest);
+      if (!target) {
+        // Not drawn: it may sit inside a collapsed turn. Open that turn; the stream lays out again and finds it.
+        const inside = groups?.find((group) => group.index !== null && findToolUse(group.rows, scrollRequest) !== null);
+        if (inside?.index != null) expandRow(ticketId, turnRowKey(inside.index));
+        return;
+      }
+      for (const key of target.expandKeys) expandRow(ticketId, key);
+      index = rows.indexOf(plain[target.index]!);
+    }
     clearOutputScroll(ticketId);
-    const y = Math.max((offsets[target.index] ?? 0) + PAD_Y - space.md, 0);
+    const y = Math.max((offsets[index] ?? 0) + PAD_Y - space.md, 0);
     // After this layout pass the view stops following the newest output and moves to the row.
     queueMicrotask(() => {
       setFollow(false);
       setScrollTop(y);
       scrollRef.current?.scrollTo({ y, animated: true });
     });
-  }, [scrollRequest, ticketId, rows, offsets]);
+  }, [scrollRequest, ticketId, rows, groups, offsets]);
 
   // The row a permission request waits on (AL-260), and whether it is in view.
   const waitingIndex = waitingToolUseId === null ? -1 : rows.findIndex((row) => row.type === 'tool' && row.toolUseIds.includes(waitingToolUseId));
@@ -143,6 +183,14 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
   for (let index = start; index < end; index++) {
     const row = rows[index]!;
     const waiting = index === waitingIndex;
+    if (row.type === 'turn-header') {
+      drawn.push(
+        <View key={row.key} onLayout={(event) => onRowLayout(row.key, event.nativeEvent.layout.height)}>
+          {grouping?.renderHeader(headerOf(row, ticketId))}
+        </View>,
+      );
+      continue;
+    }
     drawn.push(
       <View key={row.key} onLayout={(event) => onRowLayout(row.key, event.nativeEvent.layout.height)}>
         <OutputRowView row={row} ticketId={ticketId} waiting={waiting} {...(renderUserActions ? { renderUserActions } : {})} />
@@ -183,6 +231,18 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
       ) : null}
     </View>
   );
+}
+
+function headerOf(row: TurnHeaderRow, ticketId: string): TurnHeader {
+  return {
+    index: row.index,
+    live: row.live,
+    expanded: row.expanded,
+    rowCount: row.rowCount,
+    toggle: () => {
+      if (!row.live) toggleRowExpanded(ticketId, row.key);
+    },
+  };
 }
 
 const styles = StyleSheet.create({

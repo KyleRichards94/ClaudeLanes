@@ -20,13 +20,31 @@ export interface UiPrefsState extends UiPrefs {
   setComposerDraft(ticketId: string, draft: string): void;
   /** Shows or hides the agent's thinking in the output (AL-262). */
   setShowThinking(show: boolean): void;
+  /** Picks the ticket screen's layout for every ticket (AL-275). */
+  setTicketLayout(layout: TicketLayout): void;
+  /** Closes the Code City "how to read it" card for good (AL-275). */
+  setCodeCityLegendDismissed(dismissed: boolean): void;
 }
+
+/** The ticket screen's two layouts (AL-275): Flight deck is the default. */
+export type TicketLayout = NonNullable<UiPrefs['ticketLayout']>;
+export const DEFAULT_TICKET_LAYOUT: TicketLayout = 'flightDeck';
 
 /** The embed mode of a ticket that has never been switched (AL-194). */
 export const DEFAULT_EMBED_MODE: EmbedMode = 'webview';
 
-function pickPrefs({ lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking }: UiPrefsState): UiPrefs {
-  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking };
+function pickPrefs({
+  lastRepo,
+  lastSprint,
+  lastTeam,
+  collapsedLanes,
+  embedModeByTicket,
+  composerDrafts,
+  showThinking,
+  ticketLayout,
+  codeCityLegendDismissed,
+}: UiPrefsState): UiPrefs {
+  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking, ticketLayout, codeCityLegendDismissed };
 }
 
 /** Builds a UI prefs store over the given storage; the app uses `useUiPrefs`, tests make their own. */
@@ -62,6 +80,8 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
             return { composerDrafts: next };
           }),
         setShowThinking: (showThinking) => set({ showThinking }),
+        setTicketLayout: (ticketLayout) => set({ ticketLayout }),
+        setCodeCityLegendDismissed: (codeCityLegendDismissed) => set({ codeCityLegendDismissed }),
       }),
       {
         name: 'ui-prefs',
@@ -79,6 +99,16 @@ export type UiPrefsStore = ReturnType<typeof createUiPrefsStore>;
 /** Whether the output draws the agent's thinking (AL-262); shown until switched off. */
 export function useShowThinking(): boolean {
   return useUiPrefs((state) => state.showThinking ?? true);
+}
+
+/** The ticket screen's layout (AL-275); Flight deck until the user picks Code City. */
+export function useTicketLayout(): TicketLayout {
+  return useUiPrefs((state) => state.ticketLayout ?? DEFAULT_TICKET_LAYOUT);
+}
+
+/** Whether the Code City legend card was closed (AL-275). */
+export function useCodeCityLegendDismissed(): boolean {
+  return useUiPrefs((state) => state.codeCityLegendDismissed ?? false);
 }
 
 export const useUiPrefs: UiPrefsStore = createUiPrefsStore(createUiPrefsStorage());

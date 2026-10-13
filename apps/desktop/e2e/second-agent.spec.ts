@@ -130,7 +130,8 @@ test('a reviewer runs beside the lead in the same worktree with its own output; 
   expect(reviewer.worktreePath.toLowerCase()).toBe(lead.worktreePath.toLowerCase());
   expect(reviewer.branch).toBe(lead.branch);
   const row = page.getByTestId('companion-71273-reviewer-eyes');
-  await expect(row).toContainText('Eyes · Reviewer');
+  await expect(row).toContainText('Eyes');
+  await expect(row).toContainText('Reviewer');
   await expect(row).toContainText('Read-only');
   await expect.poll(() => state('71273-reviewer-eyes'), { timeout: 30_000 }).toBe('idle');
 

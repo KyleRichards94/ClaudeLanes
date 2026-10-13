@@ -15,6 +15,13 @@ export function useRowExpanded(ticketId: string, rowKey: string): boolean {
   return useExpandedRows((state) => state.byTicket[ticketId]?.has(rowKey) ?? false);
 }
 
+const NONE: ReadonlySet<string> = new Set();
+
+/** The open rows of a ticket (and open turns, `turn:N`), for a view that lays rows out by them. */
+export function useExpandedKeys(ticketId: string): ReadonlySet<string> {
+  return useExpandedRows((state) => state.byTicket[ticketId] ?? NONE);
+}
+
 export function toggleRowExpanded(ticketId: string, rowKey: string): void {
   useExpandedRows.setState(({ byTicket }) => {
     const current = byTicket[ticketId] ?? new Set<string>();

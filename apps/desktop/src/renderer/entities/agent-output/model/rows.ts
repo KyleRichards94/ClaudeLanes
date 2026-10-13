@@ -355,3 +355,116 @@ export function statSpans(stats: string): StatSpan[] {
   }
   return spans;
 }
+
+/**
+ * A turn's rows (AL-279, grouped output): from the user's message (or the first tool or prose of a turn nothing
+ * started) to the lead's `turn-end` or `failed` row. Numbered as `deriveTurns` (`entities/turn`) numbers the same
+ * stream, so "Turn 3" is the same turn in the strip, the summary row and here. Rows between turns (app lines,
+ * compaction notices) are one group with no `index`.
+ */
+export interface TurnGroup {
+  /** 1-based turn number; null for the rows between turns. */
+  readonly index: number | null;
+  readonly rows: readonly OutputRow[];
+  /** The turn has ended (its `turn-end` or `failed` row is in the group). The newest turn is live until it has. */
+  readonly finished: boolean;
+}
+
+/** The key of a turn's header row, which is also the key its open state is kept under (`expanded.ts`). */
+export const turnRowKey = (index: number): string => `turn:${index}`;
+
+/**
+ * Splits a stream's top-level rows into turns. A turn starts at a user message that is not the app's own, or at
+ * the first tool, prose or thinking nothing started; further user messages inside it (queued or steered) stay in
+ * it. It ends at the next `turn-end` or `failed` row. A turn with no end yet is the live one.
+ */
+export function groupTurns(rows: readonly OutputRow[]): TurnGroup[] {
+  const groups: TurnGroup[] = [];
+  // Held in an object: the helpers below assign it, which control-flow narrowing of a plain `let` would not see.
+  const state: { open: OutputRow[] | null; loose: OutputRow[]; count: number } = { open: null, loose: [], count: 0 };
+
+  const flushLoose = () => {
+    if (state.loose.length > 0) groups.push({ index: null, rows: state.loose, finished: true });
+    state.loose = [];
+  };
+  const turn = (): OutputRow[] => {
+    if (!state.open) {
+      // The app's own message that came just before the turn belongs to it.
+      const carried: OutputRow[] = [];
+      while (state.loose.at(-1)?.type === 'user') carried.unshift(state.loose.pop()!);
+      flushLoose();
+      state.open = carried;
+    }
+    return state.open;
+  };
+  const close = () => {
+    if (!state.open) return;
+    groups.push({ index: ++state.count, rows: state.open, finished: true });
+    state.open = null;
+  };
+
+  for (const row of rows) {
+    switch (row.type) {
+      case 'user':
+        // The app's own turns ("Continue where you left off.") start nothing; the next tool or prose does.
+        if (row.source === 'app') (state.open ?? state.loose).push(row);
+        else turn().push(row);
+        break;
+      case 'tool':
+      case 'prose':
+      case 'streaming':
+      case 'thinking':
+        turn().push(row);
+        break;
+      case 'system':
+      case 'compact':
+        (state.open ?? state.loose).push(row);
+        break;
+      case 'turn-end':
+      case 'failed':
+        turn().push(row);
+        close();
+        break;
+    }
+  }
+  if (state.open) groups.push({ index: ++state.count, rows: state.open, finished: false });
+  flushLoose();
+  return groups;
+}
+
+/** A turn's header in the grouped stream: the collapsed summary row of a finished turn, or the live turn's caption. */
+export interface TurnHeaderRow {
+  readonly type: 'turn-header';
+  readonly key: string;
+  readonly index: number;
+  /** The turn is still going: always open, with its rows under the header. */
+  readonly live: boolean;
+  /** The turn's rows are drawn under the header (always for the live turn). */
+  readonly expanded: boolean;
+  /** How many top-level rows the turn holds. */
+  readonly rowCount: number;
+}
+
+/** What the grouped stream draws: the usual rows, and a header for each turn. */
+export type StreamRow = OutputRow | TurnHeaderRow;
+
+/**
+ * The rows the grouped stream draws, top to bottom: for each turn a header, and under it the turn's rows when it
+ * is open (`expanded` holds the keys of opened turns; the live turn is always open). Rows between turns stay as
+ * they are. The result is one flat list, so the stream still windows it row by row.
+ */
+export function displayRows(groups: readonly TurnGroup[], expanded: ReadonlySet<string>): StreamRow[] {
+  const out: StreamRow[] = [];
+  for (const group of groups) {
+    if (group.index === null) {
+      out.push(...group.rows);
+      continue;
+    }
+    const key = turnRowKey(group.index);
+    const live = !group.finished;
+    const open = live || expanded.has(key);
+    out.push({ type: 'turn-header', key, index: group.index, live, expanded: open, rowCount: group.rows.length });
+    if (open) out.push(...group.rows);
+  }
+  return out;
+}

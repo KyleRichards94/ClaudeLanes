@@ -66,3 +66,8 @@ export function resetOutputDiffLayout(): void {
 export function outputDiffLayout(): OutputDiffLayout {
   return useOutputDiffLayoutStore.getState();
 }
+
+/** One field of the layout, so a component re-renders for it alone and not when the pane is dragged. */
+export function useOutputDiffLayoutValue<T>(selector: (layout: OutputDiffLayout) => T): T {
+  return useOutputDiffLayoutStore(selector);
+}

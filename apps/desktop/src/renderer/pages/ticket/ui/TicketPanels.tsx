@@ -1,17 +1,21 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { subagentCountsLabel, type TicketRecord, type TicketSubBranch } from '@agent-lanes/contracts';
+import { subagentCountsLabel, type SubagentStatus, type TicketRecord, type TicketSubBranch } from '@agent-lanes/contracts';
 import { color, space } from '@agent-lanes/tokens';
-import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
+import { Button, GlassPanel, Pill, Text, type PillTone } from '@agent-lanes/ui';
 import { subAgentTotal, useArchiveTicket, type AgentTicket } from '@/entities/agent-ticket';
-import { LeadAgentCard, SubAgentList, subAgentTree, useSubAgents, type SubAgentActions } from '@/entities/sub-agent';
+import { subAgentRow, useSubAgents, type SubAgentActions } from '@/entities/sub-agent';
 import { BuildRunControls } from '@/features/build-run';
-import { MergeControls } from '@/features/merge-branches';
-import { useAgentUsage, useBranchStatus, useOpenWorktree, useSessionStatus, useStopSession } from '@/shared/api';
+import { MergeControls, isMergeable } from '@/features/merge-branches';
+import { useAgents } from '@/features/ticket-insight';
+import { useBranchStatus, useOpenWorktree, useSessionStatus, useStopSession } from '@/shared/api';
+import { modelEffortLabel } from '@/shared/config';
 import { toast } from '@/shared/model';
 import { ErrorBoundary } from '@/shared/ui';
-import { companionDetail, companionLabel } from '../lib/companions';
+import { AgentDonut, type AgentStatusPill } from '@/widgets/flight-deck';
+import { COMPANION_ROLE_LABELS, companionDetail } from '../lib/companions';
 import { subBranchRows } from '../lib/sub-branch-rows';
+import { useCompanionTokens } from '../model/companion-tokens';
 
 /**
  * The drill-in's rail cards (AL-250, artboard 3 reshaped): Build / Run / Stop (AL-173), the merges
@@ -71,7 +75,7 @@ export function WorktreePanel({ ticket }: { ticket: AgentTicket }) {
         </View>
       }
     >
-      <BuildRunControls ticket={ticket} />
+      <BuildRunControls ticket={ticket} compact />
     </Panel>
   );
 }
@@ -86,117 +90,127 @@ export function MergePanel({ ticket }: { ticket: AgentTicket }) {
 }
 
 /**
- * The Agents card (AL-250): the lead agent (its model and effort switch in the composer footer, AL-259)
- * and the sub-agent tree with each one's status,
- * line, model · effort and branch (AL-177, entities/sub-agent). The tree is read with
- * `agent:getSubagents` and kept current by `agent:subagent`; until it loads, the counts come from the
+ * The Agents card (AL-250, restyled for Flight deck in AL-279): a donut with a segment per agent and a row per agent
+ * (the lead, its sub-agents, and the second agents, AL-266) from `useAgents`, which `widgets/flight-deck` draws. The
+ * rows keep what the tree card showed: the lead's model · effort and role, a sub-agent's latest activity, model and
+ * branch, a second agent's role and where it works, tokens, and the actions: pressing a sub-agent's row shows its
+ * output in the stream and Stop ends it while it runs (AL-261); a second agent has Open, Stop and Remove. The tree
+ * is read with `agent:getSubagents` and kept current by `agent:subagent`; until it loads, the counts come from the
  * card's. The lead agent's tokens come from the live session usage (AL-113) when it has them.
  */
 export function AgentsPanel({ ticket, leadTokens, footer, actions, companions = [], activeId, onOpenCompanion }: { ticket: AgentTicket; leadTokens?: number; footer?: ReactNode; actions?: SubAgentActions; /** The ticket's second agents (AL-266), oldest first. */ companions?: readonly TicketRecord[]; /** The agent whose output the page shows. */ activeId?: string; onOpenCompanion?: (companionId: string) => void }) {
   const subAgents = useSubAgents(ticket.id);
+  const agents = useAgents(ticket.id, companions);
+  const branches = useBranchStatus(ticket.id);
+  const companionTokens = useCompanionTokens(companions);
   const counts = subAgents.data?.counts ?? ticket.subAgents;
-  const tree = subAgentTree(subAgents.data?.nodes ?? []);
+  const nodes = new Map((subAgents.data?.nodes ?? []).map((node) => [node.id, node]));
+  const records = new Map(companions.map((record) => [record.id, record]));
   const lead = { stage: ticket.stage, model: ticket.model, effort: ticket.effort };
   const total = subAgents.data ? subAgents.data.nodes.length : subAgentTotal(ticket.subAgents);
   const countsLabel = subagentCountsLabel(counts);
+  const subBranchesReady = (branches.data?.subBranches ?? []).filter(isMergeable).length;
+
+  // Each agent's lines, status pill and tokens, as the old tree card said them.
+  const lines: Record<string, readonly string[]> = {};
+  const statuses: Record<string, AgentStatusPill> = {};
+  const shown = agents.map((agent) => {
+    const node = nodes.get(agent.id);
+    const record = records.get(agent.id);
+    if (agent.role === 'lead') {
+      lines[agent.id] = [`${modelEffortLabel(lead.model, lead.effort)} · ${total > 0 ? 'orchestrating' : 'working alone'}`];
+      return { ...agent, tokens: leadTokens && leadTokens > 0 ? leadTokens : agent.tokens };
+    }
+    if (node) {
+      const row = subAgentRow(node, lead);
+      lines[agent.id] = [row.line, row.modelLine, row.branchLine].filter((line) => line !== '');
+      statuses[agent.id] = { label: row.statusLabel, tone: SUB_AGENT_TONES[row.status] };
+      return agent;
+    }
+    if (record?.companion) {
+      lines[agent.id] = [COMPANION_ROLE_LABELS[record.companion.role], companionDetail({ branch: record.branch, companion: record.companion })];
+      return { ...agent, tokens: companionTokens[agent.id] ?? null };
+    }
+    return agent;
+  });
 
   return (
-    <Panel
-      title="Agents"
-      testID="sub-agents-panel"
-      aside={
-        <Text variant="meta" testID="sub-agents-counts">
-          {countsLabel === 'none yet' ? 'None yet' : countsLabel}
-        </Text>
-      }
-    >
-      <LeadAgentCard lead={lead} role={total > 0 ? 'orchestrating' : 'working alone'} tokens={leadTokens && leadTokens > 0 ? leadTokens : (subAgents.data?.leadTokens ?? null)} />
-      {tree.length > 0 ? (
-        <SubAgentList items={tree} lead={lead} actions={actions} />
-      ) : subAgents.isError ? (
-        <Text variant="meta">{"Couldn't load the sub-agents."}</Text>
-      ) : null}
-      {companions.length > 0 ? (
-        <View role="list" testID="companions">
-          {companions.map((companion) => (
-            <CompanionRow key={companion.id} record={companion} active={companion.id === activeId} onOpen={onOpenCompanion} />
-          ))}
-        </View>
-      ) : null}
-      {footer}
-    </Panel>
+    <AgentDonut
+      agents={shown}
+      lines={lines}
+      statuses={statuses}
+      counts={countsLabel === 'none yet' ? 'None yet' : countsLabel}
+      subBranchesReady={subBranchesReady}
+      activeId={activeId ?? ticket.id}
+      onOpenAgent={(agent) => {
+        const node = nodes.get(agent.id);
+        if (node) actions?.onSelect?.(node);
+        else onOpenCompanion?.(agent.id);
+      }}
+      renderActions={(agent) => {
+        const node = nodes.get(agent.id);
+        if (node) {
+          const canStop = Boolean(actions?.onStop) && node.taskId !== null && (node.status === 'running' || node.status === 'queued');
+          return canStop ? (
+            <Button size="sm" variant="danger" label="Stop" icon="stop" loading={actions?.stoppingId === node.id} onPress={() => actions?.onStop?.(node)} testID={`sub-agent-${node.id}-stop`} />
+          ) : null;
+        }
+        const record = records.get(agent.id);
+        return record ? <CompanionActions record={record} active={record.id === activeId} onOpen={onOpenCompanion} /> : null;
+      }}
+      rowTestID={(agent) => (agent.role === 'lead' ? 'lead-agent' : records.has(agent.id) ? `companion-${agent.id}` : `sub-agent-${agent.id}`)}
+      notice={subAgents.isError ? <Text variant="meta">{"Couldn't load the sub-agents."}</Text> : null}
+      footer={footer}
+    />
   );
 }
+
+const SUB_AGENT_TONES = { queued: 'neutral', running: 'claude', done: 'ok', failed: 'danger' } as const satisfies Record<SubagentStatus, PillTone>;
 
 /** Session states with a `claude` process behind them. */
 const LIVE_STATES = new Set(['starting', 'running', 'idle', 'paused']);
 
-/**
- * One second agent on the Agents card (AL-266): its name and role, where it works, its session state
- * and tokens, Open (the page switches to its output), Stop while it runs, Remove once it has ended.
- */
-function CompanionRow({ record, active, onOpen }: { record: TicketRecord; active: boolean; onOpen?: (companionId: string) => void }) {
+/** A second agent's Open (the page switches to its output), Stop while it runs, and Remove once it has ended (AL-266). */
+function CompanionActions({ record, active, onOpen }: { record: TicketRecord; active: boolean; onOpen?: (companionId: string) => void }) {
   const companion = record.companion!;
   const status = useSessionStatus(record.id).data;
-  const usage = useAgentUsage(record.id).data;
   const stop = useStopSession(record.id);
   const remove = useArchiveTicket();
   const live = status ? LIVE_STATES.has(status.state) : false;
   const state = status?.state ?? 'none';
-  const stateLabel = state === 'none' ? 'Not started' : state === 'queued' ? 'Queued' : state.charAt(0).toUpperCase() + state.slice(1);
-  const stateTone = state === 'running' || state === 'starting' ? 'ok' : state === 'lost' ? 'danger' : state === 'idle' || state === 'paused' || state === 'queued' ? 'attention' : 'neutral';
-  const tokens = usage?.leadTokens ?? 0;
   return (
-    <View role="listitem" style={[styles.companion, active && styles.companionActive]} testID={`companion-${record.id}`}>
-      <View style={styles.companionText}>
-        <View style={styles.companionTitle}>
-          <Text variant="title" size="sm" numberOfLines={1} style={styles.flexText}>
-            {companionLabel(companion)}
-          </Text>
-          <Pill label={stateLabel} tone={stateTone} />
-        </View>
-        <Text variant="mono" size="xs" color={color.muted} numberOfLines={1} selectable>
-          {companionDetail({ branch: record.branch, companion })}
-        </Text>
-        {tokens > 0 ? (
-          <Text variant="meta" size="sm">
-            {`${tokens >= 1_000 ? `${Math.round(tokens / 1_000)}k` : tokens} tokens`}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.companionActions}>
-        {onOpen && !active ? <Button size="sm" variant="secondary" label="Open" onPress={() => onOpen(record.id)} testID={`companion-${record.id}-open`} /> : null}
-        {live || state === 'queued' ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="stop"
-            label="Stop"
-            loading={stop.isPending}
-            onPress={() => stop.mutate(undefined, { onError: (error) => toast({ id: `stop:${record.id}`, tone: 'error', title: `Couldn't stop ${companion.name}`, body: error.message }) })}
-            testID={`companion-${record.id}-stop`}
-          />
-        ) : (
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="archive"
-            label="Remove"
-            loading={remove.isPending}
-            onPress={() =>
-              remove.mutate(
-                { ticketId: record.id },
-                {
-                  onSuccess: () => toast({ id: `removed:${record.id}`, tone: 'success', title: `Removed ${companion.name}`, body: companion.role === 'helper' ? `Its branch ${record.branch} stays until the ticket is archived.` : 'Its output is gone; the ticket worktree is untouched.' }),
-                  onError: (error) => toast({ id: `remove:${record.id}`, tone: 'error', title: `Couldn't remove ${companion.name}`, body: error.message }),
-                },
-              )
-            }
-            testID={`companion-${record.id}-remove`}
-          />
-        )}
-      </View>
-    </View>
+    <>
+      {onOpen && !active ? <Button size="sm" variant="secondary" label="Open" onPress={() => onOpen(record.id)} testID={`companion-${record.id}-open`} /> : null}
+      {live || state === 'queued' ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="stop"
+          label="Stop"
+          loading={stop.isPending}
+          onPress={() => stop.mutate(undefined, { onError: (error) => toast({ id: `stop:${record.id}`, tone: 'error', title: `Couldn't stop ${companion.name}`, body: error.message }) })}
+          testID={`companion-${record.id}-stop`}
+        />
+      ) : (
+        <Button
+          size="sm"
+          variant="secondary"
+          icon="archive"
+          label="Remove"
+          loading={remove.isPending}
+          onPress={() =>
+            remove.mutate(
+              { ticketId: record.id },
+              {
+                onSuccess: () => toast({ id: `removed:${record.id}`, tone: 'success', title: `Removed ${companion.name}`, body: companion.role === 'helper' ? `Its branch ${record.branch} stays until the ticket is archived.` : 'Its output is gone; the ticket worktree is untouched.' }),
+                onError: (error) => toast({ id: `remove:${record.id}`, tone: 'error', title: `Couldn't remove ${companion.name}`, body: error.message }),
+              },
+            )
+          }
+          testID={`companion-${record.id}-remove`}
+        />
+      )}
+    </>
   );
 }
 
@@ -260,31 +274,6 @@ const styles = StyleSheet.create({
   },
   flexText: {
     flex: 1,
-  },
-  companion: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    paddingVertical: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: color.line,
-  },
-  companionActive: {
-    backgroundColor: color.claudeTint,
-  },
-  companionText: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  companionTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-  },
-  companionActions: {
-    flexDirection: 'row',
-    gap: space.xs,
   },
   subBranch: {
     flexDirection: 'row',

@@ -30,6 +30,8 @@ export interface TicketHeaderBandProps {
   };
   /** Controls right of the session pill: the usage strip and the Agent menu (AL-253, AL-257). */
   trailing?: ReactNode;
+  /** The layout slider (AL-275): right-aligned on the title row, left of the session pills. Pass a stable element: the band does not change when the layout does. */
+  layout?: ReactNode;
 }
 
 /**
@@ -38,7 +40,7 @@ export interface TicketHeaderBandProps {
  * pill and the agent controls sit on the right. Everything the old top bar, meta row and display title
  * said, in about 90 px, so the transcript starts near the top of the window.
  */
-export function TicketHeaderBand({ ticketId, title, repo, workItem, note, session, trailing }: TicketHeaderBandProps) {
+export function TicketHeaderBand({ ticketId, title, repo, workItem, note, session, trailing, layout }: TicketHeaderBandProps) {
   const { navigate } = useNavigation();
   const details = workItem
     ? [workItem.type, workItem.state, sprintName(workItem.iterationPath), workItem.assignedTo?.displayName].filter(Boolean).join(' · ')
@@ -78,9 +80,12 @@ export function TicketHeaderBand({ ticketId, title, repo, workItem, note, sessio
           ) : null}
         </View>
         {title !== undefined ? (
-          <Text variant="title" size="xl" role="heading" aria-level={1} numberOfLines={2} selectable style={styles.title} testID="ticket-title">
-            {title || `#${ticketId}`}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text variant="title" size="xl" role="heading" aria-level={1} numberOfLines={2} selectable style={[styles.title, styles.titleText]} testID="ticket-title">
+              {title || `#${ticketId}`}
+            </Text>
+            {layout}
+          </View>
         ) : null}
       </View>
       <View style={styles.side}>
@@ -184,6 +189,15 @@ const styles = StyleSheet.create({
     gap: space.xs,
     minHeight: 28,
     paddingHorizontal: space.xs,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.lg,
+  },
+  titleText: {
+    flex: 1,
+    minWidth: 0,
   },
   title: {
     lineHeight: 26,

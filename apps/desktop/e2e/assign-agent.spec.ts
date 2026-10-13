@@ -8,6 +8,7 @@ import type { RepoSettings, Result, TicketRecord } from '@agent-lanes/contracts'
 import { ADO_FIXTURE_PROJECT } from '@agent-lanes/contracts/testing';
 import { FAKE_LOGIN, fakeClaudeEnv, writeFakeClaudeState, type FakeClaudeState } from './support/fake-claude-code';
 import { startFakeAdoServer, type FakeAdoServer } from './support/fake-ado-server';
+import { expectOutputToContain } from './support/output-turns';
 
 /**
  * Assign new agent (AL-263) in the real app: a running agent is replaced by a Sonnet one that starts
@@ -115,7 +116,8 @@ test('hands a running ticket over to a new Sonnet agent with a brief, keeping th
 
   // The divider and the hand-over bubble follow the earlier output; the new agent answers the brief.
   await expect(output).toContainText('New agent · Sonnet · XHigh · handed over', { timeout: 30_000 });
-  await expect(output).toContainText('Handed over');
+  // The hand-over bubble is in the new agent's turn, which collapses once it ends.
+  await expectOutputToContain(page, 'Handed over');
   await expect(output).toContainText('Taking over.', { timeout: 30_000 });
   await expect(output).toContainText('Started from the job.');
   await agentIdle();

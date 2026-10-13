@@ -1,7 +1,7 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { fakeOutputEvent } from '@/shared/testing';
-import { findToolUse, outputRows, proseSpans, statSpans, turnEndLabel, userCaption, withoutThinking, type OutputRow } from './rows';
+import { displayRows, findToolUse, groupTurns, outputRows, proseSpans, statSpans, turnEndLabel, turnRowKey, userCaption, withoutThinking, type OutputRow } from './rows';
 import { estimateRowHeight, rowOffsets, windowFor } from './virtual';
 
 let seq = 0;
@@ -233,5 +233,60 @@ describe('thinking rows (AL-262)', () => {
 describe('app notes (AL-273)', () => {
   it('captions a note the app pushed as Agent Lanes', () => {
     expect(userCaption({ source: 'app-note', at: 0, priority: null })).toBe('Agent Lanes');
+  });
+});
+
+describe('groupTurns and displayRows (AL-279, grouped output)', () => {
+  const user = (text: string, source: 'composer' | 'app' = 'composer'): AgentOutputItem => ({ kind: 'user', text, source, priority: null, messageId: null, ...lead });
+  const result = (): AgentOutputItem => ({ kind: 'result', subtype: 'success', isError: false, durationMs: 60_000, numTurns: 1, costUsd: 0.5, usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }, ...lead });
+
+  const rows = outputRows([
+    event({ kind: 'system', text: 'Plan approved', ...lead }),
+    event(user('Add a filter')),
+    event(tool('r1', { tool: 'edit', label: 'Edit' })),
+    event({ kind: 'text', streamId: 'm1', text: 'Filter added.', ...lead }),
+    event(result()),
+    event(user('Continue where you left off.', 'app')),
+    event(tool('r2')),
+    event({ kind: 'text-delta', streamId: 'm2', text: 'Reading the grid', ...lead }),
+  ]);
+
+  it('numbers turns from the user message to the turn end, as the turn strip does, and leaves the live one open', () => {
+    const groups = groupTurns(rows);
+    expect(groups.map((group) => [group.index, group.finished, group.rows.map((row) => row.type)])).toEqual([
+      [null, true, ['system']],
+      [1, true, ['user', 'tool', 'prose', 'turn-end']],
+      // The app's own message starts nothing: the next tool does, and it sits in the turn.
+      [2, false, ['user', 'tool', 'streaming']],
+    ]);
+  });
+
+  it('keeps a queued user message inside the turn it arrives in, and ends a turn on a failed row too', () => {
+    const groups = groupTurns(
+      outputRows([
+        event(user('First')),
+        event(tool('a')),
+        event(user('Also this')),
+        event({ kind: 'result', subtype: 'error_max_turns', isError: true, durationMs: 1, numTurns: 1, costUsd: 0, usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }, ...lead }),
+        event(tool('b')),
+        event(result()),
+      ]),
+    );
+    expect(groups.map((group) => [group.index, group.rows.map((row) => row.type)])).toEqual([
+      [1, ['user', 'tool', 'user', 'failed']],
+      [2, ['tool', 'turn-end']],
+    ]);
+  });
+
+  it('draws a header per turn, with rows under the open ones only; the live turn is always open', () => {
+    const groups = groupTurns(rows);
+    const collapsed = displayRows(groups, new Set());
+    expect(collapsed.map((row) => row.type)).toEqual(['system', 'turn-header', 'turn-header', 'user', 'tool', 'streaming']);
+    expect(collapsed[1]).toMatchObject({ key: 'turn:1', index: 1, live: false, expanded: false, rowCount: 4 });
+    expect(collapsed[2]).toMatchObject({ key: 'turn:2', index: 2, live: true, expanded: true });
+
+    const opened = displayRows(groups, new Set([turnRowKey(1)]));
+    expect(opened.map((row) => row.type)).toEqual(['system', 'turn-header', 'user', 'tool', 'prose', 'turn-end', 'turn-header', 'user', 'tool', 'streaming']);
+    expect(opened[1]).toMatchObject({ expanded: true });
   });
 });

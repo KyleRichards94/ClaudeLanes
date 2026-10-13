@@ -8,6 +8,7 @@ import type { RepoSettings, Result, Settings } from '@agent-lanes/contracts';
 import { ADO_FIXTURE_PROJECT } from '@agent-lanes/contracts/testing';
 import { FAKE_LOGIN, fakeClaudeEnv, writeFakeClaudeState, type FakeClaudeState } from './support/fake-claude-code';
 import { startFakeAdoServer, type FakeAdoServer } from './support/fake-ado-server';
+import { expectOutputToContain } from './support/output-turns';
 
 /**
  * Permission prompts at the waiting row (AL-260) in the real app: the fake `claude` asks
@@ -128,7 +129,7 @@ test('the prompt sits at the waiting tool row, and Always allow saves a rule the
   const box = page.getByPlaceholder('Message the agent — Enter sends, Shift+Enter for a new line');
   await box.fill('Publish again');
   await box.press('Enter');
-  await expect(page.getByTestId('ticket-tab-output')).toContainText("Allowed Bash by the repo's rule", { timeout: 30_000 });
+  await expectOutputToContain(page, "Allowed Bash by the repo's rule");
   await agentIdle();
   await expect(page.getByTestId('permission-71273-inline')).toHaveCount(0);
 });
@@ -145,7 +146,7 @@ test('Deny with a reason reaches the agent as the denial message (AL-260)', asyn
   await inline.getByTestId('permission-71273-inline-deny-reason').fill('Use the copy in docs/spec.json');
   await inline.getByTestId('permission-71273-inline-deny-send').click();
   await expect(inline).toHaveCount(0);
-  await expect(page.getByTestId('ticket-tab-output')).toContainText('denied Bash · curl https://example.test/spec.json · Use the copy in docs/spec.json');
+  await expectOutputToContain(page, 'denied Bash · curl https://example.test/spec.json · Use the copy in docs/spec.json');
   await agentIdle();
 
   // The fake writes its log when its stdin closes: what each ask was answered with.

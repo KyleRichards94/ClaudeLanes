@@ -6,8 +6,8 @@ import { _electron as electron, expect, test, type ElectronApplication, type Pag
 import { e2eTicketRecord, seedTicketRecords } from './support/ticket-records';
 
 /**
- * AL-179: the drill-in's Diff tab against a real git repository and ticket worktree. The file list
- * comes from `git:diff`; a file's lines only from `git:diffFile` once its row is opened.
+ * AL-179, AL-279: the drill-in's diff column against a real git repository and ticket worktree. The change map
+ * comes from `diff:files`; a file's lines only from `git:diffFile` once it is the one shown.
  */
 
 let app: ElectronApplication;
@@ -49,17 +49,27 @@ test.afterAll(async () => {
   rmSync(root, { recursive: true, force: true });
 });
 
-test('lists the ticket branch changes beside the output, each file open with its diff', async () => {
+test('shows the ticket branch changes as a change map beside the output, each tile opening the diff of its file', async () => {
   await page.evaluate("window.location.hash = '#/ticket/71273'");
-  // Output & diff: the diff is a pane beside the output, open by default.
+  // Output & diff: the diff column is beside the output, open by default.
   await expect(page.getByRole('tab', { name: 'Output & diff' })).toHaveAttribute('aria-selected', 'true');
 
-  const tab = page.getByTestId('ticket-tab-diff');
-  await expect(tab.getByTestId('diff-file')).toHaveCount(2, { timeout: 15_000 });
-  await expect(tab.getByTestId('diff-totals')).toHaveText('2 files · +3 −1');
-  await expect(tab.getByText('Includes uncommitted changes')).toBeVisible();
-  const lines = tab.getByTestId('diff-file-frmJobControl.vb').locator('..').getByTestId('diff-file-lines');
+  const column = page.getByTestId('ticket-tab-diff');
+  await expect(column.getByTestId('change-map').getByRole('button')).toHaveCount(2, { timeout: 15_000 });
+  await expect(column.getByTestId('diff-totals')).toHaveText('2 files · +3 −1');
+  await expect(column.getByText('Includes uncommitted changes')).toBeVisible();
+
+  // A tile opens its file; the lines come from git:diffFile. (With nothing picked, the file that changed most is open.)
+  await column.getByTestId('change-tile-frmJobControl.vb').click();
+  await expect(column.getByTestId('diff-file-path')).toHaveText('frmJobControl.vb');
+  const lines = column.getByTestId('diff-file-lines');
   await expect(lines.getByTestId('diff-line-remove')).toContainText('Public Class frmJobControl');
   await expect(lines.getByTestId('diff-line-add')).toContainText('Public Class frmJobControlLegacy');
-  await tab.screenshot({ path: test.info().outputPath('diff-tab.png') });
+
+  // The other file; with no recorded author here, it is the grey "you or a merge".
+  await column.getByTestId('change-tile-JobControl.razor').click();
+  await expect(column.getByTestId('diff-file-path')).toHaveText('JobControl.razor');
+  await expect(column.getByTestId('diff-file-author')).toHaveText('by you or a merge');
+  await expect(lines.getByTestId('diff-line-add').first()).toContainText('@page');
+  await column.screenshot({ path: test.info().outputPath('diff-column.png') });
 });

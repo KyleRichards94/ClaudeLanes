@@ -123,3 +123,30 @@ describe('show thinking (AL-262)', () => {
     await vi.waitFor(() => expect(main.settings.ui).toMatchObject({ showThinking: false }));
   });
 });
+
+describe('ticket layout (AL-275)', () => {
+  it('has no layout chosen at first and saves the choice and the dismissed legend with the other prefs', async () => {
+    const main = installFakeSettings();
+    const store = newStore();
+    await hydrateUiPrefs(store);
+    expect(store.getState().ticketLayout).toBeUndefined();
+    expect(store.getState().codeCityLegendDismissed).toBeUndefined();
+
+    store.getState().setTicketLayout('codeCity');
+    store.getState().setCodeCityLegendDismissed(true);
+    await vi.waitFor(() => expect(main.settings.ui).toMatchObject({ ticketLayout: 'codeCity', codeCityLegendDismissed: true }));
+  });
+
+  it('keeps the layout across a restart', async () => {
+    installFakeSettings();
+    const before = newStore();
+    await hydrateUiPrefs(before);
+    before.getState().setTicketLayout('codeCity');
+    await vi.waitFor(() => expect(before.persist.hasHydrated()).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const afterRestart = newStore();
+    await hydrateUiPrefs(afterRestart);
+    expect(afterRestart.getState().ticketLayout).toBe('codeCity');
+  });
+});

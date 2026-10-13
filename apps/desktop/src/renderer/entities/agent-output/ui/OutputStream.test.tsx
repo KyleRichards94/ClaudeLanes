@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeOutputEvent, installFakeBridge } from '@/shared/testing';
 import { resetExpandedRows } from '../model/expanded';
-import { requestOutputScroll, resetOutputScrollRequests } from '../model/scroll-request';
+import { requestOutputScroll, requestOutputTurnScroll, resetOutputScrollRequests } from '../model/scroll-request';
 import { createAgentOutputStore, type AgentOutputStore } from '../model/store';
 import { OutputStream } from './OutputStream';
 
@@ -365,5 +365,66 @@ describe('actions on the user\'s messages (AL-265)', () => {
     expect(screen.getByTestId('actions-u-1')).toBeTruthy();
     expect(screen.getByTestId('output-user-actions')).toBeTruthy();
     expect(screen.queryAllByTestId(/^actions-/)).toHaveLength(1);
+  });
+});
+
+describe('OutputStream grouping (AL-279)', () => {
+  const user = (text: string): AgentOutputItem => ({ kind: 'user', text, source: 'composer', priority: null, messageId: null, ...lead });
+  const turnOne = [
+    itemEvent(1, user('Add a filter')),
+    itemEvent(2, { kind: 'tool', rowId: 'r1', toolUseIds: ['r1'], tool: 'edit', label: 'Edit', detail: 'Pages/Grid.razor', stats: null, ...lead }),
+    itemEvent(3, { kind: 'text', streamId: 'm1', text: 'Filter added.', ...lead }),
+    itemEvent(4, { kind: 'result', subtype: 'success', isError: false, durationMs: 60_000, numTurns: 1, costUsd: 0.5, usage: { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }, ...lead }),
+    itemEvent(5, user('Now the tests')),
+    itemEvent(6, { kind: 'tool', rowId: 'r2', toolUseIds: ['r2'], tool: 'bash', label: 'Bash', detail: 'dotnet test', stats: null, ...lead }),
+  ];
+  const grouping = {
+    renderHeader: (header: { index: number; live: boolean; expanded: boolean; toggle(): void }) => (
+      <button type="button" data-testid={`turn-${header.index}`} aria-expanded={header.expanded} onClick={header.toggle}>
+        {`Turn ${header.index}${header.live ? ' live' : ''}`}
+      </button>
+    ),
+  };
+
+  beforeEach(() => resetExpandedRows());
+
+  it('collapses a finished turn to its header, keeps the live turn open, and opens a turn on a click', () => {
+    render(<OutputStream ticketId="71273" store={store} grouping={grouping} />);
+    act(() => store.receive(turnOne));
+
+    expect(screen.getByTestId('turn-1').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByTestId('turn-2').textContent).toBe('Turn 2 live');
+    // Turn 1's rows are hidden; the live turn's are drawn.
+    expect(screen.queryByText('Filter added.')).toBeNull();
+    expect(screen.getByText('dotnet test')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('turn-1'));
+    expect(screen.getByTestId('turn-1').getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Filter added.')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('turn-1'));
+    expect(screen.queryByText('Filter added.')).toBeNull();
+    // The live turn does not collapse.
+    fireEvent.click(screen.getByTestId('turn-2'));
+    expect(screen.getByText('dotnet test')).toBeTruthy();
+  });
+
+  it("scrolls to a turn the strip asks for, and opens the turn holding a sub-agent card's row", () => {
+    render(<OutputStream ticketId="71273" store={store} grouping={grouping} />);
+    act(() => store.receive(turnOne));
+    act(() => requestOutputTurnScroll('71273', 1));
+    expect(screen.getByTestId('turn-1')).toBeTruthy();
+
+    // A tool use inside the collapsed first turn opens it.
+    act(() => requestOutputScroll('71273', 'r1'));
+    expect(screen.getByTestId('turn-1').getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('Pages/Grid.razor')).toBeTruthy();
+  });
+
+  it('draws the flat stream when grouping is off', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive(turnOne));
+    expect(screen.queryByTestId('turn-1')).toBeNull();
+    expect(screen.getByText('Filter added.')).toBeTruthy();
   });
 });

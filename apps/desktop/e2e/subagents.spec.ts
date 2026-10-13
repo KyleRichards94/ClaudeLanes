@@ -139,7 +139,8 @@ test('two sub-agents nest under their Spawn rows, their cards show tokens and op
   await expect(output.getByTestId('output-spawn-latest')).toHaveCount(1);
 
   // Stop the writer: its task ends as stopped, and the lead agent finishes its turn.
-  await writer.locator('[data-testid$="-stop"]').click();
+  // Stop sits beside the row (a button inside a button is not valid), under the Agents card.
+  await page.locator('[data-testid^="sub-agent-"][data-testid$="-stop"]').click();
   await expect(page.getByRole('button', { name: 'writer, Failed' })).toBeVisible({ timeout: 15_000 });
   await expect(output).toContainText('Both sub-agents are done.', { timeout: 30_000 });
   await expect.poll(async () => (await data<{ state: string }>('agent:getStatus', { ticketId: '71273' })).state, { timeout: 30_000 }).toBe('idle');

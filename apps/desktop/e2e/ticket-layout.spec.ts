@@ -40,7 +40,7 @@ async function setContentSize(width: number, height: number) {
   await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0]?.setContentSize(size.width, size.height), { width, height });
 }
 
-test('at 1440 × 900 the transcript starts within 260 px of the top and the composer is on screen', async () => {
+test('at 1440 × 900 the transcript starts within 340 px of the top and the composer is on screen', async () => {
   await setContentSize(1440, 900);
   await expect(page.getByTestId('ticket-body-wide')).toBeVisible();
   const output = await page.getByTestId('ticket-tab-output').boundingBox();
@@ -50,11 +50,12 @@ test('at 1440 × 900 the transcript starts within 260 px of the top and the comp
     return { width: view.innerWidth, height: view.innerHeight };
   }));
   expect(output).not.toBeNull();
-  expect(output!.y).toBeLessThanOrEqual(260);
+  // The Flight deck workflow card (stage cards, turn strip) sits above the tabs: about 320 px with the header.
+  expect(output!.y).toBeLessThanOrEqual(340);
   expect(composer).not.toBeNull();
   expect(composer!.y + composer!.height).toBeLessThanOrEqual(viewport.height + 1);
-  // The transcript's card runs down to the composer, not a fixed 560 px.
-  expect(output!.height).toBeGreaterThan(300);
+  // The transcript's card runs down to the composer, not a fixed 560 px; the workflow card and the composer leave it about 290 px at 900 high.
+  expect(output!.height).toBeGreaterThan(250);
 });
 
 test('at 1100 × 800 the rail stacks under the panel and the transcript keeps at least 360 px', async () => {

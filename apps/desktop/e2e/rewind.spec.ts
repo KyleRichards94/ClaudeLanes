@@ -8,6 +8,7 @@ import type { RepoSettings, Result } from '@agent-lanes/contracts';
 import { ADO_FIXTURE_PROJECT } from '@agent-lanes/contracts/testing';
 import { FAKE_LOGIN, fakeClaudeEnv, writeFakeClaudeState, type FakeClaudeState } from './support/fake-claude-code';
 import { startFakeAdoServer, type FakeAdoServer } from './support/fake-ado-server';
+import { expandTurns } from './support/output-turns';
 
 /**
  * Rewind to here (AL-265) in the real app: one of the user's messages offers Rewind, the modal
@@ -92,7 +93,9 @@ test('a user message offers Rewind to here: the modal previews the files, confir
   await expect(output).toContainText('Filter added.', { timeout: 30_000 });
   await agentIdle();
 
-  // The composer's message has Rewind to here; the launch job does too, but this one is newest.
+  // The composer's message has Rewind to here; the launch job does too, but this one is newest. Finished turns are
+  // collapsed to a summary row in Flight deck, so open them to reach the message.
+  await expandTurns(page);
   const bubble = output.getByTestId('output-user').filter({ hasText: 'Add a filter' });
   await bubble.hover();
   await bubble.getByTestId('message-actions-rewind').click();

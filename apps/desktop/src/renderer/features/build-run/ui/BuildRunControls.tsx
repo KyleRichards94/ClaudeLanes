@@ -10,6 +10,8 @@ type TicketSlice = Pick<AgentTicket, 'id' | 'repo' | 'build' | 'run'>;
 
 export interface BuildRunControlsProps {
   ticket: TicketSlice;
+  /** 38 px buttons instead of 44 px, so three fit the 330 px rail without cutting their labels (AL-279). */
+  compact?: boolean;
 }
 
 /**
@@ -17,13 +19,14 @@ export interface BuildRunControlsProps {
  * worktree, then "Last build 14:02 · succeeded" and the run status. Available at every stage. The
  * buttons follow the queued / running / stopped state the events put in the agent ticket store.
  */
-export function BuildRunControls({ ticket }: BuildRunControlsProps) {
+export function BuildRunControls({ ticket, compact }: BuildRunControlsProps) {
   const actions = useBuildRunActions(ticket.id);
   const commands = useRepoCommands(ticket.repo);
   const job = ticket.build.job;
   return (
     <BuildRunControlsView
       ticket={ticket}
+      compact={compact}
       runCommand={commands.data ? commands.data.run !== null : undefined}
       onBuild={() => actions.build.mutate()}
       onRun={() => actions.run.mutate()}
@@ -53,10 +56,11 @@ export interface BuildRunControlsViewProps {
   onOpen(): void;
   /** Calls still in flight, so a second press does nothing before the first one's event arrives. */
   pending?: { build?: boolean; run?: boolean; stop?: boolean };
+  compact?: boolean;
 }
 
 /** The panel body without its actions, for the component gallery's Worktree panel states. */
-export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onStop, onOpen, pending = {} }: BuildRunControlsViewProps) {
+export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onStop, onOpen, pending = {}, compact = false }: BuildRunControlsViewProps) {
   const view = buildRunControls(ticket, { runCommand });
   const stopTarget = view.stop.target;
 
@@ -69,6 +73,7 @@ export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onSto
           onPress={onBuild}
           disabled={view.build.disabled && !view.build.loading}
           loading={view.build.loading || pending.build}
+          size={compact ? "sm" : "md"}
           style={styles.button}
           testID="build-run-build"
         />
@@ -79,6 +84,7 @@ export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onSto
           onPress={onRun}
           disabled={view.run.disabled && !view.run.loading}
           loading={view.run.loading || pending.run}
+          size={compact ? "sm" : "md"}
           style={styles.button}
           testID="build-run-run"
         />
@@ -90,6 +96,7 @@ export function BuildRunControlsView({ ticket, runCommand, onBuild, onRun, onSto
           }}
           disabled={stopTarget === null}
           loading={view.stop.loading || pending.stop}
+          size={compact ? "sm" : "md"}
           style={styles.button}
           testID="build-run-stop"
         />

@@ -1,0 +1,13 @@
+{
+  "_comment": "The reference ticket of the Flight deck / Code City handoff (AL-284): five changed files under OnSiteCompanion/, drawn from one git repo by ticket-layouts.spec.ts. `before` lines exist in the base commit; the head keeps `kept` of them, drops `removed` and adds `added` new ones.",
+  "id": "71273",
+  "files": [
+    { "path": "OnSiteCompanion/ComponentLibrary/Pages/Companion/FailedSyncFiles.razor", "before": 0, "kept": 0, "added": 120, "removed": 0 },
+    { "path": "OnSiteCompanion/Tests/Companion/FailedSyncFilesTests.cs", "before": 0, "kept": 0, "added": 64, "removed": 0 },
+    { "path": "OnSiteCompanion/Legacy.WinExe/OfflineSynchronisation/frmFailedFiles.vb", "before": 44, "kept": 0, "added": 3, "removed": 44 },
+    { "path": "OnSiteCompanion/ComponentLibrary/Pages/Companion/FailedSyncFiles.razor.cs", "before": 40, "kept": 38, "added": 38, "removed": 2 },
+    { "path": "OnSiteCompanion/ComponentLibrary/Components/CompanionGridFormatter.cs", "before": 20, "kept": 19, "added": 6, "removed": 1 }
+  ],
+  "agents": ["lead", "razor-writer", "test-writer", "legacy-cleaner", "reviewer"],
+  "turns": 7
+}

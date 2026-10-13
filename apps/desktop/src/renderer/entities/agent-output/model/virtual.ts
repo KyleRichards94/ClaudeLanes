@@ -1,4 +1,4 @@
-import type { OutputRow } from './rows';
+import type { StreamRow } from './rows';
 
 /**
  * Windowing for the output stream (AL-175, design §12 Performance). Rows have different heights
@@ -19,8 +19,11 @@ const PROSE_LINE_PX = 22;
 export const OUTPUT_ROW_GAP = 10;
 
 /** A first guess at a row's height, before it is measured. */
-export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH, expanded = false): number {
+export function estimateRowHeight(row: StreamRow, width = FALLBACK_WIDTH, expanded = false): number {
   switch (row.type) {
+    case 'turn-header':
+      // A finished turn's summary row (grouped output) is two lines and a chip; open or live, a caption.
+      return (row.expanded ? 40 : 64) + OUTPUT_ROW_GAP;
     case 'tool':
       // An open row shows its input and output (AL-256): a guess until it is measured.
       return (expanded ? 38 + 240 : 38) + OUTPUT_ROW_GAP;
@@ -50,7 +53,7 @@ export function estimateRowHeight(row: OutputRow, width = FALLBACK_WIDTH, expand
  * Top offset of every row, plus the total height at the end (`offsets[rows.length]`). Measured
  * heights win over estimates; linear in the number of rows (10,000 rows take well under a millisecond).
  */
-export function rowOffsets(rows: readonly OutputRow[], measured: ReadonlyMap<string, number>, width?: number): Float64Array {
+export function rowOffsets(rows: readonly StreamRow[], measured: ReadonlyMap<string, number>, width?: number): Float64Array {
   const offsets = new Float64Array(rows.length + 1);
   let top = 0;
   for (let index = 0; index < rows.length; index++) {

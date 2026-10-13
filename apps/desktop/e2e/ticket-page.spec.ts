@@ -61,8 +61,8 @@ test('lays out the drill-in at 1440 wide with the rail on the right', async () =
   // Side by side: the rail starts right of the output card and no lower than it (AL-250).
   expect(side!.x).toBeGreaterThan(output!.x + output!.width);
   expect(side!.y).toBeLessThanOrEqual(output!.y + 1);
-  // The 400 px rail, as on artboard 3.
-  expect(Math.round(side!.width)).toBe(400);
+  // The 330 px rail of the Flight deck grid (handoff).
+  expect(Math.round(side!.width)).toBe(330);
 });
 
 test('stacks the rail under the output below 1200 wide', async () => {
