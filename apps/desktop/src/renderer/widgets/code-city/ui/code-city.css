@@ -57,7 +57,10 @@
   font:400 12px/16px "JetBrains Mono",ui-monospace,monospace;color:#0F1B2D;background:rgba(255,255,255,.92);
   border:1px solid #E2E8F0;border-radius:9px;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
   transition:left .3s ease,top .3s ease}
-.cc-chip.sel{border-color:#5B4BC4}
+/* Chips pile up in a crowded city: the picked one, the one under the mouse and the one for the focused building come to the front. */
+.cc-chip.sel{border-color:#5B4BC4;z-index:2}
+.cc-chip.front{z-index:3;background:#fff;box-shadow:0 2px 8px rgba(15,27,45,.18)}
+.cc-chip:hover{z-index:4;background:#fff;box-shadow:0 2px 8px rgba(15,27,45,.18)}
 .cc-chip .add{color:#047857}
 .cc-chip .del{color:#B91C1C}
 .cc-chip .tall{font:800 10px/12px "Plus Jakarta Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:#4A3BB0;

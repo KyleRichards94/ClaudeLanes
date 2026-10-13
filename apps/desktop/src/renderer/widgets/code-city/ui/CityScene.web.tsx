@@ -62,6 +62,7 @@ export function CityScene({ layout, files, agents, reviewStatus, selectedFilePat
   const size = useElementSize(sceneRef);
   const [focusPath, setFocusPath] = useState<string | null>(null);
   const [tipPath, setTipPath] = useState<string | null>(null);
+  const [hoverPath, setHoverPath] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const tipTimer = useRef<number | undefined>(undefined);
 
@@ -89,6 +90,7 @@ export function CityScene({ layout, files, agents, reviewStatus, selectedFilePat
 
   const hover = (path: string | null) => {
     window.clearTimeout(tipTimer.current);
+    setHoverPath(path);
     if (path === null) {
       setTipPath(null);
       return;
@@ -267,6 +269,7 @@ export function CityScene({ layout, files, agents, reviewStatus, selectedFilePat
             chips={labels.chips}
             districts={labels.districts}
             selectedPath={selectedFilePath}
+            frontPath={hoverPath ?? focusPath}
             onSelect={onSelectFile}
             overflow={
               layout.overflow > 0

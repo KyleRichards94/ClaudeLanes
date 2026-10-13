@@ -109,6 +109,18 @@ test('the slider switches to Code City, where the tallest building opens its fil
   await page.screenshot({ path: test.info().outputPath('code-city.png') });
 });
 
+test('the blueprint diff expands beside the city between two dividers', async () => {
+  await page.getByTestId('city-diff-expand').click();
+  await expect(page.getByRole('separator', { name: 'Resize the city and the blueprint diff' })).toBeVisible();
+  await expect(page.getByRole('separator', { name: 'Resize the blueprint diff and the inspector' })).toBeVisible();
+  await expect(page.getByTestId('city-diff-pane').getByTestId('diff-file-lines').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('city-rail').getByTestId('city-diff')).toHaveCount(0);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: test.info().outputPath('code-city-expanded.png') });
+  await page.getByRole('button', { name: 'Move the blueprint diff back to the rail' }).click();
+  await expect(page.getByTestId('city-rail').getByTestId('city-diff')).toBeVisible();
+});
+
 test('the selected file carries back to Flight deck, and the choice survives a restart', async () => {
   const slider = page.getByRole('radiogroup', { name: 'Ticket layout' });
   await slider.getByRole('radio', { name: 'Flight deck' }).click();

@@ -8,6 +8,8 @@ export interface LabelLayerProps {
   chips: readonly ChipLabel[];
   districts: readonly DistrictLabel[];
   selectedPath: string | null;
+  /** The building under the mouse or holding focus: its chips come to the front of the pile. */
+  frontPath?: string | null;
   onSelect(path: string): void;
   /** The grey "{n} more files" plot's label, when files are over the cap. */
   overflow: { count: number; at: Point | null; open: boolean; onToggle(): void } | null;
@@ -40,7 +42,7 @@ function ChipBody({ chip }: { chip: ChipLabel }) {
  * labels. Chips are for the mouse (the listbox's options carry the accessible names), so they are hidden from
  * assistive tech and take no Tab stop.
  */
-export function LabelLayer({ chips, districts, selectedPath, onSelect, overflow }: LabelLayerProps) {
+export function LabelLayer({ chips, districts, selectedPath, frontPath = null, onSelect, overflow }: LabelLayerProps) {
   return (
     <div className="cc-overlay">
       {districts.map((d) => (
@@ -51,7 +53,7 @@ export function LabelLayer({ chips, districts, selectedPath, onSelect, overflow 
       {chips.map((chip) => (
         <div
           key={chip.key}
-          className={`cc-chip${chip.kind === 'rubble' ? ' rubble' : ''}${chip.path === selectedPath ? ' sel' : ''}`}
+          className={`cc-chip${chip.kind === 'rubble' ? ' rubble' : ''}${chip.path === selectedPath ? ' sel' : ''}${chip.path === frontPath ? ' front' : ''}`}
           aria-hidden="true"
           data-chip={chip.key}
           style={{ left: chip.x, top: chip.y - CHIP_GAP - chip.lift }}

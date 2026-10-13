@@ -2451,6 +2451,7 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | 2026-10-13 | Remove all on Done and the single-step lanes. D813. |
 | 2026-10-13 | Output & diff: output and live diff side by side with a splitter, unified or side-by-side diffs, files expanded, Follow agent. D814. |
 | 2026-10-13 | E17 (AL-275–AL-284): ticket screen layouts. Header slider (Flight deck default, Code City, Ctrl+Shift+L, saved as `ticketLayout`); `diff:files` with agent attribution and `review:findings`; Flight deck (workflow card, turn strip, grouped output, change map with author stripe, agent donut); Code City (`layoutCity`, CSS 3D scene, labels and pins, crew, stage track, inspector rail, keyboard listbox); `ticket-layouts.spec.ts` and fixture `ticket-11726`. D815–D822. |
+| 2026-10-14 | Code City: chips under the pointer, on the focused building and on the picked one come to the front; Blueprint diff has an expand button that opens it beside the city, between two draggable dividers (city · diff · rest of the inspector), local to the page and off in the narrow bottom sheet. |
 ---
 
 ## 7. Parallel build rules

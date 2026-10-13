@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { space } from '@agent-lanes/tokens';
 import { GlassPanel, Icon } from '@agent-lanes/ui';
+import { SplitView } from '@/shared/ui';
 import { authorOf } from '../model/cityData';
 import { commonDirPrefix, districtKey, districtLabel, layoutCity } from '../model/layoutCity';
 import type { CodeCityProps } from '../model/types';
@@ -14,6 +15,9 @@ import { StageTrack } from './StageTrack';
 /** Below this window width the inspector rail becomes a bottom sheet. */
 export const NARROW_BELOW = 1200;
 const RAIL_WIDTH = 450;
+/** Where the dividers start when the Blueprint diff is expanded: the city's share of the width, then the diff's share of the rest. */
+const CITY_RATIO = 0.4;
+const DIFF_RATIO = 0.58;
 
 /**
  * Code City: an isometric 3D city of the ticket's changed files with a crew panel, a stage track, a composer and an
@@ -24,6 +28,11 @@ export function CodeCity(props: CodeCityProps) {
   const { diffMode, onDiffModeChange, stages, legendDismissed, onDismissLegend, renderDiff, composer, worktree, onOpenPrThread, testID } = props;
   const { width } = useWindowDimensions();
   const narrow = width < NARROW_BELOW;
+  // The Blueprint diff opens out of the rail into its own pane beside the city, between two draggable dividers.
+  const [expanded, setExpanded] = useState(false);
+  const [cityRatio, setCityRatio] = useState(CITY_RATIO);
+  const [diffRatio, setDiffRatio] = useState(DIFF_RATIO);
+  const split = expanded && !narrow;
 
   const layout = useMemo(() => layoutCity(files), [files]);
   const paths = useMemo(() => new Set(files.map((f) => f.path)), [files]);
@@ -47,26 +56,25 @@ export function CodeCity(props: CodeCityProps) {
     }
   }, [followAgent, latestActivityPath, paths, onSelectFile]);
 
-  const rail = (
-    <InspectorRail
-      loading={loading && files.length === 0}
-      file={selected}
-      author={author}
-      district={selected ? districtLabel(districtKey(selected.path, prefix)) : ''}
-      review={selected ? (reviewStatus[selected.path] ?? 'notReviewed') : 'notReviewed'}
-      anyUncommitted={anyUncommitted}
-      findings={noteFindings}
-      diffMode={diffMode}
-      onDiffModeChange={onDiffModeChange}
-      renderDiff={renderDiff}
-      worktree={worktree}
-      onOpenPrThread={onOpenPrThread}
-    />
-  );
+  const railProps = {
+    loading: loading && files.length === 0,
+    file: selected,
+    author,
+    district: selected ? districtLabel(districtKey(selected.path, prefix)) : '',
+    review: selected ? (reviewStatus[selected.path] ?? 'notReviewed') : 'notReviewed',
+    anyUncommitted,
+    findings: noteFindings,
+    diffMode,
+    onDiffModeChange,
+    renderDiff,
+    worktree,
+    onOpenPrThread,
+  } as const;
+  const toggleExpand = narrow ? undefined : () => setExpanded((open) => !open);
+  const rail = <InspectorRail {...railProps} part={split ? 'rest' : 'all'} expanded={split} onToggleExpand={toggleExpand} />;
 
-  return (
-    <View style={[styles.root, narrow ? null : styles.wide]} testID={testID ?? 'code-city'}>
-      <View style={styles.left}>
+  const city = (
+    <View style={styles.left}>
         <View style={styles.sceneHost}>
           <CityScene
             layout={layout}
@@ -86,6 +94,41 @@ export function CodeCity(props: CodeCityProps) {
         <StageTrack stages={stages} />
         {composer}
       </View>
+  );
+
+  if (split) {
+    // Expanded: the city and the Blueprint diff side by side in the middle, the rest of the inspector at the right,
+    // with a divider between each (arrow keys move a focused divider too).
+    return (
+      <View style={styles.root} testID={testID ?? 'code-city'}>
+        <SplitView
+          direction="row"
+          ratio={cityRatio}
+          onRatioChange={setCityRatio}
+          minRatio={0.2}
+          label="Resize the city and the blueprint diff"
+          testID="city-split"
+          first={city}
+          second={
+            <SplitView
+              direction="row"
+              ratio={diffRatio}
+              onRatioChange={setDiffRatio}
+              minRatio={0.25}
+              label="Resize the blueprint diff and the inspector"
+              testID="city-split-inner"
+              first={<InspectorRail {...railProps} part="diff" expanded onToggleExpand={toggleExpand} />}
+              second={rail}
+            />
+          }
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.root, narrow ? null : styles.wide]} testID={testID ?? 'code-city'}>
+      {city}
       {narrow ? (
         selected ? (
           <GlassPanel level="xl" style={styles.sheet} testID="city-sheet">

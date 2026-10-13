@@ -178,6 +178,17 @@ describe('CodeCity overlays', () => {
     expect(screen.queryByTestId('city-tooltip')).toBeNull();
   });
 
+  it('brings the label of the building under the pointer to the front, and takes it back on leave', async () => {
+    const { container } = render(<CodeCity {...props()} />);
+    await waitFor(() => expect(container.querySelectorAll('.cc-chip').length).toBeGreaterThan(0));
+    const chip = () => container.querySelector('[data-chip="b:' + FIXTURE_PATHS.tests + '"]')!;
+    expect(chip().classList.contains('front')).toBe(false);
+    fireEvent.mouseEnter(optionFor(FIXTURE_PATHS.tests));
+    expect(chip().classList.contains('front')).toBe(true);
+    fireEvent.mouseLeave(optionFor(FIXTURE_PATHS.tests));
+    expect(chip().classList.contains('front')).toBe(false);
+  });
+
   it('selects the building when its label chip is clicked', async () => {
     const onSelectFile = vi.fn();
     const { container } = render(<CodeCity {...props({ onSelectFile })} />);
@@ -472,6 +483,49 @@ describe('CodeCity follow agent', () => {
     expect(onSelectFile).not.toHaveBeenCalled();
     rerender(<CodeCity {...props({ onSelectFile, followAgent: true, latestActivityPath: 'not/in/the/diff.cs' })} />);
     expect(onSelectFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('CodeCity expanded blueprint diff', () => {
+  const expand = () => fireEvent.click(screen.getByTestId('city-diff-expand'));
+
+  it('opens the diff beside the city between two dividers, with the rest of the inspector at the right, and puts it back', () => {
+    render(<CodeCity {...props({ selectedFilePath: FIXTURE_PATHS.razor })} />);
+    expect(screen.queryByTestId('city-split')).toBeNull();
+    expect(within(screen.getByTestId('city-rail')).getByTestId('city-diff')).toBeTruthy();
+
+    expand();
+    expect(screen.getByRole('separator', { name: 'Resize the city and the blueprint diff' })).toBeTruthy();
+    expect(screen.getByRole('separator', { name: 'Resize the blueprint diff and the inspector' })).toBeTruthy();
+    const pane = within(screen.getByTestId('city-diff-pane'));
+    expect(pane.getByTestId('diff').textContent).toContain(FIXTURE_PATHS.razor);
+    // The building card, notes and worktree stay in the rail; the diff left it.
+    const rail = within(screen.getByTestId('city-rail'));
+    expect(rail.getByTestId('city-inspector')).toBeTruthy();
+    expect(rail.getByText('worktree slot')).toBeTruthy();
+    expect(rail.queryByTestId('city-diff')).toBeNull();
+    // The city, its stage track and the composer are still there.
+    expect(screen.getByRole('listbox', { name: 'Changed files' })).toBeTruthy();
+    expect(screen.getByText('composer slot')).toBeTruthy();
+
+    fireEvent.click(pane.getByRole('button', { name: 'Move the blueprint diff back to the rail' }));
+    expect(screen.queryByTestId('city-split')).toBeNull();
+    expect(within(screen.getByTestId('city-rail')).getByTestId('city-diff')).toBeTruthy();
+  });
+
+  it('moves a divider with the arrow keys', () => {
+    render(<CodeCity {...props()} />);
+    expand();
+    const divider = screen.getByRole('separator', { name: 'Resize the city and the blueprint diff' });
+    const before = Number(divider.getAttribute('aria-valuenow'));
+    fireEvent.keyDown(divider, { key: 'ArrowRight' });
+    expect(Number(divider.getAttribute('aria-valuenow'))).toBeGreaterThan(before);
+  });
+
+  it('has no expand button in the narrow bottom sheet', () => {
+    setWindowWidth(1000);
+    render(<CodeCity {...props({ selectedFilePath: FIXTURE_PATHS.razor })} />);
+    expect(screen.queryByTestId('city-diff-expand')).toBeNull();
   });
 });
 

@@ -11,6 +11,8 @@ import AtSign from 'lucide-react-native/icons/at-sign';
 import Bot from 'lucide-react-native/icons/bot';
 import Brain from 'lucide-react-native/icons/brain';
 import BuildingComplex from 'lucide-react-native/icons/building-complex';
+import Maximize2 from 'lucide-react-native/icons/maximize-2';
+import Minimize2 from 'lucide-react-native/icons/minimize-2';
 import Check from 'lucide-react-native/icons/check';
 import Columns3 from 'lucide-react-native/icons/columns-3';
 import Copy from 'lucide-react-native/icons/copy';
@@ -111,6 +113,9 @@ const glyphs = {
   /** The ticket layout slider (AL-275): Flight deck (three columns) and Code city (buildings). */
   'layout-columns': { component: Columns3 },
   buildings: { component: BuildingComplex },
+  /** Code City's Blueprint diff opens beside the city and goes back (E17). */
+  expand: { component: Maximize2 },
+  collapse: { component: Minimize2 },
 } as const satisfies Record<string, Glyph>;
 
 export type IconName = keyof typeof glyphs;
