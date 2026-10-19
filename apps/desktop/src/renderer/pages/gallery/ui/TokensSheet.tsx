@@ -1,5 +1,5 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { color, glass, radius, shadow, space, type ColorToken, type GlassLevel } from '@agent-lanes/tokens';
+import { color, glass, lightColor, radius, shadow, space, type ColorToken, type GlassLevel } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Text } from '@agent-lanes/ui';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
 
@@ -19,6 +19,8 @@ const swatches: readonly { token: ColorToken; name: string; use: string }[] = [
   { token: 'skyGlow', name: 'sky glow', use: 'Glass backdrop, progress' },
   { token: 'claudeText', name: 'claude-text', use: 'Text on claude tint' },
   { token: 'danger', name: 'danger', use: 'Failures' },
+  { token: 'onAccent', name: 'on accent', use: 'Text on a saturated fill' },
+  { token: 'onInk', name: 'on ink', use: 'Text on the strong button' },
 ];
 
 const glassLevels: readonly { level: GlassLevel; blur: number; use: string }[] = [
@@ -54,7 +56,7 @@ export function TokensSheet() {
                   {swatch.name}
                 </Text>
                 <Text variant="mono" size="xs" color={color.muted}>
-                  {color[swatch.token]}
+                  {lightColor[swatch.token]}
                 </Text>
                 <Text variant="meta">{swatch.use}</Text>
               </View>
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     gap: space.xl,
     padding: space.xxl,
     borderRadius: radius.panel,
-    backgroundColor: '#E8EDF5',
+    backgroundColor: color.bg,
     overflow: 'hidden',
   },
   glow: {

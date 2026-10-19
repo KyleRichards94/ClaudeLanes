@@ -76,6 +76,12 @@ describe('settings contract', () => {
       expect(SettingsPatchSchema.parse({ defaults: { model: 'sonnet' } })).toEqual({ defaults: { model: 'sonnet' } });
     });
 
+    it('accepts an appearance and refuses anything else named like a theme', () => {
+      expect(SettingsPatchSchema.parse({ ui: { appearance: 'dark' } })).toEqual({ ui: { appearance: 'dark' } });
+      expect(SettingsPatchSchema.safeParse({ ui: { appearance: 'dim' } }).success).toBe(false);
+      expect(defaultSettings().ui.appearance).toBe('system');
+    });
+
     it('refuses unknown sections and unknown fields', () => {
       expect(SettingsPatchSchema.safeParse({ theme: 'dark' }).success).toBe(false);
       expect(SettingsPatchSchema.safeParse({ ui: { zoom: 2 } }).success).toBe(false);

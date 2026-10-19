@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { app, safeStorage, shell, type BrowserWindow } from 'electron';
-import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, err, ok, agentPermissionPolicy, dropDefaultsOf, dropKindOf, launchHoldPercentOf } from '@agent-lanes/contracts';
+import { DEFAULT_MAX_CONCURRENT_AGENTS, agentPermissionMode, err, ok, agentPermissionPolicy, dropDefaultsOf, dropKindOf, launchHoldPercentOf, type Settings } from '@agent-lanes/contracts';
 import { createAdoService, readRegisteredRemotes, type AdoService } from './ado';
 import { adoConnectionIdFor, createStageComments } from './ado/stage-comments';
 import { claudeExecutableLookup, resolveClaudeExecutable } from './agent/claude-executable';
@@ -216,6 +216,8 @@ export interface ServiceOptions {
   openPath?: (path: string) => Promise<string>;
   /** Opens the Backlog in its own window (AL-239); without it, `app:popOutBacklog` reports that it can't. */
   backlogWindow?: BacklogWindowController;
+  /** Settings as loaded, and after each accepted update. The window chrome follows the appearance. */
+  onSettingsChange?: (settings: Settings) => void;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -232,6 +234,7 @@ export function createServices(options: ServiceOptions): Services {
   const settingsStore = createSettingsService({
     file: createElectronSettingsFile(options.appDataDir),
     warn: (message) => log.child('settings').warn(message),
+    onChange: options.onSettingsChange,
   });
   // Concurrency follows the `buildQueueSize` setting (AL-041), read at each scheduling decision.
   const buildQueue = createJobQueue({ concurrency: () => settingsStore.get().buildQueueSize });

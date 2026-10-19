@@ -36,7 +36,7 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
     <GlassPanel style={styles.header} testID="board-header">
       <View style={styles.brand}>
         <View style={styles.logo}>
-          <Text variant="title" size="lg" color={color.surface}>
+          <Text variant="title" size="lg" color={color.onAccent}>
             ≡
           </Text>
         </View>

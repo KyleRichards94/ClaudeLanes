@@ -1,6 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import type { ChangedFile, ReviewStatus } from '@agent-lanes/contracts';
-import { color, space } from '@agent-lanes/tokens';
+import { color, space, tone } from '@agent-lanes/tokens';
 import { Card, Pill, Text } from '@agent-lanes/ui';
 import { faceColors, REVIEW_WORDS, type Author } from '../model/cityData';
 import { fileName } from '../model/layoutCity';
@@ -32,10 +32,10 @@ function StatTile({ value, label, background, ink, testID }: { value: string; la
 }
 
 const reviewTone: Record<ReviewStatus, { background: string; ink: string }> = {
-  notReviewed: { background: '#F1F5F9', ink: '#475569' },
-  inReview: { background: '#EEEBFF', ink: '#4A3BB0' },
-  passed: { background: '#ECFDF5', ink: '#047857' },
-  changesRequested: { background: '#FFFBEB', ink: '#92400E' },
+  notReviewed: { background: tone.neutral.band, ink: tone.neutral.text },
+  inReview: { background: tone.claude.band, ink: tone.claude.text },
+  passed: { background: tone.ok.band, ink: tone.ok.text },
+  changesRequested: { background: tone.attention.band, ink: tone.attention.text },
 };
 
 /** The building card: tile, file name, district and builder, and the three stat tiles. */

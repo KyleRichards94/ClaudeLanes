@@ -14,28 +14,33 @@
  *
  * Values that repeat a `color` token are spelled out rather than imported, because index.ts
  * re-exports this file (an import back would be circular); tones.test.ts checks they still match.
- * Keep in sync with the tone block in agent-lanes-tokens.css; tones.test.ts checks that too.
+ * Keep the light hex in sync with the tone block in agent-lanes-tokens.css.
  */
-export const tone = {
+
+import { darkColor, lightColor, lightDark } from './palette';
+
+const pair = lightDark;
+
+export const lightTone = {
   claude: {
     border: '#8B80E0',
     wash: '#F6F5FF',
-    band: '#EEEBFF', // color.claudeTint
-    text: '#4A3BB0', // color.claudeText
-    dot: '#5B4BC4', // color.claude
+    band: lightColor.claudeTint,
+    text: lightColor.claudeText,
+    dot: lightColor.claude,
   },
   ado: {
     wash: '#F0F9FF',
-    band: '#E0F2FE', // color.adoTint
-    text: '#0369A1', // color.ado
-    fill: '#38BDF8', // color.skyGlow
-    dot: '#0369A1', // color.ado
+    band: lightColor.adoTint,
+    text: lightColor.ado,
+    fill: lightColor.skyGlow,
+    dot: lightColor.ado,
   },
   attention: {
     border: '#FCD34D',
     band: '#FEF3C7',
     text: '#92400E',
-    dot: '#D97706', // color.attention
+    dot: lightColor.attention,
   },
   danger: {
     border: '#FECACA',
@@ -43,14 +48,14 @@ export const tone = {
     band: '#FEE2E2',
     text: '#991B1B',
     fill: '#F87171',
-    dot: '#B91C1C', // color.danger
+    dot: lightColor.danger,
   },
   ok: {
     wash: '#ECFDF5',
     band: '#D1FAE5',
     text: '#047857',
     fill: '#10B981',
-    dot: '#059669', // color.ok
+    dot: lightColor.ok,
   },
   neutral: {
     band: '#F1F5F9',
@@ -59,12 +64,70 @@ export const tone = {
   },
 } as const;
 
+export const darkTone = {
+  claude: {
+    border: '#A99BF2',
+    wash: '#221E3D',
+    band: darkColor.claudeTint,
+    text: darkColor.claudeText,
+    dot: darkColor.claude,
+  },
+  ado: {
+    wash: '#0C2838',
+    band: darkColor.adoTint,
+    text: darkColor.ado,
+    fill: darkColor.skyGlow,
+    dot: darkColor.ado,
+  },
+  attention: {
+    border: '#FBBF24',
+    band: '#3A2C12',
+    text: '#FDE68A',
+    dot: darkColor.attention,
+  },
+  danger: {
+    border: '#FCA5A5',
+    wash: '#3A1818',
+    band: '#4C1F1F',
+    text: '#FECACA',
+    fill: '#F87171',
+    dot: darkColor.danger,
+  },
+  ok: {
+    wash: '#0C2E24',
+    band: '#134535',
+    text: '#A7F3D0',
+    fill: '#34D399',
+    dot: darkColor.ok,
+  },
+  neutral: {
+    band: '#243246',
+    text: '#D5DEEA',
+    dot: '#94A3B8',
+  },
+} as const;
+
+function themedTone<T extends Record<string, string>>(light: T, dark: { [K in keyof T]: string }): { [K in keyof T]: string } {
+  const themed = {} as { [K in keyof T]: string };
+  for (const key of Object.keys(light) as (keyof T)[]) themed[key] = pair(String(light[key]), String(dark[key]));
+  return themed;
+}
+
+export const tone = {
+  claude: themedTone(lightTone.claude, darkTone.claude),
+  ado: themedTone(lightTone.ado, darkTone.ado),
+  attention: themedTone(lightTone.attention, darkTone.attention),
+  danger: themedTone(lightTone.danger, darkTone.danger),
+  ok: themedTone(lightTone.ok, darkTone.ok),
+  neutral: themedTone(lightTone.neutral, darkTone.neutral),
+} as const;
+
 export type Tone = keyof typeof tone;
 
 /** Running progress: Claude violet into the sky glow, left to right. */
 export const progressGradient = {
-  from: '#5B4BC4', // color.claude
-  to: '#38BDF8', // color.skyGlow
+  from: pair(lightColor.claude, darkColor.claude),
+  to: pair(lightColor.skyGlow, darkColor.skyGlow),
 } as const;
 
 /**

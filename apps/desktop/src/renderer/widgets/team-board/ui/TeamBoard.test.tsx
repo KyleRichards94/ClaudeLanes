@@ -97,7 +97,7 @@ describe('TeamBoard (AL-234)', () => {
     await screen.findByTestId('team-board-columns');
     expect(screen.getByTestId('team-board-org').textContent).toBe('Azure DevOps · CompanionSystems');
     expect(screen.getByRole('button', { name: 'Team: OSC Developers · from your ADO profile' })).toBeTruthy();
-    expect(screen.getByText('Your or unassigned cards · any open PR for review')).toBeTruthy();
+    expect(screen.getByText('Click a card to open it · drag yours onto a lane')).toBeTruthy();
     await waitFor(() => expect(screen.getByTestId('team-board-backlog').textContent).toContain('Backlog 48'));
 
     const headings = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
@@ -219,6 +219,55 @@ describe('TeamBoard (AL-234)', () => {
     const error = await screen.findByTestId('team-board-error');
     expect(error.textContent).toContain('Azure DevOps answered 500.');
     expect(within(error).getByRole('button', { name: 'Retry' })).toBeTruthy();
+  });
+
+  it('opens a card, shows its contents, and saves a new person and status', async () => {
+    const workItem = {
+      id: 71318,
+      project: 'OnSite Companion',
+      type: 'Bug',
+      title: 'Quote PDF totals round incorrectly',
+      state: 'Failed UAT',
+      stateCategory: 'in-progress',
+      assignedTo: { displayName: 'Kyle Richards', uniqueName: 'kyle.richards@example.com' },
+      iterationPath: 'OnSite\\Sprint 42',
+      description: '<div>The quote PDF rounds the total down.</div>',
+      acceptanceCriteria: '<ul><li>Totals match the grid.</li></ul>',
+      webUrl: 'https://dev.azure.com/x/_workitems/edit/71318',
+    };
+    const mia = { id: 'md', displayName: 'Mia Davies', uniqueName: 'mia.davies@example.com', initials: 'MD' };
+    const { bridge } = setup({
+      'ado:getWorkItem': { ok: true, data: workItem },
+      'ado:getComments': { ok: true, data: [] },
+      'ado:listTeamMembers': { ok: true, data: { team: board.team, members: [{ ...KR, uniqueName: 'kyle.richards@example.com' }, mia] } },
+      'ado:updateBoardItem': {
+        ok: true,
+        data: { workItemId: 71318, rev: 4, state: 'Resolved', assignee: { id: 'md', displayName: 'Mia Davies', uniqueName: 'mia.davies@example.com' }, columnId: 'testing', column: 'Testing' },
+      },
+    });
+    fireEvent.click(await screen.findByTestId('team-card-71318'));
+
+    await waitFor(() => expect(screen.getByTestId('board-item-description').textContent).toContain('rounds the total down'));
+    expect(screen.getByTestId('board-item-criteria').textContent).toContain('Totals match the grid');
+    await waitFor(() => expect(screen.getByTestId('board-item-comments').textContent).toContain('No comments'));
+    expect(screen.getByTestId('board-item-save').getAttribute('aria-disabled')).toBe('true');
+
+    fireEvent.click(await screen.findByTestId('board-item-person-md'));
+    fireEvent.click(screen.getByTestId('board-item-column-testing'));
+    fireEvent.click(screen.getByTestId('board-item-save'));
+
+    await waitFor(() =>
+      expect(bridge.invoke).toHaveBeenCalledWith('ado:updateBoardItem', {
+        team: 'osc',
+        id: 71318,
+        assignee: { id: 'md', displayName: 'Mia Davies', uniqueName: 'mia.davies@example.com' },
+        columnId: 'testing',
+      }),
+    );
+    await waitFor(() => expect(screen.queryByTestId('board-item')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('team-card-71341'));
+    expect(await screen.findByRole('heading', { name: '#71341' })).toBeTruthy();
   });
 
   it('leaves Backlog off until the popout exists (AL-239)', async () => {

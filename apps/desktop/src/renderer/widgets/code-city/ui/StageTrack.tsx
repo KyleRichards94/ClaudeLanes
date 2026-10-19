@@ -9,7 +9,7 @@ export interface StageTrackProps {
 
 const DONE = '#059669';
 const ACTIVE = color.claude;
-const FUTURE = '#E2E8F0';
+const FUTURE = color.line;
 const DONE_ROAD = '#34D399';
 
 const web = (style: Record<string, string>) => style as unknown as ViewStyle;
@@ -19,7 +19,7 @@ function roadStyle(stage: CityStage): ViewStyle {
   if (stage.state === 'done') return { backgroundColor: DONE_ROAD };
   if (stage.state === 'current') {
     const at = Math.round(Math.min(1, Math.max(0, stage.progress ?? 0.5)) * 100);
-    return web({ backgroundImage: `linear-gradient(90deg, ${ACTIVE} ${at}%, ${FUTURE} ${at}%)` });
+    return web({ backgroundImage: `linear-gradient(90deg, var(--al-claude) ${at}%, var(--al-line) ${at}%)` });
   }
   return { backgroundColor: FUTURE };
 }

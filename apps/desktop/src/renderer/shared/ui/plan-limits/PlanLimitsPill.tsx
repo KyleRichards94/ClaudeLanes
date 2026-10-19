@@ -44,7 +44,7 @@ export function PlanLimitsPill({ testID = 'plan-limits-pill' }: { testID?: strin
       <Pill size="md" tone={view.tone} dot label={view.label} testID={`${testID}-label`} />
       {open && view.hint ? (
         <View role="tooltip" style={styles.tooltip} testID={`${testID}-tooltip`}>
-          <Text variant="body" size="sm" color={color.surface}>
+          <Text variant="body" size="sm" color={color.onInk}>
             {view.hint}
           </Text>
         </View>

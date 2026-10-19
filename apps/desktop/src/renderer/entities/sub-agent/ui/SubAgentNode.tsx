@@ -34,16 +34,16 @@ export function LeadAgentCard({ lead, role, tokens }: { lead: LeadAgent; role: s
   return (
     <View style={styles.lead} testID="lead-agent">
       <View style={styles.leadText}>
-        <Text variant="title" size="lg" color={color.surface}>
+        <Text variant="title" size="lg" color={color.onAccent}>
           Lead agent
         </Text>
-        <Text variant="body" size="sm" color={color.surface} numberOfLines={1}>
+        <Text variant="body" size="sm" color={color.onAccent} numberOfLines={1}>
           {`${modelEffortLabel(lead.model, lead.effort)} · ${role}`}
         </Text>
       </View>
       {tokens !== null && tokens > 0 ? (
         <View style={styles.tokens} testID="lead-agent-tokens">
-          <Text variant="mono" size="sm" color={color.surface}>
+          <Text variant="mono" size="sm" color={color.onAccent}>
             {tokensLabel(tokens)}
           </Text>
         </View>

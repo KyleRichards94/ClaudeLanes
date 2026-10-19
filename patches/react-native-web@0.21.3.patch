@@ -1,0 +1,38 @@
+diff --git a/dist/cjs/modules/isWebColor/index.js b/dist/cjs/modules/isWebColor/index.js
+index 3756045b9f036c521c31515e3fcb86d7b49b818f..1b86cd4769f19fede3ed58deedbda9c7ae83e043 100644
+--- a/dist/cjs/modules/isWebColor/index.js
++++ b/dist/cjs/modules/isWebColor/index.js
+@@ -11,6 +11,6 @@ exports.default = void 0;
+  * 
+  */
+ 
+-var isWebColor = color => color === 'currentcolor' || color === 'currentColor' || color === 'inherit' || color.indexOf('var(') === 0;
++var isWebColor = color => color === 'currentcolor' || color === 'currentColor' || color === 'inherit' || color.indexOf('var(') === 0 || color.indexOf('light-dark(') === 0;
+ var _default = exports.default = isWebColor;
+ module.exports = exports.default;
+\ No newline at end of file
+diff --git a/dist/modules/isWebColor/index.js b/dist/modules/isWebColor/index.js
+index 371221d2c369a31ac144900af6c766e4fee2a78a..2d687b5002a5cbf54e47af3166e699dc4e59869c 100644
+--- a/dist/modules/isWebColor/index.js
++++ b/dist/modules/isWebColor/index.js
+@@ -7,5 +7,5 @@
+  * 
+  */
+ 
+-var isWebColor = color => color === 'currentcolor' || color === 'currentColor' || color === 'inherit' || color.indexOf('var(') === 0;
++var isWebColor = color => color === 'currentcolor' || color === 'currentColor' || color === 'inherit' || color.indexOf('var(') === 0 || color.indexOf('light-dark(') === 0;
+ export default isWebColor;
+\ No newline at end of file
+diff --git a/src/modules/isWebColor/index.js b/src/modules/isWebColor/index.js
+index 06856926dad533cc6ba34bcabe0d8d547b520c00..f85f94eebc0e50b294d39367e164e637bcdf25e6 100644
+--- a/src/modules/isWebColor/index.js
++++ b/src/modules/isWebColor/index.js
+@@ -11,6 +11,7 @@ const isWebColor = (color: string): boolean =>
+   color === 'currentcolor' ||
+   color === 'currentColor' ||
+   color === 'inherit' ||
+-  color.indexOf('var(') === 0;
++  color.indexOf('var(') === 0 ||
++  color.indexOf('light-dark(') === 0;
+ 
+ export default isWebColor;

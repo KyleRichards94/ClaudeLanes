@@ -121,5 +121,5 @@ const styles = StyleSheet.create({
   diffBody: { flexGrow: 1 },
   notes: { flexGrow: 0, flexShrink: 0, maxHeight: 220 },
   skeleton: { padding: space.md, gap: 12 },
-  bar: { height: 14, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  bar: { height: 14, borderRadius: 8, backgroundColor: color.line },
 });

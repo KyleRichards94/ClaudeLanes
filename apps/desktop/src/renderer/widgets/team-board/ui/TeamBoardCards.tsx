@@ -18,7 +18,7 @@ export function Avatar({ avatar }: { avatar: TeamBoardAvatar | null }) {
   }
   return (
     <View style={[styles.avatar, avatar.mine ? styles.avatarMine : styles.avatarOther]} aria-label={avatar.mine ? `${avatar.name} (you)` : avatar.name} role="img">
-      <Text variant="title" size="xs" color={avatar.mine ? color.surface : tone.neutral.text}>
+      <Text variant="title" size="xs" color={avatar.mine ? color.onAccent : tone.neutral.text}>
         {avatar.initials}
       </Text>
     </View>
@@ -39,7 +39,7 @@ function Grip({ enabled }: { enabled: boolean }) {
  * agent works on has an "Agent in Implementing" tag. Both say so in words and an icon, never by
  * colour alone. One that can be dragged goes to an agent lane by pointer, Space or its Enter menu (AL-235).
  */
-export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
+export function TeamBoardItemCard({ card, onOpen }: { card: TeamBoardItemView; onOpen?: () => void }) {
   const summary = [
     `${card.idLabel} ${card.type}`,
     card.title,
@@ -48,6 +48,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
     card.avatar ? `assigned to ${card.avatar.mine ? 'you' : card.avatar.name}` : 'unassigned',
     card.lock ? `locked: ${card.lock}` : null,
     card.agentTag,
+    onOpen ? 'Opens to read it and change its person or status' : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -55,6 +56,7 @@ export function TeamBoardItemCard({ card }: { card: TeamBoardItemView }) {
     <LaneDragCard
       drag={card.drag}
       label={summary}
+      onClick={onOpen ? () => onOpen() : undefined}
       style={[styles.card, styles.typeEdge, { borderLeftColor: card.typeColor ?? FALLBACK_TYPE_COLOR }, card.agentTag ? styles.cardAgent : null]}
       testID={`team-card-${card.id}`}
     >

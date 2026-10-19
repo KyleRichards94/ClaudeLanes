@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { color, glass } from './index';
-import { overlay } from './overlay';
+import { glass, lightColor } from './index';
+import { lightOverlay, overlay } from './overlay';
 
 const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
 
@@ -13,9 +13,9 @@ const rgbOf = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2)
 
 describe('overlay tokens', () => {
   it('CSS variables mirror the TS values', () => {
-    expect(cssVar('overlay-scrim')).toBe(overlay.scrim);
+    expect(cssVar('overlay-scrim')).toBe(lightOverlay.scrim);
     expect(cssVar('overlay-scrim-blur')).toBe(`${overlay.scrimBlur}px`);
-    expect(cssVar('overlay-shadow')).toBe(overlay.shadow);
+    expect(cssVar('overlay-shadow')).toBe(lightOverlay.shadow);
   });
 
   it('blurs the app behind a modal with the small glass step, less than the modal glass itself', () => {
@@ -25,7 +25,7 @@ describe('overlay tokens', () => {
 
   it('keeps the scrim a pale, see-through wash rather than a dark dim', () => {
     const [r = 0, g = 0, b = 0, alpha = 1] = /rgba\(([^)]+)\)/
-      .exec(overlay.scrim)?.[1]
+      .exec(lightOverlay.scrim)?.[1]
       ?.split(',')
       .map(Number) ?? [];
     expect(Math.min(r, g, b)).toBeGreaterThanOrEqual(220);
@@ -34,7 +34,7 @@ describe('overlay tokens', () => {
   });
 
   it('casts the shadow in the ink colour, offset downwards', () => {
-    expect(overlay.shadow).toContain(`rgba(${rgbOf(color.ink)},`);
+    expect(lightOverlay.shadow).toContain(`rgba(${rgbOf(lightColor.ink)},`);
     expect(overlay.shadow).toMatch(/^0 \d+px /);
   });
 });

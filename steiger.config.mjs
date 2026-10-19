@@ -20,6 +20,13 @@ export default defineConfig([
     },
   },
   {
+    files: ['./apps/desktop/src/renderer/features/board-item/**'],
+    rules: {
+      // Opening a team-board card (AL-285) belongs to the team board widget alone.
+      'fsd/insignificant-slice': 'off',
+    },
+  },
+  {
     files: ['./apps/desktop/src/renderer/features/board-digest/**'],
     rules: {
       // The board digest (AL-272) belongs to the board page alone: it reads the whole ticket store.

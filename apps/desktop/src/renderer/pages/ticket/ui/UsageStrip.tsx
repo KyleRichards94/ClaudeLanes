@@ -62,7 +62,7 @@ export function UsageStrip({ usage, testID = 'usage-strip' }: UsageStripProps) {
       {percentage !== null ? (
         <View style={styles.bar} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percentage)} aria-label="Context window" testID={`${testID}-context`}>
           <View style={[styles.fill, { width: `${percentage}%`, backgroundColor: tone[barTone].dot }]} />
-          <Text variant="meta" size="xs" style={styles.barLabel} color={percentage >= 55 ? color.surface : color.muted}>
+          <Text variant="meta" size="xs" style={styles.barLabel} color={percentage >= 55 ? color.onAccent : color.muted}>
             {`${Math.round(percentage)}%`}
           </Text>
         </View>
@@ -72,7 +72,7 @@ export function UsageStrip({ usage, testID = 'usage-strip' }: UsageStripProps) {
       </Text>
       {open ? (
         <View role="tooltip" style={styles.tooltip} testID={`${testID}-tooltip`}>
-          <Text variant="body" size="sm" color={color.surface}>
+          <Text variant="body" size="sm" color={color.onInk}>
             {details}
           </Text>
         </View>

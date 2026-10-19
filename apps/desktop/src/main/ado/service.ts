@@ -6,6 +6,8 @@ import {
   getPullRequestSnapshot,
   getTeamBoard,
   getWorkItem,
+  listTeamMembers,
+  updateBoardItem,
   getWorkItemColors,
   listActivePullRequests,
   listMyTeams,
@@ -45,7 +47,11 @@ import {
   type WorkItemColors,
   type WorkItemColorsRequest,
   type WorkItemComment,
+  type BoardItemUpdate,
+  type ListTeamMembersRequest,
   type SetWorkItemStateRequest,
+  type TeamMemberList,
+  type UpdateBoardItemRequest,
   type WorkItemStateChange,
 } from '@agent-lanes/contracts';
 import type { ConnectionsService } from '../connections';
@@ -91,6 +97,10 @@ export interface AdoService {
   workItemColors(request: WorkItemColorsRequest): Promise<Result<WorkItemColors>>;
   /** The user's own state change from a card (AL-270); not subject to Settings › ADO state transitions. */
   setWorkItemState(request: SetWorkItemStateRequest): Promise<Result<WorkItemStateChange>>;
+  /** The team's people, for assigning a team-board card (AL-285). */
+  listTeamMembers(request: ListTeamMembersRequest): Promise<Result<TeamMemberList>>;
+  /** Assign a person, move a card to a column, or both (AL-285). Not a drag onto an agent lane. */
+  updateBoardItem(request: UpdateBoardItemRequest): Promise<Result<BoardItemUpdate>>;
   /** Comments and the settings-gated state change (AL-063), through the same clients. */
   readonly writeBack: WorkItemWriteBack;
 }
@@ -330,6 +340,19 @@ export function createAdoService(options: AdoServiceOptions): AdoService {
     teamBoard: (request) =>
       withTeam(request, (client, project, team) =>
         getTeamBoard(client, { project, team, ...(request.sprint === undefined ? {} : { sprint: request.sprint }) }),
+      ),
+
+    listTeamMembers: (request) => withTeam(request, (client, project, team) => listTeamMembers(client, { project, team })),
+
+    updateBoardItem: (request) =>
+      withTeam(request, (client, project, team) =>
+        updateBoardItem(client, {
+          project,
+          team,
+          workItemId: request.id,
+          ...(request.assignee === undefined ? {} : { assignee: request.assignee }),
+          ...(request.columnId === undefined ? {} : { columnId: request.columnId }),
+        }),
       ),
   };
 }

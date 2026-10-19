@@ -84,7 +84,7 @@ interface ActionButtonProps {
 
 /** Primary and secondary buttons as on the error toast; replaced by the Button primitive once AL-024 lands. */
 function ActionButton({ kind, label, icon, disabled = false, onPress }: ActionButtonProps) {
-  const textColor = kind === 'primary' ? color.surface : color.ink;
+  const textColor = kind === 'primary' ? color.onAccent : color.ink;
   return (
     <Pressable
       role="button"

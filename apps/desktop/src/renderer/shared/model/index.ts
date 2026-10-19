@@ -3,6 +3,7 @@ export {
   DEFAULT_TICKET_LAYOUT,
   createUiPrefsStore,
   hydrateUiPrefs,
+  useAppearance,
   useCodeCityLegendDismissed,
   useComposerDraft,
   useEmbedMode,

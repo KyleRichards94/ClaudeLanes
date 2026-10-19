@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { color, space } from '@agent-lanes/tokens';
+import { space } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { routes, useNavigation } from '@/shared/routing';
 import { CardStatesSheet } from './CardStatesSheet';
@@ -42,7 +42,6 @@ export function GalleryPage() {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: color.bg,
   },
   content: {
     paddingHorizontal: space.xl,

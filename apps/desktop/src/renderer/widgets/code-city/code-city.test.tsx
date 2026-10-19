@@ -418,9 +418,9 @@ describe('CodeCity inspector rail', () => {
     expect(notes.getByText('reviewer · posts via /pr-comment-actioner')).toBeTruthy();
     expect(notes.getByText('Line 42:')).toBeTruthy();
     expect(notes.getByText('Line 77:')).toBeTruthy();
-    expect(screen.getByTestId('city-note-warn').getAttribute('style')).toContain('rgb(255, 251, 235)');
+    expect(screen.getByTestId('city-note-warn').getAttribute('style')).toContain('rgb(254, 243, 199)');
     expect(screen.getByTestId('city-note-error').getAttribute('style')).toContain('rgb(254, 242, 242)');
-    expect(screen.getByTestId('city-note-info').getAttribute('style')).toContain('rgb(248, 250, 252)');
+    expect(screen.getByTestId('city-note-info').getAttribute('style')).toContain('rgb(244, 247, 251)');
     const link = notes.getByRole('link', { name: /Posted to PR/ });
     fireEvent.click(link);
     expect(onOpenPrThread).toHaveBeenCalledWith(4821);

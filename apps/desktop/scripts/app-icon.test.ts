@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // Decoding every icon entry is CPU-bound; under the full suite it passes 5 s.
 vi.setConfig({ testTimeout: 30_000 });
-import { color } from '@agent-lanes/tokens';
+import { lightColor } from '@agent-lanes/tokens';
 import { ICON_SIZES, buildResourcesDir, renderLogoMark, type RgbaImage } from './app-icon.mjs';
 
 interface IcoEntry {
@@ -102,8 +102,8 @@ describe('logo mark', () => {
     const near = (actual: number[], expected: number[]) =>
       expected.forEach((channel, index) => expect(Math.abs((actual[index] ?? 0) - channel)).toBeLessThanOrEqual(24));
 
-    near(pixel(mark, 48, 48), rgb(color.claude));
-    near(pixel(mark, 207, 207), rgb(color.ado));
+    near(pixel(mark, 48, 48), rgb(lightColor.claude));
+    near(pixel(mark, 207, 207), rgb(lightColor.ado));
   });
 
   it('draws three white lane bars, longest first', () => {

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, type PersistStorage } from 'zustand/middleware';
-import { defaultUiPrefs, type EmbedMode, type Lane, type UiPrefs } from '@agent-lanes/contracts';
+import { appearanceOf, defaultUiPrefs, type Appearance, type EmbedMode, type Lane, type UiPrefs } from '@agent-lanes/contracts';
 import { createUiPrefsStorage } from '@/shared/api';
 
 /**
@@ -24,6 +24,8 @@ export interface UiPrefsState extends UiPrefs {
   setTicketLayout(layout: TicketLayout): void;
   /** Closes the Code City "how to read it" card for good (AL-275). */
   setCodeCityLegendDismissed(dismissed: boolean): void;
+  /** Light, dark, or the computer's appearance. Applies at once. */
+  setAppearance(appearance: Appearance): void;
 }
 
 /** The ticket screen's two layouts (AL-275): Flight deck is the default. */
@@ -43,8 +45,20 @@ function pickPrefs({
   showThinking,
   ticketLayout,
   codeCityLegendDismissed,
+  appearance,
 }: UiPrefsState): UiPrefs {
-  return { lastRepo, lastSprint, lastTeam, collapsedLanes, embedModeByTicket, composerDrafts, showThinking, ticketLayout, codeCityLegendDismissed };
+  return {
+    lastRepo,
+    lastSprint,
+    lastTeam,
+    collapsedLanes,
+    embedModeByTicket,
+    composerDrafts,
+    showThinking,
+    ticketLayout,
+    codeCityLegendDismissed,
+    appearance: appearance ?? 'system',
+  };
 }
 
 /** Builds a UI prefs store over the given storage; the app uses `useUiPrefs`, tests make their own. */
@@ -82,6 +96,7 @@ export function createUiPrefsStore(storage: PersistStorage<UiPrefs, unknown>) {
         setShowThinking: (showThinking) => set({ showThinking }),
         setTicketLayout: (ticketLayout) => set({ ticketLayout }),
         setCodeCityLegendDismissed: (codeCityLegendDismissed) => set({ codeCityLegendDismissed }),
+        setAppearance: (appearance) => set({ appearance }),
       }),
       {
         name: 'ui-prefs',
@@ -109,6 +124,11 @@ export function useTicketLayout(): TicketLayout {
 /** Whether the Code City legend card was closed (AL-275). */
 export function useCodeCityLegendDismissed(): boolean {
   return useUiPrefs((state) => state.codeCityLegendDismissed ?? false);
+}
+
+/** Light, dark, or the computer's appearance. Unset follows the system. */
+export function useAppearance(): Appearance {
+  return useUiPrefs((state) => appearanceOf(state));
 }
 
 export const useUiPrefs: UiPrefsStore = createUiPrefsStore(createUiPrefsStorage());

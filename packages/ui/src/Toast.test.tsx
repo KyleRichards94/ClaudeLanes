@@ -1,18 +1,20 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { color, control, fontSize, fontWeight, glass, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, control, fontSize, fontWeight, glass, lightOf, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Toast, toastTones, toastWidth, type ToastTone } from './Toast';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** WCAG 2 contrast ratio of two #RRGGBB colours. */
 function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
+  const luminance = (value: string) => {
+    const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
     const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
       const c = parseInt(hex.slice(i, i + 2), 16) / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -69,7 +71,7 @@ describe('Toast', () => {
       expect(panel.borderTopLeftRadius).toBe(`${radius.card}px`);
       expect(panel.paddingTop).toBe('14px');
       expect(panel.paddingLeft).toBe('16px');
-      expect(panel.backgroundColor).toBe(glass.fillMax.replace(/\s/g, '').replace(/,/g, ', '));
+      expect(panel.backgroundColor).toBe(lightOf(glass.fillMax).replace(/\s/g, '').replace(/,/g, ', '));
       expect(panel.boxShadow).toBe(`${glass.highlight}, ${shadow.card}`);
 
       const alert = screen.getByRole('alert');

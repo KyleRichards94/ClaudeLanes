@@ -4,14 +4,16 @@ import { radius } from '@agent-lanes/tokens';
 import { StatusBadge, badgeStatuses, statusLabel, type BadgeStatus } from './StatusBadge';
 
 /** jsdom reports computed colours as rgb(); the artboard values below are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** WCAG 2 contrast ratio of two #RRGGBB colours. */
 function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
+  const luminance = (value: string) => {
+    const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
     const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
       const c = parseInt(hex.slice(i, i + 2), 16) / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;

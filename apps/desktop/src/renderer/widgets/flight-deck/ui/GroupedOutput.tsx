@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.control,
     borderWidth: 1,
     borderColor: color.line,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: color.bg,
     overflow: 'hidden',
   },
   rowSelected: {

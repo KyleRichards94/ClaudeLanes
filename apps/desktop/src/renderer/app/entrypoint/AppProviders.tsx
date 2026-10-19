@@ -15,6 +15,7 @@ import { sessionStatusEventHandlers } from '@/features/start-queued-agent';
 import { RouterProvider } from '@/shared/routing';
 import { connectRouterToWindow, createAppRouter } from '../routing';
 import { runningEventHub } from './EventHub';
+import { AppearanceSync } from './AppearanceSync';
 import { UiPrefsGate } from './UiPrefsGate';
 
 const SIXTY_SECONDS = 60_000;
@@ -60,7 +61,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router}>
-        <UiPrefsGate>{children}</UiPrefsGate>
+        <UiPrefsGate>
+          <AppearanceSync />
+          {children}
+        </UiPrefsGate>
       </RouterProvider>
     </QueryClientProvider>
   );

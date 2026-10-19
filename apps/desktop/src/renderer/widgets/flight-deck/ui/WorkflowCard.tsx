@@ -61,9 +61,9 @@ function StageCard({ stage, onGateChange }: { stage: WorkflowStage; onGateChange
       <View style={styles.head}>
         <View style={[styles.marker, done ? styles.markerDone : current ? styles.markerCurrent : styles.markerUpcoming]}>
           {done ? (
-            <Icon name="check" color={color.surface} size={12} />
+            <Icon name="check" color={color.onInk} size={12} />
           ) : (
-            <Text variant="title" size="xs" color={current ? color.surface : tone.neutral.text}>
+            <Text variant="title" size="xs" color={current ? color.onAccent : tone.neutral.text}>
               {String(stage.number)}
             </Text>
           )}
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
   stageWaiting: {
     borderColor: tone.attention.border,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: tone.attention.band,
   },
   waitingText: {
     fontWeight: '700',

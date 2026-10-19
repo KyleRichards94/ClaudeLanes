@@ -111,6 +111,19 @@ describe('UI prefs store', () => {
   });
 });
 
+describe('appearance', () => {
+  it('follows the system until the user picks light or dark, and saves that with the other prefs', async () => {
+    const main = installFakeSettings();
+    const store = newStore();
+    await hydrateUiPrefs(store);
+    expect(store.getState().appearance).toBe('system');
+
+    store.getState().setAppearance('dark');
+    expect(store.getState().appearance).toBe('dark');
+    await vi.waitFor(() => expect(main.settings.ui.appearance).toBe('dark'));
+  });
+});
+
 describe('show thinking (AL-262)', () => {
   it('starts shown and saves the switch with the other UI prefs', async () => {
     const main = installFakeSettings();

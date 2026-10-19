@@ -49,7 +49,7 @@ export {
   type AdoScope,
   type AdoOrgId,
 } from './ado';
-export { teamBoardKeys, useActivePrs, useBacklog, useBacklogTotal, useTeamBoard } from './team-board';
+export { teamBoardKeys, useActivePrs, useBacklog, useBacklogTotal, useTeamBoard, useTeamMembers, useUpdateBoardItem } from './team-board';
 export { useLinkCanvas, useUnlinkCanvas } from './design-canvas';
 export { useDesignCanvasSlot } from './design-view';
 export { designArtboardsQueryKey, useDesignArtboards } from './design-artboards';

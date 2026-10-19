@@ -143,7 +143,7 @@ function ArtboardRow({ artboard, checked, onToggle }: { artboard: DesignArtboard
       testID={`artboard-${artboard.id}`}
     >
       <View style={[styles.box, checked && styles.boxChecked]} aria-hidden>
-        {checked ? <Icon name="check" color={color.surface} size={12} /> : null}
+        {checked ? <Icon name="check" color={color.onAccent} size={12} /> : null}
       </View>
       <Text variant="title" numberOfLines={1} style={styles.name}>
         {artboard.name}

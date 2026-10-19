@@ -1,6 +1,6 @@
 import type { Lane } from '@agent-lanes/contracts';
 import { useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { announce, getActiveDrag, useIsDragging } from '../model/drag-store';
 import { allowedLaneList, sentAnnouncement } from '../model/lane-state';
 import type { LaneDragCard as DragCard } from '../model/types';
@@ -28,14 +28,24 @@ export interface LaneDragCardProps {
 /**
  * A team board card (or backlog row) that can go to an agent lane (T2, TB§7): picked up with the
  * pointer or with Space, and sent from the keyboard with Enter, which opens the "Send to lane" menu of
- * the lanes that take it. It is a list item either way; one that can't be dragged is only that.
+ * the lanes that take it. A card that can't be dragged stays a list item. When a click opens it, that list item holds a button with no drag menu.
  */
 export function LaneDragCard({ drag, label, style, testID, accessory, onClick, children }: LaneDragCardProps) {
   const context = useDragToLane();
   if (!drag || !context) {
+    if (!onClick) {
+      return (
+        <View role="listitem" aria-label={label} style={style} testID={testID}>
+          {children}
+          {accessory}
+        </View>
+      );
+    }
     return (
-      <View role="listitem" aria-label={label} style={style} testID={testID}>
-        {children}
+      <View role="listitem" style={styles.item}>
+        <Pressable role="button" aria-label={label} onPress={() => onClick({ shiftKey: false })} style={style} testID={testID}>
+          {children}
+        </Pressable>
         {accessory}
       </View>
     );
@@ -88,7 +98,8 @@ function DraggableCard({
     void context.drop(drag, lane);
   };
 
-  const { onKeyDown: sensorKeyDown, ...listeners } = bindings.listeners;
+  const { onKeyDown: sensorKeyDown, onPointerDown: sensorPointerDown, ...listeners } = bindings.listeners;
+  const origin = useRef<{ x: number; y: number } | null>(null);
   // Enter on a resting card opens the menu; while a card is being dragged it drops (the keyboard sensor's).
   const onKeyDown = (event: { key: string; preventDefault(): void }) => {
     if (event.key === 'Enter' && !getActiveDrag()) {
@@ -103,7 +114,20 @@ function DraggableCard({
     ...bindings.attributes,
     ...listeners,
     onKeyDown,
-    ...(onClick ? { onClick: (event: { shiftKey?: boolean }) => onClick({ shiftKey: event.shiftKey === true }) } : {}),
+    onPointerDown: (event: { clientX?: number; clientY?: number }) => {
+      if (typeof event.clientX === 'number' && typeof event.clientY === 'number') origin.current = { x: event.clientX, y: event.clientY };
+      if (typeof sensorPointerDown === 'function') sensorPointerDown(event);
+    },
+    // A click that did not move opens the card. A drag (more than a few pixels) does not.
+    ...(onClick
+      ? {
+          onClick: (event: { shiftKey?: boolean; clientX?: number; clientY?: number }) => {
+            const from = origin.current;
+            if (from && typeof event.clientX === 'number' && typeof event.clientY === 'number' && Math.hypot(event.clientX - from.x, event.clientY - from.y) > 6) return;
+            onClick({ shiftKey: event.shiftKey === true });
+          },
+        }
+      : {}),
     role: 'button',
     tabIndex: 0,
     'aria-roledescription': 'draggable card',

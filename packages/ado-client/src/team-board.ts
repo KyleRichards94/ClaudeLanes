@@ -195,6 +195,43 @@ export function inProgressColumnOf(client: AdoClient, project: string, team: str
   });
 }
 
+/** Where a direct edit moves one work item type: the column, the state that column maps it to, and the column field. */
+export interface ColumnTarget {
+  columnId: string;
+  column: string;
+  state: string;
+  /** The team's `WEF_…_Kanban.Column` field; null when the board settings don't name it (then only the state is written). */
+  field: string | null;
+}
+
+/**
+ * The column a team-board card should move to, by the board's column id (or its name). The state is
+ * the one that column maps `type` to. Never throws.
+ */
+export function columnTargetOf(
+  client: AdoClient,
+  project: string,
+  team: string | undefined,
+  type: string,
+  columnId: string,
+  options: TeamCallOptions = {},
+): Promise<Result<ColumnTarget>> {
+  return guarded('read the column to move to', async () => {
+    if (!isName(project)) return missing('project', 'move a work item');
+    if (!isName(columnId)) return adoErr('VALIDATION', 'A column is needed to move the work item.', { kind: 'config' });
+    const call = callOptions(options);
+    const teamRef = await resolveTeam(client, project, team, call);
+    if (!teamRef.ok) return teamRef;
+    const settings = await boardSettings(client, project, teamRef.data, call);
+    if (!settings.ok) return settings;
+    const column = settings.data.board.columns.find((candidate) => sameText(candidate.id, columnId) || sameText(candidate.name, columnId));
+    if (!column) return adoErr('VALIDATION', `${columnId} is not a column on ${teamRef.data.name}'s board.`, { kind: 'config' });
+    const mapping = Object.entries(column.stateMappings ?? {}).find(([candidate]) => sameText(candidate, type));
+    if (!mapping) return adoErr('VALIDATION', `${column.name} has no state for ${type}, so it cannot move there.`, { kind: 'config' });
+    return ok({ columnId: column.id, column: column.name, state: mapping[1], field: settings.data.board.fields?.columnField?.referenceName ?? null });
+  });
+}
+
 // ── Items ───────────────────────────────────────────────────────────────────────────────────────
 
 const identitySchema = z.object({ id: z.string().nullish(), displayName: z.string(), uniqueName: z.string().nullish() });

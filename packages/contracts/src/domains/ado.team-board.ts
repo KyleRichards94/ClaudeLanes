@@ -83,6 +83,35 @@ export const TeamBoardSchema = z.object({
 });
 export type TeamBoard = z.infer<typeof TeamBoardSchema>;
 
+/** `ado:listTeamMembers`: the people a team-board card can be assigned to. */
+export const TeamMemberListSchema = z.object({
+  team: TeamRefSchema,
+  members: z.array(TeamBoardPersonSchema),
+});
+export type TeamMemberList = z.infer<typeof TeamMemberListSchema>;
+
+/** Who a board item is assigned to after `ado:updateBoardItem`. */
+export const BoardItemAssigneeSchema = z.object({
+  id: z.string().min(1).nullable(),
+  displayName: z.string(),
+  uniqueName: z.string().nullable(),
+});
+export type BoardItemAssignee = z.infer<typeof BoardItemAssigneeSchema>;
+
+/**
+ * `ado:updateBoardItem`: the work item after a direct edit from the team board. `columnId` and
+ * `column` are set when the card moved to a column; null when this call left the column alone.
+ */
+export const BoardItemUpdateSchema = z.object({
+  workItemId: WorkItemIdSchema,
+  rev: z.int().min(1),
+  state: z.string().min(1),
+  assignee: BoardItemAssigneeSchema.nullable(),
+  columnId: z.string().min(1).nullable(),
+  column: z.string().min(1).nullable(),
+});
+export type BoardItemUpdate = z.infer<typeof BoardItemUpdateSchema>;
+
 /**
  * Two letters for an avatar: first and last name's initials ("Kyle Richards" → "KR"), or a single
  * name's first two letters ("MD" stays "MD"). Text in `<…>` or `(…)` is ignored.

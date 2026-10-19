@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     borderBottomWidth: 1,
     borderBottomColor: color.line,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: color.bg,
   },
   dot: {
     width: 10,

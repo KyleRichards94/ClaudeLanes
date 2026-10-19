@@ -6,14 +6,16 @@ import { color, control, focusRing, fontSize, fontWeight, minTarget, motion, rad
 import { Button, buttonSizes, buttonVariants, type ButtonVariant } from './Button';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-/** WCAG 2 contrast ratio of two #RRGGBB colours. */
+/** WCAG 2 contrast ratio of two colours. `light-dark()` is read as its light half, which jsdom computes. */
 function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
+  const luminance = (value: string) => {
+    const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
     const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
       const c = parseInt(hex.slice(i, i + 2), 16) / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -31,8 +33,8 @@ function contrast(a: string, b: string): number {
  * Plus `danger`, the red-bordered Remove button on the Connections artboard.
  */
 const artboard: Record<ButtonVariant, { label: string; fill: string; border: string; ink: string; corner: number; rest: string }> = {
-  primary: { label: 'Primary', fill: color.claude, border: color.claude, ink: color.surface, corner: radius.control, rest: control.primaryShadow },
-  strong: { label: 'Strong', fill: color.ink, border: color.ink, ink: color.surface, corner: radius.control, rest: 'none' },
+  primary: { label: 'Primary', fill: color.claude, border: color.claude, ink: color.onAccent, corner: radius.control, rest: control.primaryShadow },
+  strong: { label: 'Strong', fill: color.ink, border: color.ink, ink: color.onInk, corner: radius.control, rest: 'none' },
   secondary: { label: 'Secondary', fill: color.surface, border: color.line, ink: '#334155', corner: radius.control, rest: 'none' },
   soft: { label: 'Soft pill', fill: color.claudeTint, border: color.claudeTint, ink: color.claudeText, corner: radius.pill, rest: 'none' },
   danger: { label: 'Remove', fill: color.surface, border: tone.danger.border, ink: color.danger, corner: radius.control, rest: 'none' },
@@ -141,7 +143,7 @@ describe('Button', () => {
       const button = screen.getByRole('button', { name: 'New agent ticket' });
       const svg = button.querySelector('svg');
       expect(svg).not.toBeNull();
-      expect(svg?.getAttribute('stroke')).toBe(color.surface);
+      expect(svg?.getAttribute('stroke')).toBe(color.onAccent);
       expect(svg?.getAttribute('width')).toBe('16');
       const label = screen.getByText('New agent ticket');
       expect((svg?.compareDocumentPosition(label) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);

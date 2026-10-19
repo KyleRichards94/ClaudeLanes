@@ -1,6 +1,6 @@
-import { BACKLOG_PAGE_SIZE, type BacklogFilters } from '@agent-lanes/contracts';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { ADO_REFETCH_INTERVAL_MS } from './ado';
+import { BACKLOG_PAGE_SIZE, type BacklogFilters, type UpdateBoardItemRequest } from '@agent-lanes/contracts';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ADO_REFETCH_INTERVAL_MS, adoKeys } from './ado';
 import { invoke, unwrap } from './ipc';
 
 /**
@@ -17,6 +17,8 @@ export const teamBoardKeys = {
   backlogTotal: (team: string | null) => ['ado', 'backlog', team, 'total'] as const,
   /** The Backlog popout's rows for a team and filters (TB§6 `['ado','backlog',filters]`), page by page. */
   backlog: (team: string | null, filters: BacklogFilters) => ['ado', 'backlog', team, 'pages', filters] as const,
+  /** The team's people, for assigning an open card (AL-285). */
+  members: (team: string | null) => ['ado', 'teamMembers', team] as const,
 };
 
 const live = {
@@ -65,5 +67,26 @@ export function useBacklog(team: string | null, filters: BacklogFilters, options
     getNextPageParam: (last) => (last.page.index + 1 < last.page.count ? last.page.index + 1 : undefined),
     enabled: options.enabled ?? true,
     ...live,
+  });
+}
+
+/** The team's people (`ado:listTeamMembers`), for the open card's person list (AL-285). */
+export function useTeamMembers(team: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: teamBoardKeys.members(team),
+    queryFn: async () => unwrap(await invoke('ado:listTeamMembers', team ? { team } : {})),
+    enabled,
+  });
+}
+
+/** Assign a person, move the card to a column, or both (AL-285). The board reads itself again. */
+export function useUpdateBoardItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (request: UpdateBoardItemRequest) => unwrap(await invoke('ado:updateBoardItem', request)),
+    onSuccess: (_result, request) => {
+      void queryClient.invalidateQueries({ queryKey: adoKeys.all });
+      void queryClient.invalidateQueries({ queryKey: adoKeys.workItem(request.id) });
+    },
   });
 }

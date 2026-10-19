@@ -201,7 +201,7 @@ function labelVariant(variant: SegmentedVariant, selected: boolean): 'title' | '
 
 function labelColor(variant: SegmentedVariant, tone: SegmentedTone, selected: boolean, hovered: boolean): string {
   if (!selected) return hovered ? color.ink : selection.label;
-  if (variant === 'pills') return color.surface;
+  if (variant === 'pills') return color.onAccent;
   return tone === 'claude' ? color.claudeText : color.ink;
 }
 
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
   },
   thumbSelected: {
-    backgroundColor: color.surface,
+    backgroundColor: color.onAccent,
     boxShadow: selection.thumbShadow,
   },
   pill: {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { color } from '@agent-lanes/tokens';
+import { color, lightOf } from '@agent-lanes/tokens';
 import * as ui from '@agent-lanes/ui';
 import { badgeStatuses, buttonVariants, iconNames, pillTones, statusLabel, textVariants } from '@agent-lanes/ui';
 import { RouterProvider, createRouter, routes, selectRoute } from '@/shared/routing';
@@ -43,7 +43,7 @@ describe('GalleryPage (AL-032)', () => {
 
     expect(sheet.getByRole('heading', { name: 'Design tokens' })).toBeTruthy();
     for (const [token, value] of Object.entries(color)) {
-      expect(screen.getByTestId(`gallery-swatch-${token}`).textContent).toContain(value);
+      expect(screen.getByTestId(`gallery-swatch-${token}`).textContent).toContain(lightOf(value));
     }
     for (const level of ['sm', 'md', 'xl']) {
       expect(sheet.getByTestId(`gallery-glass-${level}`).textContent).toContain(`--blur-${level}`);

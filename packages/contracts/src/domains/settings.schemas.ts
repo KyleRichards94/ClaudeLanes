@@ -90,6 +90,11 @@ export const AgentDefaultsSchema = z.object({
 });
 export type AgentDefaults = z.infer<typeof AgentDefaultsSchema>;
 
+/** How the app chooses light or dark. `system` follows the computer. */
+export const APPEARANCES = ['system', 'light', 'dark'] as const;
+export const AppearanceSchema = z.enum(APPEARANCES);
+export type Appearance = z.infer<typeof AppearanceSchema>;
+
 /** Small UI preferences the renderer keeps in its Zustand persist store (design §6). */
 export const UiPrefsSchema = z.object({
   /** Path of the repo the board last showed. */
@@ -115,6 +120,11 @@ export const UiPrefsSchema = z.object({
   ticketLayout: z.enum(['flightDeck', 'codeCity']).optional(),
   /** The Code City "how to read it" card was closed and stays closed (AL-275). */
   codeCityLegendDismissed: z.boolean().optional(),
+  /**
+   * Light, dark, or the computer's appearance. Optional so settings saved before it stay valid;
+   * unset follows the system.
+   */
+  appearance: AppearanceSchema.optional(),
 });
 export type UiPrefs = z.infer<typeof UiPrefsSchema>;
 
@@ -229,7 +239,21 @@ export function defaultAgentDefaults(): AgentDefaults {
 
 /** Done starts collapsed into its vertical strip (artboard 1). */
 export function defaultUiPrefs(): UiPrefs {
-  return { lastRepo: null, lastSprint: null, lastTeam: null, collapsedLanes: ['done'], embedModeByTicket: {}, composerDrafts: {}, showThinking: true };
+  return {
+    lastRepo: null,
+    lastSprint: null,
+    lastTeam: null,
+    collapsedLanes: ['done'],
+    embedModeByTicket: {},
+    composerDrafts: {},
+    showThinking: true,
+    appearance: 'system',
+  };
+}
+
+/** The saved appearance, or the computer's when none was saved. */
+export function appearanceOf(prefs: Pick<UiPrefs, 'appearance'>): Appearance {
+  return prefs.appearance ?? 'system';
 }
 
 /** Fresh profile: no repos yet (AL-047 asks for one). */

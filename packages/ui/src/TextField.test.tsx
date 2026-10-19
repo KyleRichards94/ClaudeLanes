@@ -7,7 +7,8 @@ import { Text } from './Text';
 import { TextField, type SecureTextFieldHandle, type TextFieldHandle } from './TextField';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }

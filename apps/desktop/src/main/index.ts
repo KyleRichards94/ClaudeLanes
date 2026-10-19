@@ -1,6 +1,7 @@
 import { join } from 'node:path';
-import { BrowserWindow, app, dialog, screen, shell } from 'electron';
-import { color } from '@agent-lanes/tokens';
+import { BrowserWindow, app, dialog, nativeTheme, screen, shell } from 'electron';
+import { darkColor, lightColor } from '@agent-lanes/tokens';
+import { appearanceOf, type Settings } from '@agent-lanes/contracts';
 import { createQuitConfirmation, quitQuestion, type QuitConfirmation } from './app/quit-confirmation';
 import { watchWindowVisibility } from './app/window-visibility';
 import { createBacklogWindowController } from './app/backlog-window';
@@ -72,6 +73,18 @@ function loadRenderer(window: BrowserWindow, hash?: string): void {
   }
 }
 
+/** The window frame follows Settings › Appearance, including System. */
+function syncAppearance(settings: Settings): void {
+  nativeTheme.themeSource = appearanceOf(settings.ui);
+}
+
+function paintWindowBackgrounds(): void {
+  const background = nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg;
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.setBackgroundColor(background);
+  }
+}
+
 function createMainWindow(): BrowserWindow {
   // AL-213: the window opens where it was left, or centred when that spot is off every screen now.
   const stateFile = windowStateFile(app.getPath('userData'));
@@ -87,7 +100,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: MIN_WINDOW_SIZE.height,
     show: false,
     title: 'Agent Lanes',
-    backgroundColor: color.bg,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg,
     autoHideMenuBar: true,
     webPreferences: WEB_PREFERENCES,
   });
@@ -129,7 +142,7 @@ function createBacklogWindow(team: string | undefined): BrowserWindow | null {
     minHeight: 480,
     show: false,
     title: 'Backlog · Agent Lanes',
-    backgroundColor: color.bg,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg,
     autoHideMenuBar: true,
     webPreferences: WEB_PREFERENCES,
   });
@@ -179,9 +192,11 @@ if (!app.requestSingleInstanceLock()) {
       strict: !app.isPackaged,
       log: (message, issues) => eventsLog.error(message, issues),
     });
+    nativeTheme.on('updated', paintWindowBackgrounds);
     services = createServices({
       appDataDir: app.getPath('userData'),
       emit,
+      onSettingsChange: syncAppearance,
       log,
       mainWindow: () => mainWindow,
       // e2e points the design view at a local fake claude.ai (AL-191); never honoured in the installed app.

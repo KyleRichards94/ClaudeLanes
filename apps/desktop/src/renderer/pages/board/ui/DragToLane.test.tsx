@@ -234,8 +234,11 @@ describe('drag to lane (AL-235)', () => {
     fireEvent.click(await screen.findByTestId('send-to-lane-planning'));
 
     await waitFor(() => expect(screen.getByTestId('team-card-71318-agent')?.textContent).toContain('Agent in Planning'));
-    // An item with an agent can't be dragged again.
-    expect(screen.getByTestId('team-card-71318').getAttribute('role')).not.toBe('button');
+    // An item with an agent can still be opened, and it can no longer be dragged.
+    const tagged = screen.getByTestId('team-card-71318');
+    expect(tagged.getAttribute('role')).toBe('button');
+    expect(tagged.hasAttribute('aria-haspopup')).toBe(false);
+    expect(tagged.getAttribute('aria-roledescription')).toBeNull();
     await act(async () => confirm({ ticketId: '71318' }));
   });
 
@@ -250,10 +253,11 @@ describe('drag to lane (AL-235)', () => {
     fireEvent.keyDown(document, { code: 'Escape', key: 'Escape' });
   });
 
-  it("leaves someone else's item a plain list item: no drag, no menu", async () => {
+  it("lets someone else's item be opened, without a drag or a send-to-lane menu", async () => {
     await renderBoard();
     const locked = screen.getByTestId('team-card-71341');
-    expect(locked.getAttribute('role')).toBe('listitem');
-    expect(locked.hasAttribute('tabindex')).toBe(false);
+    expect(locked.getAttribute('role')).toBe('button');
+    expect(locked.hasAttribute('aria-haspopup')).toBe(false);
+    expect(locked.getAttribute('aria-roledescription')).toBeNull();
   });
 });

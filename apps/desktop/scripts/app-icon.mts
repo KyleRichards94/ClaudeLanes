@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { crc32, deflateSync } from 'node:zlib';
-import { color } from '@agent-lanes/tokens';
+import { lightColor } from '@agent-lanes/tokens';
 
 /** Sizes in the .ico; Windows picks the nearest for each DPI and surface. */
 export const ICON_SIZES = [16, 24, 32, 48, 64, 128, 256] as const;
@@ -23,8 +23,8 @@ const LARGEST_BMP_ENTRY = 48;
 const MARK = {
   grid: 32,
   cornerRadius: 8,
-  gradientFrom: color.claude,
-  gradientTo: color.ado,
+  gradientFrom: lightColor.claude,
+  gradientTo: lightColor.ado,
   barLeft: 9,
   barLengths: [14, 9, 6],
   barThickness: 2,

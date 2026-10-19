@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { ReviewFinding } from '@agent-lanes/contracts';
-import { color, space } from '@agent-lanes/tokens';
+import { color, space, tone } from '@agent-lanes/tokens';
 import { Card, Text } from '@agent-lanes/ui';
 
 export interface InspectorNotesProps {
@@ -10,9 +10,9 @@ export interface InspectorNotesProps {
 }
 
 const severityStyle = {
-  info: { background: '#F8FAFC', text: color.ink },
-  warn: { background: '#FFFBEB', text: '#78350F' },
-  error: { background: '#FEF2F2', text: '#7F1D1D' },
+  info: { background: color.bg, text: color.ink },
+  warn: { background: tone.attention.band, text: tone.attention.text },
+  error: { background: tone.danger.wash, text: tone.danger.text },
 } as const;
 
 const severityWord = { info: 'Note', warn: 'Warning', error: 'Error' } as const;

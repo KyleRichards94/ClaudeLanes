@@ -27,7 +27,7 @@ export function LiveDock({ store = agentTickets }: { store?: AgentTicketStore })
     <GlassPanel level="md" style={styles.dock} testID="live-dock">
       <View style={styles.live}>
         <View aria-hidden style={styles.liveDot} />
-        <Text variant="title" size="sm" color={color.surface}>
+        <Text variant="title" size="sm" color={color.onAccent}>
           Live
         </Text>
       </View>

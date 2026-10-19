@@ -11,9 +11,9 @@ export function DragStatusPill() {
   return (
     <View style={styles.pill} testID="drag-status">
       <View aria-hidden style={styles.arrow}>
-        <Icon name="arrow-right" size={14} color={color.surface} />
+        <Icon name="arrow-right" size={14} color={color.onAccent} />
       </View>
-      <Text variant="title" color={color.surface}>
+      <Text variant="title" color={color.onAccent}>
         {dragStatusText(active)}
       </Text>
     </View>

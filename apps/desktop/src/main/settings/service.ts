@@ -30,10 +30,13 @@ export interface SettingsServiceOptions {
   file: SettingsFile;
   /** Where load problems are reported; the console until the app log exists (AL-214). */
   warn?: (message: string) => void;
+  /** Called with the settings after they load and after each accepted update. */
+  onChange?: (settings: Settings) => void;
 }
 
-export function createSettingsService({ file, warn = console.warn }: SettingsServiceOptions): SettingsService {
+export function createSettingsService({ file, warn = console.warn, onChange }: SettingsServiceOptions): SettingsService {
   let current = load(file, warn);
+  onChange?.(current);
 
   return {
     get: () => structuredClone(current),
@@ -51,6 +54,7 @@ export function createSettingsService({ file, warn = console.warn }: SettingsSer
         return err('INTERNAL', `Could not save settings to ${file.location}: ${describe(cause)}`);
       }
       current = next.data;
+      onChange?.(current);
       return ok(structuredClone(current));
     },
   };

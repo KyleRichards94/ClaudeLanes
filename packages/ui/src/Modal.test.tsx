@@ -3,12 +3,13 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TextInput, type TextInputInstance } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
-import { color, focusRing, glass, overlay, radius } from '@agent-lanes/tokens';
+import { color, focusRing, glass, lightOf, overlay, radius } from '@agent-lanes/tokens';
 import { Button } from './Button';
 import { Modal, type ModalProps } from './Modal';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
@@ -109,7 +110,7 @@ describe('Modal', () => {
       const panel = screen.getByTestId('connections-panel');
       const style = getComputedStyle(panel);
       expect(style.borderTopLeftRadius).toBe(`${radius.modal}px`);
-      expect(style.backgroundColor).toBe(glass.fillMax.replace(/\s+/g, ' '));
+      expect(style.backgroundColor).toBe(lightOf(glass.fillMax).replace(/\s+/g, ' '));
       expect(panel.getAttribute('style') ?? '').toContain(`blur(${glass.blurXl}px)`);
       expect(style.boxShadow).toContain(glass.highlight);
       expect(style.boxShadow).toContain(overlay.shadow);
@@ -119,7 +120,7 @@ describe('Modal', () => {
       render(<Modal visible title="Connections" onClose={() => {}} testID="connections" />);
       const backdrop = screen.getByTestId('connections-backdrop');
       expect(backdrop.getAttribute('aria-hidden')).toBe('true');
-      expect(getComputedStyle(backdrop).backgroundColor).toBe(overlay.scrim);
+      expect(getComputedStyle(backdrop).backgroundColor).toBe(lightOf(overlay.scrim));
       expect(backdrop.getAttribute('style') ?? '').toContain(`blur(${overlay.scrimBlur}px)`);
       // A sibling of the panel, so the panel's own glass still blurs what lies behind both.
       expect(backdrop.contains(screen.getByTestId('connections-panel'))).toBe(false);

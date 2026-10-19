@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useState, type CSSProperties } from 'react';
-import { space } from '@agent-lanes/tokens';
+import { color, space } from '@agent-lanes/tokens';
 import { usePrefersReducedMotion } from '@/shared/lib';
 import { useTicketLayout, type TicketLayout } from '@/shared/model';
 import { ErrorBoundary } from '@/shared/ui';
@@ -165,9 +165,9 @@ function CitySkeleton() {
           height: 440,
           transform: 'translate(-50%, -50%) rotateX(58deg) rotateZ(-42deg)',
           borderRadius: 40,
-          backgroundColor: '#F8FAFC',
-          boxShadow: '0 0 0 1px #E2E8F0',
-          backgroundImage: 'linear-gradient(#E2E8F0 1px, transparent 1px), linear-gradient(90deg, #E2E8F0 1px, transparent 1px)',
+          backgroundColor: color.bg,
+          boxShadow: `0 0 0 1px ${color.line}`,
+          backgroundImage: `linear-gradient(${color.line} 1px, transparent 1px), linear-gradient(90deg, ${color.line} 1px, transparent 1px)`,
           backgroundSize: '40px 40px',
         }}
       />

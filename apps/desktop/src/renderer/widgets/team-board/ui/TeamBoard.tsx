@@ -1,5 +1,5 @@
 import type { TeamRef } from '@agent-lanes/contracts';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Text } from '@agent-lanes/ui';
@@ -10,6 +10,7 @@ import { openConnections } from '@/shared/model';
 import { HeaderMenu } from '@/shared/ui';
 import { setTeamBoardFilter, setTeamBoardTeam, useTeamBoardSession } from '../model/session';
 import { teamBoardColumns, type ColumnTone, type TeamBoardColumnView, type TeamBoardFilter, type TeamBoardMe } from '../model/view';
+import { BoardItemSheet } from './BoardItemSheet';
 import { TeamBoardItemCard, TeamBoardPullRequestCard } from './TeamBoardCards';
 
 export interface TeamBoardProps {
@@ -53,6 +54,8 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   const pendingLanes = usePendingDropLanes();
   const workItemLanes = useMemo(() => ({ ...agentLanes, ...pendingLanes }), [agentLanes, pendingLanes]);
 
+  const [openId, setOpenId] = useState<number | null>(null);
+  const openItem = openId === null ? null : (board.data?.items.find((item) => item.id === openId) ?? null);
   const me: TeamBoardMe | null = ado?.identity ? { displayName: ado.identity } : null;
   const columns = teamBoardColumns({ board: board.data, pullRequests: prs.data?.pullRequests, me, workItemLanes, filter: session.filter, colors: colors.data ?? null });
   const team = board.data?.team ?? teamList.find((candidate) => candidate.id === (pickedTeam ?? defaultTeamId)) ?? null;
@@ -67,25 +70,29 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
           : { kind: 'loading' };
 
   return (
-    <TeamBoardView
-      orgName={ado?.name ?? null}
-      teams={teamList}
-      team={team}
-      fromProfile={team !== null && team.id === defaultTeamId}
-      onTeamChange={(id) => setTeamBoardTeam(id === defaultTeamId ? null : id)}
-      filter={session.filter}
-      onFilterChange={setTeamBoardFilter}
-      columns={columns}
-      backlogTotal={backlog.data ?? null}
-      onOpenBacklog={onOpenBacklog}
-      state={state}
-      onRetry={() => {
-        void board.refetch();
-        void prs.refetch();
-      }}
-      onConnect={() => openConnections()}
-      prsError={prs.isError ? prs.error.message : null}
-    />
+    <>
+      <TeamBoardView
+        orgName={ado?.name ?? null}
+        teams={teamList}
+        team={team}
+        fromProfile={team !== null && team.id === defaultTeamId}
+        onTeamChange={(id) => setTeamBoardTeam(id === defaultTeamId ? null : id)}
+        filter={session.filter}
+        onFilterChange={setTeamBoardFilter}
+        columns={columns}
+        backlogTotal={backlog.data ?? null}
+        onOpenBacklog={onOpenBacklog}
+        state={state}
+        onRetry={() => {
+          void board.refetch();
+          void prs.refetch();
+        }}
+        onConnect={() => openConnections()}
+        prsError={prs.isError ? prs.error.message : null}
+        onOpenItem={setOpenId}
+      />
+      {openItem ? <BoardItemSheet key={openItem.id} item={openItem} columns={board.data?.columns ?? []} teamId={board.data?.team.id ?? null} onClose={() => setOpenId(null)} /> : null}
+    </>
   );
 }
 
@@ -107,6 +114,8 @@ export interface TeamBoardViewProps {
   onConnect(): void;
   /** Active PRs could not be read; the column says so. */
   prsError?: string | null;
+  /** A click on a work item opens it. Pull requests stay drag-only. */
+  onOpenItem?: (id: number) => void;
 }
 
 const FILTER_OPTIONS = [
@@ -126,7 +135,7 @@ const DOTS: Readonly<Record<ColumnTone, string>> = {
 
 /** The team board as drawn, from data (also the component gallery's sample). */
 export function TeamBoardView(props: TeamBoardViewProps) {
-  const { orgName, teams, team, fromProfile, onTeamChange, filter, onFilterChange, columns, backlogTotal, onOpenBacklog, state, onRetry, onConnect, prsError } =
+  const { orgName, teams, team, fromProfile, onTeamChange, filter, onFilterChange, columns, backlogTotal, onOpenBacklog, state, onRetry, onConnect, prsError, onOpenItem } =
     props;
   return (
     <GlassPanel style={styles.panel} testID="team-board">
@@ -153,7 +162,7 @@ export function TeamBoardView(props: TeamBoardViewProps) {
           <SegmentedControl label="Show cards for" tone="ink" options={FILTER_OPTIONS} value={filter} onChange={onFilterChange} testID="team-board-filter" />
           <View style={styles.spacer} />
           <Text variant="meta" testID="team-board-hint">
-            Your or unassigned cards · any open PR for review
+            Click a card to open it · drag yours onto a lane
           </Text>
           <Button
             label={backlogTotal === null ? 'Backlog' : `Backlog ${backlogTotal}`}
@@ -183,7 +192,7 @@ export function TeamBoardView(props: TeamBoardViewProps) {
           <ScrollView horizontal style={styles.scroller} contentContainerStyle={styles.columnsContent} testID="team-board-columns">
             <View style={styles.columns}>
               {columns.map((column) => (
-                <Column key={column.id} column={column} note={column.kind === 'active-prs' && prsError ? `Couldn't load the pull requests. ${prsError}` : null} />
+                <Column key={column.id} column={column} note={column.kind === 'active-prs' && prsError ? `Couldn't load the pull requests. ${prsError}` : null} onOpenItem={onOpenItem} />
               ))}
             </View>
           </ScrollView>
@@ -193,7 +202,7 @@ export function TeamBoardView(props: TeamBoardViewProps) {
   );
 }
 
-function Column({ column, note }: { column: TeamBoardColumnView; note: string | null }) {
+function Column({ column, note, onOpenItem }: { column: TeamBoardColumnView; note: string | null; onOpenItem?: (id: number) => void }) {
   const prs = column.kind === 'active-prs';
   return (
     <View style={[styles.column, prs && styles.prColumn]} testID={`team-column-${column.kind === 'active-prs' ? 'active-prs' : column.id}`}>
@@ -208,7 +217,7 @@ function Column({ column, note }: { column: TeamBoardColumnView; note: string | 
       </View>
       <View role="list" aria-label={column.name} style={styles.cards}>
         {column.cards.map((card) =>
-          card.kind === 'item' ? <TeamBoardItemCard key={`i${card.id}`} card={card} /> : <TeamBoardPullRequestCard key={`p${card.id}`} card={card} />,
+          card.kind === 'item' ? <TeamBoardItemCard key={`i${card.id}`} card={card} onOpen={onOpenItem ? () => onOpenItem(card.id) : undefined} /> : <TeamBoardPullRequestCard key={`p${card.id}`} card={card} />,
         )}
       </View>
       {note ? <Text variant="meta">{note}</Text> : column.cards.length === 0 ? <Text variant="meta">{prs ? 'No open pull requests' : 'Nothing here'}</Text> : null}

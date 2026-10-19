@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { color } from './index';
+import { darkColor, darkControl, lightColor, lightControl } from './index';
 import { control } from './controls';
 
 const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
@@ -25,18 +25,25 @@ function contrast(a: string, b: string): number {
 }
 
 describe('control tokens', () => {
-  it.each(Object.entries(control))('CSS variable --al-control-%s mirrors the TS value', (key, value) => {
+  it.each(Object.entries(lightControl))('CSS variable --al-control-%s mirrors the light value', (key, value) => {
     expect(cssVar(`control-${kebab(key)}`)?.toLowerCase()).toBe(String(value).toLowerCase());
   });
 
-  it('control ink meets 4.5:1 on white and on the app ground', () => {
-    expect(contrast(control.ink, color.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(control.ink, color.bg)).toBeGreaterThanOrEqual(4.5);
+  it('keeps the press and disabled treatments beside the colours', () => {
+    expect(cssVar('control-pressed-filter')).toBe(control.pressedFilter);
+    expect(cssVar('control-disabled-opacity')).toBe(String(control.disabledOpacity));
+  });
+
+  it('control ink meets 4.5:1 on the surface and on the app ground', () => {
+    expect(contrast(lightControl.ink, lightColor.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(lightControl.ink, lightColor.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(darkControl.ink, darkColor.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(darkControl.ink, darkColor.bg)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('tints the primary glow with the Claude violet', () => {
-    const violet = [1, 3, 5].map((i) => parseInt(color.claude.slice(i, i + 2), 16)).join(', ');
-    expect(control.primaryShadow).toContain(`rgba(${violet},`);
-    expect(control.primaryShadowLifted).toContain(`rgba(${violet},`);
+    const violet = [1, 3, 5].map((i) => parseInt(lightColor.claude.slice(i, i + 2), 16)).join(', ');
+    expect(lightControl.primaryShadow).toContain(`rgba(${violet},`);
+    expect(lightControl.primaryShadowLifted).toContain(`rgba(${violet},`);
   });
 });

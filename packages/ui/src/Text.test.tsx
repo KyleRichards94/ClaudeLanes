@@ -4,16 +4,18 @@ import { color, font, fontSize, fontWeight, tone } from '@agent-lanes/tokens';
 import { Text, textStyle, textVariants, type TextVariant } from './Text';
 
 /** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** WCAG 2 contrast ratio of a computed `rgb(r, g, b)` text colour on a #RRGGBB background. */
-function contrast(computedRgb: string, backgroundHex: string): number {
+function contrast(computedRgb: string, background: string): number {
   const channels = (/^rgb\((\d+), (\d+), (\d+)\)$/.exec(computedRgb) ?? []).slice(1).map(Number);
   expect(channels, `not an opaque rgb() colour: ${computedRgb}`).toHaveLength(3);
-  const background = [1, 3, 5].map((i) => parseInt(backgroundHex.slice(i, i + 2), 16));
+  const backgroundHex = /#[0-9a-fA-F]{6}/.exec(background)?.[0] ?? background;
+  const backgroundChannels = [1, 3, 5].map((i) => parseInt(backgroundHex.slice(i, i + 2), 16));
   const luminance = ([r = 0, g = 0, b = 0]: number[]) => {
     const [lr = 0, lg = 0, lb = 0] = [r, g, b].map((value) => {
       const c = value / 255;
@@ -21,7 +23,7 @@ function contrast(computedRgb: string, backgroundHex: string): number {
     });
     return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
   };
-  const [hi, lo] = [luminance(channels), luminance(background)].sort((x, y) => y - x) as [number, number];
+  const [hi, lo] = [luminance(channels), luminance(backgroundChannels)].sort((x, y) => y - x) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
 }
 

@@ -117,6 +117,28 @@ const examples = {
     request: { org: ADO_FIXTURE_ORG_ID, project: ADO_FIXTURE_PROJECT, id: 71273, state: 'Active' },
     response: { outcome: 'changed', workItemId: 71273, state: 'Active', previousState: 'New', rev: 4 },
   },
+  'ado:listTeamMembers': {
+    request: { team: 'OSC Developers' },
+    response: {
+      team: { id: '0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0', name: 'OSC Developers' },
+      members: [{ id: 'kr', displayName: 'Kyle Richards', uniqueName: 'kyle.richards@example.com', initials: 'KR' }],
+    },
+  },
+  'ado:updateBoardItem': {
+    request: {
+      id: 71318,
+      assignee: { id: 'md', displayName: 'Mia Davies', uniqueName: 'mia.davies@example.com' },
+      columnId: 'c-testing',
+    },
+    response: {
+      workItemId: 71318,
+      rev: 4,
+      state: 'Resolved',
+      assignee: { id: 'md', displayName: 'Mia Davies', uniqueName: 'mia.davies@example.com' },
+      columnId: 'c-testing',
+      column: 'Testing',
+    },
+  },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], { request: unknown; response: unknown }>;
 
 describe('ado:* channel contracts', () => {
@@ -135,6 +157,8 @@ describe('ado:* channel contracts', () => {
       'ado:backlog',
       'ado:workItemColors',
       'ado:setWorkItemState', // AL-270
+      'ado:listTeamMembers', // AL-285
+      'ado:updateBoardItem', // AL-285
     ]);
     for (const channel of ADO_INVOKE_CHANNELS) expect(invokeContracts[channel]).toBeDefined();
   });

@@ -134,7 +134,7 @@ function SessionPill({ id, startedAt, now, usage, status, onReconnect, reconnect
         <Pill label={label} tone={view.tone} dot size="md" testID="session-pill" />
         {open && details ? (
           <View role="tooltip" id="session-usage-tooltip" style={styles.tooltip} testID="session-usage-tooltip">
-            <Text variant="body" size="sm" color={color.surface}>
+            <Text variant="body" size="sm" color={color.onInk}>
               {details}
             </Text>
           </View>

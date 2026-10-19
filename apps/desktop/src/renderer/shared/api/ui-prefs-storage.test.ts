@@ -30,7 +30,7 @@ describe('createUiPrefsStorage', () => {
     await createUiPrefsStorage().setItem('ui-prefs', { state: prefs, version: 0 });
 
     expect(main.updates).toEqual([{ ui: prefs }]);
-    expect(main.settings.ui).toEqual(prefs);
+    expect(main.settings.ui).toEqual({ ...prefs, appearance: 'system' });
   });
 
   it('resets the prefs to their defaults when cleared', async () => {

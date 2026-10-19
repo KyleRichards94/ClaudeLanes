@@ -139,8 +139,11 @@ export async function inProgressStateOf(client: AdoClient, project: string, type
 export interface AssignmentChange {
   /** The revision the change was decided on; the write is refused when the item changed since. */
   expectedRev: number;
-  /** Whom to assign (a sign-in name, or a person whose names are tried in turn), or null to leave it unassigned. */
-  assignee: string | AssigneeIdentity | null;
+  /**
+   * Whom to assign (a sign-in name, or a person whose names are tried in turn), or null to leave it
+   * unassigned. Left out, the assignee is not touched.
+   */
+  assignee?: string | AssigneeIdentity | null;
   /** The state to move it to; null leaves the state alone. */
   state: string | null;
   /** Other fields written in the same revision, e.g. the team's board column field. */
@@ -206,6 +209,12 @@ export async function setWorkItemAssignment(
   change: AssignmentChange,
   options: AssignmentCallOptions = {},
 ): Promise<Result<WorkItemAssignment>> {
+  if (change.assignee === undefined) {
+    if (change.state === null && Object.keys(change.fields ?? {}).length === 0) {
+      return err('VALIDATION', `Work item #${ref.workItemId} has nothing to change.`, { reason: 'empty' });
+    }
+    return writeAssignment(client, ref, undefined, change, options);
+  }
   const values = change.assignee === null ? [null] : typeof change.assignee === 'string' ? [change.assignee] : assigneeValues(change.assignee);
   if (values.length === 0) return err('VALIDATION', `Work item #${ref.workItemId} cannot be assigned: the person has no sign-in name, id or display name.`, { reason: 'no-identity' });
   let last: Result<WorkItemAssignment> | undefined;
@@ -218,10 +227,16 @@ export async function setWorkItemAssignment(
   return last ?? err('INTERNAL', 'The assignment was not written.');
 }
 
-async function writeAssignment(client: AdoClient, ref: AssignmentRef, assignee: string | null, change: AssignmentChange, options: AssignmentCallOptions): Promise<Result<WorkItemAssignment>> {
+async function writeAssignment(
+  client: AdoClient,
+  ref: AssignmentRef,
+  assignee: string | null | undefined,
+  change: AssignmentChange,
+  options: AssignmentCallOptions,
+): Promise<Result<WorkItemAssignment>> {
   const patch = [
     { op: 'test', path: '/rev', value: change.expectedRev },
-    assignee === null ? { op: 'remove', path: '/fields/System.AssignedTo' } : { op: 'add', path: '/fields/System.AssignedTo', value: assignee },
+    ...(assignee === undefined ? [] : [assignee === null ? { op: 'remove', path: '/fields/System.AssignedTo' } : { op: 'add', path: '/fields/System.AssignedTo', value: assignee }]),
     ...(change.state === null ? [] : [{ op: 'add', path: '/fields/System.State', value: change.state }]),
     ...Object.entries(change.fields ?? {}).map(([field, value]) => ({ op: 'add', path: `/fields/${field}`, value })),
   ];

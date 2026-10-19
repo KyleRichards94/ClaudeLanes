@@ -65,7 +65,7 @@ const fillStyles = StyleSheet.create({
   claude: {
     // Solid violet underneath in case a renderer has no gradient support.
     backgroundColor: progressGradient.from,
-    backgroundImage: `linear-gradient(90deg, ${progressGradient.from}, ${progressGradient.to})`,
+    backgroundImage: 'var(--al-progress-gradient)',
   },
   ado: { backgroundColor: tone.ado.fill },
   danger: { backgroundColor: tone.danger.fill },

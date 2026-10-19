@@ -54,7 +54,7 @@ export function BacklogRow({ row, drag, selected, onSelect, popped }: BacklogRow
       style={[styles.checkbox, selected && styles.checkboxOn, !row.drag && styles.checkboxOff]}
       testID={`backlog-row-${row.id}-select`}
     >
-      {selected ? <Icon name="check" size={12} color={color.surface} /> : null}
+      {selected ? <Icon name="check" size={12} color={color.onAccent} /> : null}
     </Pressable>
   );
 

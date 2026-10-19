@@ -18,6 +18,8 @@
   --al-attention: #d97706;
   --al-danger: #b91c1c;
   --al-sky-glow: #38bdf8;
+  --al-on-accent: #ffffff;
+  --al-on-ink: #ffffff;
 
   --al-glass-fill-min: rgba(255, 255, 255, 0.62);
   --al-glass-fill-max: rgba(255, 255, 255, 0.72);
@@ -104,4 +106,75 @@
   --al-overlay-scrim: rgba(238, 242, 247, 0.55);
   --al-overlay-scrim-blur: 8px;
   --al-overlay-shadow: 0 24px 72px rgba(15, 27, 45, 0.18);
+}
+
+/* Dark palette. Mirrors darkColor / darkTone / darkGlass in the TypeScript tokens. */
+:root[data-theme='dark'] {
+  --al-bg: #101820;
+  --al-surface: #1a2432;
+  --al-ink: #e7eef6;
+  --al-muted: #a8b7c9;
+  --al-line: #334155;
+  --al-claude: #5b65c4;
+  --al-claude-tint: #2c2654;
+  --al-claude-text: #ddd6fe;
+  --al-ado: #7dd3fc;
+  --al-ado-tint: #123448;
+  --al-ok: #34d399;
+  --al-attention: #fbbf24;
+  --al-danger: #fca5a5;
+  --al-sky-glow: #38bdf8;
+  --al-progress-gradient: linear-gradient(90deg, #5b65c4, #38bdf8);
+  --al-on-accent: #f7f9fc;
+  --al-on-ink: #101820;
+
+  --al-glass-fill-min: rgba(18, 26, 40, 0.74);
+  --al-glass-fill-max: rgba(18, 26, 40, 0.84);
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --al-glass-border: rgba(255, 255, 255, 0.16);
+
+  --al-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --al-shadow-lifted: 0 2px 4px rgba(0, 0, 0, 0.32), 0 16px 40px rgba(0, 0, 0, 0.45);
+
+  --al-tone-claude-border: #a99bf2;
+  --al-tone-claude-wash: #221e3d;
+  --al-tone-claude-band: #2c2654;
+  --al-tone-claude-text: #ddd6fe;
+  --al-tone-claude-dot: #5b65c4;
+  --al-tone-ado-wash: #0c2838;
+  --al-tone-ado-band: #123448;
+  --al-tone-ado-text: #7dd3fc;
+  --al-tone-ado-fill: #38bdf8;
+  --al-tone-ado-dot: #7dd3fc;
+  --al-tone-attention-border: #fbbf24;
+  --al-tone-attention-band: #3a2c12;
+  --al-tone-attention-text: #fde68a;
+  --al-tone-attention-dot: #fbbf24;
+  --al-tone-danger-border: #fca5a5;
+  --al-tone-danger-wash: #3a1818;
+  --al-tone-danger-band: #4c1f1f;
+  --al-tone-danger-text: #fecaca;
+  --al-tone-danger-fill: #f87171;
+  --al-tone-danger-dot: #fca5a5;
+  --al-tone-ok-wash: #0c2e24;
+  --al-tone-ok-band: #134535;
+  --al-tone-ok-text: #a7f3d0;
+  --al-tone-ok-fill: #34d399;
+  --al-tone-ok-dot: #34d399;
+  --al-tone-neutral-band: #243246;
+  --al-tone-neutral-text: #d5deea;
+  --al-tone-neutral-dot: #94a3b8;
+
+  --al-selection-track: #243044;
+  --al-selection-label: #c5d2e2;
+  --al-selection-switch-off: #4a5e78;
+  --al-selection-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.28);
+  --al-selection-pill-shadow: 0 2px 8px rgba(91, 101, 196, 0.45);
+
+  --al-control-ink: #d5dee9;
+  --al-control-primary-shadow: 0 6px 16px rgba(91, 101, 196, 0.45);
+  --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 101, 196, 0.55);
+
+  --al-overlay-scrim: rgba(8, 12, 18, 0.55);
+  --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
 }

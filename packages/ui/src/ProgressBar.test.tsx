@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { color, progressGradient, tone } from '@agent-lanes/tokens';
+import { color, tone } from '@agent-lanes/tokens';
 import { ProgressBar, toPercent, type ProgressTone } from './ProgressBar';
 
-function rgb(hex: string): string {
+function rgb(value: string): string {
+  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   return `rgb(${r}, ${g}, ${b})`;
 }
@@ -39,10 +40,7 @@ describe('ProgressBar', () => {
 
   it('runs violet to sky by default', () => {
     render(<ProgressBar testID="bar" progress={0.5} label="Progress" />);
-    const fill = getComputedStyle(screen.getByTestId('bar-fill'));
-    expect(fill.backgroundImage).toBe(
-      `linear-gradient(90deg, ${rgb(progressGradient.from)}, ${rgb(progressGradient.to)})`,
-    );
+    expect(getComputedStyle(screen.getByTestId('bar-fill')).backgroundImage).toBe('var(--al-progress-gradient)');
   });
 
   const solid: [ProgressTone, string][] = [

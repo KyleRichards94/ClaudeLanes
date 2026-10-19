@@ -1,11 +1,11 @@
-import { DROP_KINDS, DROP_KIND_LABELS, EFFORTS, MODELS, STAGES, type AgentPermissionMode, type RepoSettings, type Settings } from '@agent-lanes/contracts';
+import { DROP_KINDS, DROP_KIND_LABELS, EFFORTS, MODELS, STAGES, type AgentPermissionMode, type Appearance, type RepoSettings, type Settings } from '@agent-lanes/contracts';
 import { useId, useMemo, useReducer, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { color, space } from '@agent-lanes/tokens';
 import { Button, Modal, SegmentedControl, Switch, TabPanel, Tabs, Text, TextField } from '@agent-lanes/ui';
 import { useAddRepo, useRemoveRepo, useRepoCommands, useSettings, useUpdateSettings } from '@/shared/api';
 import { EFFORT_LABELS, MODEL_LABELS, stageLabel } from '@/shared/config';
-import { toast } from '@/shared/model';
+import { toast, useAppearance, useUiPrefs } from '@/shared/model';
 import {
   draftFromSettings,
   draftReducer,
@@ -22,7 +22,7 @@ import {
 } from '../model/settings-draft';
 import { DropRowFields } from './DropRowFields';
 
-export type SettingsSection = 'defaults' | 'drops' | 'repos';
+export type SettingsSection = 'appearance' | 'defaults' | 'drops' | 'repos';
 
 export interface SettingsPanelProps {
   visible: boolean;
@@ -74,10 +74,23 @@ const TITLE = 'Settings';
 const SUBTITLE = 'Repos and agent defaults. Tokens and MCP servers are in Connections.';
 
 const TABS = [
+  { value: 'appearance', label: 'Appearance' },
   { value: 'defaults', label: 'Agent defaults' },
   { value: 'drops', label: 'Drops' },
   { value: 'repos', label: 'Repos' },
 ] as const;
+
+const APPEARANCE_OPTIONS = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+] as const;
+
+const APPEARANCE_HELP: Readonly<Record<Appearance, string>> = {
+  system: 'Follows this computer. Change it in Windows and the app changes with it.',
+  light: 'The pale ground, whatever this computer is set to.',
+  dark: 'Blue-black ground. The colour behind the glass keeps moving.',
+};
 
 function SettingsForm({ settings, tab, onTab, idPrefix, initialRepo, onClose }: SettingsFormProps) {
   const [draft, dispatch] = useReducer(draftReducer, settings, draftFromSettings);
@@ -121,7 +134,9 @@ function SettingsForm({ settings, tab, onTab, idPrefix, initialRepo, onClose }: 
       <View style={styles.form}>
         <Tabs tabs={TABS} value={tab} onChange={onTab} label="Settings sections" idPrefix={idPrefix} />
         <TabPanel idPrefix={idPrefix} value={tab}>
-          {tab === 'defaults' ? (
+          {tab === 'appearance' ? (
+            <AppearanceSection />
+          ) : tab === 'defaults' ? (
             <DefaultsSection draft={draft} errors={errors} dispatch={dispatch} />
           ) : tab === 'drops' ? (
             <DropsSection draft={draft} errors={errors} dispatch={dispatch} />
@@ -131,6 +146,24 @@ function SettingsForm({ settings, tab, onTab, idPrefix, initialRepo, onClose }: 
         </TabPanel>
       </View>
     </Modal>
+  );
+}
+
+/** Settings › Appearance. Takes effect as you choose, without Save settings. */
+function AppearanceSection() {
+  const appearance = useAppearance();
+  const setAppearance = useUiPrefs((state) => state.setAppearance);
+  return (
+    <View style={styles.section} testID="settings-appearance">
+      <Heading>Appearance</Heading>
+      <Text variant="meta" size="sm">
+        Applies straight away.
+      </Text>
+      <SegmentedControl label="Appearance" options={APPEARANCE_OPTIONS} value={appearance} onChange={setAppearance} fill testID="settings-appearance-choice" />
+      <Text variant="meta" size="sm" testID="settings-appearance-help">
+        {APPEARANCE_HELP[appearance]}
+      </Text>
+    </View>
   );
 }
 

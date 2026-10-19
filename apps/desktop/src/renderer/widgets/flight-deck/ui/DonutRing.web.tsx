@@ -1,8 +1,9 @@
+import { color } from '@agent-lanes/tokens';
 import { DONUT_SIZE, DONUT_STROKE } from '../model/donut';
 import type { DonutRingProps } from './DonutRing';
 
 const RADIUS = (DONUT_SIZE - DONUT_STROKE) / 2;
-const TRACK = '#E2E8F0';
+const TRACK = color.line;
 
 /**
  * Web (Electron): the donut as a plain SVG, 84 px with a 5 px stroke, one arc per agent clockwise from the top. A

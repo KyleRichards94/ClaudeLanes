@@ -68,6 +68,16 @@ const type = (testId: string, value: string) => fireEvent.change(input(testId), 
 afterEach(() => clearToasts());
 
 describe('SettingsPanel', () => {
+  it('switches appearance straight away, without Save settings', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Appearance' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Dark' }));
+
+    await waitFor(() => expect(fake.updates.at(-1)).toMatchObject({ ui: { appearance: 'dark' } }));
+    expect(screen.getByText('Blue-black ground. The colour behind the glass keeps moving.')).toBeTruthy();
+    expect(save().getAttribute('aria-disabled')).toBe('true');
+  });
+
   it('edits the agent defaults, the build queue and ADO state changes, and saves only what changed', async () => {
     const { onClose } = renderPanel();
     await screen.findByRole('radio', { name: 'Opus' });

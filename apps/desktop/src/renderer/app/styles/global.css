@@ -5,21 +5,84 @@ body,
   margin: 0;
 }
 
+/* The first paint follows the computer. AppearanceSync overrides this once settings have loaded. */
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  background-color: light-dark(#f4f7fb, #101820);
+  animation: al-ground-light 36s ease-in-out infinite alternate;
+}
+
+:root[data-theme='dark'] {
+  animation-name: al-ground-dark;
+}
+
 body {
-  background-color: var(--al-bg);
-  /* Soft glow behind the glass surfaces, as on the board artboard. */
-  background-image:
-    radial-gradient(60rem 30rem at 10% -10%, rgba(91, 75, 196, 0.18), transparent 70%),
-    radial-gradient(50rem 30rem at 95% 85%, rgba(56, 189, 248, 0.22), transparent 70%);
-  color: var(--al-ink);
+  background-color: transparent;
+  color: light-dark(#0f1b2d, #e7eef6);
   font-family: var(--al-font-sans);
   -webkit-font-smoothing: antialiased;
   /* No ligatures anywhere: "<=" in the agent's prose and code must read as it was written (AL-254). */
   font-variant-ligatures: none;
 }
 
+/* Colour behind the liquid glass: three blooms that drift, grow and shift hue. */
+body::before {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  inset: -30%;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(closest-side at 22% 18%, light-dark(rgba(91, 75, 196, 0.42), rgba(124, 108, 240, 0.62)), transparent 72%),
+    radial-gradient(closest-side at 82% 78%, light-dark(rgba(56, 189, 248, 0.48), rgba(56, 189, 248, 0.55)), transparent 70%),
+    radial-gradient(closest-side at 58% 42%, light-dark(rgba(16, 185, 129, 0.2), rgba(196, 181, 253, 0.38)), transparent 68%);
+  animation: al-atmosphere 42s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+}
+
 #root {
+  position: relative;
+  z-index: 1;
   display: flex;
+}
+
+@keyframes al-ground-light {
+  from {
+    background-color: #f4f7fb;
+  }
+  to {
+    background-color: #e3eefb;
+  }
+}
+
+@keyframes al-ground-dark {
+  from {
+    background-color: #101820;
+  }
+  to {
+    background-color: #1a1630;
+  }
+}
+
+@keyframes al-atmosphere {
+  from {
+    transform: translate3d(-8%, -6%, 0) scale(0.68);
+    filter: hue-rotate(-18deg);
+  }
+  to {
+    transform: translate3d(10%, 8%, 0) scale(1.32);
+    filter: hue-rotate(24deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body::before {
+    animation: none;
+  }
 }
 
 :focus-visible {

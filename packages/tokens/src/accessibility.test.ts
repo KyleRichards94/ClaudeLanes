@@ -3,16 +3,14 @@ import {
   MIN_TEXT_CONTRAST,
   MIN_UI_CONTRAST,
   blendOver,
-  color,
   contrastRatio,
-  control,
-  focusRing,
-  glass,
+  lightColor as color,
+  lightControl as control,
+  lightGlass,
+  lightSelection as selection,
+  lightTone as tone,
   mutedOpacity,
   parseHex,
-  progressGradient,
-  selection,
-  tone,
   type Rgb,
 } from './index';
 
@@ -23,7 +21,7 @@ import {
  */
 
 /** Glass at its thinnest fill (62 % white) over the app ground: toasts, modals, the header. */
-const glassAlpha = Number(/,\s*([\d.]+)\)$/.exec(glass.fillMin)?.[1]);
+const glassAlpha = Number(/,\s*([\d.]+)\)$/.exec(lightGlass.fillMin)?.[1]);
 const glassOverGround: Rgb = blendOver('#FFFFFF', color.bg, glassAlpha);
 
 type Colour = string | Rgb;
@@ -78,12 +76,12 @@ const textPairs: Pair[] = [
 
 /** UI parts that carry meaning on their own (3:1, WCAG 1.4.11). */
 const uiPairs: Pair[] = [
-  { where: 'focus ring on the app ground', fg: focusRing.color, bg: color.bg },
-  { where: 'focus ring on cards and fields', fg: focusRing.color, bg: color.surface },
+  { where: 'focus ring on the app ground', fg: color.claude, bg: color.bg },
+  { where: 'focus ring on cards and fields', fg: color.claude, bg: color.surface },
   { where: 'switch track when on', fg: color.claude, bg: color.surface },
   { where: 'selected effort pill fill', fg: color.claude, bg: color.surface },
   { where: 'TextField error outline', fg: color.danger, bg: color.surface },
-  { where: 'running progress fill on its track', fg: progressGradient.from, bg: color.line },
+  { where: 'running progress fill on its track', fg: color.claude, bg: color.line },
   ...(['claude', 'ado', 'danger', 'ok'] as const).map((name) => ({
     where: `${name} status dot on its pill`,
     fg: tone[name].dot,

@@ -21,5 +21,7 @@ export function createAdoHandlers(ado: AdoService): HandlersFor<(typeof ADO_INVO
     'ado:backlog': (request) => ado.backlog(request),
     'ado:workItemColors': (request) => ado.workItemColors(request),
     'ado:setWorkItemState': (request) => ado.setWorkItemState(request),
+    'ado:listTeamMembers': (request) => ado.listTeamMembers(request),
+    'ado:updateBoardItem': (request) => ado.updateBoardItem(request),
   };
 }

@@ -173,9 +173,11 @@ test('Enter opens "Send to lane" with only the lanes that take the card; Escape 
   await expect(card).toBeFocused();
 });
 
-test("someone else's item is not a drag handle, and the board has no serious axe violations", async () => {
-  await expect(page.getByTestId('team-card-71341')).toHaveAttribute('role', 'listitem');
-  await expect(page.getByTestId('team-card-71341')).not.toHaveAttribute('tabindex', '0');
+test("someone else's item opens and is not a drag handle, and the board has no serious axe violations", async () => {
+  const locked = page.getByTestId('team-card-71341');
+  await expect(locked).toHaveAttribute('role', 'button');
+  await expect(locked).not.toHaveAttribute('aria-roledescription', 'draggable card');
+  await expect(locked).not.toHaveAttribute('aria-haspopup', 'menu');
   await expect(page.getByTestId('team-card-71273')).toHaveAttribute('aria-roledescription', 'draggable card');
   expect(await seriousAxeViolations(page)).toEqual([]);
 });

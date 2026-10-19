@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     width: knobSize,
     height: knobSize,
     borderRadius: radius.pill,
-    backgroundColor: color.surface,
+    backgroundColor: color.onAccent,
     boxShadow: selection.thumbShadow,
   },
   knobOn: {

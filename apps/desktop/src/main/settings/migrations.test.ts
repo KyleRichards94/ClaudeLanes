@@ -38,7 +38,18 @@ const expectedV2: Settings = {
   },
   buildQueueSize: 2,
   adoStateTransitions: false,
-  ui: { lastRepo: repoPath, lastSprint: null, lastTeam: null, collapsedLanes: ['queued', 'done'], embedModeByTicket: {}, composerDrafts: {}, showThinking: true },
+  ui: {
+    lastRepo: repoPath,
+    lastSprint: null,
+    lastTeam: null,
+    collapsedLanes: ['queued', 'done'],
+    embedModeByTicket: {},
+    composerDrafts: {},
+    showThinking: true,
+    appearance: 'system',
+    ticketLayout: undefined,
+    codeCityLegendDismissed: undefined,
+  },
 };
 
 describe('settings migration v1 → v2', () => {
@@ -94,13 +105,13 @@ describe('settings saved before the board team (lastTeam)', () => {
     const loaded = loadSettings(savedBefore);
     expect(loaded.migratedFrom).toBeUndefined();
     expect(loaded.dropped).toEqual([]);
-    expect(loaded.settings.ui).toEqual({ ...savedBefore.ui, lastTeam: null });
+    expect(loaded.settings.ui).toEqual({ ...savedBefore.ui, lastTeam: null, appearance: 'system', ticketLayout: undefined, codeCityLegendDismissed: undefined });
   });
 
   it('keep a saved team, and refuse an empty one in favour of the default', () => {
     expect(loadSettings({ ...savedBefore, ui: { ...savedBefore.ui, lastTeam: 'team-1' } }).settings.ui.lastTeam).toBe('team-1');
     const empty = loadSettings({ ...savedBefore, ui: { ...savedBefore.ui, lastTeam: '' } });
-    expect(empty.settings.ui).toEqual({ ...savedBefore.ui, lastTeam: null });
+    expect(empty.settings.ui).toEqual({ ...savedBefore.ui, lastTeam: null, appearance: 'system', ticketLayout: undefined, codeCityLegendDismissed: undefined });
     expect(empty.dropped).toEqual(['ui.lastTeam']);
   });
 });

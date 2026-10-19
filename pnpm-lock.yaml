@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  react-native-web@0.21.3:
+    hash: c5d38d56a7b10d9fb8f9388450c59bef74cd56743af2baeb2022d50075297bdf
+    path: patches/react-native-web@0.21.3.patch
+
 importers:
 
   .:
@@ -85,7 +90,7 @@ importers:
         version: 19.3.0(react@19.3.0)
       react-native-web:
         specifier: ^0.21.3
-        version: 0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.21.3(patch_hash=c5d38d56a7b10d9fb8f9388450c59bef74cd56743af2baeb2022d50075297bdf)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -192,7 +197,7 @@ importers:
         version: 0.87.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
       react-native-web:
         specifier: ^0.21.3
-        version: 0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 0.21.3(patch_hash=c5d38d56a7b10d9fb8f9388450c59bef74cd56743af2baeb2022d50075297bdf)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
 
 packages:
 
@@ -7188,7 +7193,7 @@ snapshots:
       react: 19.3.0
       react-native: 0.87.1(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.3.0)
 
-  react-native-web@0.21.3(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  react-native-web@0.21.3(patch_hash=c5d38d56a7b10d9fb8f9388450c59bef74cd56743af2baeb2022d50075297bdf)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@babel/runtime': 7.29.7
       '@react-native/normalize-colors': 0.74.89

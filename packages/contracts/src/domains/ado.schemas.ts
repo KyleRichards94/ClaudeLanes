@@ -10,7 +10,7 @@ import {
   PullRequestSnapshotSchema,
 } from './ado.pull-requests';
 import { WorkItemCommentSchema, WorkItemStateChangeSchema } from './ado.write-back';
-import { TeamBoardSchema, TeamListSchema } from './ado.team-board';
+import { BoardItemAssigneeSchema, BoardItemUpdateSchema, TeamBoardSchema, TeamListSchema, TeamMemberListSchema } from './ado.team-board';
 import { ActivePullRequestListSchema } from './ado.active-prs';
 import { BACKLOG_PAGE_SIZE_MAX, BacklogKindSchema, BacklogPageSchema } from './ado.backlog';
 import { WorkItemColorsSchema } from './ado.work-item-colors';
@@ -292,6 +292,38 @@ export type BacklogRequest = z.infer<typeof BacklogRequestSchema>;
 export const WorkItemColorsRequestSchema = z.strictObject({ ...AdoScopeShape });
 export type WorkItemColorsRequest = z.infer<typeof WorkItemColorsRequestSchema>;
 
+/** `ado:listTeamMembers`: the team's people, for assigning a card (AL-285). */
+export const ListTeamMembersRequestSchema = z.strictObject({
+  ...AdoScopeShape,
+  /** Team name or id. Left out, the team from the user's ADO profile. */
+  team: adoText(256).optional(),
+});
+export type ListTeamMembersRequest = z.infer<typeof ListTeamMembersRequestSchema>;
+
+/** A person to assign, or null to clear `System.AssignedTo`. */
+export const BoardItemAssigneeInputSchema = BoardItemAssigneeSchema.extend({
+  displayName: z.string().trim().min(1).max(256),
+  uniqueName: z.string().trim().min(1).max(256).nullable(),
+});
+
+/**
+ * `ado:updateBoardItem` (AL-285): the user's own edit from an open team-board card. Assigns the
+ * person, moves the card to a board column, or both, in one revision. Not a drag onto an agent lane.
+ */
+export const UpdateBoardItemRequestSchema = z
+  .strictObject({
+    ...AdoScopeShape,
+    /** Team name or id. Left out, the team from the user's ADO profile. The column is read from this team's board. */
+    team: adoText(256).optional(),
+    id: WorkItemIdSchema,
+    /** Left out, the assignee stays. Null clears it. */
+    assignee: BoardItemAssigneeInputSchema.nullable().optional(),
+    /** A column id (or name) on the team's board. Left out, the card stays in its column. */
+    columnId: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((value) => value.assignee !== undefined || value.columnId !== undefined, { message: 'Choose a person or a column' });
+export type UpdateBoardItemRequest = z.infer<typeof UpdateBoardItemRequestSchema>;
+
 // ── Channels ─────────────────────────────────────────────────────────────────
 
 export const adoInvokeContracts = {
@@ -316,6 +348,10 @@ export const adoInvokeContracts = {
   /** Each work item type's colour and each type's state colours, read from the project's process. */
   'ado:workItemColors': { request: WorkItemColorsRequestSchema, response: WorkItemColorsSchema },
   'ado:setWorkItemState': { request: SetWorkItemStateRequestSchema, response: WorkItemStateChangeSchema },
+  /** The team's people, so a card can be assigned to one of them (AL-285). */
+  'ado:listTeamMembers': { request: ListTeamMembersRequestSchema, response: TeamMemberListSchema },
+  /** Assign a person, move the card to a column, or both (AL-285). */
+  'ado:updateBoardItem': { request: UpdateBoardItemRequestSchema, response: BoardItemUpdateSchema },
 } as const satisfies Record<(typeof ADO_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const adoEventContracts = {} as const satisfies Record<(typeof ADO_EVENT_CHANNELS)[number], z.ZodType>;

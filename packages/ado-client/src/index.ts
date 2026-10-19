@@ -83,11 +83,13 @@ export {
   gitLinksOf,
   listMyTeams,
   MY_TEAMS_PAGE_SIZE,
+  columnTargetOf,
   inProgressColumnOf,
   resolveTeam,
   TEAM_BOARD_MAX_ITEMS,
   teamFieldClause,
   toPerson,
+  type ColumnTarget,
   type InProgressColumn,
   type TeamBoardOptions,
   type TeamCallOptions,
@@ -118,3 +120,4 @@ export {
   type WorkItemAssignment,
 } from './assignment';
 export { listOpenThreads, type OpenThread } from './pr-threads';
+export { listTeamMembers, TEAM_MEMBER_PAGE_SIZE, updateBoardItem, type TeamMembersOptions, type UpdateBoardItemOptions } from './board-item';

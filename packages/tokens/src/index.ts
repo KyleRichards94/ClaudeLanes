@@ -1,46 +1,54 @@
 /**
  * Agent Lanes design tokens (design §11 and the "Design tokens" artboard).
  * Soft corporate: cool pale ground, white rounded cards, light liquid glass,
- * violet for Claude activity, blue for Azure DevOps.
+ * violet for Claude activity, blue for Azure DevOps. Dark mode keeps that palette
+ * and sets it on a blue-black ground (`palette.ts`).
  *
  * Glass recipe adapted from "Pure CSS Glassmorphism Liquid Glass UI Kit"
  * by Margarita-the-solid on CodePen. Keep this credit with the tokens.
  *
- * Keep in sync with agent-lanes-tokens.css; tokens.test.ts checks the two agree.
+ * Paintable colours are `light-dark()` pairs. The hex palettes stay in `palette.ts`
+ * and match agent-lanes-tokens.css; tokens.test.ts checks the two agree.
  */
 
-export const color = {
-  bg: '#F4F7FB',
-  surface: '#FFFFFF',
-  ink: '#0F1B2D',
-  muted: '#5B6B82',
-  line: '#E2E8F0',
-  claude: '#5B4BC4',
-  claudeTint: '#EEEBFF',
-  claudeText: '#4A3BB0',
-  ado: '#0369A1',
-  adoTint: '#E0F2FE',
-  ok: '#059669',
-  attention: '#D97706',
-  danger: '#B91C1C',
-  skyGlow: '#38BDF8',
-} as const;
+import { darkColor, lightColor, lightDark, themedColors } from './palette';
+
+export { darkColor, lightColor, lightOf } from './palette';
+
+export const color = themedColors(lightColor, darkColor);
 
 export type ColorToken = keyof typeof color;
 
-export const glass = {
-  /** White fill opacity range for glass surfaces. */
+/** Light glass fills. Dark glass is darker and a little clearer, so the moving ground reads through it. */
+const lightGlass = {
   fillMin: 'rgba(255, 255, 255, 0.62)',
   fillMax: 'rgba(255, 255, 255, 0.72)',
+  highlight: 'rgba(255, 255, 255, 0.9)',
+  border: 'rgba(255, 255, 255, 0.7)',
+} as const;
+
+const darkGlass = {
+  fillMin: 'rgba(18, 26, 40, 0.74)',
+  fillMax: 'rgba(18, 26, 40, 0.84)',
+  highlight: 'rgba(255, 255, 255, 0.22)',
+  border: 'rgba(255, 255, 255, 0.16)',
+} as const;
+
+export const glass = {
+  /** Fill opacity range for glass surfaces. */
+  fillMin: lightDark(lightGlass.fillMin, darkGlass.fillMin),
+  fillMax: lightDark(lightGlass.fillMax, darkGlass.fillMax),
   /** Chips and toolbar buttons. */
   blurSm: 8,
   /** Panels, header, live dock. */
   blurMd: 18,
   /** Modals and sheets. */
   blurXl: 40,
-  highlight: 'inset 0 1px 0 rgba(255, 255, 255, 0.9)',
-  border: 'rgba(255, 255, 255, 0.7)',
+  highlight: `inset 0 1px 0 ${lightDark(lightGlass.highlight, darkGlass.highlight)}`,
+  border: lightDark(lightGlass.border, darkGlass.border),
 } as const;
+
+export { lightGlass, darkGlass };
 
 export type GlassLevel = 'sm' | 'md' | 'xl';
 
@@ -84,8 +92,8 @@ export const space = {
 } as const;
 
 export const shadow = {
-  card: '0 1px 2px rgba(15, 27, 45, 0.04), 0 8px 24px rgba(15, 27, 45, 0.06)',
-  lifted: '0 2px 4px rgba(15, 27, 45, 0.06), 0 16px 40px rgba(15, 27, 45, 0.10)',
+  card: `0 1px 2px ${lightDark('rgba(15, 27, 45, 0.04)', 'rgba(0, 0, 0, 0.28)')}, 0 8px 24px ${lightDark('rgba(15, 27, 45, 0.06)', 'rgba(0, 0, 0, 0.35)')}`,
+  lifted: `0 2px 4px ${lightDark('rgba(15, 27, 45, 0.06)', 'rgba(0, 0, 0, 0.32)')}, 0 16px 40px ${lightDark('rgba(15, 27, 45, 0.10)', 'rgba(0, 0, 0, 0.45)')}`,
 } as const;
 
 export const motion = {

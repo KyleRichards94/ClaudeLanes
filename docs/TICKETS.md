@@ -171,6 +171,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-240 | Per-lane drop defaults and Alt launch sheet | E14 | M | AL-146, AL-236 | done |
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
 | AL-242 | Board picker for the team board | E14 | M | AL-234 | todo |
+| AL-285 | Open a team board card | E14 | M | AL-234, AL-231 | done |
 | AL-250 | Output-first ticket layout | E15 | L | — | done |
 | AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | done |
 | AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | done |
@@ -1235,13 +1236,21 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
 
 ---
 
+#### AL-285 · Open a team board item
+- **Design:** Kyle, 2026-10-14: open a team-board card, read it, and set its person and status. **Depends on:** AL-234, AL-231
+- **Scope:** A click on a work item (a click that is not a drag; someone else's card too) opens it: description, acceptance criteria and discussion from `ado:getWorkItem` and `ado:getComments`. Person is the team's members (`ado:listTeamMembers`) or unassigned. Status is the board's columns. Save writes `ado:updateBoardItem`: assignee and, for a column, the state that column maps the type to plus the team's column field, in one guarded revision. Drag onto an agent lane is unchanged.
+- **Acceptance criteria:**
+  - [x] Clicking a card opens it and shows the description and acceptance criteria.
+  - [x] Saving a person and a column assigns the work item and moves the card, including between columns that share a state.
+  - [x] A column the board does not map for that type is refused, and nothing is written.
+- **Tests:** `packages/ado-client/src/board-item.test.ts`, `apps/desktop/src/renderer/widgets/team-board/ui/TeamBoard.test.tsx`.
+
 #### AL-242 · Board picker for the team board
 - **Design:** T1, TB§2 (Kyle, 2026-10-08: "options to select my team, my team board and team sprint") · **Depends on:** AL-234
 - **Scope:** A Board menu next to Team in the board header listing the team's ADO boards (its backlog levels: Stories or Backlog items, Features, Epics). The choice is kept in the UI prefs per team and drives the team board widget's columns and items. Main: `ado:listBoards({ org, project, team })` over the team's Work › Boards API, and a `board` field on `ado:teamBoard`. Must work on Azure DevOps Server through api-version negotiation.
 - **Acceptance criteria:**
   - [ ] The team board shows the chosen board's columns, and the choice survives a restart.
   - [ ] Switching team falls back to that team's first board when the saved one is not there.
-
 
 ---
 
@@ -2357,6 +2366,8 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | D820 | Flight deck replaces `StageStepper`, `DiffPane`, `FlightDeckBody` and `live-diff` (removed); the gate toggle is now the stage card's gate chip (`role="switch"`, same `stage-gate-{stage}` testID); the Agents card is the donut plus a flat spawn-ordered list (sub-agent nesting dropped, testIDs kept); the page frame is 14/18/18 padding for both layouts; the rail order is Agents, then Worktree. `DiffTab` (with the sub-branch compare) stays but only its test uses it. The three-column grid has no splitter; Hide diff / Show diff remain. Esc with no running turn clears the selected file | Handoff "Flight deck layout"; the old pieces had no caller left | 2026-10-13 |
 | D821 | Code City details the handoff left open: a modified file that only removes lines stands at the 14 px minimum (so it can be clicked); a deleted file has `side 0` and its rubble tile is its listbox option; district labels sit below the plot's front-left corner; pins stack 32 px apart on one file; label overlap uses a character-width estimate; label chips are mouse-only (one Tab stop, the listbox options carry the names); the roads leaving the current stage split at its progress (50% when unknown). The blueprint diff card never shrinks under 280 px: the rail grows and the page scrolls | Handoff silent or ambiguous | 2026-10-13 |
 | D822 | Partly done: Flight deck has no sub-branch compare, "Changed just now" marks or review findings; its Implementing bar uses `ticket.progress` (no plan steps to count) and future-stage copy is generic. Code City's "Posted to PR" link is not wired (`onOpenPrThread`); a pin can cross a neighbouring label chip; reduced motion is CSS and hooks, untested. Specs edited for the new page but not run: `rewind`, `assign-agent`, `permissions`, `second-agent`, `subagents` (Kyle asked for no broad e2e runs); `ticket-layouts`, `ticket-layout`, `ticket-diff` and `ticket-page` pass | Honest scope of AL-279, AL-282, AL-283 | 2026-10-13 |
+| D823 | AL-285: clicking a team-board card opens it (description, acceptance criteria, discussion) and Save assigns a person and/or moves it to a column (`ado:updateBoardItem`). The column write sets the state that column maps the type to and the team's kanban column field, so columns that share a state still move the card. This is the user's own edit. T9 still holds for drag-to-agent: only a To Do or Failed drop on Planning or Implementing changes ADO by itself | Kyle (2026-10-14): he wants to open a ticket and set its person and status from the board | 2026-10-14 |
+| D824 | Settings › Appearance is `ui.appearance`: system, light or dark (optional, so old settings stay valid; unset follows the computer). Colours are `light-dark()` pairs, so the light palette is unchanged and dark is a second set (`onAccent` / `onInk` split the old white-on-fill from the card surface). react-native-web drops any colour that is not a hex or `var()`, so `patches/react-native-web@0.21.3.patch` lets `light-dark()` through. The window frame follows via `nativeTheme`. The ground behind the glass slowly shifts colour, and three blooms drift, grow and change hue; reduced motion freezes both. Design §11 is light only | Kyle (2026-10-14): a dark mode, and a moving ground so the liquid glass reads | 2026-10-14 |
 
 ---
 
@@ -2452,6 +2463,8 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | 2026-10-13 | Output & diff: output and live diff side by side with a splitter, unified or side-by-side diffs, files expanded, Follow agent. D814. |
 | 2026-10-13 | E17 (AL-275–AL-284): ticket screen layouts. Header slider (Flight deck default, Code City, Ctrl+Shift+L, saved as `ticketLayout`); `diff:files` with agent attribution and `review:findings`; Flight deck (workflow card, turn strip, grouped output, change map with author stripe, agent donut); Code City (`layoutCity`, CSS 3D scene, labels and pins, crew, stage track, inspector rail, keyboard listbox); `ticket-layouts.spec.ts` and fixture `ticket-11726`. D815–D822. |
 | 2026-10-14 | Code City: chips under the pointer, on the focused building and on the picked one come to the front; Blueprint diff has an expand button that opens it beside the city, between two draggable dividers (city · diff · rest of the inspector), local to the page and off in the narrow bottom sheet. |
+| 2026-10-14 | AL-285: click a team-board card to read it and set its person and column. D823. |
+| 2026-10-14 | Settings › Appearance (system, light, dark) and a slow moving ground behind the liquid glass. D824. |
 ---
 
 ## 7. Parallel build rules
