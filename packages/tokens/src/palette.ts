@@ -83,28 +83,3 @@ export function varsFor<K extends string>(prefix: string, keys: readonly K[]): R
   for (const key of keys) vars[key] = cssVar(`${prefix}${kebab(key)}`);
   return vars;
 }
-
-/** A colour that follows the document color-scheme. Gone in Task 3. */
-export function lightDark(light: string, dark: string): string {
-  return `light-dark(${light}, ${dark})`;
-}
-
-export function themedColors<K extends string>(light: Record<K, string>, dark: Record<K, string>): Record<K, string> {
-  const themed = {} as Record<K, string>;
-  for (const key of Object.keys(light) as K[]) themed[key] = lightDark(light[key], dark[key]);
-  return themed;
-}
-
-/** The first colour of a `light-dark()` pair, or the value itself. Gone in Task 3. */
-export function lightOf(value: string): string {
-  if (!value.startsWith('light-dark(') || !value.endsWith(')')) return value;
-  const inner = value.slice('light-dark('.length, -1);
-  let depth = 0;
-  for (let index = 0; index < inner.length; index += 1) {
-    const char = inner[index];
-    if (char === '(') depth += 1;
-    else if (char === ')') depth -= 1;
-    else if (char === ',' && depth === 0) return inner.slice(0, index).trim();
-  }
-  return value;
-}

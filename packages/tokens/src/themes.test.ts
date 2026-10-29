@@ -52,8 +52,7 @@ describe('themes', () => {
     expect(root['overlay-scrim-blur']).toBe('8px');
   });
 
-  // Passes only after Task 3 switches the paintable tokens to var() references.
-  it.skip('paintable tokens are var() references to themed variables', () => {
+  it('paintable tokens are var() references to themed variables', () => {
     const names = Object.keys(themeVariables('light'));
     const refs = [...Object.values(color), glass.fillMin, glass.fillMax, glass.highlight, glass.border, shadow.card, shadow.lifted, ...Object.values(tone).flatMap((values) => Object.values(values))];
     for (const ref of refs) {

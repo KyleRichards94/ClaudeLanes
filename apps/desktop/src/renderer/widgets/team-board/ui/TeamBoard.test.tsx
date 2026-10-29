@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ActivePullRequestList, TeamBoard as TeamBoardData, TeamBoardItem } from '@agent-lanes/contracts';
+import { tone } from '@agent-lanes/tokens';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAgentTicketStore } from '@/entities/agent-ticket';
 import { fakeAdoRow, fakeTicketRecord, installFakeBridge } from '@/shared/testing';
@@ -139,7 +140,7 @@ describe('TeamBoard (AL-234)', () => {
   it('keeps the token colours when ADO colours cannot be read', async () => {
     setup();
     const card = await screen.findByTestId('team-card-71318');
-    expect(getComputedStyle(card).borderLeftColor).toBe('rgb(3, 105, 161)');
+    expect(getComputedStyle(card).borderLeftColor).toBe(tone.ado.dot);
     expect(screen.getByTestId('team-card-71318-state').textContent).toBe('Failed UAT');
   });
 

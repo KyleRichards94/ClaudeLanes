@@ -13,9 +13,7 @@
  * "1 queued" count on artboard 1).
  */
 
-import { darkColor, lightColor, lightDark, solarpunkColor } from './palette';
-
-const pair = lightDark;
+import { cssVar, darkColor, keysOf, lightColor, solarpunkColor, varsFor } from './palette';
 
 export const lightTone = {
   claude: {
@@ -148,27 +146,21 @@ export const solarpunkTone = {
   },
 } as const satisfies TonePalette;
 
-function themedTone<T extends Record<string, string>>(light: T, dark: { [K in keyof T]: string }): { [K in keyof T]: string } {
-  const themed = {} as { [K in keyof T]: string };
-  for (const key of Object.keys(light) as (keyof T)[]) themed[key] = pair(String(light[key]), String(dark[key]));
-  return themed;
-}
-
 export const tone = {
-  claude: themedTone(lightTone.claude, darkTone.claude),
-  ado: themedTone(lightTone.ado, darkTone.ado),
-  attention: themedTone(lightTone.attention, darkTone.attention),
-  danger: themedTone(lightTone.danger, darkTone.danger),
-  ok: themedTone(lightTone.ok, darkTone.ok),
-  neutral: themedTone(lightTone.neutral, darkTone.neutral),
+  claude: varsFor('tone-claude-', keysOf(lightTone.claude)),
+  ado: varsFor('tone-ado-', keysOf(lightTone.ado)),
+  attention: varsFor('tone-attention-', keysOf(lightTone.attention)),
+  danger: varsFor('tone-danger-', keysOf(lightTone.danger)),
+  ok: varsFor('tone-ok-', keysOf(lightTone.ok)),
+  neutral: varsFor('tone-neutral-', keysOf(lightTone.neutral)),
 } as const;
 
 export type Tone = keyof typeof tone;
 
-/** Running progress: Claude violet into the sky glow, left to right. */
+/** Running progress: the Claude colour into the sky glow, left to right. */
 export const progressGradient = {
-  from: pair(lightColor.claude, darkColor.claude),
-  to: pair(lightColor.skyGlow, darkColor.skyGlow),
+  from: cssVar('claude'),
+  to: cssVar('sky-glow'),
 } as const;
 
 /**

@@ -15,7 +15,7 @@
  * - `disabledOpacity`: a disabled segment or switch fades back.
  */
 
-import { lightDark } from './palette';
+import { keysOf, varsFor } from './palette';
 
 export const lightSelection = {
   track: '#EEF2F7',
@@ -47,11 +47,6 @@ export const solarpunkSelection: SelectionPalette = {
 };
 
 export const selection = {
-  track: lightDark(lightSelection.track, darkSelection.track),
-  thumb: lightDark(lightSelection.thumb, darkSelection.thumb),
-  label: lightDark(lightSelection.label, darkSelection.label),
-  switchOff: lightDark(lightSelection.switchOff, darkSelection.switchOff),
-  thumbShadow: `0 1px 2px ${lightDark('rgba(15, 27, 45, 0.1)', 'rgba(0, 0, 0, 0.35)')}, 0 1px 3px ${lightDark('rgba(15, 27, 45, 0.08)', 'rgba(0, 0, 0, 0.28)')}`,
-  pillShadow: `0 2px 8px ${lightDark('rgba(91, 75, 196, 0.28)', 'rgba(91, 101, 196, 0.45)')}`,
+  ...varsFor('selection-', keysOf(lightSelection)),
   disabledOpacity: 0.5,
 } as const;

@@ -4,13 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { color, minTarget, selection } from '@agent-lanes/tokens';
 import { Switch, type SwitchProps } from './Switch';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 const gate = { on: 'Needs approval', off: 'Auto' };
 
 type HarnessProps = Omit<SwitchProps, 'value' | 'onValueChange'> & {
@@ -121,17 +114,17 @@ describe('Switch', () => {
     it('shows a violet track with the knob to the right when on', () => {
       render(<Switch testID="gate" label="Planning" value stateText={gate} onValueChange={() => {}} />);
 
-      expect(getComputedStyle(screen.getByTestId('gate-track')).backgroundColor).toBe(rgb(color.claude));
+      expect(getComputedStyle(screen.getByTestId('gate-track')).backgroundColor).toBe(color.claude);
       expect(getComputedStyle(screen.getByTestId('gate-knob')).transform).toBe('translateX(16px)');
-      expect(getComputedStyle(screen.getByTestId('gate-knob')).backgroundColor).toBe(rgb(color.surface));
-      expect(getComputedStyle(screen.getByText('Needs approval')).color).toBe(rgb(selection.label));
-      expect(getComputedStyle(screen.getByText('Planning')).color).toBe(rgb(color.ink));
+      expect(getComputedStyle(screen.getByTestId('gate-knob')).backgroundColor).toBe(color.onAccent);
+      expect(getComputedStyle(screen.getByText('Needs approval')).color).toBe(selection.label);
+      expect(getComputedStyle(screen.getByText('Planning')).color).toBe(color.ink);
     });
 
     it('shows a grey track with the knob to the left when off', () => {
       render(<Switch testID="gate" label="Implementing" value={false} stateText={gate} onValueChange={() => {}} />);
 
-      expect(getComputedStyle(screen.getByTestId('gate-track')).backgroundColor).toBe(rgb(selection.switchOff));
+      expect(getComputedStyle(screen.getByTestId('gate-track')).backgroundColor).toBe(selection.switchOff);
       expect(getComputedStyle(screen.getByTestId('gate-knob')).transform).not.toContain('translateX(16px)');
     });
   });

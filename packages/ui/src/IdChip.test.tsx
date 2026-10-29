@@ -3,22 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { font, fontWeight, radius, tone } from '@agent-lanes/tokens';
 import { IdChip } from './IdChip';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 describe('IdChip', () => {
   it('shows the work item id as #71273 in mono on the ADO tint', () => {
     render(<IdChip testID="chip" id={71273} />);
     const chip = getComputedStyle(screen.getByTestId('chip'));
     const id = getComputedStyle(screen.getByText('#71273'));
 
-    expect(chip.backgroundColor).toBe(rgb(tone.ado.band));
+    expect(chip.backgroundColor).toBe(tone.ado.band);
     expect(chip.borderTopLeftRadius).toBe(`${radius.chip}px`);
-    expect(id.color).toBe(rgb(tone.ado.text));
+    expect(id.color).toBe(tone.ado.text);
     expect(id.fontFamily).toBe(font.mono);
     expect(id.fontWeight).toBe(fontWeight.mono);
     expect(id.fontSize).toBe('11px');

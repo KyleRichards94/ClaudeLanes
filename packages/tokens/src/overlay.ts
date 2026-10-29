@@ -10,7 +10,7 @@
  * - `shadow`: the modal's large soft drop shadow, heavier below the panel than above it.
  */
 
-import { lightDark } from './palette';
+import { keysOf, varsFor } from './palette';
 
 export const lightOverlay = {
   scrim: 'rgba(238, 242, 247, 0.55)',
@@ -30,7 +30,6 @@ export const solarpunkOverlay: OverlayPalette = {
 };
 
 export const overlay = {
-  scrim: lightDark(lightOverlay.scrim, darkOverlay.scrim),
+  ...varsFor('overlay-', keysOf(lightOverlay)),
   scrimBlur: 8,
-  shadow: `0 24px 72px ${lightDark('rgba(15, 27, 45, 0.18)', 'rgba(0, 0, 0, 0.5)')}`,
 } as const;

@@ -10,7 +10,7 @@
  * - `disabledOpacity`: disabled controls fade back but keep their shape and colours.
  */
 
-import { lightDark } from './palette';
+import { keysOf, varsFor } from './palette';
 
 export const lightControl = {
   ink: '#334155',
@@ -33,9 +33,7 @@ export const solarpunkControl: ControlPalette = {
 };
 
 export const control = {
-  ink: lightDark(lightControl.ink, darkControl.ink),
-  primaryShadow: `0 6px 16px ${lightDark('rgba(91, 75, 196, 0.28)', 'rgba(91, 101, 196, 0.45)')}`,
-  primaryShadowLifted: `0 12px 28px ${lightDark('rgba(91, 75, 196, 0.34)', 'rgba(91, 101, 196, 0.55)')}`,
+  ...varsFor('control-', keysOf(lightControl)),
   pressedFilter: 'brightness(0.94)',
   disabledOpacity: 0.5,
 } as const;
