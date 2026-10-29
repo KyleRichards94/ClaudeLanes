@@ -31,6 +31,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
 | **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
 | **M7 Ticket view parity** | The ticket drill-in works like Claude Code: your messages, expandable tool calls, usage and plan limits, Stop, Assign new agent, a second agent | E15 (AL-250–AL-266) | Assign a new agent to a lost session and hand over; a reviewer runs beside it |
+| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-297) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -207,6 +208,17 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-282 | Code City overlays and panels | E17 | L | AL-281, AL-276, AL-277, AL-278 | partial |
 | AL-283 | Code City interaction, accessibility and states | E17 | M | AL-282, AL-275 | partial |
 | AL-284 | E2E: ticket layouts | E17 | M | AL-279, AL-283 | done |
+| AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | todo |
+| AL-288 | Peer network service | E18 | L | AL-287, AL-042 | todo |
+| AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | todo |
+| AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | todo |
+| AL-291 | Room log and replay | E18 | M | AL-290 | todo |
+| AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | todo |
+| AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
+| AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
+| AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | todo |
+| AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | todo |
+| AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1539,6 +1551,104 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
   - [x] Spec passes alone.
 
 ---
+
+### E18 — Peer lanes and Feature rooms (add-on brief, `Operations/Apps/AgentLanes/DESIGN-peer-lanes.md`, outside the repo)
+
+Requirements P1–P11 from the 2026-10-29 add-on brief, cited as PL§n (D826 says where it lives). Each
+Agent Lanes app is a peer on the office LAN; lanes whose work items share a parent Feature or Epic get
+a room where their Claudes talk; the board shows who is on what, flags file overlap, and shows an
+Assist bubble. No server, no shared store, nothing written to ADO. No artboards yet: Kyle draws them
+before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are main-process.
+
+#### AL-287 · Peer frame contracts and signing
+- **Design:** PL§3, PL§7 · **Depends on:** AL-011, AL-012
+- **Scope:** `packages/contracts/src/domains/peers.names.ts` and `peers.schemas.ts`: the frame schema (version, id, room, kind, from, lane, text ≤ 2 000, data, sentAt, replay, sig), presence and room member types, the invoke and event channels of PL§4. `src/main/peers/signer.ts`: canonical JSON with sorted keys, HMAC-SHA256 sign and verify, constant-time compare. Pure, no sockets.
+- **Acceptance criteria:**
+  - [ ] Every kind in the PL§3 table round-trips through the schema; an unknown kind, an over-long text or a missing signature is rejected.
+  - [ ] A frame signed with one secret fails verification with another; a changed byte anywhere fails.
+  - [ ] Unit tests.
+
+#### AL-288 · Peer network service
+- **Design:** P1, PL§4, PL§6, PL§7 · **Depends on:** AL-287, AL-042
+- **Scope:** `src/main/peers/network.ts` with `ws`: listener on the configured port bound to non-loopback interfaces (loopback only for explicitly listed loopback peers), accept only private-range addresses and listed hosts, 64 KB frame cap, 20 frames/s per peer cap; one outbound connection per listed peer with reconnect and backoff; the lower-instance-id rule when both directions connect; `hello`/`bye`; heartbeat every 30 s; dedupe by frame id (last 10 000 ids). Emits `peers:status`. Registered in `services.ts`; starts after Connections load and restarts when the Peers connection changes.
+- **Acceptance criteria:**
+  - [ ] Two services on loopback in one Vitest process exchange signed frames; a third with a different secret is rejected and counted.
+  - [ ] Both sides connecting at once ends with exactly one connection between them.
+  - [ ] A peer going silent is marked unreachable after 90 s; `bye` marks it at once.
+  - [ ] Port in use is reported as a status, not a crash.
+
+#### AL-289 · Connections › Peers tab
+- **Design:** P1, PL§2, R4, R5 · **Depends on:** AL-287, AL-046
+- **Scope:** A `peers` connection kind in `connections.schemas.ts`: port (default 47811), team secret (SecretStore, masked tail after save, Generate button), peer list (hostname or IP, optional `:port`, one row each). `features/peer-network` draws the tab in the Connections modal with a status dot per peer. Test = dial each peer and exchange a signed `hello`; the result names who answered, who was unreachable and who rejected the signature.
+- **Acceptance criteria:**
+  - [ ] The secret never crosses IPC after save; `connections:list` carries the masked tail only.
+  - [ ] Test reports the three outcomes per peer with the e2e fake peer.
+  - [ ] Saving restarts the listener on the new port without an app restart.
+
+#### AL-290 · Rooms and presence
+- **Design:** P2, P3, P5, PL§4 · **Depends on:** AL-288, AL-062, AL-065, AL-276, AL-103
+- **Scope:** `roomId` on the ticket record, set at launch from the work item's nearest parent Feature or Epic (`System.LinkTypes.Hierarchy-Reverse`, ado-client, works on Azure DevOps Server) and null when there is none; `src/main/peers/rooms.ts` joins on launch and resume, leaves on finish, archive and app close; `src/main/peers/presence.ts` sends `status` (stage, branch) on change and every 30 s, and `touched` (worktree-relative paths from `diff:files`, including sub-branches) at most every 30 s. Emits `peers:presence`. `peers:rooms` and `peers:list` handlers.
+- **Acceptance criteria:**
+  - [ ] A Feature under an Epic gives the Feature's room; a Story with no parent gives no room; two orgs never share a room.
+  - [ ] A lane rebuilt on start-up rejoins its room.
+  - [ ] Presence for a lane includes its touched files within 30 s of an edit.
+
+#### AL-291 · Room log and replay
+- **Design:** P7, P9, PL§4, PL§6 · **Depends on:** AL-290
+- **Scope:** `src/main/peers/room-log.ts`: own sent frames per room in memory and in `<userData>/peers/rooms/<hash>.json`, last 200 or 7 days; received frames kept in memory for the session; replay own frames with `replay: true` to a peer that sends `hello` for that room; `peers:log` handler returns own, replayed and live frames oldest first. Reloads from disk on start.
+- **Acceptance criteria:**
+  - [ ] A late joiner receives every frame the other app sent in that room, in order, marked replay, and none from other rooms.
+  - [ ] The 200 cap drops the oldest and the log says it is capped.
+  - [ ] Nothing in the file is a secret.
+
+#### AL-292 · Delivery to the Claude and the `agent_lanes` room tools
+- **Design:** P4, P6, P7, P10, PL§3 · **Depends on:** AL-291, AL-100, AL-103
+- **Scope:** `src/main/peers/delivery.ts`: the PL§3 kind table, the fixed `[Peer lanes]` prefix, 2 s coalescing, `answer` addressing, unread counts per room and per lane behind `peers:message`, `peers:markSeen`. On join with members present: one turn with the replayed log and the instruction to post `ask`. `stage-server.ts`: `list_peers`, `post_to_room` (rate limit one per 20 s per lane except `answer`; `changed` refused while the ticket branch has unpushed commits), `read_room`; the Peer lanes protocol text appended only for lanes in a room. Second agents (AL-266) and solo lanes get `list_peers` and `read_room` but not `post_to_room`.
+- **Acceptance criteria:**
+  - [ ] With the fake SDK, a `changed` frame becomes one user turn on each local lane in the room and none elsewhere; `status` becomes no turn.
+  - [ ] Five frames in 2 s become one turn.
+  - [ ] `post_to_room({ kind: 'changed' })` with an unpushed commit returns the push error; after `git push` it sends.
+  - [ ] A frame whose text contains tool-call syntax or a heading arrives quoted, unchanged, inside the prefix line.
+
+#### AL-293 · Board presence
+- **Design:** P3, P5, PL§2 · **Depends on:** AL-290, AL-234
+- **Scope:** `entities/peer` (presence model, `overlap()` pure, member row); the Peers pill in the board header with its three states; the room row and the amber overlap row on agent cards; the live "<user>'s agent · <stage> · <ago>" tag on team-board cards for items a peer's lane is on. Reads `peers:rooms` and `peers:presence`.
+- **Acceptance criteria:**
+  - [ ] Two lanes touching the same file, on two fake peers, show the overlap row on the local card naming the user and the files.
+  - [ ] A peer going unreachable turns the pill amber and leaves "last seen" on its members until expiry.
+  - [ ] Nothing relies on colour alone.
+
+#### AL-294 · Assist bubble
+- **Design:** P8, PL§2, PL§5 · **Depends on:** AL-292, AL-293
+- **Scope:** A count pill in the lane-count style: in the board header (all rooms) and on each lane header (lanes in a room with unread `ask`, `blocked` or `offer`). Label "N waiting on you"; zero hides it; click opens the Rooms panel at the first unread row; `peers:markSeen` on open. A button, Tab-reachable, polite announcement on change.
+- **Acceptance criteria:**
+  - [ ] A `blocked` frame from a fake peer raises both bubbles by one; opening the panel clears them; a `changed` frame raises neither.
+  - [ ] Matches the lane-count pill's size, type and radius (tokens, not new values).
+
+#### AL-295 · Room log widget and the ticket Room tab
+- **Design:** P9, PL§2 · **Depends on:** AL-292, AL-293
+- **Scope:** `widgets/room-log`: the Rooms panel on the board (rooms, members, log rows with user, host, time, kind pill, text; unread highlight) and the Room tab on the ticket page; `features/post-to-room` composer that sends `peers:post` as the person (`from.person: true`) with an optimistic row. Virtualised like the output stream (§12).
+- **Acceptance criteria:**
+  - [ ] The log shows own, replayed and live rows in order with the kind as a word.
+  - [ ] A person's post reaches a fake peer as a frame with `from.person: true` and is delivered to that peer's lane with the "(person)" prefix.
+  - [ ] Unit tests and a slice integration test.
+
+#### AL-296 · Hardening and the README section
+- **Design:** PL§7 · **Depends on:** AL-288, AL-292
+- **Scope:** Private-range and peer-list filters at accept, the frame-size and rate caps, signature-failure counters surfaced in `peers:status` and the Peers tab; the `[Peer lanes]` prefix rule and the protocol wording reviewed against `WORK_ITEM_COMMENT_RULE`; README: a "Peer lanes" section (what it shares, the firewall prompt, the team secret, the peer list, what it never sends).
+- **Acceptance criteria:**
+  - [ ] A connection from a non-private address or an unlisted host is closed before any frame is read (test with a fake socket).
+  - [ ] A 65 KB frame and a 21st frame in one second each close the connection and count.
+  - [ ] README section reviewed by Kyle.
+
+#### AL-297 · E2E: two apps talking
+- **Design:** P1–P9 · **Depends on:** AL-294, AL-295, AL-296
+- **Scope:** Playwright drives two Electron instances with separate `AGENT_LANES_USER_DATA_DIR`, ports 47811 and 47812, each listing the other as `localhost:<port>`, the fake `claude` and the e2e ADO fixtures with two stories under one Feature. `peer-lanes.spec.ts`: launch a lane in each, presence on both boards, a `changed` from one fake agent arrives as a turn in the other, the bubble on a `blocked`, the log on both sides, a person's post from the Room tab.
+- **Acceptance criteria:**
+  - [ ] The spec passes on CI (Windows) within the existing e2e budget.
+  - [ ] Screenshot `peer-lanes-1440x960.png` with the pill, bubble, overlap row and panel.
+
+---
 ## 4. Decisions
 
 | # | Decision | Why | Date |
@@ -2368,6 +2478,7 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | D822 | Partly done: Flight deck has no sub-branch compare, "Changed just now" marks or review findings; its Implementing bar uses `ticket.progress` (no plan steps to count) and future-stage copy is generic. Code City's "Posted to PR" link is not wired (`onOpenPrThread`); a pin can cross a neighbouring label chip; reduced motion is CSS and hooks, untested. Specs edited for the new page but not run: `rewind`, `assign-agent`, `permissions`, `second-agent`, `subagents` (Kyle asked for no broad e2e runs); `ticket-layouts`, `ticket-layout`, `ticket-diff` and `ticket-page` pass | Honest scope of AL-279, AL-282, AL-283 | 2026-10-13 |
 | D823 | AL-285: clicking a team-board card opens it (description, acceptance criteria, discussion) and Save assigns a person and/or moves it to a column (`ado:updateBoardItem`). The column write sets the state that column maps the type to and the team's kanban column field, so columns that share a state still move the card. This is the user's own edit. T9 still holds for drag-to-agent: only a To Do or Failed drop on Planning or Implementing changes ADO by itself | Kyle (2026-10-14): he wants to open a ticket and set its person and status from the board | 2026-10-14 |
 | D824 | Settings › Appearance is `ui.appearance`: system, light or dark (optional, so old settings stay valid; unset follows the computer). Colours are `light-dark()` pairs, so the light palette is unchanged and dark is a second set (`onAccent` / `onInk` split the old white-on-fill from the card surface). react-native-web drops any colour that is not a hex or `var()`, so `patches/react-native-web@0.21.3.patch` lets `light-dark()` through. The window frame follows via `nativeTheme`. The ground behind the glass slowly shifts colour, and three blooms drift, grow and change hue; reduced motion freezes both. Design §11 is light only | Kyle (2026-10-14): a dark mode, and a moving ground so the liquid glass reads | 2026-10-14 |
+| D826 | E18 (Peer lanes, AL-287–AL-297) is built from Mitch's add-on brief, which lives outside the repo at `C:\Users\mitchell.healy\Documents\Operations\Apps\AgentLanes\DESIGN-peer-lanes.md` with its system diagram in `diagrams\` beside it; tickets cite it as PL§n and P1–P11. Neither is copied into `docs/design`. Its tickets were drafted as AL-286–AL-296 and moved up one because the themes work took AL-286 | Mitch keeps his documents in Operations\Apps, never in a repo | 2026-10-29 |
 
 ---
 
@@ -2465,6 +2576,7 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | 2026-10-14 | Code City: chips under the pointer, on the focused building and on the picked one come to the front; Blueprint diff has an expand button that opens it beside the city, between two draggable dividers (city · diff · rest of the inspector), local to the page and off in the narrow bottom sheet. |
 | 2026-10-14 | AL-285: click a team-board card to read it and set its person and column. D823. |
 | 2026-10-14 | Settings › Appearance (system, light, dark) and a slow moving ground behind the liquid glass. D824. |
+| 2026-10-29 | E18 Peer lanes and Feature rooms (AL-287–AL-297) added from the 2026-10-29 add-on brief, with milestone M8. D826. |
 ---
 
 ## 7. Parallel build rules
