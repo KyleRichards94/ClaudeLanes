@@ -213,7 +213,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | done |
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | done |
 | AL-291 | Room log and replay | E18 | M | AL-290 | done |
-| AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | todo |
+| AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | done |
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | todo |
@@ -1605,10 +1605,10 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P4, P6, P7, P10, PL§3 · **Depends on:** AL-291, AL-100, AL-103
 - **Scope:** `src/main/peers/delivery.ts`: the PL§3 kind table, the fixed `[Peer lanes]` prefix, 2 s coalescing, `answer` addressing, unread counts per room and per lane behind `peers:message`, `peers:markSeen`. On join with members present: one turn with the replayed log and the instruction to post `ask`. `stage-server.ts`: `list_peers`, `post_to_room` (rate limit one per 20 s per lane except `answer`; `changed` refused while the ticket branch has unpushed commits), `read_room`; the Peer lanes protocol text appended only for lanes in a room. Second agents (AL-266) and solo lanes get `list_peers` and `read_room` but not `post_to_room`.
 - **Acceptance criteria:**
-  - [ ] With the fake SDK, a `changed` frame becomes one user turn on each local lane in the room and none elsewhere; `status` becomes no turn.
-  - [ ] Five frames in 2 s become one turn.
-  - [ ] `post_to_room({ kind: 'changed' })` with an unpushed commit returns the push error; after `git push` it sends.
-  - [ ] A frame whose text contains tool-call syntax or a heading arrives quoted, unchanged, inside the prefix line.
+  - [x] With the fake SDK, a `changed` frame becomes one user turn on each local lane in the room and none elsewhere; `status` becomes no turn. (`src/main/peers/delivery.test.ts`)
+  - [x] Five frames in 2 s become one turn.
+  - [x] `post_to_room({ kind: 'changed' })` with an unpushed commit returns the push error; after `git push` it sends. (`posting.test.ts`, real git)
+  - [x] A frame whose text contains tool-call syntax or a heading arrives quoted, unchanged, inside the prefix line.
 
 #### AL-293 · Board presence
 - **Design:** P3, P5, PL§2 · **Depends on:** AL-290, AL-234
@@ -2489,6 +2489,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D834 | AL-290: the record keeps `room: { id, parentId, parentType, parentTitle }` or null instead of a bare `roomId` (absent = not looked up yet, so older records still read). The parent is found through `System.Parent` (`nearestPortfolioParent` in ado-client, up to 5 links), not `System.LinkTypes.Hierarchy-Reverse` relations; a parent the token can't read is no room; a failed read is tried again at the next tick. The room id lower-cases the organisation URL | The protocol text names the room by its Feature's title; `System.Parent` is one field read per link and is what the backlog already uses on Azure DevOps Server; two people who typed the URL differently still share a room | 2026-10-29 |
 | D835 | AL-290: every ticket on the board that is not Done and not a second agent announces presence, in a room or with `room: null` (the team board's live tags need both); a lane's room is looked up when its session starts (a session-extras source) and, for older tickets, at the next 30 s tick (at most 5 lookups a tick). Room lookups and the `git diff` for touched files run only while the peer network is on. `touched` is the diff against the base plus every sub-branch (PL§9 open question, answered yes) | No Azure DevOps or git work for people who don't use peer lanes; a board of old tickets doesn't flood ADO on the first tick | 2026-10-29 |
 | D836 | AL-291: the room log holds what agents and people post (`changed`, `blocked`, `done`, `ask`, `answer`, `offer`); joins and leaves are presence and show as members, not rows. Own messages are written per room, a burst sharing one write, and read back lazily the first time a room is read or replayed. A peer's lane saying `hello` live in one of this app's rooms triggers the replay, once per peer and room until that peer goes; replays go through the network's pacing. The log is capped when own messages were dropped, when a peer replayed 200, or at 1 000 in memory | A log of joins on every start and reconnect would bury the posts, and the board already lists who is in the room | 2026-10-29 |
+| D837 | AL-292: a peer's words reach an agent as a JSON string inside one `[Peer lanes]` line (`· ask: "…"`), so a newline, a heading or tool-call syntax stays quoted on that line, unchanged. Room messages are delivered only to lanes with a live session, through `sessions.send` (a lane waiting at a gate gets them when the turn ends); an idle lane is not woken and reads the room with `read_room` later. A post also reaches this app's other lanes in the room. Single-step lanes and second agents get `list_peers` and `read_room`, the read-only protocol and no turns. The protocol and tools are added when a session starts in a room; a lane that gets its room later has them from its next session | Sending to an idle lane would start a turn for every agent on the board each time a peer speaks; the brief's fixed prefix with the text "quoted as data" needs the text kept on the prefix line | 2026-10-29 |
+| D838 | AL-292: the protocol and `post_to_room` follow PL§3, with the room named by its parent (`Feature #48000 · Job DTO`) and the count of agents on other machines at session start. `changed` is refused while `git status` shows the ticket branch with no upstream, a gone upstream, or commits ahead. Unread counts cover live `ask`, `blocked` and `offer` only (not replays, not this app's own) and are kept in memory | A replayed ask from yesterday shouldn't light the bubble on every start; the Assist bubble UI (AL-294) may want them kept across restarts, which is a call for Kyle's artboards | 2026-10-29 |
 
 ---
 

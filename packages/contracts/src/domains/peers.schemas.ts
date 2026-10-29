@@ -296,9 +296,12 @@ export const peersInvokeContracts = {
   'peers:list': { request: z.undefined(), response: PeerNetworkStatusSchema },
   'peers:rooms': { request: z.undefined(), response: PeerRoomsSchema },
   'peers:log': { request: RoomLogRequestSchema, response: RoomLogSchema },
+  'peers:post': { request: PostToRoomRequestSchema, response: RoomMessageSchema },
+  'peers:markSeen': { request: MarkSeenRequestSchema, response: PeerUnreadSchema },
 } as const satisfies Record<(typeof PEERS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const peersEventContracts = {
   'peers:status': PeerStatusEventSchema,
   'peers:presence': PeerPresenceEventSchema,
+  'peers:message': PeerMessageEventSchema,
 } as const satisfies Record<(typeof PEERS_EVENT_CHANNELS)[number], z.ZodType>;

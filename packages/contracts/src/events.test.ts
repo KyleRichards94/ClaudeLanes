@@ -31,6 +31,7 @@ describe('event contracts', () => {
         'agent:prActivity', // AL-269
         'peers:status', // AL-288
         'peers:presence', // AL-290
+        'peers:message', // AL-292
       ].sort(),
     );
   });

@@ -111,7 +111,16 @@ describe('late joiner over two networks (AL-291)', () => {
         const rooms_ = createRooms({ network: peer.network, tickets, findParent: async () => ok(null), touched: async () => [], presenceMs: 60_000 });
         const roomLog = createRoomLog({ dir: join(dir, `log-${index}`), network: peer.network });
         made.push(rooms_);
-        lanes.push(createPeerLanes({ network: peer.network, rooms: rooms_, roomLog }));
+        lanes.push(
+          createPeerLanes({
+            network: peer.network,
+            rooms: rooms_,
+            roomLog,
+            tickets,
+            git: { status: async () => ({ branch: null, entries: [], stash: null }) },
+            sessions: { send: () => ok({ held: false }), status: (ticketId) => ({ ticketId, state: 'stopped', sessionId: null, message: null }) },
+          }),
+        );
         return { rooms: rooms_, roomLog, tickets };
       };
       const mitch = await side(a, 0, [

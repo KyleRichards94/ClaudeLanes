@@ -425,6 +425,15 @@ export function createServices(options: ServiceOptions): Services {
     network: peerNetwork,
     rooms: peerRooms,
     roomLog: createRoomLog({ dir: roomLogsDir(peersDir(options.appDataDir)), network: peerNetwork, log: log.child('peers') }),
+    tickets,
+    git,
+    // Room messages reach live sessions as user turns (AL-292); the session manager is created below.
+    sessions: {
+      send: (ticketId, message) => late.sessions?.send(ticketId, message) ?? err('SESSION_LOST', 'No session manager yet.'),
+      status: (ticketId) => late.sessions?.status(ticketId) ?? { ticketId, state: 'stopped', sessionId: null, message: null },
+    },
+    emit: options.emit,
+    log: log.child('peers'),
   });
 
   const sessions = createSessionManager({
@@ -542,6 +551,8 @@ export function createServices(options: ServiceOptions): Services {
     stages,
     designSpecs,
     createServer: sdkStageServer(loadClaudeSdk),
+    // list_peers, post_to_room and read_room, and the Peer lanes protocol for lanes in a room (AL-292).
+    peers: peerLanes.tools,
     // A Create PR only ticket's agent opens its PR the way the drill-in does.
     openPullRequest: async (ticketId, title, description) => {
       const opened = await pullRequests.create({ ticketId, title, description });
