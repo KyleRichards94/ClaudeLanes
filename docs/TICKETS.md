@@ -215,7 +215,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-291 | Room log and replay | E18 | M | AL-290 | done |
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | done |
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | done |
-| AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
+| AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | done |
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | done |
 | AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
 | AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | todo |
@@ -1622,8 +1622,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P8, PL§2, PL§5 · **Depends on:** AL-292, AL-293
 - **Scope:** A count pill in the lane-count style: in the board header (all rooms) and on each lane header (lanes in a room with unread `ask`, `blocked` or `offer`). Label "N waiting on you"; zero hides it; click opens the Rooms panel at the first unread row; `peers:markSeen` on open. A button, Tab-reachable, polite announcement on change.
 - **Acceptance criteria:**
-  - [ ] A `blocked` frame from a fake peer raises both bubbles by one; opening the panel clears them; a `changed` frame raises neither.
-  - [ ] Matches the lane-count pill's size, type and radius (tokens, not new values).
+  - [x] A `blocked` frame from a fake peer raises both bubbles by one; opening the panel clears them; a `changed` frame raises neither. (`pages/board/ui/AssistBubble.test.tsx`; the counting is `delivery.test.ts`; across two apps in AL-297)
+  - [x] Matches the lane-count pill's size, type and radius (tokens, not new values). (it is the lane count's `Badge`)
 
 #### AL-295 · Room log widget and the ticket Room tab
 - **Design:** P9, PL§2 · **Depends on:** AL-292, AL-293
@@ -2495,6 +2495,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D840 | E18's UI (AL-293 to AL-295) was built without artboards, on Mitch's go (2026-10-29), from the words in PL§2 and with the board's existing pills, bands, badge and tokens; no new token or colour. Kyle's artboards, when drawn, may change it | Kyle hadn't drawn them; Mitch chose not to wait | 2026-10-29 |
 | D841 | AL-293: the card has no branch line, so the room row (`Room · Feature #48000 · with Kyle, Rocky`) and the amber attention row (`Kyle is also in JobDto.cs` / `Kyle's agent is also on #48162`) sit in a section at the foot of the card, through a `peers` slot on `AgentTicketCardView`. Both are left off a lane in no room, as PL§2 says (PL§6's "No room · #48162 has no parent Feature" row is not shown). The Peers pill is hidden with no Peers connection, green when every listed peer is online, grey with none online, amber with the names on hover when one can't be reached, red when the listener failed. The team-board tag reads `Kyle's agent · Implementing · 4 min ago` under the lock row | PL§2 and PL§6 disagree on the no-room row; a row on every card of a lane with no Feature adds noise | 2026-10-29 |
 | D842 | AL-295 was built before AL-294, since the Assist bubble opens the Rooms panel. The app has no side-panel pattern, so the Rooms panel is a modal like the Digest, opened from the Peers pill (and the bubbles, AL-294); it lists the rooms (a picker when there are several), the members, the log and the composer. The ticket page always has a Room tab, which says when peer lanes is off (with Open Connections) or the ticket is in no room. The composer lives in `widgets/room-log` (D833) and posts `ask`, `answer`, `blocked` or `offer` as the person, named by the ADO identity. Showing a room (panel or tab) marks it seen; the rows that were unread stay marked "new" while it is on screen. The log is a FlatList | No drawer exists to copy, and a modal keeps the board's layout as it is | 2026-10-29 |
+| D843 | AL-294: both bubbles are the lane count's own `Badge` in its attention tone, so size, type and radius are the lane pill's by construction (the lane's bubble is the same size, not smaller). The header bubble sits after the Peers pill; the lane bubble sits beside the lane header (the header is itself the collapse button, so the bubble can't go inside it). A click opens the Rooms panel on the first room with something unread, scrolled to its first unread row; a hidden polite live region reads the count out when it changes | No new size or colour values (the AL-294 criterion), and no button inside a button | 2026-10-29 |
 
 ---
 

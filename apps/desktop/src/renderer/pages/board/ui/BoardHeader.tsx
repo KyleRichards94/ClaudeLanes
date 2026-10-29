@@ -8,6 +8,7 @@ import { openConnections, openNewTicket, openRooms, toast, useBoardSprint, useBo
 import { HeaderMenu, PlanLimitsPill, type HeaderMenuItem } from '@/shared/ui';
 import { sprintRangeLabel } from '../model/header';
 import { McpStatusPill } from './McpStatusPill';
+import { AssistBubble } from './AssistBubble';
 import { PeersPill } from './PeersPill';
 
 /** The Repo menu's last item, which opens the folder picker (AL-081). */
@@ -69,6 +70,8 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         <PlanLimitsPill />
         {/* Peer lanes: who is online on the office network (AL-293). */}
         <PeersPill onPress={() => openRooms()} />
+        {/* What other agents asked of yours and you haven't looked at (AL-294). */}
+        <AssistBubble />
       </View>
       {/* The board digest: every ticket ranked by what it needs, and next actions (AL-272). */}
       <Button label="Digest" icon="backlog" onPress={onOpenDigest} testID="open-digest" />

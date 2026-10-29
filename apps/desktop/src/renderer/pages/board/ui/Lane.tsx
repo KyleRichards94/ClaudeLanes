@@ -29,6 +29,7 @@ import { PermissionPrompt } from "@/features/resolve-permission";
 import { LANE_LABELS } from "@/shared/config";
 import { useIsLaunchedTicket, useUiPrefs } from "@/shared/model";
 import { useRouter, routes } from "@/shared/routing";
+import { LaneAssistBubble } from "./AssistBubble";
 import { BoardTicketCard } from "./BoardTicketCard";
 import { LaneSettingsModal } from "./LaneSettingsModal";
 import { laneDropKinds } from "../model/lane-drops";
@@ -179,6 +180,8 @@ export function Lane({
             style={styles.badge}
           />
         </Pressable>
+        {/* Unread ask, blocked and offer in the rooms of this lane's tickets (AL-294). */}
+        <LaneAssistBubble lane={lane} ticketIds={ids} />
         {bulkRemovable ? (
           <Pressable
             role="button"

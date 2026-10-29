@@ -66,7 +66,9 @@ export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; 
   const list = useRef<FlatList<RoomMessage>>(null);
   const messages = log.data?.messages ?? [];
   const unread = unreadIds(messages, room.unread);
-  const at = focus ? messages.findIndex((message) => message.id === focus) : -1;
+  // The message asked for, else the first unread one (the Assist bubble opens the panel there, AL-294).
+  const target = focus ?? messages.find((message) => unread.has(message.id))?.id ?? null;
+  const at = target ? messages.findIndex((message) => message.id === target) : -1;
 
   useEffect(() => {
     if (at >= 0) list.current?.scrollToIndex({ index: at, animated: false, viewPosition: 0 });
