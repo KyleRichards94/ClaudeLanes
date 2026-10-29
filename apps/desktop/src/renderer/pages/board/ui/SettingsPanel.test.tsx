@@ -78,6 +78,16 @@ describe('SettingsPanel', () => {
     expect(save().getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('offers Solarpunk as a fourth appearance and applies it straight away', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Appearance' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Solarpunk' }));
+
+    await waitFor(() => expect(fake.updates.at(-1)).toMatchObject({ ui: { appearance: 'solarpunk' } }));
+    expect(screen.getByText('Cream ground, leaf green and sun gold. Light window frame.')).toBeTruthy();
+    expect(save().getAttribute('aria-disabled')).toBe('true');
+  });
+
   it('edits the agent defaults, the build queue and ADO state changes, and saves only what changed', async () => {
     const { onClose } = renderPanel();
     await screen.findByRole('radio', { name: 'Opus' });
