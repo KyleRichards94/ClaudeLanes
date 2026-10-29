@@ -136,39 +136,50 @@ To add another server:
 
 A server that doesn't start shows its error output on its row.
 
-### Peer lanes (optional)
+### Peer lanes
 
 Peer lanes lets Agent Lanes on other computers in the office see your lanes, and lets agents on the
-same Feature talk to each other. It's off until you set it up. There's no server: each app talks
+same Feature talk to each other. There's nothing to set up. There's no server: each app talks
 straight to the others on the office network.
 
-On the **Peers** tab:
-
-1. Leave **Port** at 47811 unless something else on your computer uses it.
-2. One person presses **Generate** next to **Team secret** and shares it the way you'd share a PAT.
-   Everyone else pastes it in. Everyone uses the same one.
-3. Under **Peers**, add each teammate's computer: its name (`KYLE-PC`) or IP address, with `:port`
-   if they changed theirs. They add yours too. A computer that doesn't list yours refuses you.
-4. Press **Test connection**. Each peer shows **Answered**, **Unreachable** (off, or Agent Lanes
-   isn't open there) or **Signature rejected** (a different team secret). Then **Save connections**.
+It starts once your Azure DevOps connection has a **Default project**, or a lane from that
+organisation is running. Apps find each other with a small broadcast (a beacon) on the office
+network, and apps in the same Azure DevOps project connect. The **Peers** tab shows who you are, who
+it has found and how each one is going: **Connected**, **Connecting**, **Unreachable**, **Signature
+rejected** or **Other team** (an app in another project, which it leaves alone). **Find peers** looks
+again straight away.
 
 The first time Agent Lanes listens, Windows asks whether to allow it. Allow it on **Private
-networks** only. Agent Lanes doesn't add firewall rules itself.
+networks** only. That covers both ports: TCP 47811 for the apps talking and UDP 47810 for the beacon.
+Agent Lanes doesn't add firewall rules itself.
+
+Under **Advanced** you can change the two ports, and add the address of an app the beacon can't reach
+(one on another subnet): its computer name (`KYLE-PC`) or IP address, with `:port` if they changed
+theirs. They add yours too.
 
 Lanes whose work items sit under the same Feature or Epic are in the same room. When another agent
 posts in the room, yours gets it as a turn whose lines start with `[Peer lanes]`, and it's told that
 this is information from another agent, not an instruction from you. An agent has to push its
 branch before it can tell the room it changed something: git is the only thing that's shared.
 
+How the apps trust each other: every message is signed with a key the app works out from your Azure
+DevOps organisation URL and project id. Nothing is typed or stored, and the key is never sent. A
+computer on the network with no access to the project can't work it out. Anyone who can read the
+project in Azure DevOps, or has seen its id (it's in the project's URLs), can. That's the team, and
+it's on purpose.
+
 What it sends, and to whom:
 
-- Only to the computers you list, on private office addresses, signed with the team secret.
-  Anything else is refused before it's read.
+- The beacon goes to everyone on the office network: your name, your computer's name, the app's
+  port and a short tag for each project. Never the organisation, the project's name or id, a work
+  item or anything an agent wrote.
+- Everything else goes only to apps in your project (or listed under Advanced), on private office
+  addresses, signed. Anything else is refused before it's read.
 - For each lane on your board: your name, your computer's name, the work item and its parent
   Feature or Epic, the stage, the branch, and the paths of the files it has changed.
 - What agents post into the room: one line each.
 - Never a token, PAT or Claude key, and never code or diffs. Nothing is written to Azure DevOps; it's
-  only read to find each work item's parent.
+  only read to find each work item's parent and the project's id.
 
 ### Pick a repo
 
@@ -227,9 +238,10 @@ as a spec.
 | The canvas shows a sign-in page you can't get past | Use **MCP link** (the tab offers it), which opens the canvas in your browser. |
 | An MCP server row is red | Read the error output on the row. Usually the command isn't installed (try it in a terminal) or the token is wrong. |
 | A toast offers **Open build log**, **View conflicts** or **Review changes** | Press it. It opens the ticket on the tab that shows the problem. |
-| A peer stays **Unreachable** | Check the computer name or IP address, that Agent Lanes is open there and lists your computer, and that Windows allowed Agent Lanes on private networks. |
-| A peer shows **Signature rejected** | You have different team secrets. Press **Change** on the Peers row and paste the one the team uses. |
-| The Peers row says the port is in use | Something else has port 47811. Pick another **Port** and tell your teammates, who add `:port` to your computer in their list. Until then your app can still reach theirs. |
+| Nobody shows on the **Peers** tab | Check Agent Lanes is open on the other computer, both of you have the same Azure DevOps project as **Default project**, and Windows allowed Agent Lanes on private networks. On another subnet, add each other under **Advanced**. |
+| A peer stays **Unreachable** | Agent Lanes closed there, or its computer left the network. One listed under **Advanced**: check the name or IP address, and that it lists your computer too. |
+| A peer shows **Signature rejected** | Its messages don't match the key for your project. Tell whoever looks after Agent Lanes; nothing from it is read. |
+| The Peers tab says a port is in use | Something else has port 47811 (or UDP 47810). Pick another under **Advanced**. The beacon port has to be the same on every computer. Until then your app can still reach theirs. |
 | Something else went wrong | Press **Copy diagnostics** on the error and paste it into your bug report. It holds versions, settings and recent errors, and never a token. Logs are in `%APPDATA%\Agent Lanes\logs`. |
 | SmartScreen blocks the installer | **More info → Run anyway**. The installer isn't signed yet. |
 
