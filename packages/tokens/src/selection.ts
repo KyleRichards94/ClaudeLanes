@@ -8,7 +8,9 @@
  *   "Needs approval"). Meets 4.5:1 on `track` and on the surface.
  * - `switchOff`: the switch track when off (on is `color.claude`). The state is the knob and the
  *   word, so the track itself stays under 3:1 (D291).
- * - `thumbShadow`: the raised thumb of the selected segment and the switch knob.
+ * - `thumb`: the raised thumb of the selected segment and tab. White in light; in dark a lift
+ *   above the track, so the light labels still read on it.
+ * - `thumbShadow`: the thumb's and the switch knob's shadow.
  * - `pillShadow`: the soft violet glow under the selected effort pill.
  * - `disabledOpacity`: a disabled segment or switch fades back.
  *
@@ -19,6 +21,7 @@ import { lightDark } from './palette';
 
 export const lightSelection = {
   track: '#EEF2F7',
+  thumb: '#FFFFFF',
   label: '#475569',
   switchOff: '#CBD5E1',
   thumbShadow: '0 1px 2px rgba(15, 27, 45, 0.1), 0 1px 3px rgba(15, 27, 45, 0.08)',
@@ -27,6 +30,7 @@ export const lightSelection = {
 
 export const darkSelection = {
   track: '#243044',
+  thumb: '#36455C',
   label: '#C5D2E2',
   switchOff: '#4A5E78',
   thumbShadow: '0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.28)',
@@ -35,6 +39,7 @@ export const darkSelection = {
 
 export const selection = {
   track: lightDark(lightSelection.track, darkSelection.track),
+  thumb: lightDark(lightSelection.thumb, darkSelection.thumb),
   label: lightDark(lightSelection.label, darkSelection.label),
   switchOff: lightDark(lightSelection.switchOff, darkSelection.switchOff),
   thumbShadow: `0 1px 2px ${lightDark('rgba(15, 27, 45, 0.1)', 'rgba(0, 0, 0, 0.35)')}, 0 1px 3px ${lightDark('rgba(15, 27, 45, 0.08)', 'rgba(0, 0, 0, 0.28)')}`,

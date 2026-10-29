@@ -40,8 +40,10 @@ describe('selection control tokens', () => {
     expect(contrast(darkSelection.label, darkSelection.track)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(darkSelection.label, darkColor.surface)).toBeGreaterThanOrEqual(4.5);
     // Selected segment: violet or ink on the thumb; selected pill: onAccent on violet.
-    expect(contrast(lightColor.claudeText, lightColor.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(lightColor.ink, lightColor.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(lightColor.claudeText, lightSelection.thumb)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(lightColor.ink, lightSelection.thumb)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(darkColor.claudeText, darkSelection.thumb)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(darkColor.ink, darkSelection.thumb)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(lightColor.onAccent, lightColor.claude)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(darkColor.onAccent, darkColor.claude)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(darkColor.ink, darkColor.surface)).toBeGreaterThanOrEqual(4.5);
