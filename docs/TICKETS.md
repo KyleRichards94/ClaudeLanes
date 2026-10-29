@@ -218,7 +218,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | done |
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | done |
 | AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
-| AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | in-progress |
+| AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | partial |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1645,8 +1645,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P1–P9 · **Depends on:** AL-294, AL-295, AL-296
 - **Scope:** Playwright drives two Electron instances with separate `AGENT_LANES_USER_DATA_DIR`, ports 47811 and 47812, each listing the other as `localhost:<port>`, the fake `claude` and the e2e ADO fixtures with two stories under one Feature. `peer-lanes.spec.ts`: launch a lane in each, presence on both boards, a `changed` from one fake agent arrives as a turn in the other, the bubble on a `blocked`, the log on both sides, a person's post from the Room tab.
 - **Acceptance criteria:**
-  - [ ] The spec passes on CI (Windows) within the existing e2e budget.
-  - [ ] Screenshot `peer-lanes-1440x960.png` with the pill, bubble, overlap row and panel.
+  - [ ] The spec passes on CI (Windows) within the existing e2e budget. (open: `e2e/peer-lanes.spec.ts` passes 4/4 in the full local run on Windows, about 38 s; CI on the branch wasn't checked from here)
+  - [x] Screenshot `peer-lanes-1440x960.png` with the pill, bubble, overlap row and panel. (plus `peer-lanes-board-1440x960.png`, since the panel covers the board, D844)
 
 ---
 ## 4. Decisions
@@ -2596,6 +2596,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | 2026-10-14 | Settings › Appearance (system, light, dark) and a slow moving ground behind the liquid glass. D824. |
 | 2026-10-29 | E18 Peer lanes and Feature rooms (AL-287–AL-297) added from the 2026-10-29 add-on brief, with milestone M8. D826. |
 | 2026-10-29 | E18 main process: AL-287 frame contracts and signing, AL-288 peer network (`ws`, paced sends, tie rule), AL-289 Connections › Peers tab (`widgets/peer-network`), AL-290 rooms and presence, AL-291 room log and replay, AL-292 delivery and the `list_peers` / `post_to_room` / `read_room` tools, AL-296 hardening and the README section (partial: Kyle's review). D827–D839. The UI tickets AL-293 to AL-295 and the two-app e2e AL-297 wait for Kyle's artboards. Full `pnpm e2e` on each ticket's commit: AL-288 183 passed, AL-289 187, AL-290 186, AL-291 176 (a Playwright worker crash left 10 unrun; the extra failures passed on rerun), AL-296 with AL-292 186 (3 more are serial follow-ons of a failure). The 8 that fail each time (board-scroll strip, design-presence, router, settings-panel ×2) fail the same way on main at 3ca925b. `pnpm verify` per ticket: typecheck, lint, FSD and build green; unit tests green apart from renderer tests that time out at 5 s under load and pass when rerun alone. |
+| 2026-10-29 | E18 UI on Mitch's go, without artboards (D840): AL-293 board presence (Peers pill, room and overlap rows on agent cards, team-board tag), AL-295 Rooms panel, ticket Room tab and person's composer (built before AL-294, D842), AL-294 Assist bubble in the header and on lanes, AL-297 two-app e2e (partial: CI not checked). D840–D844. Full `pnpm e2e` on the final commit: 191 passed, `peer-lanes.spec.ts` 4/4; the 7 failures are the ones main already has. |
 ---
 
 ## 7. Parallel build rules
