@@ -49,12 +49,12 @@ describe('createPeerConfigSync (AL-298)', () => {
     await sync.sync();
     await sync.sync();
     expect(configure).toHaveBeenCalledTimes(1);
-    expect(configure).toHaveBeenLastCalledWith({ port: 47811, addresses: [], teams: [osc] });
+    expect(configure).toHaveBeenLastCalledWith({ port: 47811, beaconPort: 47810, addresses: [], loopback: false, teams: [osc] });
 
     rows = [peersRow(47900, ['KYLE-PC'])];
     await sync.sync();
     expect(configure).toHaveBeenCalledTimes(2);
-    expect(configure).toHaveBeenLastCalledWith({ port: 47900, addresses: ['KYLE-PC'], teams: [osc] });
+    expect(configure).toHaveBeenLastCalledWith({ port: 47900, beaconPort: 47810, addresses: ['KYLE-PC'], loopback: false, teams: [osc] });
 
     projects = ['OnSite Companion', 'Liink'];
     await sync.sync();

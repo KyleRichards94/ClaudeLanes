@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { PeerNetworkStatus, PeerRoom, PeerRooms, RoomMember } from '@agent-lanes/contracts';
+import type { PeerLinkState, PeerNetworkStatus, PeerRoom, PeerRooms, RoomMember } from '@agent-lanes/contracts';
 import { overlap, overlapOf, overlapText, peerOnWorkItem, peersPillView, roomOfTicket, totalUnread, unreadForTickets } from './peer';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 const ROOM = 'https://devops:8090/tfs/defaultcollection#48000';
 
@@ -60,18 +61,21 @@ describe('peer entity (AL-293)', () => {
     expect(peerOnWorkItem(rooms, 48162)).toBeUndefined();
   });
 
-  it('shows the Peers pill by its words: hidden when off, red when not listening, amber when a peer is down', () => {
-    const base: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 };
-    const link = (state: 'online' | 'unreachable' | 'rejected', user: string | null, address: string) => ({ address, state, user, host: null, instance: null, lastSeenAt: null, rejectedFrames: 0, message: null });
+  it('shows the Peers pill by its words: hidden when off, red when not listening, amber when a listed peer is down, grey with nobody found', () => {
+    const base: PeerNetworkStatus = peerNetworkFixture({ listener: { state: 'listening', port: 47811, message: null } });
+    const link = (state: PeerLinkState, user: string | null, address: string, source: 'found' | 'listed' = 'listed') => ({ address, source, state, user, host: null, instance: null, lastSeenAt: null, rejectedFrames: 0, message: null });
     expect(peersPillView(undefined)).toBeNull();
     expect(peersPillView({ ...base, listener: { state: 'off', port: null, message: null } })).toBeNull();
     expect(peersPillView({ ...base, listener: { state: 'failed', port: 47811, message: 'Port 47811 is in use.' } })).toMatchObject({ label: 'Peers · not listening', tone: 'danger', hint: 'Port 47811 is in use.' });
-    expect(peersPillView(base)).toMatchObject({ label: 'Peers · 0 online', tone: 'neutral' });
+    expect(peersPillView(base)).toMatchObject({ label: 'Peers · none found', tone: 'neutral' });
+    expect(peersPillView({ ...base, peers: [link('other-team', 'Sam', '10.0.0.40:47811', 'found')] })).toMatchObject({ label: 'Peers · none found', tone: 'neutral' });
+    expect(peersPillView({ ...base, peers: [link('unreachable', 'Kyle', '10.0.0.12:47811', 'found')] })).toMatchObject({ label: 'Peers · 0 online', tone: 'neutral' });
+    expect(peersPillView({ ...base, beacon: { state: 'failed', port: 47810, message: 'UDP port 47810 is in use.' } })).toMatchObject({ tone: 'attention', hint: 'UDP port 47810 is in use.' });
     expect(peersPillView({ ...base, peers: [link('online', 'Kyle', 'KYLE-PC'), link('online', 'Rocky', 'ROCKY-PC'), link('online', 'Sam', 'SAM-PC')] })).toMatchObject({ label: 'Peers · 3 online', tone: 'ok' });
     expect(peersPillView({ ...base, peers: [link('online', 'Kyle', 'KYLE-PC'), link('unreachable', null, 'ROCKY-PC'), link('rejected', null, 'SAM-PC')] })).toEqual({
       label: 'Peers · 1 online',
       tone: 'attention',
-      hint: "Can't reach: ROCKY-PC · SAM-PC (different team secret)",
+      hint: "Can't reach: ROCKY-PC · SAM-PC (signature rejected)",
     });
   });
 });

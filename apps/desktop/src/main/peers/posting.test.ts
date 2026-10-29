@@ -11,6 +11,7 @@ import { POST_EVERY_MS, createPeerPosting, describePeers } from './posting';
 import { createRoomLog } from './room-log';
 import { signFrame } from './signer';
 import { TEST_ROOM, TEST_TEAM, testLane } from './testing';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 const ME = { user: 'Mitch Healy', host: 'MITCH-PC', instance: randomUUID() };
 const ROOM: TicketRoom = { id: TEST_ROOM, parentId: 48000, parentType: 'Feature', parentTitle: 'Job DTO' };
@@ -25,7 +26,7 @@ function fakeNetwork(state: PeerNetworkStatus['listener']['state'] = 'listening'
   const sent: PeerFrame[] = [];
   return {
     sent,
-    status: (): PeerNetworkStatus => ({ listener: { state, port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 }),
+    status: (): PeerNetworkStatus => peerNetworkFixture({ listener: { state, port: 47811, message: null } }),
     identity: () => ME,
     broadcast(draft: FrameDraft) {
       const frame = signFrame(

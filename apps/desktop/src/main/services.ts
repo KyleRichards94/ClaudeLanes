@@ -369,12 +369,7 @@ export function createServices(options: ServiceOptions): Services {
   const peerIdentity = createPeerIdentity({ dir: peersDir(options.appDataDir), connections, warn: (message) => log.child('peers').warn(message) });
   late.peerIdentity = peerIdentity;
   void peerIdentity.refresh();
-  const peerNetwork = createPeerNetwork({
-    identity: () => peerIdentity.current(),
-    emit: options.emit,
-    log: log.child('peers'),
-    ...(options.peers.loopback ? { bindHost: '127.0.0.1' } : {}),
-  });
+  const peerNetwork = createPeerNetwork({ identity: () => peerIdentity.current(), emit: options.emit, log: log.child('peers') });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
   const designView = createDesignViewService({

@@ -151,6 +151,26 @@ export const PeerFrameSchema = PeerFrameBaseSchema.extend({
 }).superRefine(checkFrame);
 export type PeerFrame = z.infer<typeof PeerFrameSchema>;
 
+// ── Beacon (PL§11) ───────────────────────────────────────────────────────────────────────────────
+//
+// One UDP datagram, broadcast every 5 s on the beacon port. Unsigned, so it says only who an app is,
+// where it listens and which teams it is in: never an organisation, project, room, work item or text.
+
+export const PEER_BEACON_TEAMS_MAX = 32;
+
+export const PeerBeaconSchema = z.object({
+  v: z.literal(PEER_PROTOCOL_VERSION),
+  kind: z.literal('beacon'),
+  instance: z.uuid(),
+  host: z.string().min(1).max(255),
+  /** Where its listener is; null while that failed, so the other app waits to be dialled. */
+  port: z.int().min(1).max(65_535).nullable(),
+  user: UserNameSchema,
+  teams: z.array(PeerTeamTagSchema).max(PEER_BEACON_TEAMS_MAX),
+  sentAt: z.iso.datetime(),
+});
+export type PeerBeacon = z.infer<typeof PeerBeaconSchema>;
+
 // ── What the renderer sees (PL§4) ────────────────────────────────────────────────────────────────
 
 const EpochMsSchema = z.int().nonnegative();
@@ -161,10 +181,11 @@ export const PEER_LINK_STATES = ['connecting', 'online', 'unreachable', 'rejecte
 export const PeerLinkStateSchema = z.enum(PEER_LINK_STATES);
 export type PeerLinkState = z.infer<typeof PeerLinkStateSchema>;
 
-/** One peer listed under Advanced. */
+/** One peer the beacon found, or an address listed under Advanced. */
 export const PeerLinkSchema = z.object({
-  /** As listed: `KYLE-PC`, `10.0.0.12`, `localhost:47812`. */
+  /** As listed (`KYLE-PC`, `localhost:47812`), or where a found peer's beacon came from (`10.0.0.12:47811`). */
   address: z.string().min(1).max(300),
+  source: z.enum(['found', 'listed']),
   state: PeerLinkStateSchema,
   /** Who answered, from its signed `hello`; null until then. */
   user: UserNameSchema.nullable(),
@@ -178,7 +199,7 @@ export const PeerLinkSchema = z.object({
 });
 export type PeerLink = z.infer<typeof PeerLinkSchema>;
 
-/** `off`: no team, so peer lanes is idle. `failed`: the port could not be opened; dialling out still works. */
+/** `off`: no team, so peer lanes is idle. `failed`: the port could not be opened; dialling out still works. Also the beacon's state. */
 export const PEER_LISTENER_STATES = ['off', 'listening', 'failed'] as const;
 export const PeerListenerSchema = z.object({
   state: z.enum(PEER_LISTENER_STATES),
@@ -188,12 +209,17 @@ export const PeerListenerSchema = z.object({
 export type PeerListener = z.infer<typeof PeerListenerSchema>;
 
 export const PeerNetworkStatusSchema = z.object({
+  /** Who this app is to its peers (PL§4 Identity). */
+  identity: z.object({ user: UserNameSchema, host: z.string().min(1).max(255), instance: z.uuid() }),
   listener: PeerListenerSchema,
+  beacon: PeerListenerSchema,
   peers: z.array(PeerLinkSchema).max(200),
   /** ADO projects this app has a key for (PL§11); none means peer lanes is off. */
   teams: CountSchema,
   /** Connections closed at accept (not a private address, not a listed host) or for breaking a cap (PL§7). */
   refusedConnections: CountSchema,
+  /** Beacons from another team, from outside the private ranges, or not a beacon at all. */
+  ignoredBeacons: CountSchema,
 });
 export type PeerNetworkStatus = z.infer<typeof PeerNetworkStatusSchema>;
 
@@ -292,6 +318,7 @@ export type PeerStatusEvent = z.infer<typeof PeerStatusEventSchema>;
 
 export const peersInvokeContracts = {
   'peers:list': { request: z.undefined(), response: PeerNetworkStatusSchema },
+  'peers:find': { request: z.undefined(), response: PeerNetworkStatusSchema },
   'peers:rooms': { request: z.undefined(), response: PeerRoomsSchema },
   'peers:log': { request: RoomLogRequestSchema, response: RoomLogSchema },
   'peers:post': { request: PostToRoomRequestSchema, response: RoomMessageSchema },

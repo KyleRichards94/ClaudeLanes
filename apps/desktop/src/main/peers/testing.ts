@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createSocket } from 'node:dgram';
 import { createServer } from 'node:net';
 import type { PeerLane } from '@agent-lanes/contracts';
 import { createPeerNetwork, type PeerConfig, type PeerNetwork, type PeerNetworkOptions } from './network';
@@ -31,6 +32,8 @@ export function createTestPeer(user: string, port: number, options: Partial<Peer
     heartbeatMs: 250,
     expiryMs: 1_500,
     backoffMs: { min: 20, max: 200 },
+    beaconMs: 100,
+    foundMs: 600,
     ...options,
   });
   return { network, port, instance, user };
@@ -45,7 +48,21 @@ export const TEST_ROOM = 'https://devops:8090/tfs/defaultcollection#48000';
 export const TEST_TEAM = deriveTeam('https://devops:8090/tfs/DefaultCollection', '6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c');
 export const OTHER_TEAM = deriveTeam('https://devops:8090/tfs/DefaultCollection', '0f7a4c2e-1b3d-4e5f-8a6b-9c0d1e2f3a4b');
 
-/** A config listening on `port` and dialling the given addresses, in TEST_TEAM unless told otherwise. */
+/** A config listening on `port` and dialling the given addresses, with no beacon, in TEST_TEAM unless told otherwise. */
 export function testConfig(port: number, addresses: readonly string[], teams: readonly PeerTeamKey[] = [TEST_TEAM]): PeerConfig {
-  return { port, addresses, teams };
+  return { port, addresses, teams, beaconPort: null };
+}
+
+/** A config that finds peers by the beacon on `beaconPort`, on loopback, with no addresses. */
+export function beaconConfig(port: number, beaconPort: number, teams: readonly PeerTeamKey[] = [TEST_TEAM]): PeerConfig {
+  return { port, addresses: [], teams, beaconPort, loopback: true };
+}
+
+/** A UDP port nothing is bound to right now. */
+export async function freeUdpPort(): Promise<number> {
+  const socket = createSocket('udp4');
+  await new Promise<void>((done) => socket.bind(0, '127.0.0.1', done));
+  const { port } = socket.address();
+  await new Promise<void>((done) => socket.close(() => done()));
+  return port;
 }

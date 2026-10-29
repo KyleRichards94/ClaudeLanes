@@ -6,6 +6,7 @@ import { closeRooms, useRoomsPanel } from '@/shared/model';
 import { fakeAdoRow, installFakeBridge } from '@/shared/testing';
 import { RoomsPanel } from '@/widgets/room-log';
 import { AssistBubble, LaneAssistBubble } from './AssistBubble';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 /** AL-294: the Assist bubble in the header and on a lane, from fake peers' messages. */
 
@@ -59,7 +60,7 @@ function setup(unread: number) {
       state.unread = 0;
       return { ok: true, data: { total: 0, byRoom: {}, byTicket: {} } };
     }
-    if (channel === 'peers:list') return { ok: true, data: { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 } };
+    if (channel === 'peers:list') return { ok: true, data: peerNetworkFixture({ listener: { state: 'listening', port: 47811, message: null } }) };
     return others(channel, payload);
   });
   render(

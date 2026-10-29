@@ -6,6 +6,7 @@ import { Button } from '@agent-lanes/ui';
 import { fakeConnections, installFakeBridge, type FakeConnections } from '@/shared/testing';
 import { addressError, usePeersDraft } from '../model/use-peers-draft';
 import { PeersPanel, listenerText } from './PeersPanel';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 /** AL-298: the Peers tab against the fake main process. */
 
@@ -27,15 +28,13 @@ const savedRow: PeersConnectionSummary = {
   updatedAt: '2026-10-30T00:00:00.000Z',
 };
 
-const network: PeerNetworkStatus = {
+const network: PeerNetworkStatus = peerNetworkFixture({
   listener: { state: 'listening', port: 47811, message: null },
   peers: [
-    { address: 'KYLE-PC', state: 'online', user: 'Kyle Richards', host: 'KYLE-PC', instance: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d', lastSeenAt: 1, rejectedFrames: 0, message: null },
-    { address: 'ROCKY-PC', state: 'other-team', user: null, host: null, instance: null, lastSeenAt: null, rejectedFrames: 3, message: 'It shares no Azure DevOps project with this app.' },
+    { address: 'KYLE-PC', source: 'listed', state: 'online', user: 'Kyle Richards', host: 'KYLE-PC', instance: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d', lastSeenAt: 1, rejectedFrames: 0, message: null },
+    { address: 'ROCKY-PC', source: 'listed', state: 'other-team', user: null, host: null, instance: null, lastSeenAt: null, rejectedFrames: 3, message: 'It shares no Azure DevOps project with this app.' },
   ],
-  teams: 1,
-  refusedConnections: 0,
-};
+});
 
 function Host({ row }: { row?: PeersConnectionSummary }) {
   const draft = usePeersDraft();

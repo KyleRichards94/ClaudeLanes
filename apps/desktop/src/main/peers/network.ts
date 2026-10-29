@@ -6,6 +6,7 @@ import {
   PEER_PROTOCOL_VERSION,
   UnsignedPeerFrameSchema,
   parsePeerAddress,
+  type PeerBeacon,
   type PeerData,
   type PeerFrame,
   type PeerKind,
@@ -20,13 +21,14 @@ import {
 import type { Emit } from '../ipc/emit';
 import type { Logger } from '../logging';
 import { isLoopbackHost, isLoopbackIp, isPrivateIp, plainIp } from './addresses';
+import { beaconOf, openDiscovery, type Discovery } from './discovery';
 import { openFrame, signFrame, type PeerTeamKey } from './signer';
 
 /**
- * The peer network (AL-288, PL§4): a WebSocket listener and one outbound connection to each peer.
- * Frames are signed with the key of a team both apps have (PL§11); anything with an unknown team or
- * a bad signature is dropped and counted. Between two apps only one connection stays open: the one
- * the lower instance id started.
+ * The peer network (AL-288, AL-298, PL§4, PL§11): a WebSocket listener, the UDP beacon that finds
+ * other apps, and one connection to each app that shares a team, dialled by the lower instance id
+ * (and to each address under Advanced). Frames are signed with the key of a team both apps have;
+ * anything with an unknown team or a bad signature is dropped and counted.
  */
 
 export const PEER_FRAME_MAX_BYTES = 64 * 1024;
@@ -37,8 +39,13 @@ export const PEER_SEND_BURST = 4;
 export const PEER_HEARTBEAT_MS = 30_000;
 export const PEER_EXPIRY_MS = 90_000;
 const SEEN_IDS_MAX = 10_000;
+export const PEER_BEACON_MS = 5_000;
+/** A found peer whose beacon stops is unreachable after this, and leaves the list after `PEER_FORGET_MS`. */
+export const PEER_FOUND_MS = 20_000;
+export const PEER_FORGET_MS = 10 * 60_000;
 const RESOLVE_AGAIN_MS = 10_000;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
+const FIND_WAIT_MS = 3_000;
 
 /** WebSocket close codes this app uses. */
 export const CLOSE_DUPLICATE = 4001;
@@ -54,6 +61,10 @@ export interface PeerConfig {
   addresses: readonly string[];
   /** The ADO projects this app has a key for; every frame carries one of their tags. */
   teams: readonly PeerTeamKey[];
+  /** UDP port of the beacon; null for no beacon, only the addresses. */
+  beaconPort: number | null;
+  /** e2e: the listener and the beacon on loopback, so nothing leaves this computer. */
+  loopback?: boolean;
 }
 
 export interface PeerIdentity {
@@ -85,6 +96,8 @@ export interface PeerNetwork {
   configure(config: PeerConfig | null): Promise<void>;
   /** New team keys without a restart; a peer that shares none of them any more is closed. */
   setTeams(teams: readonly PeerTeamKey[]): void;
+  /** Find peers: a beacon now, and every peer not connected dialled again; resolves within a few seconds. */
+  findPeers(): Promise<void>;
   /** Signs a frame and sends it to every connected peer; null when the network is off or the frame is not valid. */
   broadcast(draft: FrameDraft): PeerFrame | null;
   /** Signs a frame and sends it to one peer; false when that peer is not connected. */
@@ -111,15 +124,25 @@ export interface PeerNetworkOptions {
   expiryMs?: number;
   backoffMs?: { min: number; max: number };
   resolve?: (host: string) => Promise<string[]>;
-  /** Where to listen instead of the address the peer list implies (tests that must not open a LAN port). */
+  /** Where to listen instead of the address the config implies (tests that must not open a LAN port). */
   bindHost?: string;
+  beaconMs?: number;
+  foundMs?: number;
+  forgetMs?: number;
+  /** Where beacons go instead of the broadcast addresses. */
+  beaconTargets?: readonly string[];
 }
 
 interface Link {
+  readonly source: 'found' | 'listed';
   readonly address: string;
   readonly host: string;
-  readonly port: number;
+  /** Null for a found peer whose listener is down: it dials this app. */
+  readonly port: number | null;
   ips: Set<string>;
+  /** From its beacon; null for a listed address. */
+  teams: Set<PeerTeamTag> | null;
+  beaconAt: number | null;
   state: PeerLinkState;
   message: string | null;
   instance: string | null;
@@ -165,9 +188,10 @@ async function resolveHost(host: string): Promise<string[]> {
 }
 
 /**
- * Who may connect (PL§7), from the address alone: loopback only while a loopback peer is listed;
- * otherwise a private address that a listed peer resolves to. `unknown`: private but not one of the
- * listed peers' addresses as last resolved, so they are resolved again before it is refused.
+ * Who may connect (PL§7), from the address alone, given the peers found (in this app's team, beacon
+ * heard lately) and listed: loopback only while one of them is on loopback; otherwise a private
+ * address one of them has. `unknown`: private but not an address a listed peer last resolved to, so
+ * those are resolved again before it is refused.
  */
 export function acceptsAddress(remote: string, links: ReadonlyArray<{ host: string; ips: ReadonlySet<string> }>): 'accept' | 'refuse' | 'unknown' {
   const ip = plainIp(remote);
@@ -191,6 +215,9 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   const expiryMs = options.expiryMs ?? PEER_EXPIRY_MS;
   const backoff = options.backoffMs ?? { min: 1_000, max: 30_000 };
   const resolve = options.resolve ?? resolveHost;
+  const beaconMs = options.beaconMs ?? PEER_BEACON_MS;
+  const foundMs = options.foundMs ?? PEER_FOUND_MS;
+  const forgetMs = options.forgetMs ?? PEER_FORGET_MS;
   const frameListeners = new Set<(frame: PeerFrame) => void>();
   const peerListeners = new Set<(event: PeerEvent) => void>();
   const seen = new Set<string>();
@@ -201,7 +228,9 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   let teams = new Map<PeerTeamTag, PeerTeamKey>();
   let server: WebSocketServer | null = null;
   let listener: PeerListener = { state: 'off', port: null, message: null };
+  let discovery: Discovery | null = null;
   let refused = 0;
+  let ignoredBeacons = 0;
   let resolvedAt = 0;
   const intervals: NodeJS.Timeout[] = [];
   let generation = 0;
@@ -211,10 +240,18 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   }
 
   function status(): PeerNetworkStatus {
+    const listedAs = new Set(links.flatMap((link) => (link.source === 'listed' && link.instance ? [link.instance] : [])));
+    const { user, host, instance } = options.identity();
     return {
+      identity: { user, host, instance },
       listener: { ...listener },
-      peers: links.map((link) => ({
+      beacon: discovery ? { ...discovery.state } : { state: 'off', port: null, message: null },
+      // A found peer that is also listed shows once, as listed.
+      peers: links
+        .filter((link) => link.source === 'listed' || !link.instance || !listedAs.has(link.instance))
+        .map((link) => ({
         address: link.address,
+        source: link.source,
         state: link.state,
         user: link.user,
         host: link.hostName,
@@ -225,7 +262,80 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       })),
       teams: teams.size,
       refusedConnections: refused,
+      ignoredBeacons,
     };
+  }
+
+  function online(link: Link): boolean {
+    return link.instance !== null && (peers.get(link.instance)?.conns.size ?? 0) > 0;
+  }
+
+  function shares(link: Link): boolean {
+    return link.teams !== null && [...link.teams].some((tag) => teams.has(tag));
+  }
+
+  function heardLately(link: Link): boolean {
+    return link.beaconAt !== null && now() - link.beaconAt <= foundMs;
+  }
+
+  /** The lower instance id dials a found peer and the other waits, unless its own listener is down. */
+  function dialsFound(link: Link): boolean {
+    if (link.port === null || !shares(link) || !heardLately(link)) return false;
+    return options.identity().instance < (link.instance ?? '') || listener.state !== 'listening';
+  }
+
+  function announce(): void {
+    discovery?.send(beaconOf(options.identity(), listener.state === 'listening' ? listener.port : null, [...teams.keys()], now()));
+  }
+
+  /** A found peer's state from its beacon and this app's teams, and a dial when it's this app's turn. */
+  function settleFound(link: Link): void {
+    if (online(link) || link.state === 'rejected') return;
+    if (!shares(link)) {
+      link.state = 'other-team';
+      link.message = 'It shares no Azure DevOps project with this app.';
+      return;
+    }
+    if (!heardLately(link)) return;
+    link.state = 'connecting';
+    link.message = dialsFound(link) ? null : 'Waiting for it to connect.';
+    if (dialsFound(link) && !link.out && !link.timer) void dial(link, generation);
+  }
+
+  function forget(link: Link): void {
+    if (link.timer) clearTimeout(link.timer);
+    links = links.filter((item) => item !== link);
+  }
+
+  function onBeacon(beacon: PeerBeacon, from: string): void {
+    let link = links.find((item) => item.source === 'found' && item.instance === beacon.instance);
+    // Back on another address or port: start again there.
+    if (link && (link.host !== from || link.port !== beacon.port)) {
+      forget(link);
+      link = undefined;
+    }
+    const before = link ? `${link.state}|${link.message}|${link.user}|${link.hostName}` : null;
+    if (!link) {
+      link = newLink('found', beacon.port === null ? from : `${from}:${beacon.port}`, from, beacon.port);
+      link.ips = new Set([from]);
+      link.instance = beacon.instance;
+      links.push(link);
+    }
+    const at = now();
+    link.user = beacon.user;
+    link.hostName = beacon.host;
+    link.teams = new Set(beacon.teams);
+    link.beaconAt = at;
+    link.lastSeenAt = at;
+    const peer = peers.get(beacon.instance);
+    if (peer) for (const tag of beacon.teams) peer.teams.add(tag);
+    if (!shares(link)) ignoredBeacons += 1;
+    settleFound(link);
+    if (before !== `${link.state}|${link.message}|${link.user}|${link.hostName}`) emitStatus();
+  }
+
+  function newLink(source: Link['source'], address: string, host: string, port: number | null): Link {
+    return { source, address, host, port, ips: new Set<string>(), teams: null, beaconAt: null, state: 'connecting', message: null, instance: null, user: null, hostName: null, lastSeenAt: null, rejectedFrames: 0, out: null, timer: null, attempt: 0, self: false };
   }
 
   function remember(id: string): boolean {
@@ -308,11 +418,13 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     }
   }
 
-  /** Once under each of this app's tags, since the other app's aren't known yet; it reads the ones it has a key for. */
+  /** Under the tags a found peer's beacon shares; otherwise under each of this app's, and it reads the ones it has a key for. */
   function hello(conn: Conn): void {
     const frame = prepare({ kind: 'hello', room: null, lane: null, data: listener.port ? { port: listener.port } : {} });
     if (!frame) return;
-    for (const tag of teams.keys()) {
+    const theirs = conn.link?.teams;
+    const shared = theirs ? [...teams.keys()].filter((tag) => theirs.has(tag)) : [];
+    for (const tag of shared.length > 0 ? shared : teams.keys()) {
       const signed = seal(frame, tag);
       if (signed) write(conn, signed);
     }
@@ -328,6 +440,8 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
 
   function linkFor(conn: Conn, frame: PeerFrame): Link | null {
     if (conn.link) return conn.link;
+    const found = links.find((link) => link.source === 'found' && link.instance === frame.from.instance);
+    if (found) return found;
     const byIp = links.filter((link) => link.ips.has(conn.remoteIp) || (isLoopbackIp(conn.remoteIp) && isLoopbackHost(link.host)));
     const port = frame.data.port;
     return byIp.find((link) => link.port === port) ?? (byIp.length === 1 ? (byIp[0] ?? null) : null);
@@ -368,6 +482,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     }
     peer.conns.add(conn);
     peer.teams.add(frame.team);
+    for (const tag of conn.link?.teams ?? []) peer.teams.add(tag);
     peers.set(conn.instance, peer);
     if (conn.link) refreshLink(conn.link);
     if (fresh) for (const listen of peerListeners) listen({ instance: conn.instance, change: 'online' });
@@ -480,16 +595,19 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   }
 
   async function dial(link: Link, gen: number): Promise<void> {
-    if (link.out || (link.instance && (peers.get(link.instance)?.conns.size ?? 0) > 0)) return;
-    try {
-      link.ips = new Set(await resolve(link.host));
-    } catch {
-      if (gen !== generation) return;
-      link.state = 'unreachable';
-      link.message = `${link.host} could not be found.`;
-      emitStatus();
-      schedule(link);
-      return;
+    if (link.out || online(link) || link.port === null) return;
+    if (link.source === 'found' && !dialsFound(link)) return;
+    if (link.source === 'listed') {
+      try {
+        link.ips = new Set(await resolve(link.host));
+      } catch {
+        if (gen !== generation) return;
+        link.state = 'unreachable';
+        link.message = `${link.host} could not be found.`;
+        emitStatus();
+        schedule(link);
+        return;
+      }
     }
     if (gen !== generation) return;
     const host = link.host.includes(':') ? `[${link.host}]` : link.host;
@@ -501,7 +619,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       hello(conn);
     });
     ws.on('unexpected-response', (_request, response) => {
-      link.message = response.statusCode === 403 ? 'It refused the connection: this computer is not in its peer list.' : `It answered HTTP ${response.statusCode}.`;
+      link.message = response.statusCode === 403 ? "It refused the connection: it hasn't heard this computer's beacon, and doesn't list it under Advanced." : `It answered HTTP ${response.statusCode}.`;
       ws.terminate();
     });
     ws.on('error', (error) => {
@@ -511,21 +629,26 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
 
   async function allowed(remote: string): Promise<boolean> {
     const ip = plainIp(remote);
-    const verdict = acceptsAddress(ip, links);
+    const verdict = acceptsAddress(
+      ip,
+      links.filter((link) => link.source === 'listed' || (shares(link) && heardLately(link))),
+    );
     if (verdict !== 'unknown') return verdict === 'accept';
     if (now() - resolvedAt < RESOLVE_AGAIN_MS) return false;
     resolvedAt = now();
+    const listed = links.filter((link) => link.source === 'listed');
     await Promise.all(
-      links.map(async (link) => {
+      listed.map(async (link) => {
         link.ips = new Set(await resolve(link.host).catch(() => [...link.ips]));
       }),
     );
-    return links.some((link) => link.ips.has(ip));
+    return listed.some((link) => link.ips.has(ip));
   }
 
   async function listen(next: PeerConfig, gen: number): Promise<void> {
-    // Only loopback peers listed: listen on loopback alone, so nothing on the LAN can reach the port.
-    const host = options.bindHost ?? (links.length > 0 && links.every((link) => isLoopbackHost(link.host)) ? '127.0.0.1' : '0.0.0.0');
+    // Loopback for e2e, or with no beacon and only loopback addresses listed: nothing on the LAN can reach the port.
+    const onlyLoopback = next.beaconPort === null && links.length > 0 && links.every((link) => isLoopbackHost(link.host));
+    const host = options.bindHost ?? (next.loopback || onlyLoopback ? '127.0.0.1' : '0.0.0.0');
     await new Promise<void>((done) => {
       const wss = new WebSocketServer({
         host,
@@ -579,6 +702,19 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
         conn.ws.terminate();
       }
     }
+    let changed = false;
+    for (const link of links) {
+      if (link.source !== 'found' || link.beaconAt === null || online(link)) continue;
+      if (at - link.beaconAt > forgetMs) {
+        forget(link);
+        changed = true;
+      } else if (at - link.beaconAt > foundMs && link.state !== 'unreachable' && link.state !== 'other-team') {
+        link.state = 'unreachable';
+        link.message = `No beacon for ${Math.round(foundMs / 1_000)} s.`;
+        changed = true;
+      }
+    }
+    if (changed) emitStatus();
   }
 
   function heartbeat(): void {
@@ -620,6 +756,9 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     const wss = server;
     server = null;
     if (wss) await new Promise<void>((done) => wss.close(() => done()));
+    const beacon = discovery;
+    discovery = null;
+    await beacon?.close();
     links = [];
     listener = { state: 'off', port: null, message: null };
   }
@@ -636,8 +775,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       const gen = generation;
       links = next.addresses.flatMap((address) => {
         const parsed = parsePeerAddress(address);
-        if (!parsed) return [];
-        return [{ address: address.trim(), ...parsed, ips: new Set<string>(), state: 'connecting', message: null, instance: null, user: null, hostName: null, lastSeenAt: null, rejectedFrames: 0, out: null, timer: null, attempt: 0, self: false } satisfies Link];
+        return parsed ? [newLink('listed', address.trim(), parsed.host, parsed.port)] : [];
       });
       await Promise.all(
         links.map(async (link) => {
@@ -647,8 +785,30 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       resolvedAt = now();
       await listen(next, gen);
       if (gen !== generation) return;
-      intervals.push(setInterval(tick, Math.max(10, Math.min(heartbeatMs, expiryMs / 6))), setInterval(heartbeat, heartbeatMs));
+      if (next.beaconPort !== null) {
+        const opened = await openDiscovery({
+          port: next.beaconPort,
+          loopback: next.loopback ?? false,
+          self: options.identity().instance,
+          onBeacon: (beacon, from) => {
+            if (gen === generation) onBeacon(beacon, from);
+          },
+          onIgnored: () => {
+            ignoredBeacons += 1;
+          },
+          ...(options.beaconTargets ? { targets: options.beaconTargets } : {}),
+          ...(options.log ? { log: options.log } : {}),
+        });
+        if (gen !== generation) {
+          await opened.close();
+          return;
+        }
+        discovery = opened;
+        intervals.push(setInterval(announce, beaconMs));
+      }
+      intervals.push(setInterval(tick, Math.max(10, Math.min(heartbeatMs, expiryMs / 6, foundMs / 4))), setInterval(heartbeat, heartbeatMs));
       for (const interval of intervals) interval.unref();
+      announce();
       for (const link of links) void dial(link, gen);
       emitStatus();
     },
@@ -659,7 +819,23 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
         if ([...peer.teams].some((tag) => teams.has(tag))) continue;
         for (const conn of peer.conns) conn.ws.close(CLOSE_TEAM, 'no shared team');
       }
+      for (const link of links) if (link.source === 'found') settleFound(link);
+      announce();
       emitStatus();
+    },
+    async findPeers() {
+      if (!config) return;
+      announce();
+      for (const link of links) {
+        if (online(link) || link.self) continue;
+        if (link.timer) clearTimeout(link.timer);
+        link.timer = null;
+        link.attempt = 0;
+        void dial(link, generation);
+      }
+      const until = now() + FIND_WAIT_MS;
+      const waiting = () => links.some((link) => link.state === 'connecting' && (link.source === 'listed' || dialsFound(link)));
+      while (now() < until && waiting()) await new Promise((done) => setTimeout(done, 100));
     },
     broadcast(draft) {
       const frame = prepare(draft);

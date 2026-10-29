@@ -9,6 +9,7 @@ import { fakeAdoRow, fakeTicketRecord, installFakeBridge } from '@/shared/testin
 import { TeamBoardView } from '@/widgets/team-board';
 import { BoardTicketCard } from './BoardTicketCard';
 import { PeersPill } from './PeersPill';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 /** AL-293: peer lanes presence on the board, the team board and the header, from fake peers' presence. */
 
@@ -100,15 +101,13 @@ describe('board presence (AL-293)', () => {
   });
 
   it('turns the Peers pill amber with the name when a peer is unreachable, and its members show when they were last seen', async () => {
-    const network: PeerNetworkStatus = {
+    const network: PeerNetworkStatus = peerNetworkFixture({
       listener: { state: 'listening', port: 47811, message: null },
       peers: [
-        { address: 'KYLE-PC', state: 'online', user: 'Kyle Richards', host: 'KYLE-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: null },
-        { address: 'ROCKY-PC', state: 'unreachable', user: 'Rocky Smith', host: 'ROCKY-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: 'Nothing heard for 90 s.' },
+        { address: 'KYLE-PC', source: 'listed', state: 'online', user: 'Kyle Richards', host: 'KYLE-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: null },
+        { address: 'ROCKY-PC', source: 'listed', state: 'unreachable', user: 'Rocky Smith', host: 'ROCKY-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: 'Nothing heard for 90 s.' },
       ],
-      teams: 1,
-      refusedConnections: 0,
-    };
+    });
     wrap(<PeersPill />, { 'peers:list': { ok: true, data: network } });
     expect((await screen.findByTestId('peers-pill')).textContent).toBe('Peers · 1 online');
 
@@ -118,7 +117,7 @@ describe('board presence (AL-293)', () => {
   });
 
   it('hides the Peers pill while there is no Peers connection', async () => {
-    wrap(<PeersPill />, { 'peers:list': { ok: true, data: { listener: { state: 'off', port: null, message: null }, peers: [], teams: 1, refusedConnections: 0 } } });
+    wrap(<PeersPill />, { 'peers:list': { ok: true, data: peerNetworkFixture({ listener: { state: 'off', port: null, message: null } }) } });
     await waitFor(() => expect(screen.queryByTestId('peers-pill')).toBeNull());
   });
 });

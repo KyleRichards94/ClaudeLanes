@@ -42,7 +42,8 @@ export function createPeerConfigSync(options: {
 
   async function apply(): Promise<void> {
     const row = (await options.connections.list()).find((item) => item.kind === 'peers');
-    const settings = row?.kind === 'peers' ? { port: row.port, addresses: row.addresses } : { port: options.defaults.port, addresses: [] };
+    const settings =
+      row?.kind === 'peers' ? { port: row.port, beaconPort: row.beaconPort, addresses: row.addresses } : { port: options.defaults.port, beaconPort: options.defaults.beaconPort, addresses: [] };
     const teams = await options.teams.current();
     const settingsKey = teams.length === 0 ? 'off' : JSON.stringify(settings);
     const teamsKey = teams
@@ -52,7 +53,7 @@ export function createPeerConfigSync(options: {
     if (settingsKey !== appliedSettings) {
       appliedSettings = settingsKey;
       appliedTeams = teamsKey;
-      await options.network.configure(teams.length === 0 ? null : { ...settings, teams });
+      await options.network.configure(teams.length === 0 ? null : { ...settings, loopback: options.defaults.loopback, teams });
       options.onApplied?.();
     } else if (teamsKey !== appliedTeams) {
       appliedTeams = teamsKey;

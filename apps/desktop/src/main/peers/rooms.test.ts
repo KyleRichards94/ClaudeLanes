@@ -8,6 +8,7 @@ import type { FrameDraft, PeerEvent, PeerNetwork } from './network';
 import { createRooms, type PortfolioParentRef, type Rooms } from './rooms';
 import { signFrame } from './signer';
 import { TEST_TEAM } from './testing';
+import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
 
 const BASE = join('C:', 'src');
 const ME = { user: 'Mitch Healy', host: 'MITCH-PC', instance: randomUUID() };
@@ -24,7 +25,7 @@ interface FakeNetwork extends Pick<PeerNetwork, 'broadcast' | 'sendTo' | 'onFram
 function fakeNetwork(): FakeNetwork {
   const frames = new Set<(frame: PeerFrame) => void>();
   const peers = new Set<(event: PeerEvent) => void>();
-  const status: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 };
+  const status: PeerNetworkStatus = peerNetworkFixture({ listener: { state: 'listening', port: 47811, message: null } });
   const sent: FakeNetwork['sent'] = [];
   return {
     sent,

@@ -85,17 +85,24 @@ export function clock(at: number): string {
   return new Date(at).toTimeString().slice(0, 5);
 }
 
-/** The board header's Peers pill: hidden with no Peers connection; red when the listener failed, amber when a listed peer can't be reached. */
+/**
+ * The board header's Peers pill (PL§2, PL§6): hidden while peer lanes is off (no team); red when the
+ * listener failed; amber when an address under Advanced can't be reached, a peer's signature fails or
+ * the beacon is down; grey with nobody found. A found peer that went away is normal, not amber.
+ */
 export function peersPillView(status: PeerNetworkStatus | undefined): { label: string; tone: Tone; hint: string } | null {
   if (!status || status.listener.state === 'off') return null;
-  const online = status.peers.filter((peer) => peer.state === 'online').length;
-  const label = `Peers · ${online} online`;
+  const online = status.peers.filter((peer) => peer.state === 'online');
+  const label = `Peers · ${online.length} online`;
   if (status.listener.state === 'failed') return { label: 'Peers · not listening', tone: 'danger', hint: status.listener.message ?? 'The listener failed.' };
-  const down = status.peers.filter((peer) => peer.state === 'unreachable' || peer.state === 'rejected');
+  const down = status.peers.filter((peer) => peer.state === 'rejected' || (peer.source === 'listed' && peer.state === 'unreachable'));
   if (down.length > 0) {
-    return { label, tone: 'attention', hint: `Can't reach: ${down.map((peer) => `${peer.user ?? peer.address}${peer.state === 'rejected' ? ' (different team secret)' : ''}`).join(' · ')}` };
+    return { label, tone: 'attention', hint: `Can't reach: ${down.map((peer) => `${peer.user ?? peer.address}${peer.state === 'rejected' ? ' (signature rejected)' : ''}`).join(' · ')}` };
   }
-  return { label, tone: online > 0 ? 'ok' : 'neutral', hint: online > 0 ? `Online: ${status.peers.filter((peer) => peer.state === 'online').map((peer) => peer.user ?? peer.address).join(' · ')}` : 'No peer is online' };
+  if (status.beacon.state === 'failed') return { label, tone: 'attention', hint: status.beacon.message ?? 'The beacon failed, so other apps are not found.' };
+  if (online.length > 0) return { label, tone: 'ok', hint: `Connected: ${online.map((peer) => peer.user ?? peer.address).join(' · ')}` };
+  const team = status.peers.some((peer) => peer.state !== 'other-team');
+  return { label: team ? label : 'Peers · none found', tone: 'neutral', hint: team ? 'No peer is connected right now.' : 'No other Agent Lanes in your Azure DevOps project has been found on this network.' };
 }
 
 export const KIND_LABELS: Record<PeerKind, string> = {
