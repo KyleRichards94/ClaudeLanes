@@ -1,5 +1,5 @@
 /*
- * Agent Lanes design tokens (design §11). Mirrors src/index.ts.
+ * Agent Lanes design tokens (design §11). The :root block is the light theme; each :root[data-theme] block is another theme. Mirrors src/themes.ts.
  * Glass recipe adapted from "Pure CSS Glassmorphism Liquid Glass UI Kit"
  * by Margarita-the-solid on CodePen.
  */
@@ -20,6 +20,11 @@
   --al-sky-glow: #38bdf8;
   --al-on-accent: #ffffff;
   --al-on-ink: #ffffff;
+  --al-ground-from: #f4f7fb;
+  --al-ground-to: #e3eefb;
+  --al-atmosphere-1: rgba(91, 75, 196, 0.42);
+  --al-atmosphere-2: rgba(56, 189, 248, 0.48);
+  --al-atmosphere-3: rgba(16, 185, 129, 0.2);
 
   --al-glass-fill-min: rgba(255, 255, 255, 0.62);
   --al-glass-fill-max: rgba(255, 255, 255, 0.72);
@@ -109,7 +114,7 @@
   --al-overlay-shadow: 0 24px 72px rgba(15, 27, 45, 0.18);
 }
 
-/* Dark palette. Mirrors darkColor / darkTone / darkGlass in the TypeScript tokens. */
+/* Dark. Mirrors themes.dark in themes.ts; themes.test.ts checks every block. */
 :root[data-theme='dark'] {
   --al-bg: #101820;
   --al-surface: #1a2432;
@@ -128,6 +133,11 @@
   --al-progress-gradient: linear-gradient(90deg, #5b65c4, #38bdf8);
   --al-on-accent: #f7f9fc;
   --al-on-ink: #101820;
+  --al-ground-from: #101820;
+  --al-ground-to: #1a1630;
+  --al-atmosphere-1: rgba(124, 108, 240, 0.62);
+  --al-atmosphere-2: rgba(56, 189, 248, 0.55);
+  --al-atmosphere-3: rgba(196, 181, 253, 0.38);
 
   --al-glass-fill-min: rgba(18, 26, 40, 0.74);
   --al-glass-fill-max: rgba(18, 26, 40, 0.84);
@@ -179,4 +189,81 @@
 
   --al-overlay-scrim: rgba(8, 12, 18, 0.55);
   --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
+}
+
+/* Solarpunk (AL-286). Mirrors themes.solarpunk in themes.ts. */
+:root[data-theme='solarpunk'] {
+  --al-bg: #f7f3e8;
+  --al-surface: #fffdf7;
+  --al-ink: #1f2a1e;
+  --al-muted: #5c6b57;
+  --al-line: #e3dcc8;
+  --al-claude: #0f766e;
+  --al-claude-tint: #d9f2ec;
+  --al-claude-text: #0b5a54;
+  --al-ado: #1a669a;
+  --al-ado-tint: #dceef9;
+  --al-ok: #2e7d32;
+  --al-attention: #b45309;
+  --al-danger: #b3261e;
+  --al-sky-glow: #f5b82e;
+  --al-progress-gradient: linear-gradient(90deg, #0f766e, #f5b82e);
+  --al-on-accent: #ffffff;
+  --al-on-ink: #ffffff;
+  --al-ground-from: #f7f3e8;
+  --al-ground-to: #eef4e2;
+  --al-atmosphere-1: rgba(245, 184, 46, 0.42);
+  --al-atmosphere-2: rgba(47, 158, 110, 0.4);
+  --al-atmosphere-3: rgba(56, 189, 248, 0.22);
+
+  --al-glass-fill-min: rgba(255, 252, 240, 0.62);
+  --al-glass-fill-max: rgba(255, 252, 240, 0.74);
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --al-glass-border: rgba(255, 255, 255, 0.7);
+
+  --al-shadow-card: 0 1px 2px rgba(31, 42, 30, 0.05), 0 8px 24px rgba(31, 42, 30, 0.08);
+  --al-shadow-lifted: 0 2px 4px rgba(31, 42, 30, 0.07), 0 16px 40px rgba(31, 42, 30, 0.12);
+
+  --al-tone-claude-border: #5fb8a6;
+  --al-tone-claude-wash: #eef8f4;
+  --al-tone-claude-band: #d9f2ec;
+  --al-tone-claude-text: #0b5a54;
+  --al-tone-claude-dot: #0f766e;
+  --al-tone-ado-wash: #eef6fb;
+  --al-tone-ado-band: #dceef9;
+  --al-tone-ado-text: #1a669a;
+  --al-tone-ado-fill: #f5b82e;
+  --al-tone-ado-dot: #1a669a;
+  --al-tone-attention-border: #f2c94c;
+  --al-tone-attention-band: #fbf0c8;
+  --al-tone-attention-text: #7a4a00;
+  --al-tone-attention-dot: #b45309;
+  --al-tone-danger-border: #f3b5ae;
+  --al-tone-danger-wash: #fdf1ef;
+  --al-tone-danger-band: #f9dcd7;
+  --al-tone-danger-text: #8c1d14;
+  --al-tone-danger-fill: #e0665a;
+  --al-tone-danger-dot: #b3261e;
+  --al-tone-ok-wash: #edf7ec;
+  --al-tone-ok-band: #d6eed3;
+  --al-tone-ok-text: #1f5e22;
+  --al-tone-ok-fill: #4caf50;
+  --al-tone-ok-dot: #2e7d32;
+  --al-tone-neutral-band: #eeeae0;
+  --al-tone-neutral-text: #4e5a4a;
+  --al-tone-neutral-dot: #9aa394;
+
+  --al-selection-track: #ece7d8;
+  --al-selection-thumb: #ffffff;
+  --al-selection-label: #4e5a4a;
+  --al-selection-switch-off: #c9c2ae;
+  --al-selection-thumb-shadow: 0 1px 2px rgba(31, 42, 30, 0.1), 0 1px 3px rgba(31, 42, 30, 0.08);
+  --al-selection-pill-shadow: 0 2px 8px rgba(15, 118, 110, 0.28);
+
+  --al-control-ink: #3b4a38;
+  --al-control-primary-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+  --al-control-primary-shadow-lifted: 0 12px 28px rgba(15, 118, 110, 0.34);
+
+  --al-overlay-scrim: rgba(247, 243, 232, 0.55);
+  --al-overlay-shadow: 0 24px 72px rgba(31, 42, 30, 0.18);
 }
