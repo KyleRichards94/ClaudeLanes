@@ -208,7 +208,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-282 | Code City overlays and panels | E17 | L | AL-281, AL-276, AL-277, AL-278 | partial |
 | AL-283 | Code City interaction, accessibility and states | E17 | M | AL-282, AL-275 | partial |
 | AL-284 | E2E: ticket layouts | E17 | M | AL-279, AL-283 | done |
-| AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | todo |
+| AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | done |
 | AL-288 | Peer network service | E18 | L | AL-287, AL-042 | todo |
 | AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | todo |
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | todo |
@@ -1564,9 +1564,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** PL§3, PL§7 · **Depends on:** AL-011, AL-012
 - **Scope:** `packages/contracts/src/domains/peers.names.ts` and `peers.schemas.ts`: the frame schema (version, id, room, kind, from, lane, text ≤ 2 000, data, sentAt, replay, sig), presence and room member types, the invoke and event channels of PL§4. `src/main/peers/signer.ts`: canonical JSON with sorted keys, HMAC-SHA256 sign and verify, constant-time compare. Pure, no sockets.
 - **Acceptance criteria:**
-  - [ ] Every kind in the PL§3 table round-trips through the schema; an unknown kind, an over-long text or a missing signature is rejected.
-  - [ ] A frame signed with one secret fails verification with another; a changed byte anywhere fails.
-  - [ ] Unit tests.
+  - [x] Every kind in the PL§3 table round-trips through the schema; an unknown kind, an over-long text or a missing signature is rejected.
+  - [x] A frame signed with one secret fails verification with another; a changed byte anywhere fails.
+  - [x] Unit tests. (`peers.schemas.test.ts`, `src/main/peers/signer.test.ts`)
 
 #### AL-288 · Peer network service
 - **Design:** P1, PL§4, PL§6, PL§7 · **Depends on:** AL-287, AL-042

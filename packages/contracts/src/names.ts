@@ -14,6 +14,7 @@ import { CHANGES_EVENT_CHANNELS, CHANGES_INVOKE_CHANNELS } from './domains/chang
 import { CONNECTIONS_EVENT_CHANNELS, CONNECTIONS_INVOKE_CHANNELS } from './domains/connections.names';
 import { DESIGN_EVENT_CHANNELS, DESIGN_INVOKE_CHANNELS } from './domains/design.names';
 import { GIT_EVENT_CHANNELS, GIT_INVOKE_CHANNELS } from './domains/git.names';
+import { PEERS_EVENT_CHANNELS, PEERS_INVOKE_CHANNELS } from './domains/peers.names';
 import { PR_EVENT_CHANNELS, PR_INVOKE_CHANNELS } from './domains/pr.names';
 import { REPOS_EVENT_CHANNELS, REPOS_INVOKE_CHANNELS } from './domains/repos.names';
 import { SETTINGS_EVENT_CHANNELS, SETTINGS_INVOKE_CHANNELS } from './domains/settings.names';
@@ -28,6 +29,7 @@ export * from './domains/changes.names';
 export * from './domains/connections.names';
 export * from './domains/design.names';
 export * from './domains/git.names';
+export * from './domains/peers.names';
 export * from './domains/pr.names';
 export * from './domains/repos.names';
 export * from './domains/settings.names';
@@ -48,6 +50,7 @@ export const INVOKE_CHANNEL_NAMES = [
   ...SKILLS_INVOKE_CHANNELS,
   ...PR_INVOKE_CHANNELS,
   ...CHANGES_INVOKE_CHANNELS,
+  ...PEERS_INVOKE_CHANNELS,
 ] as const;
 export type InvokeChannel = (typeof INVOKE_CHANNEL_NAMES)[number];
 
@@ -65,6 +68,7 @@ export const EVENT_CHANNEL_NAMES = [
   ...SKILLS_EVENT_CHANNELS,
   ...PR_EVENT_CHANNELS,
   ...CHANGES_EVENT_CHANNELS,
+  ...PEERS_EVENT_CHANNELS,
 ] as const;
 export type EventChannel = (typeof EVENT_CHANNEL_NAMES)[number];
 
