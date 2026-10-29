@@ -49,7 +49,7 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
       <SprintMenu />
       <View style={styles.spacer} />
       <View style={styles.pills} role="group" aria-label="Live counts">
-        <Pill tone="claude" size="md" label={`${running} running`} testID="board-count-running" />
+        <Pill tone="claude" size="md" label={`${running} running`} style={styles.pillCentred} testID="board-count-running" />
         <Pressable
           role="button"
           aria-pressed={needsYouOnly}
@@ -61,7 +61,7 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         >
           <Pill tone="attention" size="md" label={`${needsYou} need you`} style={needsYouOnly ? styles.pillOn : undefined} />
         </Pressable>
-        <Pill tone="neutral" size="md" label={`${queued} queued`} testID="board-count-queued" />
+        <Pill tone="neutral" size="md" label={`${queued} queued`} style={styles.pillCentred} testID="board-count-queued" />
         {/* MCP servers of the running sessions, amber with the failing names on hover (AL-108). */}
         <McpStatusPill />
         {/* The plan's 5-hour and 7-day windows, once a session reported them (AL-258). */}
@@ -223,6 +223,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
+  },
+  // Pill hugs its label with alignSelf flex-start, which would pin it to the top of the 44 px row.
+  pillCentred: {
+    alignSelf: 'center',
   },
   // The pill is 28 px; the pressable target around it is 44 px tall (design §11).
   pillButton: {
