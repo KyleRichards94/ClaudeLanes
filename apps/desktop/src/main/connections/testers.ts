@@ -1,4 +1,4 @@
-import type { AdoScope, AdoScopeCheck, ConnectionDraft, ConnectionKind } from '@agent-lanes/contracts';
+import type { AdoScope, AdoScopeCheck, ConnectionDraft, ConnectionKind, PeerProbe } from '@agent-lanes/contracts';
 
 /** A validated draft of one kind, with an ADO org URL already normalised. */
 export type DraftOf<K extends ConnectionKind> = Extract<ConnectionDraft, { kind: K }>;
@@ -16,6 +16,8 @@ export interface ConnectionTestOutcome {
   projects?: string[] | null;
   /** MCP only (AL-045): names of the tools the server listed. */
   tools?: string[];
+  /** Peers only (AL-289): what each listed peer did when dialled. */
+  peers?: PeerProbe[];
 }
 
 /**

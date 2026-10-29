@@ -6,6 +6,7 @@ import {
   MASKED_TOKEN_BULLETS,
   MASKED_TOKEN_VISIBLE_CHARS,
   McpConnectionSummarySchema,
+  PeersConnectionSummarySchema,
 } from '@agent-lanes/contracts';
 
 /**
@@ -33,6 +34,7 @@ export const StoredConnectionSchema = z.discriminatedUnion('kind', [
   ClaudeConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
   // Built-in MCP servers (AL-045) are derived from the ADO connections when listing, never stored.
   McpConnectionSummarySchema.omit({ needsReconnect: true, builtInFor: true }).extend(secretRef),
+  PeersConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
 ]);
 export type StoredConnection = z.infer<typeof StoredConnectionSchema>;
 
@@ -75,7 +77,7 @@ export function parseConnectionsDocument(document: unknown): ParsedDocument {
 
 /** SecretStore ids this service owns; start-up removes those no connection refers to any more. */
 export function isConnectionSecretId(id: string): boolean {
-  return /^(?:ado|claude|mcp):/.test(id);
+  return /^(?:ado|claude|mcp|peers):/.test(id);
 }
 
 /** Tokens shorter than this show bullets only: four characters of a short token give too much away. */

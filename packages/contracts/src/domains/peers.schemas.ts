@@ -60,6 +60,28 @@ export function parsePeerAddress(address: string): PeerAddress | null {
   return port >= 1 && port <= 65_535 ? { host, port } : null;
 }
 
+/** The most peers one app lists. */
+export const PEER_LIST_MAX = 50;
+
+/** One row of the Peers tab's peer list (AL-289). */
+export const PeerAddressTextSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a computer name or IP address')
+  .max(300)
+  .refine((address) => parsePeerAddress(address) !== null, `Use a computer name or IP address, with :port when it isn't ${DEFAULT_PEER_PORT}`);
+
+/** What Test found at one listed peer (AL-289): it answered with the same team secret, could not be reached, or signs with another secret. */
+export const PEER_PROBE_OUTCOMES = ['answered', 'unreachable', 'rejected'] as const;
+export const PeerProbeSchema = z.object({
+  address: z.string().min(1).max(300),
+  outcome: z.enum(PEER_PROBE_OUTCOMES),
+  user: z.string().min(1).max(200).nullable(),
+  host: z.string().min(1).max(255).nullable(),
+  message: z.string().nullable(),
+});
+export type PeerProbe = z.infer<typeof PeerProbeSchema>;
+
 /** Worktree-relative, forward slashes. */
 export const PeerPathSchema = z.string().min(1).max(1_024);
 const UserNameSchema = z.string().min(1).max(200);
@@ -270,7 +292,9 @@ export type PeerMessageEvent = z.infer<typeof PeerMessageEventSchema>;
 export const PeerStatusEventSchema = EventEnvelopeSchema.extend(PeerNetworkStatusSchema.shape);
 export type PeerStatusEvent = z.infer<typeof PeerStatusEventSchema>;
 
-export const peersInvokeContracts = {} as const satisfies Record<(typeof PEERS_INVOKE_CHANNELS)[number], InvokeContract>;
+export const peersInvokeContracts = {
+  'peers:list': { request: z.undefined(), response: PeerNetworkStatusSchema },
+} as const satisfies Record<(typeof PEERS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const peersEventContracts = {
   'peers:status': PeerStatusEventSchema,

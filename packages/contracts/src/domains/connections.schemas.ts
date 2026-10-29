@@ -3,9 +3,11 @@ import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema } from '../events';
 import { ClaudeLoginDetectionSchema } from './connections.claude';
 import type { CONNECTIONS_EVENT_CHANNELS, CONNECTIONS_INVOKE_CHANNELS } from './connections.names';
+import { DEFAULT_PEER_PORT, PEER_LIST_MAX, PeerAddressTextSchema, PeerProbeSchema } from './peers.schemas';
 
 /**
- * Connections (AL-042, design §8, R4): Azure DevOps organisations, Claude, and MCP servers.
+ * Connections (AL-042, design §8, R4): Azure DevOps organisations, Claude, MCP servers, and the
+ * peer list with its team secret (AL-289, PL§2).
  *
  * Only two requests carry a token, `connections:save` and `connections:replace`: the token the user
  * typed goes straight into the main process's SecretStore. Nothing that comes back carries one.
@@ -14,7 +16,7 @@ import type { CONNECTIONS_EVENT_CHANNELS, CONNECTIONS_INVOKE_CHANNELS } from './
  * that no response or event field is named like a secret.
  */
 
-export const CONNECTION_KINDS = ['ado', 'claude', 'mcp'] as const;
+export const CONNECTION_KINDS = ['ado', 'claude', 'mcp', 'peers'] as const;
 export const ConnectionKindSchema = z.enum(CONNECTION_KINDS);
 export type ConnectionKind = z.infer<typeof ConnectionKindSchema>;
 
@@ -72,11 +74,11 @@ export type ClaudeAuthMode = z.infer<typeof ClaudeAuthModeSchema>;
 
 /**
  * `ado:<org>` and `mcp:<name>` (lowercase slugs the main process derives from the org URL or the
- * server name), or `claude`: there is one Claude connection.
+ * server name), or `claude` and `peers`: there is one of each.
  */
 export const ConnectionIdSchema = z
   .string()
-  .regex(/^(?:(?:ado|mcp):[a-z0-9][a-z0-9._-]{0,63}|claude)$/, 'Not a connection id');
+  .regex(/^(?:(?:ado|mcp):[a-z0-9][a-z0-9._-]{0,63}|claude|peers)$/, 'Not a connection id');
 export type ConnectionId = z.infer<typeof ConnectionIdSchema>;
 
 /** Eight bullets, then the token's last characters (none for a short token). */
@@ -181,11 +183,22 @@ export const McpConnectionSummarySchema = ConnectionRowSchema.extend({
 });
 export type McpConnectionSummary = z.infer<typeof McpConnectionSummarySchema>;
 
+export const PeerPortSchema = z.int().min(1).max(65_535);
+
+/** Peer lanes (AL-289): the port this app listens on and the peers it dials; `maskedToken` is the team secret's tail. */
+export const PeersConnectionSummarySchema = ConnectionRowSchema.extend({
+  kind: z.literal('peers'),
+  port: PeerPortSchema,
+  peers: z.array(z.string().min(1).max(300)).max(PEER_LIST_MAX),
+});
+export type PeersConnectionSummary = z.infer<typeof PeersConnectionSummarySchema>;
+
 /** One connection as the renderer sees it: status and identity, never the token (design §8). */
 export const ConnectionSummarySchema = z.discriminatedUnion('kind', [
   AdoConnectionSummarySchema,
   ClaudeConnectionSummarySchema,
   McpConnectionSummarySchema,
+  PeersConnectionSummarySchema,
 ]);
 export type ConnectionSummary = z.infer<typeof ConnectionSummarySchema>;
 
@@ -240,10 +253,24 @@ export const McpConnectionDraftSchema = z
   });
 export type McpConnectionDraft = z.infer<typeof McpConnectionDraftSchema>;
 
+export const PeersConnectionDraftSchema = z.strictObject({
+  kind: z.literal('peers'),
+  port: PeerPortSchema.default(DEFAULT_PEER_PORT),
+  /** Any string the team shares. Left out of a Replace or a Test, the saved one is used. */
+  teamSecret: TokenInputSchema.optional(),
+  peers: z
+    .array(PeerAddressTextSchema)
+    .max(PEER_LIST_MAX)
+    .refine((peers) => new Set(peers.map((peer) => peer.toLowerCase())).size === peers.length, 'Each peer can be listed once'),
+  expiresAt: OptionalExpirySchema,
+});
+export type PeersConnectionDraft = z.infer<typeof PeersConnectionDraftSchema>;
+
 export const ConnectionDraftSchema = z.discriminatedUnion('kind', [
   AdoConnectionDraftSchema,
   ClaudeConnectionDraftSchema,
   McpConnectionDraftSchema,
+  PeersConnectionDraftSchema,
 ]);
 /** A draft after validation (trimmed); `z.input` is what the renderer sends. */
 export type ConnectionDraft = z.infer<typeof ConnectionDraftSchema>;
@@ -280,6 +307,8 @@ export const ConnectionTestResultSchema = z.object({
   testedAt: z.iso.datetime(),
   /** MCP only (AL-045): the tools the server listed; absent when the test failed or for other kinds. */
   tools: McpToolListSchema.optional(),
+  /** Peers only (AL-289): what each listed peer did when dialled with the draft's team secret. */
+  peers: z.array(PeerProbeSchema).max(PEER_LIST_MAX).optional(),
 });
 export type ConnectionTestResult = z.infer<typeof ConnectionTestResultSchema>;
 

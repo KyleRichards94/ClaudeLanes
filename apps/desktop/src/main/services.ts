@@ -34,6 +34,7 @@ import {
   createClaudeLoginDetector,
   createConnectionsService,
   createMcpConnectionTester,
+  createPeersConnectionTester,
   type ConnectionsService,
 } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
@@ -78,6 +79,8 @@ import { createBacklogWindowController, type BacklogWindowController } from './a
 import { createChangesService, type ChangesService } from './changes/service';
 import { createPeerNetwork, type PeerNetwork } from './peers/network';
 import { createPeerIdentity, peersDir, type PeerIdentitySource } from './peers/identity';
+import { createPeerConfigSync, type PeerConfigSync } from './peers/config';
+import { probePeers } from './peers/probe';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -228,7 +231,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource; peerConfig?: PeerConfigSync } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -333,7 +336,13 @@ export function createServices(options: ServiceOptions): Services {
     file: createElectronConnectionsFile(options.appDataDir),
     secrets,
     emit: options.emit,
-    testers: { ado: createAdoConnectionTester(), claude: createClaudeConnectionTester(claude), mcp: createMcpConnectionTester() },
+    testers: {
+      ado: createAdoConnectionTester(),
+      claude: createClaudeConnectionTester(claude),
+      mcp: createMcpConnectionTester(),
+      // Dials each listed peer with the draft's secret (AL-289); the identity is created just below.
+      peers: createPeersConnectionTester((addresses, secret, signal) => probePeers(addresses, secret, late.peerIdentity?.current().instance ?? '', { signal })),
+    },
     detectClaudeLogin: createClaudeLoginDetector(claude),
     // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
     adoMcpServer: adoMcpServerFor,
@@ -343,12 +352,17 @@ export function createServices(options: ServiceOptions): Services {
       void late.credentialFailures?.connectionsChanged();
       // A new ADO test may have signed in as someone (AL-288).
       void late.peerIdentity?.refresh();
+      // A saved, replaced or removed Peers connection restarts the network (AL-289).
+      void late.peerConfig?.sync();
     },
   });
   const peerIdentity = createPeerIdentity({ dir: peersDir(options.appDataDir), connections, warn: (message) => log.child('peers').warn(message) });
   late.peerIdentity = peerIdentity;
   void peerIdentity.refresh();
   const peerNetwork = createPeerNetwork({ identity: () => peerIdentity.current(), emit: options.emit, log: log.child('peers') });
+  const peerConfig = createPeerConfigSync({ connections, network: peerNetwork, log: log.child('peers') });
+  late.peerConfig = peerConfig;
+  void peerConfig.sync();
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
   const designView = createDesignViewService({

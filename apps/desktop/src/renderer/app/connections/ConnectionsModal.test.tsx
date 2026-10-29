@@ -41,7 +41,7 @@ describe('ConnectionsModal (AL-046)', () => {
     resetConnectionsModal();
   });
 
-  it('matches artboard 5: header note, three tabs with status words, the add form and the footer', async () => {
+  it('matches artboard 5: header note, the tabs with status words, the add form and the footer', async () => {
     setup([fakeAdoRow(), fakeClaudeRow()]);
     act(() => openConnections());
 
@@ -49,6 +49,7 @@ describe('ConnectionsModal (AL-046)', () => {
     expect(await screen.findByRole('tab', { name: 'Azure DevOps, Connected' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Claude, Connected' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'MCP servers, Not connected' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Peers, Not connected' })).toBeTruthy(); // AL-289
 
     const row = await screen.findByTestId('connection-ado:companionsystems');
     expect(within(row).getByText('CompanionSystems')).toBeTruthy();

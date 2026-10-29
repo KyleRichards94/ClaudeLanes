@@ -139,6 +139,8 @@ export interface ConnectionsServiceOptions {
 
 export const CLAUDE_CONNECTION_ID = 'claude';
 export const CLAUDE_API_KEY_SECRET_ID = 'claude:api-key';
+export const PEERS_CONNECTION_ID = 'peers';
+export const PEERS_SECRET_ID = 'peers:team-secret';
 /** Env var the Agent SDK's `claude` process reads an API key from (AL-044, AL-100). */
 export const ANTHROPIC_API_KEY_ENV = 'ANTHROPIC_API_KEY';
 
@@ -149,8 +151,8 @@ const DRAFT_TEST_LIMIT = 16;
 
 export const RECONNECT_MESSAGE = "The saved token can't be read on this computer. Replace it to reconnect.";
 
-const KIND_LABEL: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP server' };
-const KIND_ORDER: Record<ConnectionKind, number> = { ado: 0, claude: 1, mcp: 2 };
+const KIND_LABEL: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP server', peers: 'Peers' };
+const KIND_ORDER: Record<ConnectionKind, number> = { ado: 0, claude: 1, mcp: 2, peers: 3 };
 
 type DraftTester = (draft: ConnectionDraft, signal: AbortSignal) => Promise<ConnectionTestOutcome>;
 type AdoRecord = Extract<StoredConnection, { kind: 'ado' }>;
@@ -308,6 +310,14 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
     return ok(draft);
   }
 
+  /** A peers draft without a team secret (Replace or Test of the saved list) uses the saved one. */
+  async function withSavedSecret(draft: ConnectionDraft): Promise<Result<ConnectionDraft>> {
+    if (draft.kind !== 'peers' || draft.teamSecret !== undefined) return ok(draft);
+    const saved = records.find((record) => record.kind === 'peers');
+    const secret = saved?.secretId ? await secrets.get(saved.secretId) : undefined;
+    return secret === undefined ? err('VALIDATION', 'Enter the team secret.') : ok({ ...draft, teamSecret: secret });
+  }
+
   function findRecord(id: string): StoredConnection | undefined {
     return records.find((record) => record.id === id);
   }
@@ -322,18 +332,19 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       if (record.id === exceptId) return false;
       if (record.kind === 'ado' && draft.kind === 'ado') return record.orgUrl.toLowerCase() === draft.orgUrl.toLowerCase();
       if (record.kind === 'mcp' && draft.kind === 'mcp') return record.name.toLowerCase() === draft.name.toLowerCase();
-      return record.kind === 'claude' && draft.kind === 'claude';
+      return (record.kind === 'claude' && draft.kind === 'claude') || (record.kind === 'peers' && draft.kind === 'peers');
     });
   }
 
   function newId(draft: ConnectionDraft): string {
     const taken = new Set([...records.map((record) => record.id), ...builtIns().map((entry) => entry.id)]);
     if (draft.kind === 'claude') return CLAUDE_CONNECTION_ID;
+    if (draft.kind === 'peers') return PEERS_CONNECTION_ID;
     return draft.kind === 'ado' ? uniqueId('ado', orgNameFromUrl(draft.orgUrl), taken) : uniqueId('mcp', draft.name, taken);
   }
 
   function secretIdFor(id: string, draft: ConnectionDraft): string {
-    return draft.kind === 'claude' ? CLAUDE_API_KEY_SECRET_ID : id;
+    return draft.kind === 'claude' ? CLAUDE_API_KEY_SECRET_ID : draft.kind === 'peers' ? PEERS_SECRET_ID : id;
   }
 
   /** The record a save or replace writes, checked against the file format before anything is stored. */
@@ -379,6 +390,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return { ...common, kind: 'claude', name: 'Claude', mode: draft.mode };
       case 'mcp':
         return { ...common, kind: 'mcp', name: draft.name, transport: draft.transport, ...(test?.tools ? { tools: test.tools } : {}) };
+      case 'peers':
+        return { ...common, kind: 'peers', name: 'Peers', port: draft.port, peers: draft.peers };
     }
   }
 
@@ -511,7 +524,9 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         ? ['ado', draft.orgUrl.toLowerCase(), draft.pat]
         : draft.kind === 'claude'
           ? ['claude', draft.mode, draft.apiKey ?? '']
-          : ['mcp', JSON.stringify(draft.transport), draft.token ?? ''];
+          : draft.kind === 'peers'
+            ? ['peers', String(draft.port), draft.peers.join(' ').toLowerCase(), draft.teamSecret ?? '']
+            : ['mcp', JSON.stringify(draft.transport), draft.token ?? ''];
     return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
   }
 
@@ -557,6 +572,7 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       projects: ado && passed && outcome.projects ? outcome.projects.map((name) => scrubSecrets(name, token)) : null,
       testedAt: now().toISOString(),
       ...(draft.kind === 'mcp' && passed && outcome.tools ? { tools: toolNames(outcome.tools, token) } : {}),
+      ...(draft.kind === 'peers' && outcome.peers ? { peers: outcome.peers.map((probe) => ({ ...probe, message: probe.message ? scrubSecrets(probe.message, token) : null })) } : {}),
     });
   }
 
@@ -595,6 +611,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return { kind: 'claude', mode: record.mode, ...(token === undefined ? {} : { apiKey: token }), expiresAt: record.expiresAt };
       case 'mcp':
         return { kind: 'mcp', name: record.name, transport: record.transport, ...(token === undefined ? {} : { token }), expiresAt: record.expiresAt };
+      case 'peers':
+        return token === undefined ? undefined : { kind: 'peers', port: record.port, teamSecret: token, peers: record.peers, expiresAt: record.expiresAt };
     }
   }
 
@@ -662,7 +680,9 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       if (!request.success) return err('VALIDATION', 'Invalid connection test', request.error.issues);
       if ('id' in request.data) return testSaved(request.data.id);
 
-      const draft = parseDraft(request.data.draft);
+      const parsed = parseDraft(request.data.draft);
+      if (!parsed.ok) return parsed;
+      const draft = await exclusive(async () => withSavedSecret(parsed.data));
       if (!draft.ok) return draft;
       const result = await runTest(draft.data);
       if (result.ok) rememberDraftTest(draft.data, result.data);
@@ -675,7 +695,9 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         if (blocked) return blocked;
         const parsed = parseDraft(input);
         if (!parsed.ok) return parsed;
-        const draft = parsed.data;
+        const filled = await withSavedSecret(parsed.data);
+        if (!filled.ok) return filled;
+        const draft = filled.data;
 
         const duplicate = duplicateOf(draft);
         if (duplicate) {
@@ -716,7 +738,9 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         }
         const parsed = parseDraft(request.data.draft);
         if (!parsed.ok) return parsed;
-        const draft = parsed.data;
+        const filled = await withSavedSecret(parsed.data);
+        if (!filled.ok) return filled;
+        const draft = filled.data;
         if (draft.kind !== existing.kind) {
           return err('VALIDATION', `${existing.name} is a ${KIND_LABEL[existing.kind]} connection; replace it with the same kind.`);
         }
@@ -881,6 +905,8 @@ function tokenOf(draft: ConnectionDraft): string | undefined {
       return draft.apiKey;
     case 'mcp':
       return draft.token;
+    case 'peers':
+      return draft.teamSecret;
   }
 }
 

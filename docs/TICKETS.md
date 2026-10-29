@@ -210,7 +210,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-284 | E2E: ticket layouts | E17 | M | AL-279, AL-283 | done |
 | AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | done |
 | AL-288 | Peer network service | E18 | L | AL-287, AL-042 | done |
-| AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | todo |
+| AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | done |
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | todo |
 | AL-291 | Room log and replay | E18 | M | AL-290 | todo |
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | todo |
@@ -1581,9 +1581,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P1, PL§2, R4, R5 · **Depends on:** AL-287, AL-046
 - **Scope:** A `peers` connection kind in `connections.schemas.ts`: port (default 47811), team secret (SecretStore, masked tail after save, Generate button), peer list (hostname or IP, optional `:port`, one row each). `features/peer-network` draws the tab in the Connections modal with a status dot per peer. Test = dial each peer and exchange a signed `hello`; the result names who answered, who was unreachable and who rejected the signature.
 - **Acceptance criteria:**
-  - [ ] The secret never crosses IPC after save; `connections:list` carries the masked tail only.
-  - [ ] Test reports the three outcomes per peer with the e2e fake peer.
-  - [ ] Saving restarts the listener on the new port without an app restart.
+  - [x] The secret never crosses IPC after save; `connections:list` carries the masked tail only. (`service.peers.test.ts`, `e2e/peers-connection.spec.ts`)
+  - [x] Test reports the three outcomes per peer with the e2e fake peer. (fake peers are the main process's own network on loopback, `src/main/peers/testing.ts`)
+  - [x] Saving restarts the listener on the new port without an app restart.
 
 #### AL-290 · Rooms and presence
 - **Design:** P2, P3, P5, PL§4 · **Depends on:** AL-288, AL-062, AL-065, AL-276, AL-103
@@ -2484,6 +2484,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D829 | AL-288: outbound frames are paced per connection by a token bucket (4 at once, then 14 a second); frames queued on a connection that loses the lower-instance-id rule move to the one that stays, and frames still arriving on the losing one are read (the id check drops repeats). A peer whose frames fail the signature keeps its socket and stays `rejected` until either app changes its Peers connection | A 200-frame replay or a reconnect's hellos would otherwise break the receiver's 20 frames/s cap and get the connection closed; the tie rule was dropping queued frames | 2026-10-29 |
 | D830 | E18 channels are registered by the ticket that builds their handler: `peers:status` (AL-288), `peers:list` (AL-289, the Peers tab needs it), `peers:rooms` and `peers:presence` (AL-290), `peers:log` (AL-291), `peers:post`, `peers:markSeen` and `peers:message` (AL-292). AL-287 declared every schema. AL-288 registers the network switched off; AL-289 starts it from the Peers connection and restarts it on a change | `InvokeHandlers` fails the build for a channel without a handler, and stub handlers would only be replaced | 2026-10-29 |
 | D831 | AL-288: `from.user` is the first ADO connection's tested identity, else the Windows user name; the instance id is in `<userData>/peers/instance.json` | TB§6 identity, with a fallback before any ADO test | 2026-10-29 |
+| D832 | AL-289: one Peers connection per app (id `peers`, secret `peers:team-secret`). A Change or Test that leaves the team secret empty uses the saved one. Generate makes 24 random bytes in the renderer and shows them in the draft until Save so they can be shared; the secure field is for a secret someone else shared. Test reads the signed `hello` each peer sends on connect and sends none back, and `connections:test` carries the outcome per peer (`peers`). A peer on another secret fails Test; an unreachable one is listed but does not | A Test that said hello as this app would trip the lower-instance-id rule and close the running connection; colleagues' PCs being off shouldn't stop a save | 2026-10-29 |
+| D833 | AL-289: the Peers tab is `widgets/peer-network`, not `features/peer-network` | The features layer is at Steiger's 20-slice limit (`fsd/excessive-slicing`), and the ESLint deep-import rule rules out a `features/connections/*` group. AL-295's composer (`features/post-to-room` in the brief) can sit inside `widgets/room-log` for the same reason | 2026-10-29 |
 
 ---
 
