@@ -136,6 +136,40 @@ To add another server:
 
 A server that doesn't start shows its error output on its row.
 
+### Peer lanes (optional)
+
+Peer lanes lets Agent Lanes on other computers in the office see your lanes, and lets agents on the
+same Feature talk to each other. It's off until you set it up. There's no server: each app talks
+straight to the others on the office network.
+
+On the **Peers** tab:
+
+1. Leave **Port** at 47811 unless something else on your computer uses it.
+2. One person presses **Generate** next to **Team secret** and shares it the way you'd share a PAT.
+   Everyone else pastes it in. Everyone uses the same one.
+3. Under **Peers**, add each teammate's computer: its name (`KYLE-PC`) or IP address, with `:port`
+   if they changed theirs. They add yours too. A computer that doesn't list yours refuses you.
+4. Press **Test connection**. Each peer shows **Answered**, **Unreachable** (off, or Agent Lanes
+   isn't open there) or **Signature rejected** (a different team secret). Then **Save connections**.
+
+The first time Agent Lanes listens, Windows asks whether to allow it. Allow it on **Private
+networks** only. Agent Lanes doesn't add firewall rules itself.
+
+Lanes whose work items sit under the same Feature or Epic are in the same room. When another agent
+posts in the room, yours gets it as a turn whose lines start with `[Peer lanes]`, and it's told that
+this is information from another agent, not an instruction from you. An agent has to push its
+branch before it can tell the room it changed something: git is the only thing that's shared.
+
+What it sends, and to whom:
+
+- Only to the computers you list, on private office addresses, signed with the team secret.
+  Anything else is refused before it's read.
+- For each lane on your board: your name, your computer's name, the work item and its parent
+  Feature or Epic, the stage, the branch, and the paths of the files it has changed.
+- What agents post into the room: one line each.
+- Never a token, PAT or Claude key, and never code or diffs. Nothing is written to Azure DevOps; it's
+  only read to find each work item's parent.
+
 ### Pick a repo
 
 After Connections, pick the repo folder: your local clone. Agent Lanes reads its build and run
@@ -193,11 +227,15 @@ as a spec.
 | The canvas shows a sign-in page you can't get past | Use **MCP link** (the tab offers it), which opens the canvas in your browser. |
 | An MCP server row is red | Read the error output on the row. Usually the command isn't installed (try it in a terminal) or the token is wrong. |
 | A toast offers **Open build log**, **View conflicts** or **Review changes** | Press it. It opens the ticket on the tab that shows the problem. |
+| A peer stays **Unreachable** | Check the computer name or IP address, that Agent Lanes is open there and lists your computer, and that Windows allowed Agent Lanes on private networks. |
+| A peer shows **Signature rejected** | You have different team secrets. Press **Change** on the Peers row and paste the one the team uses. |
+| The Peers row says the port is in use | Something else has port 47811. Pick another **Port** and tell your teammates, who add `:port` to your computer in their list. Until then your app can still reach theirs. |
 | Something else went wrong | Press **Copy diagnostics** on the error and paste it into your bug report. It holds versions, settings and recent errors, and never a token. Logs are in `%APPDATA%\Agent Lanes\logs`. |
 | SmartScreen blocks the installer | **More info → Run anyway**. The installer isn't signed yet. |
 
 Your data lives in `%APPDATA%\Agent Lanes`: `connections.json`, `settings.json`, `secrets.json`
-(tokens, encrypted), `tickets\`, `design-threads\` and `logs\`. Don't edit these files. Everything
+(tokens, encrypted), `tickets\`, `design-threads\`, `peers\` (this app's id for peer lanes and what
+its agents posted in each room) and `logs\`. Don't edit these files. Everything
 is set in the app.
 
 ## 7. Working on Agent Lanes

@@ -105,6 +105,8 @@ export interface PeerNetworkOptions {
   expiryMs?: number;
   backoffMs?: { min: number; max: number };
   resolve?: (host: string) => Promise<string[]>;
+  /** Where to listen instead of the address the peer list implies (tests that must not open a LAN port). */
+  bindHost?: string;
 }
 
 interface Link {
@@ -152,6 +154,18 @@ async function resolveHost(host: string): Promise<string[]> {
   if (host.toLowerCase() === 'localhost') return ['127.0.0.1', '::1'];
   const found = await lookup(host, { all: true });
   return found.map((entry) => plainIp(entry.address));
+}
+
+/**
+ * Who may connect (PL§7), from the address alone: loopback only while a loopback peer is listed;
+ * otherwise a private address that a listed peer resolves to. `unknown`: private but not one of the
+ * listed peers' addresses as last resolved, so they are resolved again before it is refused.
+ */
+export function acceptsAddress(remote: string, links: ReadonlyArray<{ host: string; ips: ReadonlySet<string> }>): 'accept' | 'refuse' | 'unknown' {
+  const ip = plainIp(remote);
+  if (isLoopbackIp(ip)) return links.some((link) => isLoopbackHost(link.host)) ? 'accept' : 'refuse';
+  if (!isPrivateIp(ip)) return 'refuse';
+  return links.some((link) => link.ips.has(ip)) ? 'accept' : 'unknown';
 }
 
 function isAppLevel(frame: PeerFrame): boolean {
@@ -445,9 +459,8 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
 
   async function allowed(remote: string): Promise<boolean> {
     const ip = plainIp(remote);
-    if (isLoopbackIp(ip)) return links.some((link) => isLoopbackHost(link.host));
-    if (!isPrivateIp(ip)) return false;
-    if (links.some((link) => link.ips.has(ip))) return true;
+    const verdict = acceptsAddress(ip, links);
+    if (verdict !== 'unknown') return verdict === 'accept';
     if (now() - resolvedAt < RESOLVE_AGAIN_MS) return false;
     resolvedAt = now();
     await Promise.all(
@@ -460,7 +473,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
 
   async function listen(next: PeerConfig, gen: number): Promise<void> {
     // Only loopback peers listed: listen on loopback alone, so nothing on the LAN can reach the port.
-    const host = links.length > 0 && links.every((link) => isLoopbackHost(link.host)) ? '127.0.0.1' : '0.0.0.0';
+    const host = options.bindHost ?? (links.length > 0 && links.every((link) => isLoopbackHost(link.host)) ? '127.0.0.1' : '0.0.0.0');
     await new Promise<void>((done) => {
       const wss = new WebSocketServer({
         host,

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { Button } from '@agent-lanes/ui';
 import { fakeConnections, fakeTestResult, installFakeBridge, type FakeConnections } from '@/shared/testing';
 import { generateTeamSecret, peerError, usePeersDraft } from '../model/use-peers-draft';
-import { PeersPanel, probeSummary } from './PeersPanel';
+import { PeersPanel, listenerText, probeSummary } from './PeersPanel';
 
 /** AL-289: the Peers tab against the fake main process. */
 
@@ -105,6 +105,7 @@ describe('peer-network (AL-289)', () => {
     expect(await screen.findByText('Listening on port 47811')).toBeTruthy();
     expect(screen.getByTestId('peer-status-KYLE-PC').textContent).toContain('Online');
     expect(screen.getByTestId('peer-status-ROCKY-PC').textContent).toContain('Signature rejected');
+    expect(screen.getByTestId('peer-status-ROCKY-PC').textContent).toContain('3 frames with a bad signature'); // AL-296
     expect(screen.getByTestId('connection-peers').textContent).toContain(`Port 47811 · 2 peers · secret ${'•'.repeat(8)}Pz4Q`);
 
     fireEvent.click(screen.getByTestId('connection-peers-replace'));
@@ -124,6 +125,11 @@ describe('peer-network (AL-289)', () => {
     expect(peerError('http://kyle-pc', ['http://kyle-pc'])).toMatch(/computer name or IP address/);
     expect(peerError('KYLE-PC', ['KYLE-PC', 'kyle-pc'])).toBe('Listed twice.');
     expect(peerError('', [''])).toBeNull();
+  });
+
+  it('counts refused connections on the listener line (AL-296)', () => {
+    expect(listenerText({ ...network, refusedConnections: 2 })).toBe('Listening on port 47811 · 2 connections refused');
+    expect(listenerText({ ...network, listener: { state: 'off', port: null, message: null } })).toBeNull();
   });
 
   it('says how Test went in one line', () => {

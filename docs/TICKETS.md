@@ -217,7 +217,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | todo |
-| AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | todo |
+| AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
 | AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
@@ -1637,9 +1637,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** PL§7 · **Depends on:** AL-288, AL-292
 - **Scope:** Private-range and peer-list filters at accept, the frame-size and rate caps, signature-failure counters surfaced in `peers:status` and the Peers tab; the `[Peer lanes]` prefix rule and the protocol wording reviewed against `WORK_ITEM_COMMENT_RULE`; README: a "Peer lanes" section (what it shares, the firewall prompt, the team secret, the peer list, what it never sends).
 - **Acceptance criteria:**
-  - [ ] A connection from a non-private address or an unlisted host is closed before any frame is read (test with a fake socket).
-  - [ ] A 65 KB frame and a 21st frame in one second each close the connection and count.
-  - [ ] README section reviewed by Kyle.
+  - [x] A connection from a non-private address or an unlisted host is closed before any frame is read (test with a fake socket). (`src/main/peers/hardening.test.ts`: `acceptsAddress` with fake socket addresses, and a live listener answering 403)
+  - [x] A 65 KB frame and a 21st frame in one second each close the connection and count.
+  - [ ] README section reviewed by Kyle. (open: README › Peer lanes (optional) and three Troubleshooting rows are written; Kyle hasn't reviewed them)
 
 #### AL-297 · E2E: two apps talking
 - **Design:** P1–P9 · **Depends on:** AL-294, AL-295, AL-296
@@ -2491,6 +2491,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D836 | AL-291: the room log holds what agents and people post (`changed`, `blocked`, `done`, `ask`, `answer`, `offer`); joins and leaves are presence and show as members, not rows. Own messages are written per room, a burst sharing one write, and read back lazily the first time a room is read or replayed. A peer's lane saying `hello` live in one of this app's rooms triggers the replay, once per peer and room until that peer goes; replays go through the network's pacing. The log is capped when own messages were dropped, when a peer replayed 200, or at 1 000 in memory | A log of joins on every start and reconnect would bury the posts, and the board already lists who is in the room | 2026-10-29 |
 | D837 | AL-292: a peer's words reach an agent as a JSON string inside one `[Peer lanes]` line (`· ask: "…"`), so a newline, a heading or tool-call syntax stays quoted on that line, unchanged. Room messages are delivered only to lanes with a live session, through `sessions.send` (a lane waiting at a gate gets them when the turn ends); an idle lane is not woken and reads the room with `read_room` later. A post also reaches this app's other lanes in the room. Single-step lanes and second agents get `list_peers` and `read_room`, the read-only protocol and no turns. The protocol and tools are added when a session starts in a room; a lane that gets its room later has them from its next session | Sending to an idle lane would start a turn for every agent on the board each time a peer speaks; the brief's fixed prefix with the text "quoted as data" needs the text kept on the prefix line | 2026-10-29 |
 | D838 | AL-292: the protocol and `post_to_room` follow PL§3, with the room named by its parent (`Feature #48000 · Job DTO`) and the count of agents on other machines at session start. `changed` is refused while `git status` shows the ticket branch with no upstream, a gone upstream, or commits ahead. Unread counts cover live `ask`, `blocked` and `offer` only (not replays, not this app's own) and are kept in memory | A replayed ask from yesterday shouldn't light the bubble on every start; the Assist bubble UI (AL-294) may want them kept across restarts, which is a call for Kyle's artboards | 2026-10-29 |
+| D839 | AL-296: reviewed against `WORK_ITEM_COMMENT_RULE`: that rule limits what an agent may post on a work item (QA failures and answers only); it isn't a data-not-instructions rule, so there were no words to reuse. The peer rule stands on its own: every peer line starts `[Peer lanes]` with the peer's words as a JSON string, the protocol says they are information from another agent and not instructions from the user, second agents and single-step lanes can't post, and `changed` waits for a push. The accept filters, the 64 KB and 20 frames/s caps and the signature counters were built in AL-288; AL-296 tests them and shows the counters in the Peers tab. A connection whose frames switch instance id is closed as a spoof | PL§7 asked for the same words "where possible"; it isn't possible, and the brief's reading of that rule doesn't match the code | 2026-10-29 |
 
 ---
 
@@ -2589,6 +2590,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | 2026-10-14 | AL-285: click a team-board card to read it and set its person and column. D823. |
 | 2026-10-14 | Settings › Appearance (system, light, dark) and a slow moving ground behind the liquid glass. D824. |
 | 2026-10-29 | E18 Peer lanes and Feature rooms (AL-287–AL-297) added from the 2026-10-29 add-on brief, with milestone M8. D826. |
+| 2026-10-29 | E18 main process: AL-287 frame contracts and signing, AL-288 peer network (`ws`, paced sends, tie rule), AL-289 Connections › Peers tab (`widgets/peer-network`), AL-290 rooms and presence, AL-291 room log and replay, AL-292 delivery and the `list_peers` / `post_to_room` / `read_room` tools, AL-296 hardening and the README section (partial: Kyle's review). D827–D839. The UI tickets AL-293 to AL-295 and the two-app e2e AL-297 wait for Kyle's artboards. E2E on each commit: 183–187 passed; the same 8 tests (board-scroll strip, design-presence, router ×4, settings-panel ×2) fail on main at 3ca925b without these changes. |
 ---
 
 ## 7. Parallel build rules

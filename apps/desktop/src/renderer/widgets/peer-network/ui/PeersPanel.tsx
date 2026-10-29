@@ -25,15 +25,17 @@ export function peersRowDetails(row: PeersConnectionSummary): string {
   return [`Port ${row.port}`, `${row.peers.length} ${row.peers.length === 1 ? 'peer' : 'peers'}`, row.maskedToken ? `secret ${row.maskedToken}` : null].filter(Boolean).join(' · ');
 }
 
-/** What the listener is doing, in words. */
+/** What the listener is doing, in words, with the connections it refused (AL-296). */
 export function listenerText(status: PeerNetworkStatus | undefined): string | null {
   const listener = status?.listener;
-  if (!listener || listener.state === 'off') return null;
-  return listener.state === 'listening' ? `Listening on port ${listener.port ?? ''}` : (listener.message ?? 'The listener failed.');
+  if (!status || !listener || listener.state === 'off') return null;
+  const refused = status.refusedConnections > 0 ? ` · ${status.refusedConnections} ${status.refusedConnections === 1 ? 'connection' : 'connections'} refused` : '';
+  return listener.state === 'listening' ? `Listening on port ${listener.port ?? ''}${refused}` : (listener.message ?? 'The listener failed.');
 }
 
 function linkLine(link: PeerLink): string {
-  return [link.address, link.user ? `${link.user}${link.host ? ` on ${link.host}` : ''}` : null, link.message].filter(Boolean).join(' · ');
+  const rejected = link.rejectedFrames > 0 ? `${link.rejectedFrames} ${link.rejectedFrames === 1 ? 'frame' : 'frames'} with a bad signature` : null;
+  return [link.address, link.user ? `${link.user}${link.host ? ` on ${link.host}` : ''}` : null, link.message, rejected].filter(Boolean).join(' · ');
 }
 
 interface PeersPanelProps {
