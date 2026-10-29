@@ -85,6 +85,7 @@
 /* Selection controls (SegmentedControl, Switch) from artboards 2 and 3. Mirrors src/selection.ts. */
 :root {
   --al-selection-track: #eef2f7;
+  --al-selection-thumb: #ffffff;
   --al-selection-label: #475569;
   --al-selection-switch-off: #cbd5e1;
   --al-selection-thumb-shadow: 0 1px 2px rgba(15, 27, 45, 0.1), 0 1px 3px rgba(15, 27, 45, 0.08);
@@ -166,6 +167,7 @@
   --al-tone-neutral-dot: #94a3b8;
 
   --al-selection-track: #243044;
+  --al-selection-thumb: #36455c;
   --al-selection-label: #c5d2e2;
   --al-selection-switch-off: #4a5e78;
   --al-selection-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.28);

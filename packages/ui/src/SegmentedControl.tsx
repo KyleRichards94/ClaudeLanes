@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
   },
   thumbSelected: {
-    backgroundColor: color.onAccent,
+    backgroundColor: selection.thumb,
     boxShadow: selection.thumbShadow,
   },
   pill: {

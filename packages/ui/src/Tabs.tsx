@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.chip,
   },
   thumbSelected: {
-    backgroundColor: color.surface,
+    backgroundColor: selection.thumb,
     boxShadow: selection.thumbShadow,
   },
   dot: {
