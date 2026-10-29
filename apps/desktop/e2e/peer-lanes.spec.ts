@@ -7,10 +7,12 @@ import type { FakeAgentTurn } from './support/fake-claude-code';
 import { startTeamBoardApp, type TeamBoardApp } from './support/team-board-app';
 
 /**
- * AL-297: two Agent Lanes apps on this computer, each listing the other as `localhost:<port>`, with
- * one fake Azure DevOps organisation where #71360 and #71362 sit under Feature #70101 "Job
- * management". A lane in each app joins that room; the fake agents post through `post_to_room`, and
- * the other app's agent gets the post as a `[Peer lanes]` turn.
+ * AL-297, AL-298: two Agent Lanes apps on this computer, with one fake Azure DevOps organisation
+ * where #71360 and #71362 sit under Feature #70101 "Job management". The apps find each other by the
+ * beacon on loopback; where the runner blocks that, each lists the other as `localhost:<port>` under
+ * Advanced. A lane in each app joins that room; the fake agents post through `post_to_room`, and the
+ * other app's agent gets the post as a `[Peer lanes]` turn. AL-298 didn't run it, on Mitch's call
+ * (2026-10-30).
  */
 
 const ALL_AUTO = Object.fromEntries(STAGES.map((stage) => [stage, 'auto']));
@@ -71,14 +73,23 @@ test.beforeAll(async () => {
   mitch = await startTeamBoardApp({ name: 'peers-mitch', ado, claude: { lead: { turns: MITCH_AGENT } } });
   // The second app skips the ADO token test, so it posts under the Windows user name and the two are told apart.
   kyle = await startTeamBoardApp({ name: 'peers-kyle', ado, testAdo: false, claude: { lead: { turns: KYLE_AGENT } } });
-  for (const [app, port, other] of [
+  const pairs = [
     [mitch, mitchPort, kylePort],
     [kyle, kylePort, mitchPort],
-  ] as const) {
-    expect(await app.invoke('connections:save', { kind: 'peers', port, beaconPort: BEACON_PORT, addresses: [`localhost:${other}`] })).toMatchObject({ ok: true });
+  ] as const;
+  for (const [app, port] of pairs) expect(await app.invoke('connections:save', { kind: 'peers', port, beaconPort: BEACON_PORT, addresses: [] })).toMatchObject({ ok: true });
+  const connected = async () => (await network(mitch))?.peers.some((peer) => peer.state === 'online') && (await network(kyle))?.peers.some((peer) => peer.state === 'online');
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline && !(await connected())) await new Promise((done) => setTimeout(done, 250));
+  if (!(await connected())) {
+    // No loopback broadcast on this runner: the Advanced fallback.
+    test.info().annotations.push({ type: 'peers', description: 'The beacon did not connect the apps in 15 s; used the Advanced addresses.' });
+    for (const [app, port, other] of pairs) {
+      expect(await app.invoke('connections:replace', { id: 'peers', draft: { kind: 'peers', port, beaconPort: BEACON_PORT, addresses: [`localhost:${other}`] } })).toMatchObject({ ok: true });
+    }
   }
-  await expect.poll(async () => (await network(mitch))?.peers[0]?.state, { timeout: 20_000 }).toBe('online');
-  await expect.poll(async () => (await network(kyle))?.peers[0]?.state, { timeout: 20_000 }).toBe('online');
+  await expect.poll(async () => (await network(mitch))?.peers.some((peer) => peer.state === 'online'), { timeout: 20_000 }).toBe(true);
+  await expect.poll(async () => (await network(kyle))?.peers.some((peer) => peer.state === 'online'), { timeout: 20_000 }).toBe(true);
 });
 
 test.afterAll(async () => {

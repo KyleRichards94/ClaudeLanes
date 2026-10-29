@@ -49,7 +49,7 @@ describe('ConnectionsModal (AL-046)', () => {
     expect(await screen.findByRole('tab', { name: 'Azure DevOps, Connected' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Claude, Connected' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'MCP servers, Not connected' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Peers, Not connected' })).toBeTruthy(); // AL-289
+    expect(screen.getByRole('tab', { name: 'Peers, Off' })).toBeTruthy(); // AL-298: the network's state, not a saved connection
 
     const row = await screen.findByTestId('connection-ado:companionsystems');
     expect(within(row).getByText('CompanionSystems')).toBeTruthy();

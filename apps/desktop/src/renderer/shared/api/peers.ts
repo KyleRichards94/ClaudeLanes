@@ -7,12 +7,21 @@ export const peerNetworkQueryKey = ['peers', 'network'] as const;
 export const peerRoomsQueryKey = ['peers', 'rooms'] as const;
 export const roomLogQueryKey = (room: string) => ['peers', 'log', room] as const;
 
-/** The listener and each listed peer's state (AL-289): the Peers tab's status dots. Kept current by `peers:status`. */
+/** The listener, the beacon and each peer's state (AL-289, AL-298): the Peers tab. Kept current by `peers:status`. */
 export function usePeerNetwork() {
   return useQuery({
     queryKey: peerNetworkQueryKey,
     queryFn: async () => unwrap(await invoke('peers:list')),
     staleTime: Infinity,
+  });
+}
+
+/** Find peers (AL-298): a beacon now and every peer not connected dialled again; the reply is the network as it stands after. */
+export function useFindPeers() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => unwrap(await invoke('peers:find')),
+    onSuccess: (status) => queryClient.setQueryData<PeerNetworkStatus>(peerNetworkQueryKey, status),
   });
 }
 

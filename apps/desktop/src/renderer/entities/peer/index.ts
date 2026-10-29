@@ -11,6 +11,7 @@ export {
   overlapText,
   peerOnWorkItem,
   peersPillView,
+  peersTabStatus,
   roomOfTicket,
   totalUnread,
   unreadForTickets,

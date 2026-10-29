@@ -2,121 +2,124 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
-import type { ConnectionSummary, PeerNetworkStatus, Result } from '@agent-lanes/contracts';
-import { OTHER_TEAM, createTestPeer, freePort, testConfig, type TestPeer } from '../src/main/peers/testing';
+import type { PeerNetworkStatus, Result } from '@agent-lanes/contracts';
+import { ADO_FIXTURE_PROJECT, ADO_FIXTURE_PROJECT_ID } from '@agent-lanes/contracts/testing';
+import { deriveTeam } from '../src/main/peers/signer';
+import { OTHER_TEAM, beaconConfig, createTestPeer, freePort, type TestPeer } from '../src/main/peers/testing';
+import { startFakeAdoServer, type FakeAdoServer } from './support/fake-ado-server';
 
 /**
- * AL-289 against the real app: Connections › Peers saves a port, a team secret and a peer list. Test
- * dials fake peers started here on loopback (one with the same secret, one with another, and a port
- * nobody listens on). Saving starts the listener; a new port restarts it without restarting the app.
- * The secret goes into the SecretStore and comes back in no IPC reply and no other file.
+ * AL-298 against the real app: Connections › Peers is a status page. The app has a team as soon as
+ * its Azure DevOps connection has a default project, and finds two fake peers started here by their
+ * beacons on loopback (beacon port 47820, from playwright.config.ts): one in its project, which
+ * connects, and one in another, shown as other team. Advanced changes the port without a restart.
+ * Not run for AL-298 on Mitch's call (2026-10-30).
  */
-
-/** Made up for this test. */
-const SECRET = 'e2e-team-secret-made-up-0000-Tq7V';
 
 interface Bridge {
   invoke(channel: string, payload?: unknown): Promise<unknown>;
 }
 
+const BEACON_PORT = 47820;
+
 let userDataDir: string;
+let ado: FakeAdoServer;
 let app: ElectronApplication | undefined;
 let page: Page;
-let appPort: number;
 let kyle: TestPeer;
-let rocky: TestPeer;
-let nobody: number;
-const replies: string[] = [];
+let sam: TestPeer;
 
 async function openPeersTab(): Promise<void> {
   await page.getByTestId('open-connections').click();
   await page.getByRole('tab', { name: /Peers/ }).click();
 }
 
-async function data<T>(channel: string): Promise<T> {
-  const reply = (await page.evaluate((name) => (globalThis as unknown as { agentLanes: Bridge }).agentLanes.invoke(name), channel)) as Result<T>;
-  replies.push(JSON.stringify(reply));
+async function invoke<T>(channel: string, payload?: unknown): Promise<T> {
+  const reply = (await page.evaluate(([name, body]) => (globalThis as unknown as { agentLanes: Bridge }).agentLanes.invoke(name as string, body), [channel, payload])) as Result<T>;
   if (!reply.ok) throw new Error(`${channel} failed: ${reply.message}`);
   return reply.data;
 }
+
+const network = () => invoke<PeerNetworkStatus>('peers:list');
 
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   userDataDir = mkdtempSync(join(tmpdir(), 'agent-lanes-e2e-peers-'));
-  appPort = await freePort();
+  ado = await startFakeAdoServer();
+  const team = deriveTeam(ado.orgUrl, ADO_FIXTURE_PROJECT_ID);
   kyle = createTestPeer('kyle', await freePort());
-  rocky = createTestPeer('rocky', await freePort());
-  nobody = await freePort();
-  await kyle.network.configure(testConfig(kyle.port, [`localhost:${appPort}`]));
-  await rocky.network.configure(testConfig(rocky.port, [`localhost:${appPort}`], [OTHER_TEAM]));
+  sam = createTestPeer('sam', await freePort());
+  await kyle.network.configure(beaconConfig(kyle.port, BEACON_PORT, [team]));
+  await sam.network.configure(beaconConfig(sam.port, BEACON_PORT, [OTHER_TEAM]));
   app = await electron.launch({ args: [join(__dirname, '..')], env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir } });
   page = await app.firstWindow();
   await expect(page.getByText('Agent board')).toBeVisible();
+  await invoke('connections:save', { kind: 'ado', orgUrl: ado.orgUrl, pat: ado.pat, defaultProject: ADO_FIXTURE_PROJECT });
 });
 
 test.afterAll(async () => {
   await app?.close();
   await kyle?.network.dispose();
-  await rocky?.network.dispose();
+  await sam?.network.dispose();
+  await ado?.close();
   rmSync(userDataDir, { recursive: true, force: true });
 });
 
-test('Test names who answered, who could not be reached and who signs with another secret; Save starts the listener', async () => {
-  await openPeersTab();
-  await page.getByTestId('peers-port').fill(String(appPort));
-  await page.getByTestId('peers-secret').fill(SECRET);
-  await page.getByTestId('peers-address-0').fill(`localhost:${kyle.port}`);
-  await page.getByTestId('peers-add').click();
-  await page.getByTestId('peers-address-1').fill(`localhost:${rocky.port}`);
-  await page.getByTestId('peers-add').click();
-  await page.getByTestId('peers-address-2').fill(`localhost:${nobody}`);
-
-  await page.getByTestId('peers-test-connection').click();
-  await expect(page.getByTestId('peers-probe-0')).toContainText('Answered');
-  await expect(page.getByTestId('peers-probe-0')).toContainText('kyle on KYLE-PC');
-  await expect(page.getByTestId('peers-probe-1')).toContainText('Signature rejected');
-  await expect(page.getByTestId('peers-probe-2')).toContainText('Unreachable');
-  await expect(page.getByTestId('peers-test-outcome')).toContainText(`localhost:${rocky.port} uses a different team secret.`);
-  await expect(page.getByTestId('connections-save')).toBeDisabled();
-
-  // Without the peer on another secret the test passes, with the unreachable one still listed.
-  await page.getByTestId('peers-remove-1').click();
-  await page.getByTestId('peers-test-connection').click();
-  await expect(page.getByTestId('peers-test-outcome')).toContainText('1 answered · 1 unreachable');
-  await page.getByTestId('connections-save').click();
-  await expect(page.getByRole('dialog', { name: 'Connections' })).toHaveCount(0);
-  await openPeersTab();
-  await expect(page.getByTestId('connection-peers')).toContainText(`Port ${appPort} · 2 peers · secret ••••••••Tq7V`);
-
-  await expect.poll(async () => (await data<PeerNetworkStatus>('peers:list')).listener).toEqual({ state: 'listening', port: appPort, message: null });
-  await expect.poll(async () => (await data<PeerNetworkStatus>('peers:list')).peers.find((peer) => peer.address === `localhost:${kyle.port}`)?.state, { timeout: 15_000 }).toBe('online');
-  await expect(page.getByTestId(`peer-status-localhost:${kyle.port}`)).toContainText('Online');
+test('with nothing typed, the tab shows this computer, a found peer connected and one from another team', async () => {
+  await expect.poll(async () => (await network()).teams, { timeout: 15_000 }).toBe(1);
+  await expect.poll(async () => (await network()).peers.find((peer) => peer.instance === kyle.instance)?.state, { timeout: 20_000 }).toBe('online');
+  await expect.poll(async () => (await network()).peers.find((peer) => peer.instance === sam.instance)?.state, { timeout: 20_000 }).toBe('other-team');
   expect(kyle.network.online()).toHaveLength(1);
+  expect(sam.network.online()).toEqual([]);
+
+  await openPeersTab();
+  await expect(page.getByTestId('peers-listener')).toContainText('Listening on port');
+  await expect(page.getByTestId('peers-beacon')).toContainText(`Beacon on UDP port ${BEACON_PORT}`);
+  await expect(page.getByTestId('peers-teams')).toHaveText('Team: 1 Azure DevOps project');
+  const status = await network();
+  const kyleRow = status.peers.find((peer) => peer.instance === kyle.instance)!;
+  const samRow = status.peers.find((peer) => peer.instance === sam.instance)!;
+  await expect(page.getByTestId(`peer-status-${kyleRow.address}`)).toContainText('Connected');
+  await expect(page.getByTestId(`peer-status-${kyleRow.address}`)).toContainText('kyle on KYLE-PC');
+  await expect(page.getByTestId(`peer-status-${samRow.address}`)).toContainText('Other team');
+  await expect(page.getByTestId('peers-secret')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: /Peers, 1 connected/ })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath('peers-tab-1440x960.png') });
+});
+
+test('Find peers finds a peer that started after the app', async () => {
+  const late = createTestPeer('rocky', await freePort());
+  try {
+    await late.network.configure(beaconConfig(late.port, BEACON_PORT, [deriveTeam(ado.orgUrl, ADO_FIXTURE_PROJECT_ID)]));
+    await page.getByTestId('peers-find').click();
+    await expect.poll(async () => (await network()).peers.find((peer) => peer.instance === late.instance)?.state, { timeout: 20_000 }).toBe('online');
+  } finally {
+    await late.network.dispose();
+  }
   await page.getByTestId('connections-cancel').click();
 });
 
-test('saving a new port restarts the listener without restarting the app', async () => {
+test('a new port under Advanced restarts the listener without restarting the app', async () => {
   const newPort = await freePort();
   await openPeersTab();
-  await page.getByTestId('connection-peers-replace').click();
   await page.getByTestId('peers-port').fill(String(newPort));
-  await page.getByTestId('peers-test-connection').click();
-  await expect(page.getByTestId('peers-test-outcome')).toContainText('1 answered');
   await page.getByTestId('connections-save').click();
-  await expect.poll(async () => (await data<PeerNetworkStatus>('peers:list')).listener.port).toBe(newPort);
-  await expect.poll(async () => (await data<PeerNetworkStatus>('peers:list')).peers.find((peer) => peer.address === `localhost:${kyle.port}`)?.state, { timeout: 15_000 }).toBe('online');
+  await expect.poll(async () => (await network()).listener.port).toBe(newPort);
+  await expect.poll(async () => (await network()).peers.find((peer) => peer.instance === kyle.instance)?.state, { timeout: 20_000 }).toBe('online');
 });
 
-test('the team secret is in no IPC reply and in no file but the encrypted secrets file', async () => {
-  const rows = await data<ConnectionSummary[]>('connections:list');
-  expect(rows.find((row) => row.kind === 'peers')).toMatchObject({ maskedToken: '••••••••Tq7V' });
-  for (const reply of replies) expect(reply).not.toContain(SECRET);
+test('no key and no team secret is written anywhere in the profile', async () => {
+  const key = deriveTeam(ado.orgUrl, ADO_FIXTURE_PROJECT_ID).key.toString('hex');
   const walk = (folder: string): string[] =>
     readdirSync(folder, { withFileTypes: true }).flatMap((entry) => {
       const path = join(folder, entry.name);
       if (entry.isDirectory()) return walk(path);
-      return entry.name !== 'secrets.json' && /\.(json|log|txt)$/.test(entry.name) ? [path] : [];
+      return /\.(json|log|txt)$/.test(entry.name) ? [path] : [];
     });
-  for (const file of walk(userDataDir)) expect(readFileSync(file, 'utf8'), file).not.toContain(SECRET);
+  for (const file of walk(userDataDir)) {
+    const text = readFileSync(file, 'utf8');
+    expect(text, file).not.toContain(key);
+    expect(text, file).not.toContain('peers:team-secret');
+  }
 });

@@ -4,11 +4,12 @@ import type { AdoConnectionSummary, ClaudeConnectionSummary, ConnectionKind, Mcp
 import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, TabPanel, Tabs, Text, type TabItem } from '@agent-lanes/ui';
 import { connectionTabStatus, type ConnectionDraftController } from '@/entities/connection';
+import { peersTabStatus } from '@/entities/peer';
 import { AdoConnectionsPanel, useAdoDraft } from '@/features/ado-organisations';
 import { ClaudeConnectionPanel, useClaudeDraft } from '@/features/claude-sign-in';
 import { McpServersPanel, useMcpDraft } from '@/features/mcp-servers';
 import { PeersPanel, usePeersDraft } from '@/widgets/peer-network';
-import { useConnections } from '@/shared/api';
+import { useConnections, usePeerNetwork } from '@/shared/api';
 import { closeConnections, showConnectionsTab, useConnectionsModal } from '@/shared/model';
 
 export const CONNECTIONS_SUBTITLE = 'Tokens are encrypted on this computer and never shown again after you save them.';
@@ -38,6 +39,7 @@ export function ConnectionsModal() {
   const target = useConnectionsModal((state) => state.target);
   const request = useConnectionsModal((state) => state.request);
   const connections = useConnections();
+  const network = usePeerNetwork();
   const ado = useAdoDraft();
   const claude = useClaudeDraft();
   const mcp = useMcpDraft();
@@ -58,7 +60,7 @@ export function ConnectionsModal() {
   const tabs: TabItem<ConnectionKind>[] = (['ado', 'claude', 'mcp', 'peers'] as const).map((kind) => ({
     value: kind,
     label: tabLabels[kind],
-    status: connectionTabStatus(rows, kind),
+    status: kind === 'peers' ? peersTabStatus(network.data) : connectionTabStatus(rows, kind),
   }));
 
   // A reconnect target focuses its own token field; otherwise the modal's first control takes focus.

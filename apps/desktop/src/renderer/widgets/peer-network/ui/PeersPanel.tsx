@@ -4,7 +4,8 @@ import type { PeerLink, PeerLinkState, PeerNetworkStatus, PeersConnectionSummary
 import { space, tone, type Tone } from '@agent-lanes/tokens';
 import { Button, Pill, Text, TextField } from '@agent-lanes/ui';
 import { ConnectionForm } from '@/entities/connection';
-import { usePeerNetwork } from '@/shared/api';
+import { clock } from '@/entities/peer';
+import { useFindPeers, usePeerNetwork } from '@/shared/api';
 import type { PeersDraft } from '../model/use-peers-draft';
 
 const LINK_VIEW: Record<PeerLinkState, { label: string; tone: Tone }> = {
@@ -15,17 +16,29 @@ const LINK_VIEW: Record<PeerLinkState, { label: string; tone: Tone }> = {
   'other-team': { label: 'Other team', tone: 'neutral' },
 };
 
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
+
 /** What the listener is doing, in words, with the connections it refused (AL-296). */
 export function listenerText(status: PeerNetworkStatus | undefined): string | null {
   const listener = status?.listener;
   if (!status || !listener || listener.state === 'off') return null;
-  const refused = status.refusedConnections > 0 ? ` · ${status.refusedConnections} ${status.refusedConnections === 1 ? 'connection' : 'connections'} refused` : '';
+  const refused = status.refusedConnections > 0 ? ` · ${plural(status.refusedConnections, 'connection')} refused` : '';
   return listener.state === 'listening' ? `Listening on port ${listener.port ?? ''}${refused}` : (listener.message ?? 'The listener failed.');
 }
 
-function linkLine(link: PeerLink): string {
-  const rejected = link.rejectedFrames > 0 ? `${link.rejectedFrames} ${link.rejectedFrames === 1 ? 'frame' : 'frames'} dropped` : null;
-  return [link.address, link.user ? `${link.user}${link.host ? ` on ${link.host}` : ''}` : null, link.message, rejected].filter(Boolean).join(' · ');
+/** What the beacon is doing, with the beacons it ignored (another team, outside the office network). */
+export function beaconText(status: PeerNetworkStatus | undefined): string | null {
+  const beacon = status?.beacon;
+  if (!status || !beacon || beacon.state === 'off') return null;
+  const ignored = status.ignoredBeacons > 0 ? ` · ${plural(status.ignoredBeacons, 'beacon')} ignored` : '';
+  return beacon.state === 'listening' ? `Beacon on UDP port ${beacon.port ?? ''}${ignored}` : (beacon.message ?? 'The beacon failed.');
+}
+
+/** `Kyle Richards on KYLE-PC · 10.0.0.12:47811 · seen 14:02 · Waiting for it to connect.` */
+export function peerLine(link: PeerLink): string {
+  const who = link.user ? `${link.user}${link.host ? ` on ${link.host}` : ''}` : null;
+  const dropped = link.rejectedFrames > 0 ? `${plural(link.rejectedFrames, 'frame')} dropped` : null;
+  return [who, link.address, link.lastSeenAt ? `seen ${clock(link.lastSeenAt)}` : null, link.message, dropped].filter(Boolean).join(' · ');
 }
 
 interface PeersPanelProps {
@@ -33,10 +46,19 @@ interface PeersPanelProps {
   row: PeersConnectionSummary | undefined;
 }
 
-/** Connections › Peers (AL-289, AL-298): who this app is talking to, and the Advanced settings. No secret. */
+/**
+ * Connections › Peers (AL-298, PL§2): a status page, not a form. Who this app is, its listener and
+ * beacon, the peers it has found or been given, and Advanced for the ports and the addresses of apps
+ * the beacon can't reach. There is no secret: apps in the same Azure DevOps project connect.
+ */
 export function PeersPanel({ draft, row }: PeersPanelProps) {
   const network = usePeerNetwork();
-  const listener = listenerText(network.data);
+  const findPeers = useFindPeers();
+  const status = network.data;
+  const off = status?.listener.state === 'off';
+  const listener = listenerText(status);
+  const beacon = beaconText(status);
+  const peers = status?.peers ?? [];
   const { load } = draft;
 
   useEffect(() => {
@@ -47,27 +69,69 @@ export function PeersPanel({ draft, row }: PeersPanelProps) {
   return (
     <View style={styles.panel} testID="connections-peers">
       <Text variant="body">
-        Agent Lanes on other computers in the office, so agents on the same Feature can see each other and talk. Apps that share an Azure DevOps project connect; nothing is sent to Azure DevOps.
+        Agent Lanes on other computers in the office find each other, so agents on the same Feature can see each other and talk. Apps in the same Azure DevOps project connect; there's nothing to type,
+        and nothing is sent to Azure DevOps.
       </Text>
-      {listener ? (
-        <Text variant="meta" testID="peers-listener">
-          {listener}
-        </Text>
-      ) : null}
-      {(network.data?.peers ?? []).map((link) => (
-        <View key={link.address} style={styles.peer} testID={`peer-status-${link.address}`}>
-          <Pill label={LINK_VIEW[link.state].label} tone={LINK_VIEW[link.state].tone} dot />
-          <Text variant="meta" selectable style={styles.grow}>
-            {linkLine(link)}
+
+      <View style={styles.section} testID="peers-this-computer">
+        <Text variant="title">This computer</Text>
+        {status ? (
+          <Text variant="meta" selectable testID="peers-identity">
+            {`${status.identity.user} on ${status.identity.host}`}
           </Text>
+        ) : null}
+        {off ? (
+          <Text variant="meta" testID="peers-off">
+            Peer lanes is off. It starts once an Azure DevOps connection has a default project, or a lane from one is running.
+          </Text>
+        ) : (
+          <>
+            {listener ? (
+              <Text variant="meta" color={status?.listener.state === 'failed' ? tone.danger.text : undefined} testID="peers-listener">
+                {listener}
+              </Text>
+            ) : null}
+            {beacon ? (
+              <Text variant="meta" color={status?.beacon.state === 'failed' ? tone.attention.text : undefined} testID="peers-beacon">
+                {beacon}
+              </Text>
+            ) : null}
+            {status ? (
+              <Text variant="meta" testID="peers-teams">
+                {`Team: ${plural(status.teams, 'Azure DevOps project')}`}
+              </Text>
+            ) : null}
+          </>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.heading}>
+          <Text variant="title" style={styles.grow}>
+            Peers
+          </Text>
+          <Button label="Find peers" variant="secondary" size="sm" loading={findPeers.isPending} disabled={off} onPress={() => findPeers.mutate()} testID="peers-find" />
         </View>
-      ))}
+        {peers.length === 0 && !off ? (
+          <Text variant="meta" testID="peers-none">
+            None found yet. If another Agent Lanes is running, check both computers let it through Windows Firewall on private networks, or add its address under Advanced.
+          </Text>
+        ) : null}
+        {peers.map((link) => (
+          <View key={link.address} style={styles.peer} testID={`peer-status-${link.address}`}>
+            <Pill label={LINK_VIEW[link.state].label} tone={LINK_VIEW[link.state].tone} dot />
+            <Text variant="meta" selectable style={styles.grow}>
+              {peerLine(link)}
+            </Text>
+          </View>
+        ))}
+      </View>
 
       <ConnectionForm title="Advanced" testID="peers-draft">
         <View style={styles.pair}>
           <TextField
             label="Port"
-            help="Other apps reach this one on it. Windows asks once to allow the app on private networks."
+            help="Other apps reach this one on it. Windows asks once to allow Agent Lanes on private networks."
             value={draft.port}
             onChangeText={draft.setPort}
             error={draft.portError}
@@ -78,7 +142,7 @@ export function PeersPanel({ draft, row }: PeersPanelProps) {
           />
           <TextField
             label="Beacon port"
-            help="UDP. Every app in the office uses the same one."
+            help="UDP. The same on every computer in the office."
             value={draft.beaconPort}
             onChangeText={draft.setBeaconPort}
             error={draft.beaconPortError}
@@ -88,14 +152,14 @@ export function PeersPanel({ draft, row }: PeersPanelProps) {
             testID="peers-beacon-port"
           />
         </View>
-        <View style={styles.list}>
+        <View style={styles.section}>
           <Text variant="title">Addresses</Text>
-          <Text variant="meta">Only for an app on another subnet that the beacon can't reach. Add this computer on that one too.</Text>
+          <Text variant="meta">Only for an app on another subnet the beacon can't reach. Add this computer on that one too.</Text>
           {draft.addresses.map((address, index) => (
-            <View key={index} style={styles.peerRow}>
+            <View key={index} style={styles.addressRow}>
               <TextField
                 aria-label={`Address ${index + 1}`}
-                placeholder="KYLE-PC or 10.0.0.12:47812"
+                placeholder="KYLE-PC or 10.0.1.12:47812"
                 value={address}
                 onChangeText={(value) => draft.setAddress(index, value)}
                 error={draft.addressErrors[index] ?? null}
@@ -124,6 +188,14 @@ const styles = StyleSheet.create({
   panel: {
     gap: space.lg,
   },
+  section: {
+    gap: space.sm,
+  },
+  heading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+  },
   pair: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -136,10 +208,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
   },
-  list: {
-    gap: space.sm,
-  },
-  peerRow: {
+  addressRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: space.sm,

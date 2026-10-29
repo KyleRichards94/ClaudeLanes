@@ -85,6 +85,16 @@ export function clock(at: number): string {
   return new Date(at).toTimeString().slice(0, 5);
 }
 
+/** The Peers tab's status word in the Connections modal, from the same rules as the pill. */
+export function peersTabStatus(status: PeerNetworkStatus | undefined): { label: string; tone: Tone } {
+  const view = peersPillView(status);
+  if (!view) return { label: 'Off', tone: 'neutral' };
+  if (view.tone === 'danger') return { label: 'Not listening', tone: 'danger' };
+  if (view.tone === 'attention') return { label: 'Needs attention', tone: 'attention' };
+  const online = status?.peers.filter((peer) => peer.state === 'online').length ?? 0;
+  return online > 0 ? { label: `${online} connected`, tone: 'ok' } : { label: 'None connected', tone: 'neutral' };
+}
+
 /**
  * The board header's Peers pill (PL§2, PL§6): hidden while peer lanes is off (no team); red when the
  * listener failed; amber when an address under Advanced can't be reached, a peer's signature fails or
