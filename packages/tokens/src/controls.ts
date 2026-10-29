@@ -8,8 +8,6 @@
  *   under its 3 px hover lift. Other buttons sit flat and take `shadow.lifted` on hover.
  * - `pressedFilter`: darkens any fill while the button is held down.
  * - `disabledOpacity`: disabled controls fade back but keep their shape and colours.
- *
- * The light hex stays in sync with the control block in agent-lanes-tokens.css.
  */
 
 import { lightDark } from './palette';
@@ -25,6 +23,14 @@ export const darkControl = {
   primaryShadow: '0 6px 16px rgba(91, 101, 196, 0.45)',
   primaryShadowLifted: '0 12px 28px rgba(91, 101, 196, 0.55)',
 } as const;
+
+export type ControlPalette = Record<keyof typeof lightControl, string>;
+
+export const solarpunkControl: ControlPalette = {
+  ink: '#3B4A38',
+  primaryShadow: '0 6px 16px rgba(15, 118, 110, 0.28)',
+  primaryShadowLifted: '0 12px 28px rgba(15, 118, 110, 0.34)',
+};
 
 export const control = {
   ink: lightDark(lightControl.ink, darkControl.ink),

@@ -13,8 +13,6 @@
  * - `thumbShadow`: the thumb's and the switch knob's shadow.
  * - `pillShadow`: the soft violet glow under the selected effort pill.
  * - `disabledOpacity`: a disabled segment or switch fades back.
- *
- * The light hex stays in sync with the selection block in agent-lanes-tokens.css.
  */
 
 import { lightDark } from './palette';
@@ -36,6 +34,17 @@ export const darkSelection = {
   thumbShadow: '0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.28)',
   pillShadow: '0 2px 8px rgba(91, 101, 196, 0.45)',
 } as const;
+
+export type SelectionPalette = Record<keyof typeof lightSelection, string>;
+
+export const solarpunkSelection: SelectionPalette = {
+  track: '#ECE7D8',
+  thumb: '#FFFFFF',
+  label: '#4E5A4A',
+  switchOff: '#C9C2AE',
+  thumbShadow: '0 1px 2px rgba(31, 42, 30, 0.1), 0 1px 3px rgba(31, 42, 30, 0.08)',
+  pillShadow: '0 2px 8px rgba(15, 118, 110, 0.28)',
+};
 
 export const selection = {
   track: lightDark(lightSelection.track, darkSelection.track),

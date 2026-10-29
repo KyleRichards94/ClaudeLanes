@@ -11,13 +11,9 @@
  *
  * `neutral` is the grey of "Queued" and other idle states (status badges on artboard 6, the
  * "1 queued" count on artboard 1).
- *
- * Values that repeat a `color` token are spelled out rather than imported, because index.ts
- * re-exports this file (an import back would be circular); tones.test.ts checks they still match.
- * Keep the light hex in sync with the tone block in agent-lanes-tokens.css.
  */
 
-import { darkColor, lightColor, lightDark } from './palette';
+import { darkColor, lightColor, lightDark, solarpunkColor } from './palette';
 
 const pair = lightDark;
 
@@ -64,6 +60,8 @@ export const lightTone = {
   },
 } as const;
 
+export type TonePalette = { [T in keyof typeof lightTone]: { [K in keyof (typeof lightTone)[T]]: string } };
+
 export const darkTone = {
   claude: {
     border: '#A99BF2',
@@ -105,7 +103,50 @@ export const darkTone = {
     text: '#D5DEEA',
     dot: '#94A3B8',
   },
-} as const;
+} as const satisfies TonePalette;
+
+export const solarpunkTone = {
+  claude: {
+    border: '#5FB8A6',
+    wash: '#EEF8F4',
+    band: solarpunkColor.claudeTint,
+    text: solarpunkColor.claudeText,
+    dot: solarpunkColor.claude,
+  },
+  ado: {
+    wash: '#EEF6FB',
+    band: solarpunkColor.adoTint,
+    text: solarpunkColor.ado,
+    fill: solarpunkColor.skyGlow,
+    dot: solarpunkColor.ado,
+  },
+  attention: {
+    border: '#F2C94C',
+    band: '#FBF0C8',
+    text: '#7A4A00',
+    dot: solarpunkColor.attention,
+  },
+  danger: {
+    border: '#F3B5AE',
+    wash: '#FDF1EF',
+    band: '#F9DCD7',
+    text: '#8C1D14',
+    fill: '#E0665A',
+    dot: solarpunkColor.danger,
+  },
+  ok: {
+    wash: '#EDF7EC',
+    band: '#D6EED3',
+    text: '#1F5E22',
+    fill: '#4CAF50',
+    dot: solarpunkColor.ok,
+  },
+  neutral: {
+    band: '#EEEAE0',
+    text: '#4E5A4A',
+    dot: '#9AA394',
+  },
+} as const satisfies TonePalette;
 
 function themedTone<T extends Record<string, string>>(light: T, dark: { [K in keyof T]: string }): { [K in keyof T]: string } {
   const themed = {} as { [K in keyof T]: string };

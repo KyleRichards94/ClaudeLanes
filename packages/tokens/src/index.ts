@@ -12,27 +12,14 @@
  */
 
 import { darkColor, lightColor, lightDark, themedColors } from './palette';
+import { darkGlass, lightGlass } from './surfaces';
 
-export { darkColor, lightColor, lightOf } from './palette';
+export { cssVar, darkColor, kebab, keysOf, lightColor, lightOf, solarpunkColor, varsFor, type ColorPalette, type PaletteColor } from './palette';
+export { darkGlass, darkShadow, lightGlass, lightShadow, solarpunkGlass, solarpunkShadow, type GlassPalette, type ShadowPalette } from './surfaces';
 
 export const color = themedColors(lightColor, darkColor);
 
 export type ColorToken = keyof typeof color;
-
-/** Light glass fills. Dark glass is darker and a little clearer, so the moving ground reads through it. */
-const lightGlass = {
-  fillMin: 'rgba(255, 255, 255, 0.62)',
-  fillMax: 'rgba(255, 255, 255, 0.72)',
-  highlight: 'rgba(255, 255, 255, 0.9)',
-  border: 'rgba(255, 255, 255, 0.7)',
-} as const;
-
-const darkGlass = {
-  fillMin: 'rgba(18, 26, 40, 0.74)',
-  fillMax: 'rgba(18, 26, 40, 0.84)',
-  highlight: 'rgba(255, 255, 255, 0.22)',
-  border: 'rgba(255, 255, 255, 0.16)',
-} as const;
 
 export const glass = {
   /** Fill opacity range for glass surfaces. */
@@ -44,11 +31,9 @@ export const glass = {
   blurMd: 18,
   /** Modals and sheets. */
   blurXl: 40,
-  highlight: `inset 0 1px 0 ${lightDark(lightGlass.highlight, darkGlass.highlight)}`,
+  highlight: lightDark(lightGlass.highlight, darkGlass.highlight),
   border: lightDark(lightGlass.border, darkGlass.border),
 } as const;
-
-export { lightGlass, darkGlass };
 
 export type GlassLevel = 'sm' | 'md' | 'xl';
 
@@ -120,3 +105,4 @@ export * from './selection';
 export * from './controls';
 export * from './overlay';
 export * from './contrast';
+export * from './themes';

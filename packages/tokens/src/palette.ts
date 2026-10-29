@@ -1,7 +1,7 @@
 /**
- * Light and dark colour palettes. Components paint with `light-dark()`, so the document's
- * `color-scheme` swaps the whole app. The light values are design §11; the dark values are the
- * same cool violet and sky, set down on a blue-black ground so text still clears 4.5:1.
+ * Hex palettes, one per theme. Components never paint with these: they use the `var(--al-*)`
+ * references in index.ts, and the theme's block in agent-lanes-tokens.css carries the hex.
+ * The palettes stay here for the window frame, the contrast tests and the tokens gallery sheet.
  */
 
 export const lightColor = {
@@ -21,9 +21,12 @@ export const lightColor = {
   skyGlow: '#38BDF8',
   /** Label and icon on a saturated fill (primary buttons, the logo, the Live chip). */
   onAccent: '#FFFFFF',
-  /** Label on the strong button, whose fill is `ink` and so flips from dark to light. */
+  /** Label on the strong button, whose fill is `ink`. */
   onInk: '#FFFFFF',
 } as const;
+
+export type PaletteColor = keyof typeof lightColor;
+export type ColorPalette = Record<PaletteColor, string>;
 
 export const darkColor = {
   bg: '#101820',
@@ -31,7 +34,6 @@ export const darkColor = {
   ink: '#E7EEF6',
   muted: '#A8B7C9',
   line: '#334155',
-  /** Lifted just enough to clear 3:1 on the dark ground; near-white labels still clear 4.5:1 on it. */
   claude: '#5B65C4',
   claudeTint: '#2C2654',
   claudeText: '#DDD6FE',
@@ -43,11 +45,57 @@ export const darkColor = {
   skyGlow: '#38BDF8',
   onAccent: '#F7F9FC',
   onInk: '#101820',
-} as const;
+} as const satisfies ColorPalette;
 
-export type PaletteColor = keyof typeof lightColor;
+/** Solarpunk (AL-286): cream ground, teal-green for Claude, sea blue for ADO, sun gold for the glow. */
+export const solarpunkColor = {
+  bg: '#F7F3E8',
+  surface: '#FFFDF7',
+  ink: '#1F2A1E',
+  muted: '#5C6B57',
+  line: '#E3DCC8',
+  claude: '#0F766E',
+  claudeTint: '#D9F2EC',
+  claudeText: '#0B5A54',
+  ado: '#1A669A',
+  adoTint: '#DCEEF9',
+  ok: '#2E7D32',
+  attention: '#B45309',
+  danger: '#B3261E',
+  skyGlow: '#F5B82E',
+  onAccent: '#FFFFFF',
+  onInk: '#FFFFFF',
+} as const satisfies ColorPalette;
 
-/** The first colour of a `light-dark()` pair, or the value itself when it is not one. */
+export const kebab = (key: string): string => key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+
+export function keysOf<T extends object>(value: T): (keyof T & string)[] {
+  return Object.keys(value) as (keyof T & string)[];
+}
+
+export function cssVar(name: string): string {
+  return `var(--al-${name})`;
+}
+
+/** `var(--al-<prefix><kebab key>)` for every key: `varsFor('tone-ok-', ['band'])` → `{ band: 'var(--al-tone-ok-band)' }`. */
+export function varsFor<K extends string>(prefix: string, keys: readonly K[]): Record<K, string> {
+  const vars = {} as Record<K, string>;
+  for (const key of keys) vars[key] = cssVar(`${prefix}${kebab(key)}`);
+  return vars;
+}
+
+/** A colour that follows the document color-scheme. Gone in Task 3. */
+export function lightDark(light: string, dark: string): string {
+  return `light-dark(${light}, ${dark})`;
+}
+
+export function themedColors<K extends string>(light: Record<K, string>, dark: Record<K, string>): Record<K, string> {
+  const themed = {} as Record<K, string>;
+  for (const key of Object.keys(light) as K[]) themed[key] = lightDark(light[key], dark[key]);
+  return themed;
+}
+
+/** The first colour of a `light-dark()` pair, or the value itself. Gone in Task 3. */
 export function lightOf(value: string): string {
   if (!value.startsWith('light-dark(') || !value.endsWith(')')) return value;
   const inner = value.slice('light-dark('.length, -1);
@@ -59,15 +107,4 @@ export function lightOf(value: string): string {
     else if (char === ',' && depth === 0) return inner.slice(0, index).trim();
   }
   return value;
-}
-
-/** A colour that follows the document color-scheme. */
-export function lightDark(light: string, dark: string): string {
-  return `light-dark(${light}, ${dark})`;
-}
-
-export function themedColors<K extends string>(light: Record<K, string>, dark: Record<K, string>): Record<K, string> {
-  const themed = {} as Record<K, string>;
-  for (const key of Object.keys(light) as K[]) themed[key] = lightDark(light[key], dark[key]);
-  return themed;
 }

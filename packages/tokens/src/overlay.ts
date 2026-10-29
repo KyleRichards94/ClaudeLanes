@@ -8,8 +8,6 @@
  * - `scrimBlur`: the blur of the app behind the scrim (px), the `glass.blurSm` step: board cards
  *   turn into soft shapes, as on artboard 2.
  * - `shadow`: the modal's large soft drop shadow, heavier below the panel than above it.
- *
- * The light values stay in sync with the overlay block in agent-lanes-tokens.css.
  */
 
 import { lightDark } from './palette';
@@ -23,6 +21,13 @@ export const darkOverlay = {
   scrim: 'rgba(8, 12, 18, 0.55)',
   shadow: '0 24px 72px rgba(0, 0, 0, 0.5)',
 } as const;
+
+export type OverlayPalette = Record<keyof typeof lightOverlay, string>;
+
+export const solarpunkOverlay: OverlayPalette = {
+  scrim: 'rgba(247, 243, 232, 0.55)',
+  shadow: '0 24px 72px rgba(31, 42, 30, 0.18)',
+};
 
 export const overlay = {
   scrim: lightDark(lightOverlay.scrim, darkOverlay.scrim),
