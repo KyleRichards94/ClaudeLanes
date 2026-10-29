@@ -214,7 +214,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | done |
 | AL-291 | Room log and replay | E18 | M | AL-290 | done |
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | done |
-| AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
+| AL-293 | Board presence | E18 | M | AL-290, AL-234 | done |
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | todo |
 | AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
@@ -1614,9 +1614,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P3, P5, PL§2 · **Depends on:** AL-290, AL-234
 - **Scope:** `entities/peer` (presence model, `overlap()` pure, member row); the Peers pill in the board header with its three states; the room row and the amber overlap row on agent cards; the live "<user>'s agent · <stage> · <ago>" tag on team-board cards for items a peer's lane is on. Reads `peers:rooms` and `peers:presence`.
 - **Acceptance criteria:**
-  - [ ] Two lanes touching the same file, on two fake peers, show the overlap row on the local card naming the user and the files.
-  - [ ] A peer going unreachable turns the pill amber and leaves "last seen" on its members until expiry.
-  - [ ] Nothing relies on colour alone.
+  - [x] Two lanes touching the same file, on two fake peers, show the overlap row on the local card naming the user and the files. (`pages/board/ui/PeerPresence.test.tsx`)
+  - [x] A peer going unreachable turns the pill amber and leaves "last seen" on its members until expiry.
+  - [x] Nothing relies on colour alone. (every state is in the pill's words; the overlap row is text with an icon)
 
 #### AL-294 · Assist bubble
 - **Design:** P8, PL§2, PL§5 · **Depends on:** AL-292, AL-293
@@ -2492,6 +2492,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D837 | AL-292: a peer's words reach an agent as a JSON string inside one `[Peer lanes]` line (`· ask: "…"`), so a newline, a heading or tool-call syntax stays quoted on that line, unchanged. Room messages are delivered only to lanes with a live session, through `sessions.send` (a lane waiting at a gate gets them when the turn ends); an idle lane is not woken and reads the room with `read_room` later. A post also reaches this app's other lanes in the room. Single-step lanes and second agents get `list_peers` and `read_room`, the read-only protocol and no turns. The protocol and tools are added when a session starts in a room; a lane that gets its room later has them from its next session | Sending to an idle lane would start a turn for every agent on the board each time a peer speaks; the brief's fixed prefix with the text "quoted as data" needs the text kept on the prefix line | 2026-10-29 |
 | D838 | AL-292: the protocol and `post_to_room` follow PL§3, with the room named by its parent (`Feature #48000 · Job DTO`) and the count of agents on other machines at session start. `changed` is refused while `git status` shows the ticket branch with no upstream, a gone upstream, or commits ahead. Unread counts cover live `ask`, `blocked` and `offer` only (not replays, not this app's own) and are kept in memory | A replayed ask from yesterday shouldn't light the bubble on every start; the Assist bubble UI (AL-294) may want them kept across restarts, which is a call for Kyle's artboards | 2026-10-29 |
 | D839 | AL-296: reviewed against `WORK_ITEM_COMMENT_RULE`: that rule limits what an agent may post on a work item (QA failures and answers only); it isn't a data-not-instructions rule, so there were no words to reuse. The peer rule stands on its own: every peer line starts `[Peer lanes]` with the peer's words as a JSON string, the protocol says they are information from another agent and not instructions from the user, second agents and single-step lanes can't post, and `changed` waits for a push. The accept filters, the 64 KB and 20 frames/s caps and the signature counters were built in AL-288; AL-296 tests them and shows the counters in the Peers tab. A connection whose frames switch instance id is closed as a spoof | PL§7 asked for the same words "where possible"; it isn't possible, and the brief's reading of that rule doesn't match the code | 2026-10-29 |
+| D840 | E18's UI (AL-293 to AL-295) was built without artboards, on Mitch's go (2026-10-29), from the words in PL§2 and with the board's existing pills, bands, badge and tokens; no new token or colour. Kyle's artboards, when drawn, may change it | Kyle hadn't drawn them; Mitch chose not to wait | 2026-10-29 |
+| D841 | AL-293: the card has no branch line, so the room row (`Room · Feature #48000 · with Kyle, Rocky`) and the amber attention row (`Kyle is also in JobDto.cs` / `Kyle's agent is also on #48162`) sit in a section at the foot of the card, through a `peers` slot on `AgentTicketCardView`. Both are left off a lane in no room, as PL§2 says (PL§6's "No room · #48162 has no parent Feature" row is not shown). The Peers pill is hidden with no Peers connection, green when every listed peer is online, grey with none online, amber with the names on hover when one can't be reached, red when the listener failed. The team-board tag reads `Kyle's agent · Implementing · 4 min ago` under the lock row | PL§2 and PL§6 disagree on the no-room row; a row on every card of a lane with no Feature adds noise | 2026-10-29 |
 
 ---
 

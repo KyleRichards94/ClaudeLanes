@@ -8,6 +8,7 @@ import { openConnections, openNewTicket, toast, useBoardSprint, useBoardSprints,
 import { HeaderMenu, PlanLimitsPill, type HeaderMenuItem } from '@/shared/ui';
 import { sprintRangeLabel } from '../model/header';
 import { McpStatusPill } from './McpStatusPill';
+import { PeersPill } from './PeersPill';
 
 /** The Repo menu's last item, which opens the folder picker (AL-081). */
 export const ADD_REPO_KEY = '__add-repo__';
@@ -66,6 +67,8 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         <McpStatusPill />
         {/* The plan's 5-hour and 7-day windows, once a session reported them (AL-258). */}
         <PlanLimitsPill />
+        {/* Peer lanes: who is online on the office network (AL-293). */}
+        <PeersPill />
       </View>
       {/* The board digest: every ticket ranked by what it needs, and next actions (AL-272). */}
       <Button label="Digest" icon="backlog" onPress={onOpenDigest} testID="open-digest" />

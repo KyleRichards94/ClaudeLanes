@@ -34,6 +34,8 @@ export interface AgentTicketCardViewProps {
   embedded?: boolean;
   /** A control in the card's top-right corner, after the state (the board's "Remove from board…" menu). */
   cornerAction?: ReactNode;
+  /** Peer lanes rows at the foot of the card (AL-293): its room, and who else is in its files. */
+  peers?: ReactNode;
   testID?: string;
 }
 
@@ -42,7 +44,7 @@ export interface AgentTicketCardViewProps {
  * progress bar, "Model · Effort" and sub-agents, and a status band when the ticket needs something.
  * Presentational: give it a ticket; `AgentTicketCard` reads one from the store.
  */
-export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, onContextMenu, cornerAction, embedded = false, testID }: AgentTicketCardViewProps) {
+export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateColor = null, selected = false, onPress, onContextMenu, cornerAction, peers, embedded = false, testID }: AgentTicketCardViewProps) {
   const node = useRef<PressableInstance>(null);
   // The Menu key (or Shift+F10) opens the menu at the card's top-left corner.
   const onKeyDown = (event: KeyDownEvent) => {
@@ -130,6 +132,7 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
             </Text>
           </View>
         </CardSection>
+        {peers ? <CardSection>{peers}</CardSection> : null}
       </Card>
     </>
   );

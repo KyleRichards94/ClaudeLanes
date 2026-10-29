@@ -4,8 +4,9 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Text } from '@agent-lanes/ui';
 import { useWorkItemLanes, type AgentTicketStore } from '@/entities/agent-ticket';
+import { ago, peerOnWorkItem, peerStageLabel, useMinute } from '@/entities/peer';
 import { usePendingDropLanes } from '@/features/drag-to-lane';
-import { useActivePrs, useBacklogTotal, useConnections, useTeamBoard, useTeams, useWorkItemColors } from '@/shared/api';
+import { useActivePrs, useBacklogTotal, useConnections, usePeerRooms, useTeamBoard, useTeams, useWorkItemColors } from '@/shared/api';
 import { openConnections } from '@/shared/model';
 import { HeaderMenu } from '@/shared/ui';
 import { setTeamBoardFilter, setTeamBoardTeam, useTeamBoardSession } from '../model/session';
@@ -45,6 +46,12 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   // Without a sprint team (the board's teams could not be read), the sprint is the profile team's, as main resolves it.
   const onSprintTeam = sprintTeamId == null ? onProfileTeam : (pickedTeam ?? defaultTeamId) === sprintTeamId;
   const board = useTeamBoard(pickedTeam, onSprintTeam ? sprintPath : null);
+  const peerRooms = usePeerRooms().data;
+  const now = useMinute();
+  const peerTagFor = (workItemId: number): string | null => {
+    const peer = peerOnWorkItem(peerRooms, workItemId);
+    return peer ? `${peer.user.split(' ')[0] ?? peer.user}'s agent · ${peerStageLabel(peer.lane.stage)} · ${ago(peer.lastSeenAt, now)}` : null;
+  };
   const prs = useActivePrs(pickedTeam);
   const backlog = useBacklogTotal(pickedTeam);
   // ADO's own type and state colours; the cards use the token colours until (or unless) they arrive.
@@ -72,6 +79,7 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
   return (
     <>
       <TeamBoardView
+        peerTagFor={peerTagFor}
         orgName={ado?.name ?? null}
         teams={teamList}
         team={team}
@@ -97,6 +105,8 @@ export function TeamBoard({ sprintPath = null, sprintTeamId, onOpenBacklog, stor
 }
 
 export interface TeamBoardViewProps {
+  /** `Kyle's agent · Implementing · 4 min ago` for an item another person's agent is on (AL-293). */
+  peerTagFor?: (workItemId: number) => string | null;
   /** "CompanionSystems"; null before an organisation is connected. */
   orgName: string | null;
   teams: readonly TeamRef[];
@@ -135,7 +145,7 @@ const DOTS: Readonly<Record<ColumnTone, string>> = {
 
 /** The team board as drawn, from data (also the component gallery's sample). */
 export function TeamBoardView(props: TeamBoardViewProps) {
-  const { orgName, teams, team, fromProfile, onTeamChange, filter, onFilterChange, columns, backlogTotal, onOpenBacklog, state, onRetry, onConnect, prsError, onOpenItem } =
+  const { orgName, teams, team, fromProfile, onTeamChange, filter, onFilterChange, columns, backlogTotal, onOpenBacklog, state, onRetry, onConnect, prsError, onOpenItem, peerTagFor } =
     props;
   return (
     <GlassPanel style={styles.panel} testID="team-board">
@@ -192,7 +202,7 @@ export function TeamBoardView(props: TeamBoardViewProps) {
           <ScrollView horizontal style={styles.scroller} contentContainerStyle={styles.columnsContent} testID="team-board-columns">
             <View style={styles.columns}>
               {columns.map((column) => (
-                <Column key={column.id} column={column} note={column.kind === 'active-prs' && prsError ? `Couldn't load the pull requests. ${prsError}` : null} onOpenItem={onOpenItem} />
+                <Column key={column.id} column={column} note={column.kind === 'active-prs' && prsError ? `Couldn't load the pull requests. ${prsError}` : null} onOpenItem={onOpenItem} peerTagFor={peerTagFor} />
               ))}
             </View>
           </ScrollView>
@@ -202,7 +212,7 @@ export function TeamBoardView(props: TeamBoardViewProps) {
   );
 }
 
-function Column({ column, note, onOpenItem }: { column: TeamBoardColumnView; note: string | null; onOpenItem?: (id: number) => void }) {
+function Column({ column, note, onOpenItem, peerTagFor }: { column: TeamBoardColumnView; note: string | null; onOpenItem?: (id: number) => void; peerTagFor?: (workItemId: number) => string | null }) {
   const prs = column.kind === 'active-prs';
   return (
     <View style={[styles.column, prs && styles.prColumn]} testID={`team-column-${column.kind === 'active-prs' ? 'active-prs' : column.id}`}>
@@ -217,7 +227,7 @@ function Column({ column, note, onOpenItem }: { column: TeamBoardColumnView; not
       </View>
       <View role="list" aria-label={column.name} style={styles.cards}>
         {column.cards.map((card) =>
-          card.kind === 'item' ? <TeamBoardItemCard key={`i${card.id}`} card={card} onOpen={onOpenItem ? () => onOpenItem(card.id) : undefined} /> : <TeamBoardPullRequestCard key={`p${card.id}`} card={card} />,
+          card.kind === 'item' ? <TeamBoardItemCard key={`i${card.id}`} card={card} onOpen={onOpenItem ? () => onOpenItem(card.id) : undefined} peerTag={peerTagFor?.(card.id) ?? null} /> : <TeamBoardPullRequestCard key={`p${card.id}`} card={card} />,
         )}
       </View>
       {note ? <Text variant="meta">{note}</Text> : column.cards.length === 0 ? <Text variant="meta">{prs ? 'No open pull requests' : 'Nothing here'}</Text> : null}
