@@ -10,7 +10,7 @@ import type { FrameDraft } from './network';
 import { POST_EVERY_MS, createPeerPosting, describePeers } from './posting';
 import { createRoomLog } from './room-log';
 import { signFrame } from './signer';
-import { TEST_ROOM, testLane } from './testing';
+import { TEST_ROOM, TEST_TEAM, testLane } from './testing';
 
 const ME = { user: 'Mitch Healy', host: 'MITCH-PC', instance: randomUUID() };
 const ROOM: TicketRoom = { id: TEST_ROOM, parentId: 48000, parentType: 'Feature', parentTitle: 'Job DTO' };
@@ -25,12 +25,12 @@ function fakeNetwork(state: PeerNetworkStatus['listener']['state'] = 'listening'
   const sent: PeerFrame[] = [];
   return {
     sent,
-    status: (): PeerNetworkStatus => ({ listener: { state, port: 47811, message: null }, peers: [], refusedConnections: 0 }),
+    status: (): PeerNetworkStatus => ({ listener: { state, port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 }),
     identity: () => ME,
     broadcast(draft: FrameDraft) {
       const frame = signFrame(
-        { v: 1, id: randomUUID(), room: draft.room, kind: draft.kind, from: { ...ME, user: draft.person ?? ME.user, person: draft.person !== undefined }, lane: draft.lane, text: draft.text ?? '', data: draft.data ?? {}, sentAt: new Date().toISOString(), replay: false },
-        'unused',
+        { v: 1, id: randomUUID(), room: draft.room, team: TEST_TEAM.tag, kind: draft.kind, from: { ...ME, user: draft.person ?? ME.user, person: draft.person !== undefined }, lane: draft.lane, text: draft.text ?? '', data: draft.data ?? {}, sentAt: new Date().toISOString(), replay: false },
+        TEST_TEAM.key,
       );
       sent.push(frame);
       return frame;

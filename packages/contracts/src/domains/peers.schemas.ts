@@ -7,11 +7,12 @@ import type { PEERS_EVENT_CHANNELS, PEERS_INVOKE_CHANNELS } from './peers.names'
 // ── Frames (PL§3) ────────────────────────────────────────────────────────────────────────────────
 //
 // One JSON object per WebSocket message between two Agent Lanes apps on the office LAN. `sig` is an
-// HMAC-SHA256 with the team secret over the canonical JSON of every other field; the receiver checks
-// it before this schema reads anything (`src/main/peers/signer.ts`).
+// HMAC-SHA256, with the key derived for the frame's `team` tag (PL§11), over the canonical JSON of
+// every other field; the receiver checks it before this schema reads anything (`src/main/peers/signer.ts`).
 
 export const PEER_PROTOCOL_VERSION = 1;
 export const DEFAULT_PEER_PORT = 47811;
+export const DEFAULT_PEER_BEACON_PORT = 47810;
 export const PEER_TEXT_MAX = 2_000;
 /** The most files one frame lists. */
 export const PEER_FILES_MAX = 500;
@@ -42,7 +43,11 @@ export function peerRoomId(orgUrl: string, parentId: number): PeerRoomId {
   return `${orgUrl.trim().replace(/\/+$/, '').toLowerCase()}#${parentId}`;
 }
 
-/** A peer as listed in Connections: a host name or IP, with an optional `:port` (`[v6]:port` for IPv6). */
+/** A team: the first 16 hex characters of a hash of the ADO organisation URL and project id (PL§11). */
+export const PeerTeamTagSchema = z.string().regex(/^[0-9a-f]{16}$/, 'Not a team tag');
+export type PeerTeamTag = z.infer<typeof PeerTeamTagSchema>;
+
+/** An address under Advanced on the Peers tab: a host name or IP, with an optional `:port` (`[v6]:port` for IPv6). */
 export interface PeerAddress {
   host: string;
   port: number;
@@ -60,27 +65,16 @@ export function parsePeerAddress(address: string): PeerAddress | null {
   return port >= 1 && port <= 65_535 ? { host, port } : null;
 }
 
-/** The most peers one app lists. */
+/** The most addresses one app lists. */
 export const PEER_LIST_MAX = 50;
 
-/** One row of the Peers tab's peer list (AL-289). */
+/** One row of the Peers tab's Advanced addresses (AL-289, AL-298). */
 export const PeerAddressTextSchema = z
   .string()
   .trim()
   .min(1, 'Enter a computer name or IP address')
   .max(300)
   .refine((address) => parsePeerAddress(address) !== null, `Use a computer name or IP address, with :port when it isn't ${DEFAULT_PEER_PORT}`);
-
-/** What Test found at one listed peer (AL-289): it answered with the same team secret, could not be reached, or signs with another secret. */
-export const PEER_PROBE_OUTCOMES = ['answered', 'unreachable', 'rejected'] as const;
-export const PeerProbeSchema = z.object({
-  address: z.string().min(1).max(300),
-  outcome: z.enum(PEER_PROBE_OUTCOMES),
-  user: z.string().min(1).max(200).nullable(),
-  host: z.string().min(1).max(255).nullable(),
-  message: z.string().nullable(),
-});
-export type PeerProbe = z.infer<typeof PeerProbeSchema>;
 
 /** Worktree-relative, forward slashes. */
 export const PeerPathSchema = z.string().min(1).max(1_024);
@@ -127,6 +121,8 @@ const PeerFrameBaseSchema = z.object({
   /** Every app drops an id it has seen. */
   id: z.uuid(),
   room: PeerRoomIdSchema.nullable(),
+  /** Whose key signs it: a team both apps have (PL§11). */
+  team: PeerTeamTagSchema,
   kind: PeerKindSchema,
   from: PeerFromSchema,
   lane: PeerLaneSchema.nullable(),
@@ -160,12 +156,12 @@ export type PeerFrame = z.infer<typeof PeerFrameSchema>;
 const EpochMsSchema = z.int().nonnegative();
 const CountSchema = z.int().nonnegative();
 
-/** `connecting` until the first signed `hello`; `rejected`: its frames fail the signature (a different team secret). */
-export const PEER_LINK_STATES = ['connecting', 'online', 'unreachable', 'rejected'] as const;
+/** `connecting` until the first signed `hello`; `rejected`: its frames fail the signature; `other-team`: it shares no ADO project with this app. */
+export const PEER_LINK_STATES = ['connecting', 'online', 'unreachable', 'rejected', 'other-team'] as const;
 export const PeerLinkStateSchema = z.enum(PEER_LINK_STATES);
 export type PeerLinkState = z.infer<typeof PeerLinkStateSchema>;
 
-/** One peer listed in Connections. */
+/** One peer listed under Advanced. */
 export const PeerLinkSchema = z.object({
   /** As listed: `KYLE-PC`, `10.0.0.12`, `localhost:47812`. */
   address: z.string().min(1).max(300),
@@ -182,7 +178,7 @@ export const PeerLinkSchema = z.object({
 });
 export type PeerLink = z.infer<typeof PeerLinkSchema>;
 
-/** `off`: no Peers connection. `failed`: the port could not be opened; dialling out still works. */
+/** `off`: no team, so peer lanes is idle. `failed`: the port could not be opened; dialling out still works. */
 export const PEER_LISTENER_STATES = ['off', 'listening', 'failed'] as const;
 export const PeerListenerSchema = z.object({
   state: z.enum(PEER_LISTENER_STATES),
@@ -194,6 +190,8 @@ export type PeerListener = z.infer<typeof PeerListenerSchema>;
 export const PeerNetworkStatusSchema = z.object({
   listener: PeerListenerSchema,
   peers: z.array(PeerLinkSchema).max(200),
+  /** ADO projects this app has a key for (PL§11); none means peer lanes is off. */
+  teams: CountSchema,
   /** Connections closed at accept (not a private address, not a listed host) or for breaking a cap (PL§7). */
   refusedConnections: CountSchema,
 });
@@ -234,8 +232,8 @@ export const PeerRoomsSchema = z.object({
 });
 export type PeerRooms = z.infer<typeof PeerRoomsSchema>;
 
-/** A frame as the room log shows it: never the signature. */
-export const RoomMessageSchema = PeerFrameBaseSchema.extend({
+/** A frame as the room log shows and keeps it: never the signature or the team tag. */
+export const RoomMessageSchema = PeerFrameBaseSchema.omit({ team: true }).extend({
   /** Sent by this app. */
   own: z.boolean(),
 });

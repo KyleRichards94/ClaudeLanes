@@ -34,7 +34,6 @@ import {
   createClaudeLoginDetector,
   createConnectionsService,
   createMcpConnectionTester,
-  createPeersConnectionTester,
   type ConnectionsService,
 } from './connections';
 import { createElectronConnectionsFile } from './connections/electron-connections-file';
@@ -79,13 +78,13 @@ import { createBacklogWindowController, type BacklogWindowController } from './a
 import { createChangesService, type ChangesService } from './changes/service';
 import { createPeerNetwork, type PeerNetwork } from './peers/network';
 import { createPeerIdentity, peersDir, type PeerIdentitySource } from './peers/identity';
-import { createPeerConfigSync, type PeerConfigSync } from './peers/config';
-import { probePeers } from './peers/probe';
+import { createPeerConfigSync, type PeerConfigSync, type PeerDefaults } from './peers/config';
 import { createRooms, type Rooms } from './peers/rooms';
-import { touchedFiles } from './peers/presence';
+import { isLiveLane, touchedFiles } from './peers/presence';
+import { createPeerTeams } from './peers/teams';
 import { createRoomLog, roomLogsDir } from './peers/room-log';
 import { createPeerLanes, type PeerLanes } from './peers/service';
-import { nearestPortfolioParent } from '@agent-lanes/ado-client';
+import { nearestPortfolioParent, projectIdOf } from '@agent-lanes/ado-client';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -209,8 +208,10 @@ export interface Services {
   readonly backlogWindow: BacklogWindowController;
   /** Who this app is to its peers: the ADO identity, the computer and an instance id (AL-288, PL§4). */
   readonly peerIdentity: PeerIdentitySource;
-  /** The WebSocket mesh with the peers listed in Connections (AL-288, E18); off until there is a Peers connection. */
+  /** The WebSocket mesh with the other apps (AL-288, E18); off until the app has a team (AL-298). */
   readonly peerNetwork: PeerNetwork;
+  /** Keeps the network on the app's teams and the Peers connection's Advanced settings (AL-298). */
+  readonly peerConfig: PeerConfigSync;
   /** Rooms by parent Feature or Epic and every lane's presence (AL-290, P2, P3). */
   readonly peerRooms: Rooms;
   /** The room log on disk and the replay to late joiners (AL-291); delivery and posting from AL-292. */
@@ -236,6 +237,8 @@ export interface ServiceOptions {
   backlogWindow?: BacklogWindowController;
   /** Settings as loaded, and after each accepted update. The window chrome follows the appearance. */
   onSettingsChange?: (settings: Settings) => void;
+  /** Peer lanes' ports when there is no Peers connection, and e2e's loopback-only switch (AL-298). */
+  peers: PeerDefaults;
 }
 
 export function createServices(options: ServiceOptions): Services {
@@ -349,8 +352,6 @@ export function createServices(options: ServiceOptions): Services {
       ado: createAdoConnectionTester(),
       claude: createClaudeConnectionTester(claude),
       mcp: createMcpConnectionTester(),
-      // Dials each listed peer with the draft's secret (AL-289); the identity is created just below.
-      peers: createPeersConnectionTester((addresses, secret, signal) => probePeers(addresses, secret, late.peerIdentity?.current().instance ?? '', { signal })),
     },
     detectClaudeLogin: createClaudeLoginDetector(claude),
     // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
@@ -361,18 +362,19 @@ export function createServices(options: ServiceOptions): Services {
       void late.credentialFailures?.connectionsChanged();
       // A new ADO test may have signed in as someone (AL-288).
       void late.peerIdentity?.refresh();
-      // A saved, replaced or removed Peers connection restarts the network (AL-289).
+      // A new ADO project, or changed Advanced settings, reaches the peer network (AL-298).
       void late.peerConfig?.sync();
     },
   });
   const peerIdentity = createPeerIdentity({ dir: peersDir(options.appDataDir), connections, warn: (message) => log.child('peers').warn(message) });
   late.peerIdentity = peerIdentity;
   void peerIdentity.refresh();
-  const peerNetwork = createPeerNetwork({ identity: () => peerIdentity.current(), emit: options.emit, log: log.child('peers') });
-  // Presence goes out as soon as the network is up, not at the next tick (AL-290).
-  const peerConfig = createPeerConfigSync({ connections, network: peerNetwork, log: log.child('peers'), onApplied: () => void late.peerRooms?.sync() });
-  late.peerConfig = peerConfig;
-  void peerConfig.sync();
+  const peerNetwork = createPeerNetwork({
+    identity: () => peerIdentity.current(),
+    emit: options.emit,
+    log: log.child('peers'),
+    ...(options.peers.loopback ? { bindHost: '127.0.0.1' } : {}),
+  });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
   const designView = createDesignViewService({
@@ -405,6 +407,23 @@ export function createServices(options: ServiceOptions): Services {
     // AL-232: a PR in a repo that isn't registered here is flagged, so its drop asks to add the repo.
     registeredRemotes: () => readRegisteredRemotes(settings.get().repos, git.run),
   });
+  // A team per ADO organisation and project: each connection's default project and each live lane's (AL-298, PL§11).
+  const peerTeams = createPeerTeams({
+    sources: async () => [
+      ...(await connections.list()).flatMap((row) => (row.kind === 'ado' && row.defaultProject ? [{ orgUrl: row.orgUrl, project: row.defaultProject }] : [])),
+      ...(await tickets.list()).filter(isLiveLane).flatMap((record) => (record.ado ? [{ orgUrl: record.ado.orgUrl, project: record.ado.project }] : [])),
+    ],
+    projectId: async (orgUrl, project) => {
+      const connectionId = await adoConnectionIdFor(connections, orgUrl);
+      if (!connectionId) return err('ADO_UNAUTHORIZED', `${orgUrl} is not connected.`);
+      const client = await ado.clientFor(connectionId);
+      return client.ok ? projectIdOf(client.data, project) : client;
+    },
+    log: log.child('peers'),
+  });
+  // Presence goes out as soon as the network is up, not at the next tick (AL-290).
+  const peerConfig = createPeerConfigSync({ connections, teams: peerTeams, network: peerNetwork, defaults: options.peers, log: log.child('peers'), onApplied: () => void late.peerRooms?.sync() });
+  late.peerConfig = peerConfig;
   const peerRooms = createRooms({
     network: peerNetwork,
     tickets,
@@ -421,6 +440,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.peerRooms = peerRooms;
   peerRooms.start();
+  peerConfig.start();
   const peerLanes = createPeerLanes({
     network: peerNetwork,
     rooms: peerRooms,
@@ -568,8 +588,9 @@ export function createServices(options: ServiceOptions): Services {
     permissions.sessionExtras,
     (record) => ({ hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees'), (sub) => subagents.noteSubBranch(record.id, sub)) }),
     (record) => ({ hooks: subagents.hooks(record.id) }),
-    // A launched lane's room is looked up as its session starts, while peer lanes is on (AL-290).
+    // A launched lane's room is looked up as its session starts, once its project's team is in (AL-290, AL-298).
     async (record) => {
+      await peerConfig.sync();
       if (peerNetwork.status().listener.state !== 'off') await peerRooms.ensureRoom(record.id);
       return {};
     },
@@ -676,6 +697,7 @@ export function createServices(options: ServiceOptions): Services {
     launchUndo,
     peerIdentity,
     peerNetwork,
+    peerConfig,
     peerRooms,
     peerLanes,
   };
@@ -686,6 +708,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
   // Peers drop this app's lanes at once instead of waiting for them to expire (AL-288).
+  services.peerConfig.dispose();
   await services.peerLanes.dispose();
   services.peerRooms.dispose();
   await services.peerNetwork.dispose();

@@ -3,7 +3,7 @@ import type { InvokeContract } from '../contract';
 import { EventEnvelopeSchema } from '../events';
 import { ClaudeLoginDetectionSchema } from './connections.claude';
 import type { CONNECTIONS_EVENT_CHANNELS, CONNECTIONS_INVOKE_CHANNELS } from './connections.names';
-import { DEFAULT_PEER_PORT, PEER_LIST_MAX, PeerAddressTextSchema, PeerProbeSchema } from './peers.schemas';
+import { DEFAULT_PEER_BEACON_PORT, DEFAULT_PEER_PORT, PEER_LIST_MAX, PeerAddressTextSchema } from './peers.schemas';
 
 /**
  * Connections (AL-042, design §8, R4): Azure DevOps organisations, Claude, MCP servers, and the
@@ -185,11 +185,12 @@ export type McpConnectionSummary = z.infer<typeof McpConnectionSummarySchema>;
 
 export const PeerPortSchema = z.int().min(1).max(65_535);
 
-/** Peer lanes (AL-289): the port this app listens on and the peers it dials; `maskedToken` is the team secret's tail. */
+/** Peer lanes' Advanced settings (AL-298): the two ports, and addresses for apps the beacon can't reach. No secret. */
 export const PeersConnectionSummarySchema = ConnectionRowSchema.extend({
   kind: z.literal('peers'),
   port: PeerPortSchema,
-  peers: z.array(z.string().min(1).max(300)).max(PEER_LIST_MAX),
+  beaconPort: PeerPortSchema,
+  addresses: z.array(z.string().min(1).max(300)).max(PEER_LIST_MAX),
 });
 export type PeersConnectionSummary = z.infer<typeof PeersConnectionSummarySchema>;
 
@@ -256,12 +257,12 @@ export type McpConnectionDraft = z.infer<typeof McpConnectionDraftSchema>;
 export const PeersConnectionDraftSchema = z.strictObject({
   kind: z.literal('peers'),
   port: PeerPortSchema.default(DEFAULT_PEER_PORT),
-  /** Any string the team shares. Left out of a Replace or a Test, the saved one is used. */
-  teamSecret: TokenInputSchema.optional(),
-  peers: z
+  beaconPort: PeerPortSchema.default(DEFAULT_PEER_BEACON_PORT),
+  addresses: z
     .array(PeerAddressTextSchema)
     .max(PEER_LIST_MAX)
-    .refine((peers) => new Set(peers.map((peer) => peer.toLowerCase())).size === peers.length, 'Each peer can be listed once'),
+    .refine((addresses) => new Set(addresses.map((address) => address.toLowerCase())).size === addresses.length, 'Each address can be listed once')
+    .default([]),
   expiresAt: OptionalExpirySchema,
 });
 export type PeersConnectionDraft = z.infer<typeof PeersConnectionDraftSchema>;
@@ -307,8 +308,6 @@ export const ConnectionTestResultSchema = z.object({
   testedAt: z.iso.datetime(),
   /** MCP only (AL-045): the tools the server listed; absent when the test failed or for other kinds. */
   tools: McpToolListSchema.optional(),
-  /** Peers only (AL-289): what each listed peer did when dialled with the draft's team secret. */
-  peers: z.array(PeerProbeSchema).max(PEER_LIST_MAX).optional(),
 });
 export type ConnectionTestResult = z.infer<typeof ConnectionTestResultSchema>;
 

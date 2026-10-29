@@ -1,7 +1,8 @@
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { nearestPortfolioParent } from './parents';
+import { nearestPortfolioParent, projectIdOf } from './parents';
 import { installFakeWorkItems, type FakeWorkItem } from './testing/fake-work-items';
-import { createTestClient, useMswServer } from './testing/msw-server';
+import { createTestClient, ORG_URL, useMswServer } from './testing/msw-server';
 
 const server = useMswServer();
 
@@ -53,5 +54,18 @@ describe('nearestPortfolioParent (AL-290)', () => {
   it('fails when the item itself cannot be read, so the lookup is tried again later', async () => {
     installFakeWorkItems(server, items);
     expect((await nearestPortfolioParent(createTestClient().client, { id: 12345 })).ok).toBe(false);
+  });
+});
+
+describe('projectIdOf (AL-298)', () => {
+  it("reads the project's id by its name", async () => {
+    server.use(
+      http.get(`${ORG_URL}/_apis/projects/:project`, ({ params }) =>
+        params['project'] === 'OnSite Companion' ? HttpResponse.json({ id: '6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c', name: 'OnSite Companion' }) : HttpResponse.json({ message: 'TF200016: The project does not exist.' }, { status: 404 }),
+      ),
+    );
+    const { client } = createTestClient();
+    expect(await projectIdOf(client, ' OnSite Companion ')).toEqual({ ok: true, data: '6ce954b1-ce1f-45d1-b94d-e6bf2464ba2c' });
+    expect(await projectIdOf(client, 'Nope')).toMatchObject({ ok: false });
   });
 });

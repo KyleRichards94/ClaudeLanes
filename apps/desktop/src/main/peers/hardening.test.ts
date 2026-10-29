@@ -5,7 +5,7 @@ import type { PeerFrame } from '@agent-lanes/contracts';
 import { PEER_FRAME_MAX_BYTES, PEER_FRAMES_PER_SECOND, acceptsAddress } from './network';
 import { signFrame } from './signer';
 import type { PeerNetworkOptions } from './network';
-import { createTestPeer, freePort, type TestPeer } from './testing';
+import { OTHER_TEAM, TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, type TestPeer } from './testing';
 
 /** AL-296 (PL§7): who may connect, and the caps that close a connection. */
 
@@ -52,7 +52,7 @@ describe('acceptsAddress', () => {
 async function listening(peers: string[], options: Partial<PeerNetworkOptions> = {}): Promise<TestPeer> {
   const peer = createTestPeer('mitch', await freePort(), options);
   started.push(peer);
-  await peer.network.configure({ port: peer.port, secret: 'team', peers });
+  await peer.network.configure(testConfig(peer.port, peers));
   return peer;
 }
 
@@ -70,8 +70,8 @@ const KYLE = randomUUID();
 
 function hello(port: number): string {
   const frame: PeerFrame = signFrame(
-    { v: 1, id: randomUUID(), room: null, kind: 'hello', from: { user: 'kyle', host: 'KYLE-PC', instance: KYLE, person: false }, lane: null, text: '', data: { port }, sentAt: new Date().toISOString(), replay: false },
-    'team',
+    { v: 1, id: randomUUID(), room: null, team: TEST_TEAM.tag, kind: 'hello', from: { user: 'kyle', host: 'KYLE-PC', instance: KYLE, person: false }, lane: null, text: '', data: { port }, sentAt: new Date().toISOString(), replay: false },
+    TEST_TEAM.key,
   );
   return JSON.stringify(frame);
 }
@@ -124,8 +124,22 @@ describe('caps and filters on a live listener', () => {
     const socket = await connect(peer.port);
     const forged = JSON.parse(hello(other)) as PeerFrame;
     socket.send(JSON.stringify({ ...forged, sig: 'f'.repeat(64) }));
-    socket.send(JSON.stringify(signFrame({ ...forged, id: randomUUID() }, 'another-team')));
+    socket.send(JSON.stringify(signFrame({ ...forged, id: randomUUID() }, OTHER_TEAM.key)));
     await vi.waitFor(() => expect(peer.network.status().peers[0]).toMatchObject({ state: 'rejected', rejectedFrames: 2 }));
     expect(peer.network.online()).toEqual([]);
+  });
+
+  it('drops a frame whose team tag this app has no key for before reading it, and counts it', async () => {
+    const other = await freePort();
+    const peer = await listening([`localhost:${other}`]);
+    const frames = vi.fn();
+    peer.network.onFrame(frames);
+    const socket = await connect(peer.port);
+    const forged = JSON.parse(hello(other)) as PeerFrame;
+    socket.send(JSON.stringify(signFrame({ ...forged, team: OTHER_TEAM.tag, id: randomUUID() }, OTHER_TEAM.key)));
+    socket.send(JSON.stringify({ ...signFrame({ ...forged, team: OTHER_TEAM.tag, kind: 'ask', room: TEST_ROOM, text: 'hi' }, OTHER_TEAM.key), kind: 'not even a kind' }));
+    await vi.waitFor(() => expect(peer.network.status().peers[0]).toMatchObject({ state: 'other-team', rejectedFrames: 2 }));
+    expect(peer.network.online()).toEqual([]);
+    expect(frames).not.toHaveBeenCalled();
   });
 });

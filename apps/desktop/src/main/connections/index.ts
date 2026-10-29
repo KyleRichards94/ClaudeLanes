@@ -12,7 +12,6 @@ export type { AdoResponseNote } from './ado-scopes';
 export { createConnectionsHandlers } from './handlers';
 export { ADO_SESSION_SERVER_NAME, toMcpSessionConfig, type McpSessionConfig } from './mcp-session';
 export { createMcpConnectionTester, type McpConnectionTesterOptions } from './mcp-tester';
-export { createPeersConnectionTester } from './peers';
 export {
   ANTHROPIC_API_KEY_ENV,
   CLAUDE_API_KEY_SECRET_ID,

@@ -14,17 +14,19 @@ import {
   type PeerListener,
   type PeerNetworkStatus,
   type PeerRoomId,
+  type PeerTeamTag,
+  type UnsignedPeerFrame,
 } from '@agent-lanes/contracts';
 import type { Emit } from '../ipc/emit';
 import type { Logger } from '../logging';
 import { isLoopbackHost, isLoopbackIp, isPrivateIp, plainIp } from './addresses';
-import { openFrame, signFrame } from './signer';
+import { openFrame, signFrame, type PeerTeamKey } from './signer';
 
 /**
- * The peer network (AL-288, PL§4): a WebSocket listener for the peers listed in Connections and one
- * outbound connection to each. Frames are signed with the team secret; anything that fails the
- * signature is dropped and counted. Between two apps only one connection stays open: the one the
- * lower instance id started.
+ * The peer network (AL-288, PL§4): a WebSocket listener and one outbound connection to each peer.
+ * Frames are signed with the key of a team both apps have (PL§11); anything with an unknown team or
+ * a bad signature is dropped and counted. Between two apps only one connection stays open: the one
+ * the lower instance id started.
  */
 
 export const PEER_FRAME_MAX_BYTES = 64 * 1024;
@@ -43,13 +45,15 @@ export const CLOSE_DUPLICATE = 4001;
 export const CLOSE_SELF = 4002;
 export const CLOSE_RATE = 4008;
 export const CLOSE_SPOOF = 4003;
+export const CLOSE_TEAM = 4004;
 
 export interface PeerConfig {
   /** 0 picks a free port (tests). */
   port: number;
-  secret: string;
-  /** As listed in Connections: `KYLE-PC`, `10.0.0.12:47812`, `localhost:47812`. */
-  peers: readonly string[];
+  /** As listed under Advanced: `KYLE-PC`, `10.0.0.12:47812`, `localhost:47812`. */
+  addresses: readonly string[];
+  /** The ADO projects this app has a key for; every frame carries one of their tags. */
+  teams: readonly PeerTeamKey[];
 }
 
 export interface PeerIdentity {
@@ -79,6 +83,8 @@ export type PeerEvent = { instance: string; change: 'online' } | { instance: str
 export interface PeerNetwork {
   /** Starts, restarts on a new config, or stops with null. Resolves once the listener is up or has failed. */
   configure(config: PeerConfig | null): Promise<void>;
+  /** New team keys without a restart; a peer that shares none of them any more is closed. */
+  setTeams(teams: readonly PeerTeamKey[]): void;
   /** Signs a frame and sends it to every connected peer; null when the network is off or the frame is not valid. */
   broadcast(draft: FrameDraft): PeerFrame | null;
   /** Signs a frame and sends it to one peer; false when that peer is not connected. */
@@ -148,6 +154,8 @@ interface Peer {
   user: string;
   host: string;
   conns: Set<Conn>;
+  /** Tags its frames have passed with. */
+  teams: Set<PeerTeamTag>;
 }
 
 async function resolveHost(host: string): Promise<string[]> {
@@ -172,6 +180,11 @@ function isAppLevel(frame: PeerFrame): boolean {
   return frame.room === null && frame.lane === null;
 }
 
+/** `https://devops:8090/tfs/defaultcollection#48000` → `https://devops:8090/tfs/defaultcollection`. */
+function roomOrg(room: PeerRoomId): string {
+  return room.slice(0, room.lastIndexOf('#'));
+}
+
 export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   const now = options.now ?? Date.now;
   const heartbeatMs = options.heartbeatMs ?? PEER_HEARTBEAT_MS;
@@ -185,6 +198,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   const conns = new Set<Conn>();
   let links: Link[] = [];
   let config: PeerConfig | null = null;
+  let teams = new Map<PeerTeamTag, PeerTeamKey>();
   let server: WebSocketServer | null = null;
   let listener: PeerListener = { state: 'off', port: null, message: null };
   let refused = 0;
@@ -209,6 +223,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
         rejectedFrames: link.rejectedFrames,
         message: link.message,
       })),
+      teams: teams.size,
       refusedConnections: refused,
     };
   }
@@ -220,13 +235,24 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     return true;
   }
 
-  function build(draft: FrameDraft): PeerFrame | null {
-    if (!config) return null;
+  /** A tag of this app's for a frame to a peer that has `theirs` (null: not known yet), from the room's organisation when it has a room. */
+  function tagFor(theirs: ReadonlySet<PeerTeamTag> | null, room: PeerRoomId | null): PeerTeamTag | null {
+    const org = room === null ? null : roomOrg(room);
+    const ours = [...teams.values()].filter((team) => org === null || team.orgUrl === org);
+    const shared = theirs ? ours.filter((team) => theirs.has(team.tag)) : ours;
+    return shared[0]?.tag ?? null;
+  }
+
+  /** The frame checked by the schema, under a placeholder tag; `seal` gives it the real one and signs it. */
+  function prepare(draft: FrameDraft): UnsignedPeerFrame | null {
+    const placeholder = teams.keys().next().value;
+    if (!config || placeholder === undefined) return null;
     const me = options.identity();
     const parsed = UnsignedPeerFrameSchema.safeParse({
       v: PEER_PROTOCOL_VERSION,
       id: draft.id ?? randomUUID(),
       room: draft.room,
+      team: placeholder,
       kind: draft.kind,
       from: { user: draft.person ?? me.user, host: me.host, instance: me.instance, person: draft.person !== undefined },
       lane: draft.lane,
@@ -239,7 +265,22 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       options.log?.warn(`Peer lanes: a ${draft.kind} frame was not sent: ${parsed.error.issues[0]?.message ?? 'invalid'}`);
       return null;
     }
-    return signFrame(parsed.data, config.secret);
+    return parsed.data;
+  }
+
+  function seal(frame: UnsignedPeerFrame, tag: PeerTeamTag): PeerFrame | null {
+    const team = teams.get(tag);
+    return team ? signFrame({ ...frame, team: tag }, team.key) : null;
+  }
+
+  /** Sends to one peer under a tag it has; `sealed` keeps one signed copy per tag across peers. */
+  function sendToPeer(peer: Peer, frame: UnsignedPeerFrame, sealed: Map<PeerTeamTag, PeerFrame>): PeerFrame | null {
+    const tag = tagFor(peer.teams, frame.room);
+    const signed = tag ? (sealed.get(tag) ?? seal(frame, tag)) : null;
+    if (!tag || !signed) return null;
+    sealed.set(tag, signed);
+    for (const conn of peer.conns) write(conn, signed);
+    return signed;
   }
 
   /** Queues a frame behind the pacing in `pump`, so a burst (a replay, a reconnect) stays under the other side's cap. */
@@ -267,9 +308,14 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     }
   }
 
+  /** Once under each of this app's tags, since the other app's aren't known yet; it reads the ones it has a key for. */
   function hello(conn: Conn): void {
-    const frame = build({ kind: 'hello', room: null, lane: null, data: listener.port ? { port: listener.port } : {} });
-    if (frame) write(conn, frame);
+    const frame = prepare({ kind: 'hello', room: null, lane: null, data: listener.port ? { port: listener.port } : {} });
+    if (!frame) return;
+    for (const tag of teams.keys()) {
+      const signed = seal(frame, tag);
+      if (signed) write(conn, signed);
+    }
   }
 
   function refreshLink(link: Link): void {
@@ -305,7 +351,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       conn.link.user = frame.from.user;
       conn.link.hostName = frame.from.host;
     }
-    const peer = peers.get(conn.instance) ?? { user: frame.from.user, host: frame.from.host, conns: new Set<Conn>() };
+    const peer = peers.get(conn.instance) ?? { user: frame.from.user, host: frame.from.host, conns: new Set<Conn>(), teams: new Set<PeerTeamTag>() };
     const fresh = peer.conns.size === 0;
     const initiator = (c: Conn) => (c.direction === 'out' ? me.instance : (c.instance ?? ''));
     for (const other of peer.conns) {
@@ -321,6 +367,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       peer.conns.delete(other);
     }
     peer.conns.add(conn);
+    peer.teams.add(frame.team);
     peers.set(conn.instance, peer);
     if (conn.link) refreshLink(conn.link);
     if (fresh) for (const listen of peerListeners) listen({ instance: conn.instance, change: 'online' });
@@ -342,15 +389,15 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       return;
     }
     if (!config) return;
-    const opened = openFrame(data.toString(), config.secret);
+    const opened = openFrame(data.toString(), (tag) => teams.get(tag)?.key);
     if (!opened.ok) {
-      if (opened.reason === 'signature') {
+      if (opened.reason === 'team' || opened.reason === 'signature') {
         const link = conn.link ?? (conn.direction === 'in' ? links.find((item) => item.ips.has(conn.remoteIp)) : null);
         if (link) {
           link.rejectedFrames += 1;
           if (link.state !== 'online') {
-            link.state = 'rejected';
-            link.message = 'Its frames fail the signature: the team secrets differ.';
+            link.state = opened.reason === 'team' ? 'other-team' : 'rejected';
+            link.message = opened.reason === 'team' ? 'It shares no Azure DevOps project with this app.' : 'Its frames fail the signature.';
           }
         }
         emitStatus();
@@ -358,12 +405,17 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       return;
     }
     const frame = opened.frame;
+    if (frame.room !== null && roomOrg(frame.room) !== teams.get(frame.team)?.orgUrl) {
+      options.log?.warn(`Peer lanes: dropped a ${frame.kind} frame for a room outside its team's organisation`);
+      return;
+    }
     if (conn.instance === null) {
       if (!identify(conn, frame)) return;
     } else if (frame.from.instance !== conn.instance) {
       conn.ws.close(CLOSE_SPOOF, 'instance changed');
       return;
     }
+    peers.get(conn.instance ?? '')?.teams.add(frame.team);
     if (!remember(frame.id)) return;
     if (conn.link) conn.link.lastSeenAt = at;
     if (isAppLevel(frame)) {
@@ -389,7 +441,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     if (link && gen === generation) {
       if (link.out === conn) link.out = null;
       const stillOnline = link.instance ? (peers.get(link.instance)?.conns.size ?? 0) > 0 : false;
-      if (!stillOnline && link.state !== 'rejected' && !link.self) {
+      if (!stillOnline && link.state !== 'rejected' && link.state !== 'other-team' && !link.self) {
         link.state = 'unreachable';
         link.message = conn.goneReason === 'bye' ? 'It closed Agent Lanes.' : conn.goneReason === 'expired' ? `Nothing heard for ${Math.round(expiryMs / 1000)} s.` : link.message;
       }
@@ -530,8 +582,10 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   }
 
   function heartbeat(): void {
-    const frame = build({ kind: 'status', room: null, lane: null });
-    if (frame) for (const peer of peers.values()) for (const conn of peer.conns) write(conn, frame);
+    const frame = prepare({ kind: 'status', room: null, lane: null });
+    if (!frame) return;
+    const sealed = new Map<PeerTeamTag, PeerFrame>();
+    for (const peer of peers.values()) sendToPeer(peer, frame, sealed);
   }
 
   async function stop(sayBye: boolean): Promise<void> {
@@ -539,8 +593,12 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     for (const interval of intervals.splice(0)) clearInterval(interval);
     if (sayBye) {
       // Straight out, ahead of anything still queued: the socket closes next.
-      const bye = build({ kind: 'bye', room: null, lane: null });
-      if (bye) for (const peer of peers.values()) for (const conn of peer.conns) if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(JSON.stringify(bye));
+      const bye = prepare({ kind: 'bye', room: null, lane: null });
+      for (const peer of peers.values()) {
+        const tag = tagFor(peer.teams, null);
+        const signed = bye && tag ? seal(bye, tag) : null;
+        if (signed) for (const conn of peer.conns) if (conn.ws.readyState === WebSocket.OPEN) conn.ws.send(JSON.stringify(signed));
+      }
     }
     for (const link of links) if (link.timer) clearTimeout(link.timer);
     const closing = [...conns].map(
@@ -570,12 +628,13 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     async configure(next) {
       await stop(true);
       config = next;
+      teams = new Map((next?.teams ?? []).map((team) => [team.tag, team]));
       if (!next) {
         emitStatus();
         return;
       }
       const gen = generation;
-      links = next.peers.flatMap((address) => {
+      links = next.addresses.flatMap((address) => {
         const parsed = parsePeerAddress(address);
         if (!parsed) return [];
         return [{ address: address.trim(), ...parsed, ips: new Set<string>(), state: 'connecting', message: null, instance: null, user: null, hostName: null, lastSeenAt: null, rejectedFrames: 0, out: null, timer: null, attempt: 0, self: false } satisfies Link];
@@ -593,19 +652,29 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       for (const link of links) void dial(link, gen);
       emitStatus();
     },
+    setTeams(next) {
+      if (!config) return;
+      teams = new Map(next.map((team) => [team.tag, team]));
+      for (const peer of peers.values()) {
+        if ([...peer.teams].some((tag) => teams.has(tag))) continue;
+        for (const conn of peer.conns) conn.ws.close(CLOSE_TEAM, 'no shared team');
+      }
+      emitStatus();
+    },
     broadcast(draft) {
-      const frame = build(draft);
+      const frame = prepare(draft);
       if (!frame) return null;
       remember(frame.id);
-      for (const peer of peers.values()) for (const conn of peer.conns) write(conn, frame);
-      return frame;
+      const sealed = new Map<PeerTeamTag, PeerFrame>();
+      for (const peer of peers.values()) sendToPeer(peer, frame, sealed);
+      // The copy the room log keeps: under the tag any peer in that organisation would get.
+      const tag = tagFor(null, frame.room) ?? frame.team;
+      return sealed.get(tag) ?? seal(frame, tag);
     },
     sendTo(instance, draft) {
       const peer = peers.get(instance);
-      const frame = peer ? build(draft) : null;
-      if (!peer || !frame) return false;
-      for (const conn of peer.conns) write(conn, frame);
-      return true;
+      const frame = peer ? prepare(draft) : null;
+      return peer && frame ? sendToPeer(peer, frame, new Map()) !== null : false;
     },
     status,
     identity: () => options.identity(),

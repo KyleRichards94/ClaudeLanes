@@ -121,4 +121,4 @@ export {
 } from './assignment';
 export { listOpenThreads, type OpenThread } from './pr-threads';
 export { listTeamMembers, TEAM_MEMBER_PAGE_SIZE, updateBoardItem, type TeamMembersOptions, type UpdateBoardItemOptions } from './board-item';
-export { MAX_PARENT_HOPS, nearestPortfolioParent, ROOM_PARENT_TYPES, type NearestParentOptions, type PortfolioParent } from './parents';
+export { MAX_PARENT_HOPS, nearestPortfolioParent, projectIdOf, ROOM_PARENT_TYPES, type NearestParentOptions, type PortfolioParent } from './parents';

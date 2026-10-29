@@ -19,6 +19,7 @@ function frame(kind: PeerKind, overrides: Record<string, unknown> = {}) {
     v: 1,
     id: '6f1c2b0e-3d4a-4b5c-8d6e-7f8091a2b3c4',
     room: 'https://devops:8090/tfs/defaultcollection#48000',
+    team: '0123456789abcdef',
     kind,
     from: { user: 'Kyle Richards', host: 'KYLE-PC', instance: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d', person: false },
     lane: { ticketId: '48162', workItemId: 48162, title: 'Job DTO', stage: 'implementing', branch: '48162-job-dto', parentId: 48000 },
@@ -65,15 +66,23 @@ describe('PeerFrameSchema', () => {
     expect(PeerFrameSchema.safeParse(frame(kind, { room: null })).success).toBe(false);
   });
 
+  it('needs a team tag of 16 hex characters', () => {
+    const { team: _team, ...untagged } = frame('ask');
+    expect(PeerFrameSchema.safeParse(untagged).success).toBe(false);
+    expect(PeerFrameSchema.safeParse(frame('ask', { team: '0123456789ABCDEF' })).success).toBe(false);
+    expect(PeerFrameSchema.safeParse(frame('ask', { team: '0123456789abcde' })).success).toBe(false);
+  });
+
   it('rejects another protocol version', () => {
     expect(PeerFrameSchema.safeParse(frame('hello', { v: 2 })).success).toBe(false);
   });
 });
 
 describe('RoomMessageSchema', () => {
-  it('never carries the signature to the renderer', () => {
+  it('never carries the signature or the team tag to the renderer', () => {
     const message = RoomMessageSchema.parse({ ...frame('ask'), own: true });
     expect(message).not.toHaveProperty('sig');
+    expect(message).not.toHaveProperty('team');
   });
 });
 

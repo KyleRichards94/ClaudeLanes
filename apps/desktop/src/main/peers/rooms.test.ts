@@ -7,6 +7,7 @@ import { createMemoryRecordFs, newTicketInput } from '../tickets/testing';
 import type { FrameDraft, PeerEvent, PeerNetwork } from './network';
 import { createRooms, type PortfolioParentRef, type Rooms } from './rooms';
 import { signFrame } from './signer';
+import { TEST_TEAM } from './testing';
 
 const BASE = join('C:', 'src');
 const ME = { user: 'Mitch Healy', host: 'MITCH-PC', instance: randomUUID() };
@@ -16,14 +17,14 @@ const ROOM = peerRoomId(ORG, 48000);
 
 interface FakeNetwork extends Pick<PeerNetwork, 'broadcast' | 'sendTo' | 'onFrame' | 'onPeer' | 'identity' | 'status'> {
   sent: Array<FrameDraft & { to?: string }>;
-  deliver(frame: Omit<PeerFrame, 'sig' | 'v' | 'id' | 'sentAt' | 'replay' | 'from'> & { from?: PeerFrame['from'] }): void;
+  deliver(frame: Omit<PeerFrame, 'sig' | 'v' | 'id' | 'team' | 'sentAt' | 'replay' | 'from'> & { from?: PeerFrame['from'] }): void;
   peer(event: PeerEvent): void;
 }
 
 function fakeNetwork(): FakeNetwork {
   const frames = new Set<(frame: PeerFrame) => void>();
   const peers = new Set<(event: PeerEvent) => void>();
-  const status: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], refusedConnections: 0 };
+  const status: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 };
   const sent: FakeNetwork['sent'] = [];
   return {
     sent,
@@ -46,7 +47,7 @@ function fakeNetwork(): FakeNetwork {
     identity: () => ME,
     status: () => status,
     deliver(partial) {
-      const frame = signFrame({ v: 1, id: randomUUID(), sentAt: new Date().toISOString(), replay: false, from: KYLE, ...partial }, 'unused');
+      const frame = signFrame({ v: 1, id: randomUUID(), team: TEST_TEAM.tag, sentAt: new Date().toISOString(), replay: false, from: KYLE, ...partial }, TEST_TEAM.key);
       for (const listen of frames) listen(frame);
     },
     peer(event) {
@@ -183,7 +184,7 @@ describe('rooms (AL-290)', () => {
 
 describe('rooms over two networks on loopback (AL-290)', () => {
   it("shows one app's lane, with its touched files, as a member of the room on the other", async () => {
-    const { createTestPeer, freePort } = await import('./testing');
+    const { createTestPeer, freePort, testConfig } = await import('./testing');
     const a = createTestPeer('mitch', await freePort());
     const b = createTestPeer('kyle', await freePort());
     const room = { id: ROOM, parentId: 48000, parentType: 'Feature', parentTitle: 'Job DTO' };
@@ -199,8 +200,8 @@ describe('rooms over two networks on loopback (AL-290)', () => {
           return side;
         }),
       );
-      await a.network.configure({ port: a.port, secret: 'team', peers: [`localhost:${b.port}`] });
-      await b.network.configure({ port: b.port, secret: 'team', peers: [`localhost:${a.port}`] });
+      await a.network.configure(testConfig(a.port, [`localhost:${b.port}`]));
+      await b.network.configure(testConfig(b.port, [`localhost:${a.port}`]));
       await Promise.all(sides.map((side) => side.sync()));
       await vi.waitFor(() => expect(sides[1]?.members(ROOM).find((member) => !member.local)).toMatchObject({ user: 'mitch', lane: { workItemId: 48161 }, touched: ['src/File0.cs'] }), { timeout: 5_000 });
       await vi.waitFor(() => expect(sides[0]?.members(ROOM).find((member) => !member.local)).toMatchObject({ user: 'kyle', lane: { workItemId: 48162 }, touched: ['src/File1.cs'] }), { timeout: 5_000 });

@@ -61,7 +61,7 @@ describe('peer entity (AL-293)', () => {
   });
 
   it('shows the Peers pill by its words: hidden when off, red when not listening, amber when a peer is down', () => {
-    const base: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], refusedConnections: 0 };
+    const base: PeerNetworkStatus = { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 };
     const link = (state: 'online' | 'unreachable' | 'rejected', user: string | null, address: string) => ({ address, state, user, host: null, instance: null, lastSeenAt: null, rejectedFrames: 0, message: null });
     expect(peersPillView(undefined)).toBeNull();
     expect(peersPillView({ ...base, listener: { state: 'off', port: null, message: null } })).toBeNull();

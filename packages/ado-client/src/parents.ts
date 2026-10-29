@@ -14,6 +14,14 @@ export interface PortfolioParent {
   title: string;
 }
 
+const projectSchema = z.object({ id: z.string().min(1) });
+
+/** A project's id, a GUID: peer lanes derives its team key from it and the organisation URL (PL§11). */
+export async function projectIdOf(client: AdoClient, project: string, signal?: AbortSignal): Promise<Result<string>> {
+  const read = await client.get(adoPath`/_apis/projects/${project.trim()}`, projectSchema, { signal });
+  return read.ok ? ok(read.data.id) : read;
+}
+
 const parentFieldsSchema = z.object({
   id: WorkItemIdSchema,
   fields: z

@@ -31,7 +31,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
 | **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
 | **M7 Ticket view parity** | The ticket drill-in works like Claude Code: your messages, expandable tool calls, usage and plan limits, Stop, Assign new agent, a second agent | E15 (AL-250–AL-266) | Assign a new agent to a lost session and hand over; a reviewer runs beside it |
-| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-297) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
+| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-298) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -219,6 +219,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | done |
 | AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
 | AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | partial |
+| AL-298 | Automatic discovery and the derived team key | E18 | M | AL-289, AL-296 | in-progress |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1559,6 +1560,8 @@ Agent Lanes app is a peer on the office LAN; lanes whose work items share a pare
 a room where their Claudes talk; the board shows who is on what, flags file overlap, and shows an
 Assist bubble. No server, no shared store, nothing written to ADO. No artboards yet: Kyle draws them
 before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are main-process.
+AL-298 was added on 2026-10-30 from the brief's PL§11, after Mitch saw the Peers form: peers are
+found by a UDP beacon and the key is derived from the ADO project, so there is nothing to type.
 
 #### AL-287 · Peer frame contracts and signing
 - **Design:** PL§3, PL§7 · **Depends on:** AL-011, AL-012
@@ -1647,6 +1650,18 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Acceptance criteria:**
   - [ ] The spec passes on CI (Windows) within the existing e2e budget. (open: `e2e/peer-lanes.spec.ts` passes 4/4 in the full local run on Windows, about 38 s; CI on the branch wasn't checked from here)
   - [x] Screenshot `peer-lanes-1440x960.png` with the pill, bubble, overlap row and panel. (plus `peer-lanes-board-1440x960.png`, since the panel covers the board, D844)
+
+#### AL-298 · Automatic discovery and the derived team key
+- **Design:** PL§11, PL§2 (Peers tab), PL§7 · **Depends on:** AL-289, AL-296
+- **Scope:** `src/main/peers/discovery.ts`: the UDP beacon (send every 5 s and on change, listen on :47810 with `reuseAddr`, found-peer list with team tags and last seen, unreachable at 20 s, private ranges only) feeding the network's dialler; `signer.ts`: tag and key derived per ADO connection from the org URL and project id, `team` on every frame, verify with the key for the frame's tag; the `peers` connection loses its secret (deleted from SecretStore on first start, the old peer list moved to the Advanced addresses); the Peers tab becomes the status page with "Find peers" and Advanced (ports, addresses); README section updated.
+- **Acceptance criteria:**
+  - [ ] Two services in one Vitest process, no addresses configured, find each other through the beacon on loopback and end up with one connection, dialled by the lower instance id.
+  - [ ] A beacon carrying no tag the app knows is ignored and counted; one from a non-private address is ignored and counted.
+  - [ ] Two apps with the same org URL and project id derive the same key; a frame signed by one verifies on the other; a frame with an unknown `team` tag is dropped before parse and counted.
+  - [ ] A test asserts the beacon payload holds no org URL, project id, room, work item id or text.
+  - [ ] On first start with an old `peers` connection, the secret is gone from SecretStore and the old peer list appears under Advanced.
+  - [ ] The Peers tab has no secret field; `peers-connection.spec.ts` shows a found peer and the "other team" state against the fake peers.
+  - [ ] `peer-lanes.spec.ts` stays green with the Advanced address fallback, and passes without it where the runner allows broadcast.
 
 ---
 ## 4. Decisions
@@ -2597,6 +2612,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | 2026-10-29 | E18 Peer lanes and Feature rooms (AL-287–AL-297) added from the 2026-10-29 add-on brief, with milestone M8. D826. |
 | 2026-10-29 | E18 main process: AL-287 frame contracts and signing, AL-288 peer network (`ws`, paced sends, tie rule), AL-289 Connections › Peers tab (`widgets/peer-network`), AL-290 rooms and presence, AL-291 room log and replay, AL-292 delivery and the `list_peers` / `post_to_room` / `read_room` tools, AL-296 hardening and the README section (partial: Kyle's review). D827–D839. The UI tickets AL-293 to AL-295 and the two-app e2e AL-297 wait for Kyle's artboards. Full `pnpm e2e` on each ticket's commit: AL-288 183 passed, AL-289 187, AL-290 186, AL-291 176 (a Playwright worker crash left 10 unrun; the extra failures passed on rerun), AL-296 with AL-292 186 (3 more are serial follow-ons of a failure). The 8 that fail each time (board-scroll strip, design-presence, router, settings-panel ×2) fail the same way on main at 3ca925b. `pnpm verify` per ticket: typecheck, lint, FSD and build green; unit tests green apart from renderer tests that time out at 5 s under load and pass when rerun alone. |
 | 2026-10-29 | E18 UI on Mitch's go, without artboards (D840): AL-293 board presence (Peers pill, room and overlap rows on agent cards, team-board tag), AL-295 Rooms panel, ticket Room tab and person's composer (built before AL-294, D842), AL-294 Assist bubble in the header and on lanes, AL-297 two-app e2e (partial: CI not checked). D840–D844. Full `pnpm e2e` on the final commit: 191 passed, `peer-lanes.spec.ts` 4/4; the 7 failures are the ones main already has. |
+| 2026-10-30 | AL-298 added to E18 from the brief's new PL§11: automatic discovery by UDP beacon and a team key derived from the ADO organisation and project, replacing the Peers form's secret and peer list. |
 ---
 
 ## 7. Parallel build rules

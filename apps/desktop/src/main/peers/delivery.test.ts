@@ -8,13 +8,13 @@ import { createFakeClaude, fakeAssistant, fakeInit, fakeResult, type FakeClaude 
 import { eventually, fakeClaudeConnections, memoryTickets, recordingEmit } from '../agent/testing/sessions';
 import { createDelivery, peerLine, type DeliveryLane } from './delivery';
 import { signFrame } from './signer';
-import { TEST_ROOM, testLane } from './testing';
+import { TEST_ROOM, TEST_TEAM, testLane } from './testing';
 
 const KYLE = { user: 'Kyle Richards', host: 'KYLE-PC', instance: randomUUID(), person: false };
 const OTHER_ROOM = 'https://devops:8090/tfs/defaultcollection#50000';
 
 function frame(kind: PeerKind, text: string, overrides: Partial<UnsignedPeerFrame> = {}): PeerFrame {
-  return signFrame({ v: 1, id: randomUUID(), room: TEST_ROOM, kind, from: KYLE, lane: testLane(48161), text, data: {}, sentAt: new Date().toISOString(), replay: false, ...overrides }, 'unused');
+  return signFrame({ v: 1, id: randomUUID(), room: TEST_ROOM, team: TEST_TEAM.tag, kind, from: KYLE, lane: testLane(48161), text, data: {}, sentAt: new Date().toISOString(), replay: false, ...overrides }, TEST_TEAM.key);
 }
 
 /** Two live sessions on the fake SDK: #48162 is in the room, #48170 is not. */

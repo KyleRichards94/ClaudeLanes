@@ -106,6 +106,7 @@ describe('board presence (AL-293)', () => {
         { address: 'KYLE-PC', state: 'online', user: 'Kyle Richards', host: 'KYLE-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: null },
         { address: 'ROCKY-PC', state: 'unreachable', user: 'Rocky Smith', host: 'ROCKY-PC', instance: null, lastSeenAt: 1, rejectedFrames: 0, message: 'Nothing heard for 90 s.' },
       ],
+      teams: 1,
       refusedConnections: 0,
     };
     wrap(<PeersPill />, { 'peers:list': { ok: true, data: network } });
@@ -117,7 +118,7 @@ describe('board presence (AL-293)', () => {
   });
 
   it('hides the Peers pill while there is no Peers connection', async () => {
-    wrap(<PeersPill />, { 'peers:list': { ok: true, data: { listener: { state: 'off', port: null, message: null }, peers: [], refusedConnections: 0 } } });
+    wrap(<PeersPill />, { 'peers:list': { ok: true, data: { listener: { state: 'off', port: null, message: null }, peers: [], teams: 1, refusedConnections: 0 } } });
     await waitFor(() => expect(screen.queryByTestId('peers-pill')).toBeNull());
   });
 });

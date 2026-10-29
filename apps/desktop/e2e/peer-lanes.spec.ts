@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
 import { artboard11Backlog } from '@agent-lanes/ado-client/testing';
 import { STAGES, type PeerNetworkStatus } from '@agent-lanes/contracts';
-import { freePort } from '../src/main/peers/testing';
 import { startFakeAdoServer, type FakeAdoServer } from './support/fake-ado-server';
 import type { FakeAgentTurn } from './support/fake-claude-code';
 import { startTeamBoardApp, type TeamBoardApp } from './support/team-board-app';
@@ -14,10 +13,9 @@ import { startTeamBoardApp, type TeamBoardApp } from './support/team-board-app';
  * the other app's agent gets the post as a `[Peer lanes]` turn.
  */
 
-/** Made up for this test. */
-const TEAM_SECRET = 'e2e-peer-lanes-team-secret-0000-Wn5D';
 const ALL_AUTO = Object.fromEntries(STAGES.map((stage) => [stage, 'auto']));
 const SAME_FILE = 'src/JobDto.cs';
+const BEACON_PORT = 47820;
 
 /** Generic replies to room turns, so each one gets an answer whatever arrives first. */
 const noted = (who: string): FakeAgentTurn[] => Array.from({ length: 6 }, () => ({ match: '[Peer lanes]', steps: [{ text: `${who} noted the room` }] }));
@@ -68,7 +66,8 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   ado = await startFakeAdoServer({ teamBoard: true, orgName: 'CompanionSystems', teamItems: artboard11Backlog() });
-  const [mitchPort, kylePort] = [await freePort(), await freePort()];
+  // Off the ports a real Agent Lanes on this computer uses (47811, 47810).
+  const [mitchPort, kylePort] = [47821, 47822];
   mitch = await startTeamBoardApp({ name: 'peers-mitch', ado, claude: { lead: { turns: MITCH_AGENT } } });
   // The second app skips the ADO token test, so it posts under the Windows user name and the two are told apart.
   kyle = await startTeamBoardApp({ name: 'peers-kyle', ado, testAdo: false, claude: { lead: { turns: KYLE_AGENT } } });
@@ -76,7 +75,7 @@ test.beforeAll(async () => {
     [mitch, mitchPort, kylePort],
     [kyle, kylePort, mitchPort],
   ] as const) {
-    expect(await app.invoke('connections:save', { kind: 'peers', port, teamSecret: TEAM_SECRET, peers: [`localhost:${other}`] })).toMatchObject({ ok: true });
+    expect(await app.invoke('connections:save', { kind: 'peers', port, beaconPort: BEACON_PORT, addresses: [`localhost:${other}`] })).toMatchObject({ ok: true });
   }
   await expect.poll(async () => (await network(mitch))?.peers[0]?.state, { timeout: 20_000 }).toBe('online');
   await expect.poll(async () => (await network(kyle))?.peers[0]?.state, { timeout: 20_000 }).toBe('online');

@@ -52,7 +52,7 @@ const rooms: PeerRooms = { rooms: [room], others: [] };
 function setup(children: ReactNode, replies: Parameters<typeof installFakeBridge>[0] = {}) {
   const bridge = installFakeBridge({
     'connections:list': { ok: true, data: [fakeAdoRow({ identity: 'Mitch Healy' })] },
-    'peers:list': { ok: true, data: { listener: { state: 'listening', port: 47811, message: null }, peers: [], refusedConnections: 0 } },
+    'peers:list': { ok: true, data: { listener: { state: 'listening', port: 47811, message: null }, peers: [], teams: 1, refusedConnections: 0 } },
     'peers:rooms': { ok: true, data: rooms },
     'peers:log': { ok: true, data: { room: ROOM, messages, capped: false } },
     'peers:markSeen': { ok: true, data: { total: 0, byRoom: {}, byTicket: {} } },
@@ -100,7 +100,7 @@ describe('room log (AL-295)', () => {
   });
 
   it('points to Connections when peer lanes is off', async () => {
-    setup(<RoomTab ticketId="71273" />, { 'peers:list': { ok: true, data: { listener: { state: 'off', port: null, message: null }, peers: [], refusedConnections: 0 } } });
+    setup(<RoomTab ticketId="71273" />, { 'peers:list': { ok: true, data: { listener: { state: 'off', port: null, message: null }, peers: [], teams: 1, refusedConnections: 0 } } });
     await waitFor(() => expect(screen.getByTestId('room-tab').textContent).toContain('Peer lanes is off'));
   });
 });

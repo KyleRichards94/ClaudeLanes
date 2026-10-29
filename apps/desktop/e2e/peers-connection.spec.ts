@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test';
 import type { ConnectionSummary, PeerNetworkStatus, Result } from '@agent-lanes/contracts';
-import { createTestPeer, freePort, type TestPeer } from '../src/main/peers/testing';
+import { OTHER_TEAM, createTestPeer, freePort, testConfig, type TestPeer } from '../src/main/peers/testing';
 
 /**
  * AL-289 against the real app: Connections › Peers saves a port, a team secret and a peer list. Test
@@ -48,8 +48,8 @@ test.beforeAll(async () => {
   kyle = createTestPeer('kyle', await freePort());
   rocky = createTestPeer('rocky', await freePort());
   nobody = await freePort();
-  await kyle.network.configure({ port: kyle.port, secret: SECRET, peers: [`localhost:${appPort}`] });
-  await rocky.network.configure({ port: rocky.port, secret: 'another-team-entirely', peers: [`localhost:${appPort}`] });
+  await kyle.network.configure(testConfig(kyle.port, [`localhost:${appPort}`]));
+  await rocky.network.configure(testConfig(rocky.port, [`localhost:${appPort}`], [OTHER_TEAM]));
   app = await electron.launch({ args: [join(__dirname, '..')], env: { ...process.env, AGENT_LANES_USER_DATA_DIR: userDataDir } });
   page = await app.firstWindow();
   await expect(page.getByText('Agent board')).toBeVisible();

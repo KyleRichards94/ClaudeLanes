@@ -6,6 +6,7 @@ const env = {
   AGENT_LANES_SKIP_FIRST_RUN: '1',
   AGENT_LANES_CLAUDE_EXECUTABLE: 'C:/e2e/fake-claude-code.mjs',
   AGENT_LANES_DESIGN_TEST_ORIGIN: 'http://127.0.0.1:5123',
+  AGENT_LANES_PEER_TEST_PORTS: '0:47820',
 };
 
 /** `__TEST_HOOKS__` as electron.vite.config.ts defines it for the main bundle in `mode`. */
@@ -16,8 +17,13 @@ function testHooksDefine(mode: string): unknown {
 
 describe('test hooks (AL-222)', () => {
   it('reads the e2e switches from the environment', () => {
-    expect(readTestHooks(env)).toEqual({ skipFirstRun: true, claudeExecutable: 'C:/e2e/fake-claude-code.mjs', designTestOrigin: 'http://127.0.0.1:5123' });
-    expect(readTestHooks({ AGENT_LANES_SKIP_FIRST_RUN: 'true', AGENT_LANES_CLAUDE_EXECUTABLE: ' ' })).toEqual(NO_TEST_HOOKS);
+    expect(readTestHooks(env)).toEqual({
+      skipFirstRun: true,
+      claudeExecutable: 'C:/e2e/fake-claude-code.mjs',
+      designTestOrigin: 'http://127.0.0.1:5123',
+      peerPorts: { port: 0, beaconPort: 47820 },
+    });
+    expect(readTestHooks({ AGENT_LANES_SKIP_FIRST_RUN: 'true', AGENT_LANES_CLAUDE_EXECUTABLE: ' ', AGENT_LANES_PEER_TEST_PORTS: '47821:0' })).toEqual(NO_TEST_HOOKS);
   });
 
   it('never uses them in the installed app', () => {

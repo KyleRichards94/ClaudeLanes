@@ -85,8 +85,8 @@ export function useMarkSeen() {
 /** `peers:status`, `peers:presence` and `peers:message` keep the cached network, rooms and logs current. The app registers this with its event hub. */
 export function peersEventHandlers(queryClient: QueryClient): EventHandlers {
   return {
-    'peers:status': ({ listener, peers, refusedConnections }) => {
-      queryClient.setQueryData<PeerNetworkStatus>(peerNetworkQueryKey, { listener, peers, refusedConnections });
+    'peers:status': ({ listener, peers, teams, refusedConnections }) => {
+      queryClient.setQueryData<PeerNetworkStatus>(peerNetworkQueryKey, { listener, peers, teams, refusedConnections });
     },
     'peers:presence': () => {
       void queryClient.invalidateQueries({ queryKey: peerRoomsQueryKey });

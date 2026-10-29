@@ -11,9 +11,8 @@ import { OWN_LOG_MAX, createRoomLog, roomLogFile } from './room-log';
 import { createRooms, type Rooms } from './rooms';
 import { createPeerLanes } from './service';
 import { signFrame } from './signer';
-import { TEST_ROOM, createTestPeer, freePort, testLane } from './testing';
+import { TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, testLane } from './testing';
 
-const SECRET = 'room-log-test-secret-0000-Wq3e';
 const OTHER_ROOM = 'https://devops:8090/tfs/defaultcollection#50000';
 const ME = { user: 'Mitch Healy', host: 'MITCH-PC', instance: randomUUID(), person: false };
 
@@ -26,7 +25,7 @@ afterEach(async () => {
 });
 
 function frame(text: string, overrides: Partial<UnsignedPeerFrame> = {}, kind: PeerKind = 'ask'): PeerFrame {
-  return signFrame({ v: 1, id: randomUUID(), room: TEST_ROOM, kind, from: ME, lane: testLane(48162), text, data: {}, sentAt: new Date().toISOString(), replay: false, ...overrides }, SECRET);
+  return signFrame({ v: 1, id: randomUUID(), room: TEST_ROOM, team: TEST_TEAM.tag, kind, from: ME, lane: testLane(48162), text, data: {}, sentAt: new Date().toISOString(), replay: false, ...overrides }, TEST_TEAM.key);
 }
 
 function store(now?: () => number, sent: Array<{ to: string; draft: FrameDraft }> = []) {
@@ -34,13 +33,13 @@ function store(now?: () => number, sent: Array<{ to: string; draft: FrameDraft }
 }
 
 describe('room log (AL-291)', () => {
-  it('keeps own messages on disk with no signature or secret, and reads them back after a restart', async () => {
+  it('keeps own messages on disk with no signature or key, and reads them back after a restart', async () => {
     const first = store();
     await first.recordOwn(frame('Pushed JobDto.Status on 48162-job-dto'));
     await first.recordOwn(frame('Need the enum from #48161', {}, 'blocked'));
     await first.flush();
     const text = await readFile(roomLogFile(dir, TEST_ROOM), 'utf8');
-    expect(text).not.toContain(SECRET);
+    expect(text).not.toContain(TEST_TEAM.key.toString('hex'));
     expect(text).not.toContain('"sig"');
     expect(await readdir(dir)).toEqual([roomLogFile(dir, TEST_ROOM).slice(dir.length + 1)]);
 
@@ -127,7 +126,7 @@ describe('late joiner over two networks (AL-291)', () => {
         { id: TEST_ROOM, parentId: 48000 },
         { id: OTHER_ROOM, parentId: 50000 },
       ]);
-      await a.network.configure({ port: a.port, secret: 'team', peers: [`localhost:${b.port}`] });
+      await a.network.configure(testConfig(a.port, [`localhost:${b.port}`]));
       await mitch.rooms.sync();
       for (const [text, room] of [['One', TEST_ROOM], ['Two', TEST_ROOM], ['Not yours', OTHER_ROOM], ['Three', TEST_ROOM]] as const) {
         const sent = a.network.broadcast({ kind: 'ask', room, lane: testLane(48161), text });
@@ -136,7 +135,7 @@ describe('late joiner over two networks (AL-291)', () => {
 
       // Kyle starts later with a lane in the first room only.
       const kyle = await side(b, 1, [{ id: TEST_ROOM, parentId: 48000 }]);
-      await b.network.configure({ port: b.port, secret: 'team', peers: [`localhost:${a.port}`] });
+      await b.network.configure(testConfig(b.port, [`localhost:${a.port}`]));
       await kyle.rooms.sync();
       await vi.waitFor(async () => expect((await kyle.roomLog.read(TEST_ROOM)).messages.map((message) => message.text)).toEqual(['One', 'Two', 'Three']), { timeout: 8_000 });
       const read = await kyle.roomLog.read(TEST_ROOM);

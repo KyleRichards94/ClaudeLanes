@@ -62,7 +62,7 @@ export function ConnectionsModal() {
   }));
 
   // A reconnect target focuses its own token field; otherwise the modal's first control takes focus.
-  const initialFocusRef = target === 'claude' ? claude.keyRef : target === 'peers' ? peers.secretRef : target?.startsWith('mcp:') ? mcp.tokenRef : target ? ado.patRef : undefined;
+  const initialFocusRef = target === 'claude' ? claude.keyRef : target === 'peers' ? undefined : target?.startsWith('mcp:') ? mcp.tokenRef : target ? ado.patRef : undefined;
 
   function close() {
     for (const draft of drafts) draft.clear();
@@ -131,7 +131,7 @@ export function ConnectionsModal() {
         <McpServersPanel draft={mcp} rows={mcpRows} allRows={rows} target={tab === 'mcp' ? target : null} request={request} />
       </TabPanel>
       <TabPanel idPrefix={idPrefix} value="peers" style={tab === 'peers' ? undefined : styles.hidden}>
-        <PeersPanel draft={peers} row={peersRow} target={tab === 'peers' ? target : null} request={request} />
+        <PeersPanel draft={peers} row={peersRow} />
       </TabPanel>
     </View>
   );

@@ -5,7 +5,7 @@ import { WebSocket } from 'ws';
 import type { PeerFrame } from '@agent-lanes/contracts';
 import type { PeerEvent } from './network';
 import { signFrame } from './signer';
-import { TEST_ROOM, createTestPeer, freePort, testLane, type TestPeer } from './testing';
+import { OTHER_TEAM, TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, testLane, type TestPeer } from './testing';
 
 const started: TestPeer[] = [];
 const closers: Array<() => void | Promise<void>> = [];
@@ -26,19 +26,19 @@ function listing(...peers: TestPeer[]): string[] {
 }
 
 describe('peer network', () => {
-  it('exchanges signed frames between two apps and rejects a third with another secret', async () => {
+  it('exchanges signed frames between two apps in one team, and leaves a third from another project as other team', async () => {
     const [a, b, c] = [await peer('mitch'), await peer('kyle'), await peer('rocky')];
     const received: Record<string, PeerFrame[]> = { b: [], c: [] };
     b.network.onFrame((frame) => received.b?.push(frame));
     c.network.onFrame((frame) => received.c?.push(frame));
-    await a.network.configure({ port: a.port, secret: 'team', peers: listing(b, c) });
-    await b.network.configure({ port: b.port, secret: 'team', peers: listing(a, c) });
-    await c.network.configure({ port: c.port, secret: 'not-the-team', peers: listing(a, b) });
+    await a.network.configure(testConfig(a.port, listing(b, c)));
+    await b.network.configure(testConfig(b.port, listing(a, c)));
+    await c.network.configure(testConfig(c.port, listing(a, b), [OTHER_TEAM]));
 
     await vi.waitFor(() => expect(a.network.online()).toEqual([b.instance]), { timeout: 5_000 });
     await vi.waitFor(() => {
       const link = a.network.status().peers.find((item) => item.address === `localhost:${c.port}`);
-      expect(link).toMatchObject({ state: 'rejected' });
+      expect(link).toMatchObject({ state: 'other-team', message: 'It shares no Azure DevOps project with this app.' });
       expect(link?.rejectedFrames).toBeGreaterThan(0);
     });
     expect(a.network.status().peers.find((item) => item.address === `localhost:${b.port}`)).toMatchObject({ state: 'online', user: 'kyle', host: 'KYLE-PC', instance: b.instance });
@@ -54,8 +54,8 @@ describe('peer network', () => {
   it('keeps exactly one connection when both sides connect at once', async () => {
     const [a, b] = [await peer('mitch'), await peer('kyle')];
     await Promise.all([
-      a.network.configure({ port: a.port, secret: 'team', peers: listing(b) }),
-      b.network.configure({ port: b.port, secret: 'team', peers: listing(a) }),
+      a.network.configure(testConfig(a.port, listing(b))),
+      b.network.configure(testConfig(b.port, listing(a))),
     ]);
     await vi.waitFor(() => {
       expect(a.network.online()).toEqual([b.instance]);
@@ -74,14 +74,14 @@ describe('peer network', () => {
     const silentPort = await freePort();
     const events: PeerEvent[] = [];
     a.network.onPeer((event) => events.push(event));
-    await a.network.configure({ port: a.port, secret: 'team', peers: [`localhost:${silentPort}`] });
+    await a.network.configure(testConfig(a.port, [`localhost:${silentPort}`]));
 
     const instance = randomUUID();
     const frame = (kind: 'hello' | 'bye') =>
       JSON.stringify(
         signFrame(
-          { v: 1, id: randomUUID(), room: null, kind, from: { user: 'kyle', host: 'KYLE-PC', instance, person: false }, lane: null, text: '', data: kind === 'hello' ? { port: silentPort } : {}, sentAt: new Date().toISOString(), replay: false },
-          'team',
+          { v: 1, id: randomUUID(), room: null, team: TEST_TEAM.tag, kind, from: { user: 'kyle', host: 'KYLE-PC', instance, person: false }, lane: null, text: '', data: kind === 'hello' ? { port: silentPort } : {}, sentAt: new Date().toISOString(), replay: false },
+          TEST_TEAM.key,
         ),
       );
     const connect = async () => {
@@ -107,6 +107,22 @@ describe('peer network', () => {
     expect(a.network.status().peers[0]).toMatchObject({ state: 'unreachable', message: 'It closed Agent Lanes.' });
   });
 
+  it('marks a peer whose frames carry this team but fail its key as signature rejected', async () => {
+    const a = await peer('mitch');
+    const otherPort = await freePort();
+    await a.network.configure(testConfig(a.port, [`localhost:${otherPort}`]));
+    const ws = new WebSocket(`ws://127.0.0.1:${a.port}/`);
+    closers.push(() => ws.terminate());
+    await new Promise((done) => ws.once('open', done));
+    const forged = signFrame(
+      { v: 1, id: randomUUID(), room: null, team: TEST_TEAM.tag, kind: 'hello', from: { user: 'kyle', host: 'KYLE-PC', instance: randomUUID(), person: false }, lane: null, text: '', data: { port: otherPort }, sentAt: new Date().toISOString(), replay: false },
+      OTHER_TEAM.key,
+    );
+    ws.send(JSON.stringify(forged));
+    await vi.waitFor(() => expect(a.network.status().peers[0]).toMatchObject({ state: 'rejected', rejectedFrames: 1 }));
+    expect(a.network.online()).toEqual([]);
+  });
+
   it('reports a port in use as a status, not a crash', async () => {
     const taken: Server = createServer();
     await new Promise<void>((done) => taken.listen(0, '127.0.0.1', done));
@@ -114,7 +130,7 @@ describe('peer network', () => {
     const port = (taken.address() as { port: number }).port;
     const a = await peer('mitch', port);
     const other = await freePort();
-    await a.network.configure({ port, secret: 'team', peers: [`localhost:${other}`] });
+    await a.network.configure(testConfig(port, [`localhost:${other}`]));
     expect(a.network.status().listener).toMatchObject({ state: 'failed', port });
     expect(a.network.status().listener.message).toContain('in use');
   });
@@ -123,8 +139,8 @@ describe('peer network', () => {
     const [a, b] = [await peer('mitch'), await peer('kyle')];
     const received: PeerFrame[] = [];
     b.network.onFrame((frame) => received.push(frame));
-    await a.network.configure({ port: a.port, secret: 'team', peers: listing(b) });
-    await b.network.configure({ port: b.port, secret: 'team', peers: listing(a) });
+    await a.network.configure(testConfig(a.port, listing(b)));
+    await b.network.configure(testConfig(b.port, listing(a)));
     await vi.waitFor(() => expect(a.network.online()).toEqual([b.instance]));
     for (let n = 1; n <= 40; n += 1) a.network.broadcast({ kind: 'ask', room: TEST_ROOM, lane: testLane(48162), text: `Question ${n}` });
     await vi.waitFor(() => expect(received).toHaveLength(40), { timeout: 10_000 });
@@ -136,8 +152,8 @@ describe('peer network', () => {
     const [a, b] = [await peer('mitch'), await peer('kyle')];
     const received: PeerFrame[] = [];
     b.network.onFrame((frame) => received.push(frame));
-    await a.network.configure({ port: a.port, secret: 'team', peers: listing(b) });
-    await b.network.configure({ port: b.port, secret: 'team', peers: listing(a) });
+    await a.network.configure(testConfig(a.port, listing(b)));
+    await b.network.configure(testConfig(b.port, listing(a)));
     await vi.waitFor(() => expect(a.network.online()).toEqual([b.instance]));
     const first = a.network.broadcast({ kind: 'done', room: TEST_ROOM, lane: testLane(48162), text: 'PR open' });
     a.network.sendTo(b.instance, { kind: 'done', room: TEST_ROOM, lane: testLane(48162), text: 'PR open', id: first?.id, sentAt: first?.sentAt });

@@ -41,7 +41,7 @@ export function isLoggedKind(kind: PeerFrame['kind']): boolean {
 }
 
 export function toRoomMessage(frame: PeerFrame, own: boolean): RoomMessage {
-  const { sig: _sig, ...fields } = frame;
+  const { sig: _sig, team: _team, ...fields } = frame;
   return { ...fields, own };
 }
 
