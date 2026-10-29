@@ -29,6 +29,7 @@ describe('event contracts', () => {
         'agent:permission', // AL-109
         'agent:planLimits', // AL-258
         'agent:prActivity', // AL-269
+        'peers:status', // AL-288
       ].sort(),
     );
   });

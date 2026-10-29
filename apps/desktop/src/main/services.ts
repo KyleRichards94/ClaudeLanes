@@ -76,6 +76,8 @@ import { createReconcileService, ignoredWorktreesFile, type ReconcileService } f
 import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
 import { createBacklogWindowController, type BacklogWindowController } from './app/backlog-window';
 import { createChangesService, type ChangesService } from './changes/service';
+import { createPeerNetwork, type PeerNetwork } from './peers/network';
+import { createPeerIdentity, peersDir, type PeerIdentitySource } from './peers/identity';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -197,6 +199,10 @@ export interface Services {
   readonly launchUndo: LaunchUndo;
   /** The popped-out Backlog window (AL-239); index.ts supplies the real one. */
   readonly backlogWindow: BacklogWindowController;
+  /** Who this app is to its peers: the ADO identity, the computer and an instance id (AL-288, PL§4). */
+  readonly peerIdentity: PeerIdentitySource;
+  /** The WebSocket mesh with the peers listed in Connections (AL-288, E18); off until there is a Peers connection. */
+  readonly peerNetwork: PeerNetwork;
 }
 
 export interface ServiceOptions {
@@ -222,7 +228,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -333,8 +339,16 @@ export function createServices(options: ServiceOptions): Services {
     adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
     // A reconnect resumes the agents a 401 paused (AL-048); created below, after the sessions.
-    onChanged: () => void late.credentialFailures?.connectionsChanged(),
+    onChanged: () => {
+      void late.credentialFailures?.connectionsChanged();
+      // A new ADO test may have signed in as someone (AL-288).
+      void late.peerIdentity?.refresh();
+    },
   });
+  const peerIdentity = createPeerIdentity({ dir: peersDir(options.appDataDir), connections, warn: (message) => log.child('peers').warn(message) });
+  late.peerIdentity = peerIdentity;
+  void peerIdentity.refresh();
+  const peerNetwork = createPeerNetwork({ identity: () => peerIdentity.current(), emit: options.emit, log: log.child('peers') });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
   const designView = createDesignViewService({
@@ -595,6 +609,8 @@ export function createServices(options: ServiceOptions): Services {
     ticketLauncher,
     adoLauncher,
     launchUndo,
+    peerIdentity,
+    peerNetwork,
   };
 }
 
@@ -602,6 +618,8 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  // Peers drop this app's lanes at once instead of waiting for them to expire (AL-288).
+  await services.peerNetwork.dispose();
   // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
   services.claude.closeAll();
   services.mcpStatus.dispose();

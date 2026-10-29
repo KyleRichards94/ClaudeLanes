@@ -42,6 +42,24 @@ export function peerRoomId(orgUrl: string, parentId: number): PeerRoomId {
   return `${orgUrl.trim().replace(/\/+$/, '').toLowerCase()}#${parentId}`;
 }
 
+/** A peer as listed in Connections: a host name or IP, with an optional `:port` (`[v6]:port` for IPv6). */
+export interface PeerAddress {
+  host: string;
+  port: number;
+}
+
+export function parsePeerAddress(address: string): PeerAddress | null {
+  const text = address.trim();
+  const bracketed = /^\[([0-9a-fA-F:.]+)\](?::(\d{1,5}))?$/.exec(text);
+  const plain = /^([A-Za-z0-9.-]+)(?::(\d{1,5}))?$/.exec(text);
+  const bareV6 = /^[0-9a-fA-F]*:[0-9a-fA-F:.]*:[0-9a-fA-F:.]*$/.test(text) ? text : null;
+  const host = bracketed?.[1] ?? plain?.[1] ?? bareV6;
+  if (!host || host.startsWith('.') || host.startsWith('-')) return null;
+  const portText = bracketed?.[2] ?? plain?.[2];
+  const port = portText === undefined ? DEFAULT_PEER_PORT : Number(portText);
+  return port >= 1 && port <= 65_535 ? { host, port } : null;
+}
+
 /** Worktree-relative, forward slashes. */
 export const PeerPathSchema = z.string().min(1).max(1_024);
 const UserNameSchema = z.string().min(1).max(200);
@@ -77,6 +95,8 @@ export const PeerDataSchema = z.object({
   files: z.array(PeerPathSchema).max(PEER_FILES_MAX).optional(),
   branch: BranchSchema.optional(),
   to: PeerAddresseeSchema.optional(),
+  /** The sender's listening port, in the hello that opens a connection, so the other app knows which listed peer it is. */
+  port: z.int().min(1).max(65_535).optional(),
 });
 export type PeerData = z.infer<typeof PeerDataSchema>;
 
@@ -252,4 +272,6 @@ export type PeerStatusEvent = z.infer<typeof PeerStatusEventSchema>;
 
 export const peersInvokeContracts = {} as const satisfies Record<(typeof PEERS_INVOKE_CHANNELS)[number], InvokeContract>;
 
-export const peersEventContracts = {} as const satisfies Record<(typeof PEERS_EVENT_CHANNELS)[number], z.ZodType>;
+export const peersEventContracts = {
+  'peers:status': PeerStatusEventSchema,
+} as const satisfies Record<(typeof PEERS_EVENT_CHANNELS)[number], z.ZodType>;

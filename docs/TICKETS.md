@@ -209,7 +209,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-283 | Code City interaction, accessibility and states | E17 | M | AL-282, AL-275 | partial |
 | AL-284 | E2E: ticket layouts | E17 | M | AL-279, AL-283 | done |
 | AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | done |
-| AL-288 | Peer network service | E18 | L | AL-287, AL-042 | todo |
+| AL-288 | Peer network service | E18 | L | AL-287, AL-042 | done |
 | AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | todo |
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | todo |
 | AL-291 | Room log and replay | E18 | M | AL-290 | todo |
@@ -1572,10 +1572,10 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P1, PL§4, PL§6, PL§7 · **Depends on:** AL-287, AL-042
 - **Scope:** `src/main/peers/network.ts` with `ws`: listener on the configured port bound to non-loopback interfaces (loopback only for explicitly listed loopback peers), accept only private-range addresses and listed hosts, 64 KB frame cap, 20 frames/s per peer cap; one outbound connection per listed peer with reconnect and backoff; the lower-instance-id rule when both directions connect; `hello`/`bye`; heartbeat every 30 s; dedupe by frame id (last 10 000 ids). Emits `peers:status`. Registered in `services.ts`; starts after Connections load and restarts when the Peers connection changes.
 - **Acceptance criteria:**
-  - [ ] Two services on loopback in one Vitest process exchange signed frames; a third with a different secret is rejected and counted.
-  - [ ] Both sides connecting at once ends with exactly one connection between them.
-  - [ ] A peer going silent is marked unreachable after 90 s; `bye` marks it at once.
-  - [ ] Port in use is reported as a status, not a crash.
+  - [x] Two services on loopback in one Vitest process exchange signed frames; a third with a different secret is rejected and counted. (`src/main/peers/network.test.ts`)
+  - [x] Both sides connecting at once ends with exactly one connection between them.
+  - [x] A peer going silent is marked unreachable after 90 s; `bye` marks it at once. (tested with a 1.5 s expiry)
+  - [x] Port in use is reported as a status, not a crash.
 
 #### AL-289 · Connections › Peers tab
 - **Design:** P1, PL§2, R4, R5 · **Depends on:** AL-287, AL-046
@@ -2479,6 +2479,11 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D823 | AL-285: clicking a team-board card opens it (description, acceptance criteria, discussion) and Save assigns a person and/or moves it to a column (`ado:updateBoardItem`). The column write sets the state that column maps the type to and the team's kanban column field, so columns that share a state still move the card. This is the user's own edit. T9 still holds for drag-to-agent: only a To Do or Failed drop on Planning or Implementing changes ADO by itself | Kyle (2026-10-14): he wants to open a ticket and set its person and status from the board | 2026-10-14 |
 | D824 | Settings › Appearance is `ui.appearance`: system, light or dark (optional, so old settings stay valid; unset follows the computer). Colours are `light-dark()` pairs, so the light palette is unchanged and dark is a second set (`onAccent` / `onInk` split the old white-on-fill from the card surface). react-native-web drops any colour that is not a hex or `var()`, so `patches/react-native-web@0.21.3.patch` lets `light-dark()` through. The window frame follows via `nativeTheme`. The ground behind the glass slowly shifts colour, and three blooms drift, grow and change hue; reduced motion freezes both. Design §11 is light only | Kyle (2026-10-14): a dark mode, and a moving ground so the liquid glass reads | 2026-10-14 |
 | D826 | E18 (Peer lanes, AL-287–AL-297) is built from Mitch's add-on brief, which lives outside the repo at `C:\Users\mitchell.healy\Documents\Operations\Apps\AgentLanes\DESIGN-peer-lanes.md` with its system diagram in `diagrams\` beside it; tickets cite it as PL§n and P1–P11. Neither is copied into `docs/design`. Its tickets were drafted as AL-286–AL-296 and moved up one because the themes work took AL-286 | Mitch keeps his documents in Operations\Apps, never in a repo | 2026-10-29 |
+| D827 | AL-288: one listener, on 127.0.0.1 when every listed peer is loopback and on 0.0.0.0 otherwise, with the private-range and peer-list check at the WebSocket upgrade (`verifyClient`), instead of a listener per LAN interface | Interface addresses change with DHCP and Wi-Fi; the upgrade check refuses the same connections before any frame is read, and a loopback-only setup (e2e, a second profile) never raises the Windows Firewall prompt | 2026-10-29 |
+| D828 | AL-288: the app-level `hello` that opens a connection carries the sender's listening port (`data.port`, added to the frame schema), so an inbound connection is matched to its listed peer | Two apps on one host (e2e, `localhost:47812`) differ only by port | 2026-10-29 |
+| D829 | AL-288: outbound frames are paced per connection by a token bucket (4 at once, then 14 a second); frames queued on a connection that loses the lower-instance-id rule move to the one that stays, and frames still arriving on the losing one are read (the id check drops repeats). A peer whose frames fail the signature keeps its socket and stays `rejected` until either app changes its Peers connection | A 200-frame replay or a reconnect's hellos would otherwise break the receiver's 20 frames/s cap and get the connection closed; the tie rule was dropping queued frames | 2026-10-29 |
+| D830 | E18 channels are registered by the ticket that builds their handler: `peers:status` (AL-288), `peers:list` (AL-289, the Peers tab needs it), `peers:rooms` and `peers:presence` (AL-290), `peers:log` (AL-291), `peers:post`, `peers:markSeen` and `peers:message` (AL-292). AL-287 declared every schema. AL-288 registers the network switched off; AL-289 starts it from the Peers connection and restarts it on a change | `InvokeHandlers` fails the build for a channel without a handler, and stub handlers would only be replaced | 2026-10-29 |
+| D831 | AL-288: `from.user` is the first ADO connection's tested identity, else the Windows user name; the instance id is in `<userData>/peers/instance.json` | TB§6 identity, with a fallback before any ADO test | 2026-10-29 |
 
 ---
 

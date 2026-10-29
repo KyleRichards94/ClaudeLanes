@@ -7,6 +7,7 @@ import {
   RoomMessageSchema,
   UnsignedPeerFrameSchema,
   isPeerPostKind,
+  parsePeerAddress,
   peerRoomId,
   type PeerKind,
 } from './peers.schemas';
@@ -73,6 +74,23 @@ describe('RoomMessageSchema', () => {
   it('never carries the signature to the renderer', () => {
     const message = RoomMessageSchema.parse({ ...frame('ask'), own: true });
     expect(message).not.toHaveProperty('sig');
+  });
+});
+
+describe('parsePeerAddress', () => {
+  it.each([
+    ['KYLE-PC', { host: 'KYLE-PC', port: 47811 }],
+    [' kyle-pc.office.local:47812 ', { host: 'kyle-pc.office.local', port: 47812 }],
+    ['10.0.0.12', { host: '10.0.0.12', port: 47811 }],
+    ['localhost:47812', { host: 'localhost', port: 47812 }],
+    ['[fe80::1]:47812', { host: 'fe80::1', port: 47812 }],
+    ['fe80::1', { host: 'fe80::1', port: 47811 }],
+  ])('reads %s', (address, expected) => {
+    expect(parsePeerAddress(address)).toEqual(expected);
+  });
+
+  it.each(['', 'kyle pc', 'http://kyle-pc', 'kyle-pc:0', 'kyle-pc:70000', '-kyle', 'kyle-pc:port'])('refuses %j', (address) => {
+    expect(parsePeerAddress(address)).toBeNull();
   });
 });
 
