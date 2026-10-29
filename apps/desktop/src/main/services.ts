@@ -83,6 +83,8 @@ import { createPeerConfigSync, type PeerConfigSync } from './peers/config';
 import { probePeers } from './peers/probe';
 import { createRooms, type Rooms } from './peers/rooms';
 import { touchedFiles } from './peers/presence';
+import { createRoomLog, roomLogsDir } from './peers/room-log';
+import { createPeerLanes, type PeerLanes } from './peers/service';
 import { nearestPortfolioParent } from '@agent-lanes/ado-client';
 
 /**
@@ -211,6 +213,8 @@ export interface Services {
   readonly peerNetwork: PeerNetwork;
   /** Rooms by parent Feature or Epic and every lane's presence (AL-290, P2, P3). */
   readonly peerRooms: Rooms;
+  /** The room log on disk and the replay to late joiners (AL-291); delivery and posting from AL-292. */
+  readonly peerLanes: PeerLanes;
 }
 
 export interface ServiceOptions {
@@ -417,6 +421,11 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.peerRooms = peerRooms;
   peerRooms.start();
+  const peerLanes = createPeerLanes({
+    network: peerNetwork,
+    rooms: peerRooms,
+    roomLog: createRoomLog({ dir: roomLogsDir(peersDir(options.appDataDir)), network: peerNetwork, log: log.child('peers') }),
+  });
 
   const sessions = createSessionManager({
     claude,
@@ -657,6 +666,7 @@ export function createServices(options: ServiceOptions): Services {
     peerIdentity,
     peerNetwork,
     peerRooms,
+    peerLanes,
   };
 }
 
@@ -665,6 +675,7 @@ export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
   // Peers drop this app's lanes at once instead of waiting for them to expire (AL-288).
+  await services.peerLanes.dispose();
   services.peerRooms.dispose();
   await services.peerNetwork.dispose();
   // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).

@@ -295,6 +295,7 @@ export type PeerStatusEvent = z.infer<typeof PeerStatusEventSchema>;
 export const peersInvokeContracts = {
   'peers:list': { request: z.undefined(), response: PeerNetworkStatusSchema },
   'peers:rooms': { request: z.undefined(), response: PeerRoomsSchema },
+  'peers:log': { request: RoomLogRequestSchema, response: RoomLogSchema },
 } as const satisfies Record<(typeof PEERS_INVOKE_CHANNELS)[number], InvokeContract>;
 
 export const peersEventContracts = {

@@ -4,6 +4,8 @@ export const PEERS_INVOKE_CHANNELS = [
   'peers:list',
   // Rooms this app is in with their members, and peers' lanes elsewhere (AL-290).
   'peers:rooms',
+  // A room's log as this app has it: own, replayed and live messages, oldest first (AL-291).
+  'peers:log',
 ] as const;
 export const PEERS_EVENT_CHANNELS = [
   // Listener up or failed, a peer came or went, a signature failure (AL-288).

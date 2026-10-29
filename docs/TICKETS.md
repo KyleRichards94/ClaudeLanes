@@ -212,7 +212,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-288 | Peer network service | E18 | L | AL-287, AL-042 | done |
 | AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | done |
 | AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | done |
-| AL-291 | Room log and replay | E18 | M | AL-290 | todo |
+| AL-291 | Room log and replay | E18 | M | AL-290 | done |
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | todo |
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
@@ -1597,9 +1597,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P7, P9, PL§4, PL§6 · **Depends on:** AL-290
 - **Scope:** `src/main/peers/room-log.ts`: own sent frames per room in memory and in `<userData>/peers/rooms/<hash>.json`, last 200 or 7 days; received frames kept in memory for the session; replay own frames with `replay: true` to a peer that sends `hello` for that room; `peers:log` handler returns own, replayed and live frames oldest first. Reloads from disk on start.
 - **Acceptance criteria:**
-  - [ ] A late joiner receives every frame the other app sent in that room, in order, marked replay, and none from other rooms.
-  - [ ] The 200 cap drops the oldest and the log says it is capped.
-  - [ ] Nothing in the file is a secret.
+  - [x] A late joiner receives every frame the other app sent in that room, in order, marked replay, and none from other rooms. (`src/main/peers/room-log.test.ts`, two networks on loopback)
+  - [x] The 200 cap drops the oldest and the log says it is capped.
+  - [x] Nothing in the file is a secret.
 
 #### AL-292 · Delivery to the Claude and the `agent_lanes` room tools
 - **Design:** P4, P6, P7, P10, PL§3 · **Depends on:** AL-291, AL-100, AL-103
@@ -2488,6 +2488,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D833 | AL-289: the Peers tab is `widgets/peer-network`, not `features/peer-network` | The features layer is at Steiger's 20-slice limit (`fsd/excessive-slicing`), and the ESLint deep-import rule rules out a `features/connections/*` group. AL-295's composer (`features/post-to-room` in the brief) can sit inside `widgets/room-log` for the same reason | 2026-10-29 |
 | D834 | AL-290: the record keeps `room: { id, parentId, parentType, parentTitle }` or null instead of a bare `roomId` (absent = not looked up yet, so older records still read). The parent is found through `System.Parent` (`nearestPortfolioParent` in ado-client, up to 5 links), not `System.LinkTypes.Hierarchy-Reverse` relations; a parent the token can't read is no room; a failed read is tried again at the next tick. The room id lower-cases the organisation URL | The protocol text names the room by its Feature's title; `System.Parent` is one field read per link and is what the backlog already uses on Azure DevOps Server; two people who typed the URL differently still share a room | 2026-10-29 |
 | D835 | AL-290: every ticket on the board that is not Done and not a second agent announces presence, in a room or with `room: null` (the team board's live tags need both); a lane's room is looked up when its session starts (a session-extras source) and, for older tickets, at the next 30 s tick (at most 5 lookups a tick). Room lookups and the `git diff` for touched files run only while the peer network is on. `touched` is the diff against the base plus every sub-branch (PL§9 open question, answered yes) | No Azure DevOps or git work for people who don't use peer lanes; a board of old tickets doesn't flood ADO on the first tick | 2026-10-29 |
+| D836 | AL-291: the room log holds what agents and people post (`changed`, `blocked`, `done`, `ask`, `answer`, `offer`); joins and leaves are presence and show as members, not rows. Own messages are written per room, a burst sharing one write, and read back lazily the first time a room is read or replayed. A peer's lane saying `hello` live in one of this app's rooms triggers the replay, once per peer and room until that peer goes; replays go through the network's pacing. The log is capped when own messages were dropped, when a peer replayed 200, or at 1 000 in memory | A log of joins on every start and reconnect would bury the posts, and the board already lists who is in the room | 2026-10-29 |
 
 ---
 
