@@ -18,7 +18,7 @@ export function PeerCardRows({ room, ticketId, workItemId }: { room: PeerRoom; t
   const attention = overlapText(overlapOf(room, ticketId), workItemId);
   return (
     <View style={styles.rows}>
-      <Text variant="meta" size="sm" numberOfLines={1} testID={`card-${ticketId}-room`}>
+      <Text variant="meta" size="sm" numberOfLines={2} testID={`card-${ticketId}-room`}>
         {roomRowText(room, ticketId)}
       </Text>
       {attention ? (
