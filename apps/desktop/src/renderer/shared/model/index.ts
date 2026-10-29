@@ -44,6 +44,7 @@ export {
   type ConnectionsModalState,
   type OpenConnectionsOptions,
 } from './connections-modal';
+export { closeRooms, openRooms, showRoom, useRoomsPanel } from './rooms-panel';
 export {
   TICKET_TABS,
   resetTicketPageTabs,

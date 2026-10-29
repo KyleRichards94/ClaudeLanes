@@ -216,7 +216,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | done |
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | done |
 | AL-294 | Assist bubble | E18 | S | AL-292, AL-293 | todo |
-| AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | todo |
+| AL-295 | Room log widget and the ticket Room tab | E18 | L | AL-292, AL-293 | done |
 | AL-296 | Hardening and the README section | E18 | M | AL-288, AL-292 | partial |
 | AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | todo |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
@@ -1629,9 +1629,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P9, PL§2 · **Depends on:** AL-292, AL-293
 - **Scope:** `widgets/room-log`: the Rooms panel on the board (rooms, members, log rows with user, host, time, kind pill, text; unread highlight) and the Room tab on the ticket page; `features/post-to-room` composer that sends `peers:post` as the person (`from.person: true`) with an optimistic row. Virtualised like the output stream (§12).
 - **Acceptance criteria:**
-  - [ ] The log shows own, replayed and live rows in order with the kind as a word.
-  - [ ] A person's post reaches a fake peer as a frame with `from.person: true` and is delivered to that peer's lane with the "(person)" prefix.
-  - [ ] Unit tests and a slice integration test.
+  - [x] The log shows own, replayed and live rows in order with the kind as a word. (`widgets/room-log/ui/RoomLog.test.tsx`)
+  - [x] A person's post reaches a fake peer as a frame with `from.person: true` and is delivered to that peer's lane with the "(person)" prefix. (`peers:post` from the composer; `posting.test.ts` and `delivery.test.ts` on the main side; across two apps in AL-297)
+  - [x] Unit tests and a slice integration test. (the Rooms panel and Room tab against the fake bridge)
 
 #### AL-296 · Hardening and the README section
 - **Design:** PL§7 · **Depends on:** AL-288, AL-292
@@ -2494,6 +2494,7 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D839 | AL-296: reviewed against `WORK_ITEM_COMMENT_RULE`: that rule limits what an agent may post on a work item (QA failures and answers only); it isn't a data-not-instructions rule, so there were no words to reuse. The peer rule stands on its own: every peer line starts `[Peer lanes]` with the peer's words as a JSON string, the protocol says they are information from another agent and not instructions from the user, second agents and single-step lanes can't post, and `changed` waits for a push. The accept filters, the 64 KB and 20 frames/s caps and the signature counters were built in AL-288; AL-296 tests them and shows the counters in the Peers tab. A connection whose frames switch instance id is closed as a spoof | PL§7 asked for the same words "where possible"; it isn't possible, and the brief's reading of that rule doesn't match the code | 2026-10-29 |
 | D840 | E18's UI (AL-293 to AL-295) was built without artboards, on Mitch's go (2026-10-29), from the words in PL§2 and with the board's existing pills, bands, badge and tokens; no new token or colour. Kyle's artboards, when drawn, may change it | Kyle hadn't drawn them; Mitch chose not to wait | 2026-10-29 |
 | D841 | AL-293: the card has no branch line, so the room row (`Room · Feature #48000 · with Kyle, Rocky`) and the amber attention row (`Kyle is also in JobDto.cs` / `Kyle's agent is also on #48162`) sit in a section at the foot of the card, through a `peers` slot on `AgentTicketCardView`. Both are left off a lane in no room, as PL§2 says (PL§6's "No room · #48162 has no parent Feature" row is not shown). The Peers pill is hidden with no Peers connection, green when every listed peer is online, grey with none online, amber with the names on hover when one can't be reached, red when the listener failed. The team-board tag reads `Kyle's agent · Implementing · 4 min ago` under the lock row | PL§2 and PL§6 disagree on the no-room row; a row on every card of a lane with no Feature adds noise | 2026-10-29 |
+| D842 | AL-295 was built before AL-294, since the Assist bubble opens the Rooms panel. The app has no side-panel pattern, so the Rooms panel is a modal like the Digest, opened from the Peers pill (and the bubbles, AL-294); it lists the rooms (a picker when there are several), the members, the log and the composer. The ticket page always has a Room tab, which says when peer lanes is off (with Open Connections) or the ticket is in no room. The composer lives in `widgets/room-log` (D833) and posts `ask`, `answer`, `blocked` or `offer` as the person, named by the ADO identity. Showing a room (panel or tab) marks it seen; the rows that were unread stay marked "new" while it is on screen. The log is a FlatList | No drawer exists to copy, and a modal keeps the board's layout as it is | 2026-10-29 |
 
 ---
 

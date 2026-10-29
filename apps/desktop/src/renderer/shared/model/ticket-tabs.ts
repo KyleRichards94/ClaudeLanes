@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 /** The drill-in's tabs (artboard 3), in order. `design` is the Claude Design tab, its own route (AL-192). */
-export const TICKET_TABS = ['output', 'diff', 'build-log', 'ado', 'design'] as const;
+export const TICKET_TABS = ['output', 'diff', 'build-log', 'ado', 'room', 'design'] as const;
 export type TicketTab = (typeof TICKET_TABS)[number];
 /** The tabs shown inside the drill-in page itself. */
 export type TicketPageTab = Exclude<TicketTab, 'design'>;

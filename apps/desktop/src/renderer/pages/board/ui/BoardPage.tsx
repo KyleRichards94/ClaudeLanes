@@ -6,6 +6,7 @@ import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticke
 import { DragStatusPill, DragToLaneProvider, useActiveDrag, type LaunchFromLane } from '@/features/drag-to-lane';
 import { useMoveStageOnDrop } from '@/features/ticket-actions';
 import { DigestPanel } from '@/features/board-digest';
+import { RoomsPanel } from '@/widgets/room-log';
 import { useLaunchFromAdo } from '@/features/launch-from-ado';
 import { invoke, useAppInfo } from '@/shared/api';
 import { usePrefersReducedMotion } from '@/shared/lib';
@@ -153,6 +154,7 @@ function BoardContent({ collapsed, onCollapsedChange }: BoardContentProps) {
       />
       <SettingsPanel visible={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <DigestPanel visible={digestOpen} onClose={() => setDigestOpen(false)} />
+      <RoomsPanel />
     </View>
   );
 }

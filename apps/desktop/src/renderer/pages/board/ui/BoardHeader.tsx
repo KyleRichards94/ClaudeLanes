@@ -4,7 +4,7 @@ import { color, minTarget, radius, space } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { agentTickets, useAgentTicketCount, type AgentTicketStore } from '@/entities/agent-ticket';
 import { useAddRepo, useRepos, useTeams } from '@/shared/api';
-import { openConnections, openNewTicket, toast, useBoardSprint, useBoardSprints, useBoardTeam, useUiPrefs } from '@/shared/model';
+import { openConnections, openNewTicket, openRooms, toast, useBoardSprint, useBoardSprints, useBoardTeam, useUiPrefs } from '@/shared/model';
 import { HeaderMenu, PlanLimitsPill, type HeaderMenuItem } from '@/shared/ui';
 import { sprintRangeLabel } from '../model/header';
 import { McpStatusPill } from './McpStatusPill';
@@ -68,7 +68,7 @@ export function BoardHeader({ needsYouOnly, onNeedsYouOnlyChange, onOpenSettings
         {/* The plan's 5-hour and 7-day windows, once a session reported them (AL-258). */}
         <PlanLimitsPill />
         {/* Peer lanes: who is online on the office network (AL-293). */}
-        <PeersPill />
+        <PeersPill onPress={() => openRooms()} />
       </View>
       {/* The board digest: every ticket ranked by what it needs, and next actions (AL-272). */}
       <Button label="Digest" icon="backlog" onPress={onOpenDigest} testID="open-digest" />

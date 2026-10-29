@@ -19,6 +19,7 @@ const LABELS: Record<Exclude<TicketTab, 'diff'>, string> = {
   output: 'Output & diff',
   'build-log': 'Build log',
   ado: 'ADO',
+  room: 'Room',
   design: 'Claude Design',
 };
 
