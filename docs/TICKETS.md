@@ -211,7 +211,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-287 | Peer frame contracts and signing | E18 | S | AL-011, AL-012 | done |
 | AL-288 | Peer network service | E18 | L | AL-287, AL-042 | done |
 | AL-289 | Connections › Peers tab | E18 | M | AL-287, AL-046 | done |
-| AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | todo |
+| AL-290 | Rooms and presence | E18 | M | AL-288, AL-062, AL-065, AL-276, AL-103 | done |
 | AL-291 | Room log and replay | E18 | M | AL-290 | todo |
 | AL-292 | Delivery to the Claude and the `agent_lanes` room tools | E18 | L | AL-291, AL-100, AL-103 | todo |
 | AL-293 | Board presence | E18 | M | AL-290, AL-234 | todo |
@@ -1589,9 +1589,9 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 - **Design:** P2, P3, P5, PL§4 · **Depends on:** AL-288, AL-062, AL-065, AL-276, AL-103
 - **Scope:** `roomId` on the ticket record, set at launch from the work item's nearest parent Feature or Epic (`System.LinkTypes.Hierarchy-Reverse`, ado-client, works on Azure DevOps Server) and null when there is none; `src/main/peers/rooms.ts` joins on launch and resume, leaves on finish, archive and app close; `src/main/peers/presence.ts` sends `status` (stage, branch) on change and every 30 s, and `touched` (worktree-relative paths from `diff:files`, including sub-branches) at most every 30 s. Emits `peers:presence`. `peers:rooms` and `peers:list` handlers.
 - **Acceptance criteria:**
-  - [ ] A Feature under an Epic gives the Feature's room; a Story with no parent gives no room; two orgs never share a room.
-  - [ ] A lane rebuilt on start-up rejoins its room.
-  - [ ] Presence for a lane includes its touched files within 30 s of an edit.
+  - [x] A Feature under an Epic gives the Feature's room; a Story with no parent gives no room; two orgs never share a room. (`packages/ado-client/src/parents.test.ts`, `src/main/peers/rooms.test.ts`)
+  - [x] A lane rebuilt on start-up rejoins its room.
+  - [x] Presence for a lane includes its touched files within 30 s of an edit. (one presence tick; also two networks on loopback)
 
 #### AL-291 · Room log and replay
 - **Design:** P7, P9, PL§4, PL§6 · **Depends on:** AL-290
@@ -2486,6 +2486,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 | D831 | AL-288: `from.user` is the first ADO connection's tested identity, else the Windows user name; the instance id is in `<userData>/peers/instance.json` | TB§6 identity, with a fallback before any ADO test | 2026-10-29 |
 | D832 | AL-289: one Peers connection per app (id `peers`, secret `peers:team-secret`). A Change or Test that leaves the team secret empty uses the saved one. Generate makes 24 random bytes in the renderer and shows them in the draft until Save so they can be shared; the secure field is for a secret someone else shared. Test reads the signed `hello` each peer sends on connect and sends none back, and `connections:test` carries the outcome per peer (`peers`). A peer on another secret fails Test; an unreachable one is listed but does not | A Test that said hello as this app would trip the lower-instance-id rule and close the running connection; colleagues' PCs being off shouldn't stop a save | 2026-10-29 |
 | D833 | AL-289: the Peers tab is `widgets/peer-network`, not `features/peer-network` | The features layer is at Steiger's 20-slice limit (`fsd/excessive-slicing`), and the ESLint deep-import rule rules out a `features/connections/*` group. AL-295's composer (`features/post-to-room` in the brief) can sit inside `widgets/room-log` for the same reason | 2026-10-29 |
+| D834 | AL-290: the record keeps `room: { id, parentId, parentType, parentTitle }` or null instead of a bare `roomId` (absent = not looked up yet, so older records still read). The parent is found through `System.Parent` (`nearestPortfolioParent` in ado-client, up to 5 links), not `System.LinkTypes.Hierarchy-Reverse` relations; a parent the token can't read is no room; a failed read is tried again at the next tick. The room id lower-cases the organisation URL | The protocol text names the room by its Feature's title; `System.Parent` is one field read per link and is what the backlog already uses on Azure DevOps Server; two people who typed the URL differently still share a room | 2026-10-29 |
+| D835 | AL-290: every ticket on the board that is not Done and not a second agent announces presence, in a room or with `room: null` (the team board's live tags need both); a lane's room is looked up when its session starts (a session-extras source) and, for older tickets, at the next 30 s tick (at most 5 lookups a tick). Room lookups and the `git diff` for touched files run only while the peer network is on. `touched` is the diff against the base plus every sub-branch (PL§9 open question, answered yes) | No Azure DevOps or git work for people who don't use peer lanes; a board of old tickets doesn't flood ADO on the first tick | 2026-10-29 |
 
 ---
 

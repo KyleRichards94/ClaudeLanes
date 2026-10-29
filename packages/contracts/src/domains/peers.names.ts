@@ -2,8 +2,12 @@
 export const PEERS_INVOKE_CHANNELS = [
   // Listed peers with status, and the listener (AL-289: the Peers tab's status dots).
   'peers:list',
+  // Rooms this app is in with their members, and peers' lanes elsewhere (AL-290).
+  'peers:rooms',
 ] as const;
 export const PEERS_EVENT_CHANNELS = [
   // Listener up or failed, a peer came or went, a signature failure (AL-288).
   'peers:status',
+  // A lane joined, changed, left or expired (AL-290).
+  'peers:presence',
 ] as const;

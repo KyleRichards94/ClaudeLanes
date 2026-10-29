@@ -9,6 +9,7 @@ import { DesignCanvasRefSchema } from './design.canvas';
 import { TicketPullRequestSchema } from './pr.schemas';
 import { AgentPermissionModeSchema, StageGatesSchema } from './settings.schemas';
 import type { TICKETS_EVENT_CHANNELS, TICKETS_INVOKE_CHANNELS } from './tickets.names';
+import { PeerRoomIdSchema } from './peers.schemas';
 
 // ── Ticket records (AL-101, design §6, R2, Decision D8) ───────────────────────────────────────────
 
@@ -55,6 +56,15 @@ export const TicketAdoRefSchema = z.object({
   fromFailed: z.literal(true).optional(),
 });
 export type TicketAdoRef = z.infer<typeof TicketAdoRefSchema>;
+
+/** The peer lanes room (AL-290, P2): the work item's nearest Feature or Epic. */
+export const TicketRoomSchema = z.object({
+  id: PeerRoomIdSchema,
+  parentId: z.int().min(1).max(2_147_483_647),
+  parentType: z.string().max(100),
+  parentTitle: z.string().max(1000),
+});
+export type TicketRoom = z.infer<typeof TicketRoomSchema>;
 
 /** The ticket entered `stage` at `at`. Stages can repeat: Code review and QA may send work back (§9). */
 export const TicketStageEntrySchema = z.object({
@@ -220,6 +230,8 @@ export const TicketRecordSchema = z
     companion: TicketCompanionSchema.optional(),
     /** The lane a Queued ticket enters when its session starts (a team board drop, e.g. QA only); absent means Planning. */
     startLane: LaneSchema.optional(),
+    /** Its peer lanes room (AL-290): null when the work item has no Feature or Epic above it; absent until it is looked up. */
+    room: TicketRoomSchema.nullable().optional(),
     createdAt: EpochMsSchema,
     updatedAt: EpochMsSchema,
   })

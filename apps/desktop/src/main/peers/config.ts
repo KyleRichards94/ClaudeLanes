@@ -11,7 +11,13 @@ export interface PeerConfigSync {
   sync(): Promise<void>;
 }
 
-export function createPeerConfigSync(options: { connections: Pick<ConnectionsService, 'list' | 'secret'>; network: Pick<PeerNetwork, 'configure'>; log?: Pick<Logger, 'warn'> }): PeerConfigSync {
+export function createPeerConfigSync(options: {
+  connections: Pick<ConnectionsService, 'list' | 'secret'>;
+  network: Pick<PeerNetwork, 'configure'>;
+  log?: Pick<Logger, 'warn'>;
+  /** The network was started, restarted or stopped. */
+  onApplied?: () => void;
+}): PeerConfigSync {
   let applied = 'off';
   let queue: Promise<void> = Promise.resolve();
 
@@ -34,6 +40,7 @@ export function createPeerConfigSync(options: { connections: Pick<ConnectionsSer
         if (key === applied) return;
         applied = key;
         await options.network.configure(config);
+        options.onApplied?.();
       });
       queue = queue.catch((cause) => options.log?.warn(`Peer lanes: could not apply the Peers connection: ${String(cause)}`));
       return queue;
