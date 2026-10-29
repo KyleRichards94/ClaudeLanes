@@ -1,6 +1,8 @@
+import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
 import { persist, type PersistStorage } from 'zustand/middleware';
 import { appearanceOf, defaultUiPrefs, type Appearance, type EmbedMode, type Lane, type UiPrefs } from '@agent-lanes/contracts';
+import type { Theme } from '@agent-lanes/tokens';
 import { createUiPrefsStorage } from '@/shared/api';
 
 /**
@@ -129,6 +131,31 @@ export function useCodeCityLegendDismissed(): boolean {
 /** Light, dark, or the computer's appearance. Unset follows the system. */
 export function useAppearance(): Appearance {
   return useUiPrefs((state) => appearanceOf(state));
+}
+
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
+// The cleanup must remove the listener from the same MediaQueryList it was added to; matchMedia returns a new one each call.
+function subscribeSystemDark(onChange: () => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => {};
+  const query = window.matchMedia(DARK_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+const readSystemDark = () => (typeof window.matchMedia === 'function' ? window.matchMedia(DARK_QUERY).matches : false);
+
+/** Whether the computer prefers dark; false where there is no matchMedia (tests). */
+export function useSystemDark(): boolean {
+  return useSyncExternalStore(subscribeSystemDark, readSystemDark, () => false);
+}
+
+/** The theme on screen: the saved one, or light or dark by the computer when the appearance is System. */
+export function useResolvedTheme(): Theme {
+  const appearance = useAppearance();
+  const systemDark = useSystemDark();
+  if (appearance === 'system') return systemDark ? 'dark' : 'light';
+  return appearance;
 }
 
 export const useUiPrefs: UiPrefsStore = createUiPrefsStore(createUiPrefsStorage());
