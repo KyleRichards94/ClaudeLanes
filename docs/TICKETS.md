@@ -172,6 +172,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-241 | E2E: team board drops | E14 | M | AL-237, AL-238, AL-239, AL-240 | partial |
 | AL-242 | Board picker for the team board | E14 | M | AL-234 | todo |
 | AL-285 | Open a team board card | E14 | M | AL-234, AL-231 | done |
+| AL-286 | Themes: tokens as CSS variables; Solarpunk appearance | E2 | M | AL-020, AL-285 | done |
 | AL-250 | Output-first ticket layout | E15 | L | — | done |
 | AL-251 | Your messages and turn ends in the output | E15 | S | AL-250 | done |
 | AL-252 | Session status pill and Reconnect | E15 | S | AL-250 | done |
@@ -1244,6 +1245,16 @@ Do or Failed item dropped on Planning or Implementing is assigned to you and mov
   - [x] Saving a person and a column assigns the work item and moves the card, including between columns that share a state.
   - [x] A column the board does not map for that type is refused, and nothing is written.
 - **Tests:** `packages/ado-client/src/board-item.test.ts`, `apps/desktop/src/renderer/widgets/team-board/ui/TeamBoard.test.tsx`.
+
+#### AL-286 · Themes: Solarpunk as a fourth appearance
+- **Design:** Kyle, 2026-10-29: a solarpunk theme beside System, Light and Dark. **Depends on:** AL-020, AL-285
+- **Scope:** Paintable tokens become `var(--al-*)` references; each theme is one `:root[data-theme='<theme>']` block in `agent-lanes-tokens.css` with its hex palette in `packages/tokens/src/themes.ts` (`themes`, `themeVariables`). `ui.appearance` gains `solarpunk` (`THEMES` in contracts and tokens). `AppearanceSync` writes `data-theme` and the theme's light or dark `color-scheme`; the main process paints the window frame and ground from the theme's base and `bg`. The ground animation and the atmosphere blooms read theme variables. Settings › Appearance shows Solarpunk as a fourth segment.
+- **Acceptance criteria:**
+  - [x] Picking Solarpunk recolours the whole app at once, the window frame stays light, and the choice survives a restart.
+  - [x] System, Light and Dark look as they did.
+  - [x] Every theme block defines the same variables; a missing one fails `themes.test.ts`.
+  - [x] Every text and UI pair clears 4.5:1 / 3:1 in every theme, or is listed as an exemption with its reason.
+- **Tests:** `packages/tokens/src/themes.test.ts`, `packages/tokens/src/accessibility.test.ts`, `apps/desktop/src/main/app/appearance.test.ts`, `apps/desktop/src/renderer/app/entrypoint/AppearanceSync.test.tsx`, `apps/desktop/src/renderer/pages/board/ui/SettingsPanel.test.tsx`, e2e `settings-panel.spec.ts`.
 
 #### AL-242 · Board picker for the team board
 - **Design:** T1, TB§2 (Kyle, 2026-10-08: "options to select my team, my team board and team sprint") · **Depends on:** AL-234
@@ -2368,6 +2379,7 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | D822 | Partly done: Flight deck has no sub-branch compare, "Changed just now" marks or review findings; its Implementing bar uses `ticket.progress` (no plan steps to count) and future-stage copy is generic. Code City's "Posted to PR" link is not wired (`onOpenPrThread`); a pin can cross a neighbouring label chip; reduced motion is CSS and hooks, untested. Specs edited for the new page but not run: `rewind`, `assign-agent`, `permissions`, `second-agent`, `subagents` (Kyle asked for no broad e2e runs); `ticket-layouts`, `ticket-layout`, `ticket-diff` and `ticket-page` pass | Honest scope of AL-279, AL-282, AL-283 | 2026-10-13 |
 | D823 | AL-285: clicking a team-board card opens it (description, acceptance criteria, discussion) and Save assigns a person and/or moves it to a column (`ado:updateBoardItem`). The column write sets the state that column maps the type to and the team's kanban column field, so columns that share a state still move the card. This is the user's own edit. T9 still holds for drag-to-agent: only a To Do or Failed drop on Planning or Implementing changes ADO by itself | Kyle (2026-10-14): he wants to open a ticket and set its person and status from the board | 2026-10-14 |
 | D824 | Settings › Appearance is `ui.appearance`: system, light or dark (optional, so old settings stay valid; unset follows the computer). Colours are `light-dark()` pairs, so the light palette is unchanged and dark is a second set (`onAccent` / `onInk` split the old white-on-fill from the card surface). react-native-web drops any colour that is not a hex or `var()`, so `patches/react-native-web@0.21.3.patch` lets `light-dark()` through. The window frame follows via `nativeTheme`. The ground behind the glass slowly shifts colour, and three blooms drift, grow and change hue; reduced motion freezes both. Design §11 is light only | Kyle (2026-10-14): a dark mode, and a moving ground so the liquid glass reads | 2026-10-14 |
+| D825 | AL-286: paintable tokens are `var(--al-*)` references, not `light-dark()` pairs, which hold only two palettes. A theme is one `:root[data-theme]` block in agent-lanes-tokens.css plus a hex palette in themes.ts; `THEMES` is listed in contracts (the setting) and tokens (the palettes), tied by the typecheck. Every theme declares a light or dark base for the window frame and native controls. The contrast test runs per theme; dark has three pairs under the bar from AL-285 (selected segment label on the surface 3.1:1, violet on the dark line 2.0:1, claude dot on its band 2.7:1), recorded as exemptions and not changed. The `light-dark()` line in the react-native-web patch stays, unused. Solarpunk: cream `#F7F3E8`, teal `#0F766E`, sea blue `#1A669A`, sun gold `#F5B82E` | Kyle (2026-10-29): a solarpunk theme as a fourth appearance | 2026-10-29 |
 
 ---
 
@@ -2465,6 +2477,7 @@ the composer draft carry across. Adaptations to this repo are in Decisions D815�
 | 2026-10-14 | Code City: chips under the pointer, on the focused building and on the picked one come to the front; Blueprint diff has an expand button that opens it beside the city, between two draggable dividers (city · diff · rest of the inspector), local to the page and off in the narrow bottom sheet. |
 | 2026-10-14 | AL-285: click a team-board card to read it and set its person and column. D823. |
 | 2026-10-14 | Settings › Appearance (system, light, dark) and a slow moving ground behind the liquid glass. D824. |
+| 2026-10-29 | AL-286: tokens paint through CSS variables; a theme is a CSS block plus a palette. Solarpunk appearance. D825. |
 ---
 
 ## 7. Parallel build rules
