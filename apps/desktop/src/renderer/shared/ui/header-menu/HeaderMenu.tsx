@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View, type PressableInstance } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type PressableInstance } from 'react-native';
 import { color, glass, minTarget, radius, shadow, space } from '@agent-lanes/tokens';
 import { Icon, Text } from '@agent-lanes/ui';
 
@@ -48,14 +48,29 @@ export interface HeaderMenuProps {
   valueTestID?: string;
 }
 
-interface Anchor {
+/** The trigger's place in the window; the menu hangs under it, or sits above it when that fits better. */
+export interface Anchor {
   x: number;
-  y: number;
+  top: number;
+  bottom: number;
   width: number;
 }
 
 const MENU_MIN_WIDTH = 220;
 const MENU_MAX_HEIGHT = 360;
+/** Gap between the menu and the window edge. */
+const MENU_EDGE_GAP = 8;
+
+/**
+ * Where the menu goes and how tall it may be, so it never runs off the window: under the trigger
+ * when at least as much room is there as above it, else above; capped at MENU_MAX_HEIGHT either way.
+ */
+export function placeMenu(anchor: Anchor, windowHeight: number): { top?: number; bottom?: number; maxHeight: number } {
+  const below = windowHeight - anchor.bottom - space.xs - MENU_EDGE_GAP;
+  const above = anchor.top - space.xs - MENU_EDGE_GAP;
+  if (below >= Math.min(MENU_MAX_HEIGHT, above)) return { top: anchor.bottom + space.xs, maxHeight: Math.min(MENU_MAX_HEIGHT, below) };
+  return { bottom: windowHeight - anchor.top + space.xs, maxHeight: Math.min(MENU_MAX_HEIGHT, above) };
+}
 
 /**
  * The board header's Repo and Sprint dropdowns (artboard 1) and the team board's Team dropdown (artboard 08): a white capsule with the muted label,
@@ -66,11 +81,12 @@ export function HeaderMenu({ label, value, valueNote, items, onSelect, disabled 
   const trigger = useRef<PressableInstance>(null);
   const [hovered, setHovered] = useState(false);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const { height: windowHeight } = useWindowDimensions();
 
   const open = () => {
     const node = trigger.current;
     if (!node) return;
-    node.measureInWindow((x, y, width, height) => setAnchor({ x, y: y + height + space.xs, width }));
+    node.measureInWindow((x, y, width, height) => setAnchor({ x, top: y, bottom: y + height, width }));
   };
   const close = () => setAnchor(null);
   const choose = (key: string) => {
@@ -112,7 +128,7 @@ export function HeaderMenu({ label, value, valueNote, items, onSelect, disabled 
           <View
             role="menu"
             aria-label={label}
-            style={[styles.menu, { top: anchor.y, left: anchor.x, minWidth: Math.max(anchor.width, MENU_MIN_WIDTH) }]}
+            style={[styles.menu, placeMenu(anchor, windowHeight), { left: anchor.x, minWidth: Math.max(anchor.width, MENU_MIN_WIDTH) }]}
             testID={testID ? `${testID}-menu` : undefined}
           >
             <ScrollView style={styles.scroll}>
@@ -200,7 +216,6 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: 'absolute',
-    maxHeight: MENU_MAX_HEIGHT,
     paddingVertical: space.xs,
     borderRadius: radius.control,
     borderWidth: 1,
