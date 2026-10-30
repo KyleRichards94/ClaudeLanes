@@ -84,8 +84,9 @@ describe('room log (AL-295)', () => {
     const bridge = setup(<RoomsPanel />);
     act(() => openRooms());
     expect((await screen.findByTestId('room-heading')).textContent).toBe('Feature #48000 · Job DTO');
-    expect(screen.getByTestId('room-member-71273').textContent).toContain('Mitch Healy (you)');
-    expect(screen.getByTestId('room-member-71280').textContent).toContain('Kyle Richards · KYLE-PC · #71280 · Implementing');
+    expect(screen.getByTestId('room-members-count-48000').textContent).toBe('In the room · 2');
+    expect(screen.getByTestId('room-member-71273').textContent).toBe('Mitch Healy (you) · MITCH-PC · #71273 Cutover · Implementing');
+    expect(screen.getByTestId('room-member-71280').textContent).toMatch(/^Kyle Richards · KYLE-PC · #71280 Job DTO · Implementingseen /);
     await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('peers:markSeen', { room: ROOM, upTo: live.id }));
     expect(screen.getByTestId(`room-message-${live.id}`).textContent).toContain('new');
   });

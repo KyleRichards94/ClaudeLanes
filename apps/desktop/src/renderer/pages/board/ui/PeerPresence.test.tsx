@@ -113,7 +113,7 @@ describe('board presence (AL-293)', () => {
 
     const at = new Date(2026, 9, 29, 10, 42).getTime();
     render(<MemberRow member={member({ workItemId: 71290, local: false, user: 'Rocky Smith', host: 'ROCKY-PC', reachable: false, lastSeenAt: at })} now={at + 30_000} testID="rocky" />);
-    expect(screen.getByTestId('rocky').textContent).toBe('Rocky Smith · ROCKY-PC · #71290 · Implementinglast seen 10:42');
+    expect(screen.getByTestId('rocky').textContent).toBe('Rocky Smith · ROCKY-PC · #71290 Story · Implementinglast seen 10:42');
   });
 
   it('hides the Peers pill while there is no Peers connection', async () => {

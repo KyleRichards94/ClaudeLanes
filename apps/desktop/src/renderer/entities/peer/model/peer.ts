@@ -143,6 +143,6 @@ export const KIND_TONES: Record<PeerKind, Tone> = {
 
 /** `Kyle Richards · KYLE-PC · #48161 · Implementing`. */
 export function memberLine(member: RoomMember, stageLabel: (stage: string) => string): string {
-  const item = member.lane.workItemId ? `#${member.lane.workItemId}` : member.lane.title;
-  return [member.local ? `${member.user} (you)` : member.user, member.local ? null : member.host, item, stageLabel(member.lane.stage)].filter(Boolean).join(' · ');
+  const item = member.lane.workItemId ? `#${member.lane.workItemId}${member.lane.title ? ` ${member.lane.title}` : ''}` : member.lane.title;
+  return [member.local ? `${member.user} (you)` : member.user, member.host, item, stageLabel(member.lane.stage)].filter(Boolean).join(' · ');
 }

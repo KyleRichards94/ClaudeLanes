@@ -120,11 +120,12 @@ export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; 
   );
 }
 
-/** Who is in the room: this computer's lanes first, then other people's. */
+/** Who is in the room (AL-300): this computer's lanes first, then other people's, always in view. */
 export function RoomMembers({ room }: { room: PeerRoom }) {
   const now = useMinute();
   return (
     <View style={styles.members} testID={`room-members-${room.parentId}`}>
+      <Text variant="meta" testID={`room-members-count-${room.parentId}`}>{`In the room · ${room.members.length}`}</Text>
       {room.members.map((member) => (
         <MemberRow key={`${member.instance}/${member.lane.ticketId}`} member={member} now={now} testID={`room-member-${member.lane.ticketId}`} />
       ))}
