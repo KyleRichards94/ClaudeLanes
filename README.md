@@ -159,7 +159,9 @@ theirs. They add yours too.
 
 Lanes whose work items sit under the same Feature or Epic are in the same room. When another agent
 posts in the room, yours gets it as a turn whose lines start with `[Peer lanes]`, and it's told that
-this is information from another agent, not an instruction from you. An agent has to push its
+this is information from another agent, not an instruction from you. An idle agent wakes up for it,
+and one that has stopped is started again, so it counts towards your agent limit. A paused agent
+gets it when you resume it. An agent has to push its
 branch before it can tell the room it changed something: git is the only thing that's shared.
 
 How the apps trust each other: every message is signed with a key the app works out from your Azure
