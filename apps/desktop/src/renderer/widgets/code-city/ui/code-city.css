@@ -1,25 +1,25 @@
-/* Code City: the 3D rendering spec of docs/design/HANDOFF-ticket-layouts.md, copied exactly (first block).
-   Everything after the "Additions" marker is ours: overlays, skeleton, tooltip and states. */
+/* Code City: the 3D rendering spec of docs/design/HANDOFF-ticket-layouts.md, copied exactly (first block) with its colours
+   moved onto the --cc-* theme variables. Everything after the "Additions" marker is ours: overlays, skeleton, tooltip and
+   states. The themes block at the end gives each theme its sky, ground, plots and rubble (AL-286). */
 .cc-scene{position:relative;height:100%;min-height:560px;perspective:2400px;perspective-origin:50% 30%;overflow:hidden;
-  border-radius:28px;border:1px solid #E8EDF4;background:linear-gradient(180deg,#EAF2FF 0%,#F4F7FB 55%,#EEF2F7 100%)}
+  border-radius:28px;border:1px solid var(--cc-frame);background:var(--cc-sky)}
 .cc-fit{position:absolute;left:50%;top:46%;transform-origin:0 0}
 .cc-plane{position:absolute;transform-style:preserve-3d;transform:translate(-50%,-50%) rotateX(58deg) rotateZ(-42deg)}
-.cc-ground{position:absolute;inset:-40px;border-radius:40px;background-color:#fff;box-shadow:0 0 0 1px #E2E8F0;
-  background-image:linear-gradient(#EEF2F7 1px,transparent 1px),linear-gradient(90deg,#EEF2F7 1px,transparent 1px);background-size:40px 40px}
+.cc-ground{position:absolute;inset:-40px;border-radius:40px;background-color:var(--cc-ground);box-shadow:0 0 0 1px var(--cc-ground-edge);
+  background-image:var(--cc-ground-image);background-size:var(--cc-ground-size)}
 .cc-plot{position:absolute;border-radius:22px;border:2px dashed var(--plot-border);background:var(--plot-bg)}
-.cc-rubble{position:absolute;border-radius:14px;box-shadow:inset 0 0 0 2px #F87171;
-  background:repeating-linear-gradient(45deg,#FECACA 0 10px,#FEE2E2 10px 20px)}
+.cc-rubble{position:absolute;border-radius:14px;box-shadow:inset 0 0 0 2px var(--cc-rubble-ring);background:var(--cc-rubble)}
 .cc-b{position:absolute;transform-style:preserve-3d;cursor:pointer;transition:left .3s ease,top .3s ease}
 .cc-b .top{position:absolute;inset:0;transform:translateZ(var(--h));background:var(--c1);border-radius:6px}
 .cc-b .win{position:absolute;inset:0;transform:translateZ(calc(var(--h) + 1px));border-radius:6px;opacity:.6;
-  background-image:radial-gradient(rgba(255,255,255,.55) 1.4px,transparent 1.6px);background-size:12px 12px}
+  background-image:radial-gradient(var(--cc-window) 1.4px,transparent 1.6px);background-size:12px 12px}
 .cc-b .s{position:absolute;left:0;bottom:0;width:100%;height:var(--h);transform-origin:bottom;
   transform:rotateX(-90deg);background:linear-gradient(0deg,var(--c1),var(--c2))}
 .cc-b .e{position:absolute;right:0;top:0;width:var(--h);height:100%;transform-origin:right;
   transform:rotateY(90deg);background:linear-gradient(270deg,var(--c3),var(--c2))}
-.cc-b .shadow{position:absolute;inset:-10px;transform:translate(14px,14px);background:rgba(15,27,45,.10);filter:blur(10px);border-radius:10px}
-.cc-b[aria-selected="true"] .top{box-shadow:0 0 0 4px #5B4BC4,0 0 24px rgba(91,75,196,.6)}
-.cc-b:focus-visible .top{box-shadow:0 0 0 4px rgba(91,75,196,.45)}
+.cc-b .shadow{position:absolute;inset:-10px;transform:translate(14px,14px);background:var(--cc-building-shadow);filter:blur(10px);border-radius:10px}
+.cc-b[aria-selected="true"] .top{box-shadow:0 0 0 4px var(--cc-select),0 0 24px var(--cc-select-glow)}
+.cc-b:focus-visible .top{box-shadow:0 0 0 4px var(--cc-focus)}
 .cc-b.rising .top,.cc-b.rising .s,.cc-b.rising .e{transition:transform .4s cubic-bezier(.22,1,.36,1),height .4s cubic-bezier(.22,1,.36,1)}
 @keyframes cc-bob{0%,100%{transform:translate(-50%,-100%)}50%{transform:translate(-50%,calc(-100% - 8px))}}
 .cc-pin{position:absolute;animation:cc-bob 2s ease-in-out infinite;pointer-events:none}
@@ -35,40 +35,40 @@
 .cc-b .shadow{pointer-events:none}
 .cc-b:hover .top{filter:brightness(1.06)}
 /* A change that only exists in the working tree: dashed amber outline on the top face. */
-.cc-b.uncommitted .top{outline:3px dashed #D97706;outline-offset:-3px}
+.cc-b.uncommitted .top{outline:3px dashed var(--cc-uncommitted);outline-offset:-3px}
 .cc-b.slab .win{display:none}
 .cc-rubble[role="option"]{cursor:pointer;outline:none}
-.cc-rubble[role="option"][aria-selected="true"]{box-shadow:inset 0 0 0 2px #F87171,0 0 0 4px #5B4BC4,0 0 24px rgba(91,75,196,.6)}
-.cc-rubble[role="option"]:focus-visible{box-shadow:inset 0 0 0 2px #F87171,0 0 0 4px rgba(91,75,196,.45)}
-.cc-plot.cc-overflow{cursor:pointer;border-color:#CBD5E1;background:rgba(241,245,249,.8)}
+.cc-rubble[role="option"][aria-selected="true"]{box-shadow:inset 0 0 0 2px var(--cc-rubble-ring),0 0 0 4px var(--cc-select),0 0 24px var(--cc-select-glow)}
+.cc-rubble[role="option"]:focus-visible{box-shadow:inset 0 0 0 2px var(--cc-rubble-ring),0 0 0 4px var(--cc-focus)}
+.cc-plot.cc-overflow{cursor:pointer;border-color:var(--cc-plot-4-line);background:var(--cc-plot-4-bg)}
 .cc-corner{position:absolute;left:0;bottom:0;width:1px;height:1px;pointer-events:none}
 
 /* Skeleton plane: a grey grid with three ghost buildings pulsing. */
 @keyframes cc-pulse{0%,100%{opacity:.9}50%{opacity:.45}}
 .cc-ghost{pointer-events:none;cursor:default;animation:cc-pulse 1.6s ease-in-out infinite}
 .cc-ghost .win{display:none}
-.cc-skeleton .cc-ground{background-color:#F1F5F9}
-.cc-empty-plot{border-style:dashed;border-color:#CBD5E1;background:rgba(241,245,249,.7)}
+.cc-skeleton .cc-ground{background-color:var(--cc-skeleton-ground)}
+.cc-empty-plot{border-style:dashed;border-color:var(--cc-plot-4-line);background:var(--cc-empty-bg)}
 @media (prefers-reduced-motion:reduce){.cc-ghost{animation:none}}
 
 /* Flat overlay layer: labels, pins, tooltip. Not in 3D. */
 .cc-overlay{position:absolute;inset:0;pointer-events:none}
 .cc-chip{position:absolute;box-sizing:border-box;height:26px;padding:4px 9px;display:flex;align-items:center;gap:6px;white-space:nowrap;
-  font:400 12px/16px "JetBrains Mono",ui-monospace,monospace;color:#0F1B2D;background:rgba(255,255,255,.92);
-  border:1px solid #E2E8F0;border-radius:9px;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
+  font:400 12px/16px "JetBrains Mono",ui-monospace,monospace;color:var(--cc-chip-ink);background:var(--cc-chip-bg);
+  border:1px solid var(--cc-chip-line);border-radius:9px;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
   transition:left .3s ease,top .3s ease}
 /* Chips pile up in a crowded city: the picked one, the one under the mouse and the one for the focused building come to the front. */
-.cc-chip.sel{border-color:#5B4BC4;z-index:2}
-.cc-chip.front{z-index:3;background:#fff;box-shadow:0 2px 8px rgba(15,27,45,.18)}
-.cc-chip:hover{z-index:4;background:#fff;box-shadow:0 2px 8px rgba(15,27,45,.18)}
-.cc-chip .add{color:#047857}
-.cc-chip .del{color:#B91C1C}
-.cc-chip .tall{font:800 10px/12px "Plus Jakarta Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:#4A3BB0;
-  background:#EEEBFF;border-radius:6px;padding:1px 5px}
-.cc-chip.rubble{font-weight:800;color:#B91C1C;background:rgba(255,255,255,.9)}
-.cc-chip.more{font:800 12px/16px "Plus Jakarta Sans",system-ui,sans-serif;color:#475569;background:rgba(241,245,249,.95);
-  transform:translate(-50%,0);border-color:#CBD5E1}
-.cc-chip.more:focus-visible{box-shadow:0 0 0 3px rgba(91,75,196,.4);outline:none}
+.cc-chip.sel{border-color:var(--cc-select);z-index:2}
+.cc-chip.front{z-index:3;background:var(--cc-chip-front);box-shadow:0 2px 8px var(--cc-chip-shadow)}
+.cc-chip:hover{z-index:4;background:var(--cc-chip-front);box-shadow:0 2px 8px var(--cc-chip-shadow)}
+.cc-chip .add{color:var(--cc-add)}
+.cc-chip .del{color:var(--cc-del)}
+.cc-chip .tall{font:800 10px/12px "Plus Jakarta Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:var(--cc-tall-ink);
+  background:var(--cc-tall-bg);border-radius:6px;padding:1px 5px}
+.cc-chip.rubble{font-weight:800;color:var(--cc-del);background:var(--cc-chip-rubble-bg)}
+.cc-chip.more{font:800 12px/16px "Plus Jakarta Sans",system-ui,sans-serif;color:var(--cc-quiet-ink);background:var(--cc-more-bg);
+  transform:translate(-50%,0);border-color:var(--cc-plot-4-line)}
+.cc-chip.more:focus-visible{box-shadow:0 0 0 3px var(--cc-focus-soft);outline:none}
 .cc-district{position:absolute;transform:translate(-50%,2px);white-space:nowrap;pointer-events:none;
   font:800 11px/14px "Plus Jakarta Sans",system-ui,sans-serif;text-transform:uppercase;letter-spacing:.06em}
 .cc-pill{display:block;white-space:nowrap;padding:4px 10px;border-radius:999px;color:#fff;
@@ -76,26 +76,151 @@
 .cc-stem{display:block;width:3px;height:26px;margin:0 auto}
 .cc-pin{will-change:transform}
 .cc-tip{position:absolute;transform:translate(-50%,0);max-width:340px;padding:8px 10px;border-radius:12px;pointer-events:none;
-  background:#0F1B2D;color:#fff;box-shadow:0 8px 24px rgba(15,27,45,.25);
+  background:var(--cc-tip-bg);color:var(--cc-tip-ink);box-shadow:0 8px 24px var(--cc-tip-shadow);
   font:500 12px/16px "Plus Jakarta Sans",system-ui,sans-serif}
 .cc-tip .path{display:block;font:400 11px/15px "JetBrains Mono",ui-monospace,monospace;word-break:break-all;margin-bottom:2px}
 .cc-popover{position:absolute;transform:translate(-50%,-100%);width:300px;max-height:240px;overflow:auto;padding:6px;border-radius:14px;
-  background:rgba(255,255,255,.97);border:1px solid #E2E8F0;box-shadow:0 12px 32px rgba(15,27,45,.18);pointer-events:auto}
+  background:var(--cc-popover-bg);border:1px solid var(--cc-chip-line);box-shadow:0 12px 32px var(--cc-chip-shadow);pointer-events:auto}
 .cc-popover button{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:8px;padding:6px 8px;cursor:pointer;
-  font:400 11px/15px "JetBrains Mono",ui-monospace,monospace;color:#0F1B2D;word-break:break-all}
-.cc-popover button:hover,.cc-popover button:focus-visible{background:#EEEBFF;outline:none}
-.cc-popover .head{font:800 12px/16px "Plus Jakarta Sans",system-ui,sans-serif;color:#475569;padding:4px 8px}
+  font:400 11px/15px "JetBrains Mono",ui-monospace,monospace;color:var(--cc-chip-ink);word-break:break-all}
+.cc-popover button:hover,.cc-popover button:focus-visible{background:var(--cc-tall-bg);outline:none}
+.cc-popover .head{font:800 12px/16px "Plus Jakarta Sans",system-ui,sans-serif;color:var(--cc-quiet-ink);padding:4px 8px}
 
 /* Centred cards: the empty lot's caption and the error card. */
 .cc-center{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;
   text-align:center;pointer-events:auto}
 .cc-center.caption{pointer-events:none;top:50%}
-.cc-lot{padding:6px 12px;border-radius:12px;background:rgba(255,255,255,.92);border:1px solid #E2E8F0;
-  font:700 13px/18px "Plus Jakarta Sans",system-ui,sans-serif;color:#475569}
-.cc-error{max-width:380px;padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.95);border:1px solid #FECACA;
-  box-shadow:0 12px 32px rgba(15,27,45,.12)}
+.cc-lot{padding:6px 12px;border-radius:12px;background:var(--cc-chip-bg);border:1px solid var(--cc-chip-line);
+  font:700 13px/18px "Plus Jakarta Sans",system-ui,sans-serif;color:var(--cc-quiet-ink)}
+.cc-error{max-width:380px;padding:18px 20px;border-radius:16px;background:var(--cc-error-bg);border:1px solid var(--cc-error-line);
+  box-shadow:0 12px 32px var(--cc-error-shadow)}
 
 /* Announcements for screen readers only. */
 .cc-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 
 .cc-plot{box-sizing:border-box}
+
+/* ── Themes (AL-286) ───────────────────────────────────────────────────────────────────────────────
+   The defaults are the spec's light city. Author colours stay as they are in every theme: they name the agents. */
+.cc-scene{
+  --cc-frame:#E8EDF4;
+  --cc-sky:linear-gradient(180deg,#EAF2FF 0%,#F4F7FB 55%,#EEF2F7 100%);
+  --cc-ground:#fff;
+  --cc-ground-edge:#E2E8F0;
+  --cc-ground-image:linear-gradient(#EEF2F7 1px,transparent 1px),linear-gradient(90deg,#EEF2F7 1px,transparent 1px);
+  --cc-ground-size:40px 40px;
+  --cc-plot-1-bg:rgba(224,242,254,.6);--cc-plot-1-line:#7DD3FC;
+  --cc-plot-2-bg:rgba(238,235,255,.6);--cc-plot-2-line:#C4B5FD;
+  --cc-plot-3-bg:rgba(204,251,241,.5);--cc-plot-3-line:#5EEAD4;
+  --cc-plot-4-bg:rgba(241,245,249,.8);--cc-plot-4-line:#CBD5E1;
+  --cc-empty-bg:rgba(241,245,249,.7);
+  --cc-skeleton-ground:#F1F5F9;
+  --cc-rubble-ring:#F87171;
+  --cc-rubble:repeating-linear-gradient(45deg,#FECACA 0 10px,#FEE2E2 10px 20px);
+  --cc-window:rgba(255,255,255,.55);
+  --cc-building-shadow:rgba(15,27,45,.10);
+  --cc-select:var(--al-claude);
+  --cc-select-glow:color-mix(in srgb,var(--al-claude) 60%,transparent);
+  --cc-focus:color-mix(in srgb,var(--al-claude) 45%,transparent);
+  --cc-focus-soft:color-mix(in srgb,var(--al-claude) 40%,transparent);
+  --cc-uncommitted:var(--al-attention);
+  --cc-chip-ink:var(--al-ink);
+  --cc-chip-bg:rgba(255,255,255,.92);
+  --cc-chip-line:var(--al-line);
+  --cc-chip-front:#fff;
+  --cc-chip-shadow:rgba(15,27,45,.18);
+  --cc-chip-rubble-bg:rgba(255,255,255,.9);
+  --cc-add:var(--al-tone-ok-text);
+  --cc-del:var(--al-danger);
+  --cc-tall-ink:var(--al-claude-text);
+  --cc-tall-bg:var(--al-claude-tint);
+  --cc-quiet-ink:#475569;
+  --cc-more-bg:rgba(241,245,249,.95);
+  --cc-tip-bg:var(--al-ink);
+  --cc-tip-ink:var(--al-on-ink);
+  --cc-tip-shadow:rgba(15,27,45,.25);
+  --cc-popover-bg:rgba(255,255,255,.97);
+  --cc-error-bg:rgba(255,255,255,.95);
+  --cc-error-line:#FECACA;
+  --cc-error-shadow:rgba(15,27,45,.12);
+}
+/* The stage track sits outside the scene. */
+:root{--cc-stage-done:#059669;--cc-road-done:#34D399}
+
+/* Overlays in the other themes take the app's surfaces. */
+:root:is([data-theme='dark'],[data-theme='solarpunk'],[data-theme='cyberpunk']) .cc-scene{
+  --cc-chip-bg:color-mix(in srgb,var(--al-surface) 92%,transparent);
+  --cc-chip-front:var(--al-surface);
+  --cc-chip-rubble-bg:color-mix(in srgb,var(--al-surface) 90%,transparent);
+  --cc-quiet-ink:var(--al-muted);
+  --cc-more-bg:color-mix(in srgb,var(--al-surface) 95%,transparent);
+  --cc-popover-bg:color-mix(in srgb,var(--al-surface) 97%,transparent);
+  --cc-error-bg:color-mix(in srgb,var(--al-surface) 95%,transparent);
+  --cc-error-line:var(--al-tone-danger-border);
+  --cc-frame:var(--al-line);
+}
+
+/* Dark: the same city at night, on a dark ground at last. */
+:root[data-theme='dark'] .cc-scene{
+  --cc-sky:linear-gradient(180deg,#1B2638 0%,#141D2A 55%,#111923 100%);
+  --cc-ground:#18212E;
+  --cc-ground-edge:#2A3648;
+  --cc-ground-image:linear-gradient(#223047 1px,transparent 1px),linear-gradient(90deg,#223047 1px,transparent 1px);
+  --cc-plot-1-bg:rgba(56,189,248,.10);--cc-plot-1-line:#2E7AA6;
+  --cc-plot-2-bg:rgba(139,124,246,.12);--cc-plot-2-line:#6E62C8;
+  --cc-plot-3-bg:rgba(45,212,191,.10);--cc-plot-3-line:#2A8F82;
+  --cc-plot-4-bg:rgba(148,163,184,.10);--cc-plot-4-line:#475569;
+  --cc-empty-bg:rgba(148,163,184,.08);
+  --cc-skeleton-ground:#1F2A3A;
+  --cc-rubble:repeating-linear-gradient(45deg,#4A2026 0 10px,#3A1A20 10px 20px);
+  --cc-window:rgba(255,255,255,.35);
+  --cc-building-shadow:rgba(0,0,0,.35);
+  --cc-chip-shadow:rgba(0,0,0,.4);
+  --cc-tip-shadow:rgba(0,0,0,.45);
+  --cc-error-shadow:rgba(0,0,0,.4);
+}
+
+/* Solarpunk: a sunlit town on cream paper, gardens for plots. */
+:root[data-theme='solarpunk'] .cc-scene{
+  --cc-sky:linear-gradient(180deg,#D3E9F3 0%,#EEF3E2 50%,#F5EFDD 100%);
+  --cc-ground:#FFFBEF;
+  --cc-ground-edge:var(--al-line);
+  --cc-ground-image:linear-gradient(#EFE3C4 1px,transparent 1px),linear-gradient(90deg,#EFE3C4 1px,transparent 1px);
+  --cc-plot-1-bg:rgba(221,240,214,.7);--cc-plot-1-line:#6E9A4C;
+  --cc-plot-2-bg:rgba(247,229,210,.7);--cc-plot-2-line:#A8703E;
+  --cc-plot-3-bg:rgba(215,233,242,.7);--cc-plot-3-line:#4F86A3;
+  --cc-plot-4-bg:rgba(239,231,211,.8);--cc-plot-4-line:#A29470;
+  --cc-empty-bg:rgba(239,231,211,.6);
+  --cc-skeleton-ground:#F3EBD6;
+  --cc-rubble-ring:#9C6B3F;
+  --cc-rubble:repeating-linear-gradient(45deg,#E9D3B4 0 10px,#F3E3CB 10px 20px);
+  --cc-window:rgba(255,250,228,.6);
+  --cc-building-shadow:rgba(110,76,24,.16);
+  --cc-chip-shadow:rgba(110,76,24,.18);
+  --cc-tip-shadow:rgba(110,76,24,.25);
+  --cc-error-shadow:rgba(110,76,24,.15);
+}
+:root[data-theme='solarpunk']{--cc-stage-done:var(--al-ok);--cc-road-done:var(--al-tone-ok-fill)}
+
+/* Cyberpunk: a night city on a cyan grid. */
+:root[data-theme='cyberpunk'] .cc-scene{
+  --cc-frame:rgba(0,240,255,.45);
+  --cc-sky:radial-gradient(ellipse at 20% 0%,rgba(255,43,214,.22),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(0,240,255,.16),transparent 55%),linear-gradient(180deg,#0E0B1F 0%,#07060F 100%);
+  --cc-ground:#0B0A18;
+  --cc-ground-edge:rgba(0,240,255,.55);
+  --cc-ground-image:linear-gradient(rgba(0,240,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.22) 1px,transparent 1px);
+  --cc-plot-1-bg:rgba(0,240,255,.06);--cc-plot-1-line:#00F0FF;
+  --cc-plot-2-bg:rgba(255,43,214,.07);--cc-plot-2-line:#FF2BD6;
+  --cc-plot-3-bg:rgba(0,255,159,.06);--cc-plot-3-line:#00FF9F;
+  --cc-plot-4-bg:rgba(138,132,255,.08);--cc-plot-4-line:#8A84FF;
+  --cc-empty-bg:rgba(138,132,255,.06);
+  --cc-skeleton-ground:#12102A;
+  --cc-rubble-ring:#FCEE0A;
+  --cc-rubble:repeating-linear-gradient(45deg,#3A3506 0 10px,#151209 10px 20px);
+  --cc-window:rgba(0,240,255,.75);
+  --cc-building-shadow:rgba(0,0,0,.6);
+  --cc-chip-shadow:rgba(0,0,0,.5);
+  --cc-tip-shadow:rgba(0,0,0,.55);
+  --cc-error-shadow:rgba(0,0,0,.5);
+}
+:root[data-theme='cyberpunk']{--cc-stage-done:var(--al-ok);--cc-road-done:var(--al-tone-ok-fill)}
