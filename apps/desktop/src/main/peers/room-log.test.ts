@@ -138,10 +138,11 @@ describe('late joiner over two networks (AL-291)', () => {
       const kyle = await side(b, 1, [{ id: TEST_ROOM, parentId: 48000 }]);
       await b.network.configure(testConfig(b.port, [`localhost:${a.port}`]));
       await kyle.rooms.sync();
-      await vi.waitFor(async () => expect((await kyle.roomLog.read(TEST_ROOM)).messages.map((message) => message.text)).toEqual(['One', 'Two', 'Three']), { timeout: 8_000 });
-      const read = await kyle.roomLog.read(TEST_ROOM);
-      expect(read.messages.every((message) => message.replay && !message.own && message.from.user === 'mitch')).toBe(true);
-      expect((await kyle.roomLog.read(OTHER_ROOM)).messages).toEqual([]);
+      // Posts only: the joined rows (AL-300) are this app's own notes, never replayed.
+      const posts = async (room: string) => (await kyle.roomLog.read(room)).messages.filter((message) => !message.system);
+      await vi.waitFor(async () => expect((await posts(TEST_ROOM)).map((message) => message.text)).toEqual(['One', 'Two', 'Three']), { timeout: 8_000 });
+      expect((await posts(TEST_ROOM)).every((message) => message.replay && !message.own && message.from.user === 'mitch')).toBe(true);
+      expect(await posts(OTHER_ROOM)).toEqual([]);
     } finally {
       for (const item of [...lanes, ...made]) await item.dispose();
       await a.network.dispose();

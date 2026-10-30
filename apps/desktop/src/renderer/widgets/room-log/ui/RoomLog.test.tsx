@@ -120,3 +120,28 @@ describe('room composer (AL-295)', () => {
     await waitFor(() => expect((screen.getByTestId('room-post-text') as HTMLInputElement).value).toBe(''));
   });
 });
+
+describe('the room as a chat room (AL-300)', () => {
+  const joined = message('hello', '', { system: 'joined', sentAt: '2026-10-30T10:42:00.000Z' });
+  const mine = message('hello', '', { system: 'joined', own: true, sentAt: '2026-10-30T10:43:00.000Z', from: own.from });
+  const left = message('bye', '', { system: 'lost', sentAt: '2026-10-30T10:44:00.000Z' });
+  const withRows = [own, replayed, live, joined, mine, left];
+
+  it('shows joins, leaves and lost contact as quiet lines with the time, never as new', async () => {
+    setup(<RoomLog room={room} />, { 'peers:log': { ok: true, data: { room: ROOM, messages: withRows, capped: false } } });
+    const line = await screen.findByTestId(`room-system-${joined.id}`);
+    const time = (at: string) => new Date(at).toTimeString().slice(0, 5);
+    expect(line.textContent).toBe(`Kyle Richards's agent joined on #71280 · ${time(joined.sentAt)}`);
+    expect(screen.getByTestId(`room-system-${mine.id}`).textContent).toBe(`Your agent joined on #71280 · ${time(mine.sentAt)}`);
+    expect(screen.getByTestId(`room-system-${left.id}`).textContent).toBe(`Lost contact with Kyle Richards's agent on #71280 · ${time(left.sentAt)}`);
+    expect(screen.queryByTestId(`room-message-${joined.id}`)).toBeNull();
+    expect(screen.getByTestId(`room-system-${left.id}`).textContent).not.toContain('new');
+  });
+
+  it('marks the room seen up to its last post when a system row comes after it', async () => {
+    const bridge = setup(<RoomsPanel />, { 'peers:log': { ok: true, data: { room: ROOM, messages: withRows, capped: false } } });
+    act(() => openRooms());
+    await screen.findByTestId(`room-system-${left.id}`);
+    await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('peers:markSeen', { room: ROOM, upTo: live.id }));
+  });
+});

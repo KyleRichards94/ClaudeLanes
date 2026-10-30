@@ -258,10 +258,17 @@ export const PeerRoomsSchema = z.object({
 });
 export type PeerRooms = z.infer<typeof PeerRoomsSchema>;
 
-/** A frame as the room log shows and keeps it: never the signature or the team tag. */
+export const ROOM_SYSTEM_EVENTS = ['joined', 'left', 'lost'] as const;
+export type RoomSystemEvent = (typeof ROOM_SYSTEM_EVENTS)[number];
+
+/**
+ * A frame as the room log shows and keeps it: never the signature or the team tag. A system row
+ * (AL-300) is this app's note of a lane joining, leaving or going quiet; it is never sent or replayed.
+ */
 export const RoomMessageSchema = PeerFrameBaseSchema.omit({ team: true }).extend({
-  /** Sent by this app. */
+  /** Sent by this app; on a system row, about one of this app's lanes. */
   own: z.boolean(),
+  system: z.enum(ROOM_SYSTEM_EVENTS).optional(),
 });
 export type RoomMessage = z.infer<typeof RoomMessageSchema>;
 

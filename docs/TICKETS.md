@@ -31,7 +31,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
 | **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
 | **M7 Ticket view parity** | The ticket drill-in works like Claude Code: your messages, expandable tool calls, usage and plan limits, Stop, Assign new agent, a second agent | E15 (AL-250–AL-266) | Assign a new agent to a lost session and hand over; a reviewer runs beside it |
-| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-299) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
+| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-300) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -221,6 +221,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-297 | E2E: two apps talking | E18 | M | AL-294, AL-295, AL-296 | partial |
 | AL-298 | Automatic discovery and the derived team key | E18 | M | AL-289, AL-296 | partial |
 | AL-299 | Wake an idle agent on a room message | E18 | S | AL-292 | done |
+| AL-300 | The room as a chat room: members in view, joins and leaves in the log | E18 | M | AL-295 | in-progress |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1564,7 +1565,8 @@ before the UI tickets (AL-293 to AL-295) start. AL-287 to AL-292 and AL-296 are 
 AL-298 was added on 2026-10-30 from the brief's PL§11, after Mitch saw the Peers form: peers are
 found by a UDP beacon and the key is derived from the ADO project, so there is nothing to type.
 AL-299 was added the same day: a room message wakes an idle agent, or starts a session for a lane
-with none (Mitch, overriding D837).
+with none (Mitch, overriding D837). AL-300 makes the room a chat room: members always in view, joins
+and leaves in the log, and one scroll region (Mitch, overriding D836).
 
 #### AL-287 · Peer frame contracts and signing
 - **Design:** PL§3, PL§7 · **Depends on:** AL-011, AL-012
@@ -1675,6 +1677,16 @@ with none (Mitch, overriding D837).
   - [x] A lane with no live session gets one started, and its first turn is the peer message with the prefix. (`wake.test.ts`: one that never ran is launched with it as its job, a stopped one is resumed with it as its first turn)
   - [x] A `status` or `touched` frame for an idle lane starts nothing (test asserts no session call). (`wake.test.ts`: no new SDK call and nothing sent, idle or stopped, `bye` too; and the peer service never calls `wake` for them)
   - [x] TICKETS.md Decisions records D837 as superseded. (D837, D851)
+
+#### AL-300 · The room as a chat room: members in view, joins and leaves in the log
+- **Design:** P9, PL§2 (Rooms panel, Room tab), PL§8 · **Depends on:** AL-295
+- **Scope:** `room-log.ts` and `widgets/room-log`: the member list sits at the top of the Rooms panel and the Room tab, always visible, one row per member (user, machine, work item and title, stage, last seen, "you" for local lanes). The log gets system rows, visually distinct from posts: "Kyle's agent joined on #51439 · 10:42" on `hello`, "left" on `bye`, and "lost contact" when presence expires at 90 s; the app's own lanes get the same rows. System rows are kept in the app's own log (memory and the room JSON) like posts, but are not sent as frames and are not replayed to late joiners (their presence covers it). They never count toward the Assist bubble or unread. Replaces D836. Layout: one scroll region, like a chat app. The member list and the room title sit at the top, the composer is pinned at the bottom, and only the log between them scrolls, filling whatever height the panel or tab has. No fixed log height and no second, page-level scrollbar (Mitch, 2026-10-30, from a screenshot of the Room tab with two scrollbars: "The chat component shouldn't be scrollable. Notice the two scroll bars").
+- **Acceptance criteria:**
+  - [ ] A `hello` from a peer lane adds a joined row with user, work item and time; a `bye` adds a left row; expiry adds a lost-contact row (fake clock in the test).
+  - [ ] The member list shows every live member of the room with stage and last seen, and drops one on `bye` or expiry.
+  - [ ] System rows don't change the unread count or the bubble.
+  - [ ] The Room tab and the Rooms panel both show the list and the rows; screenshot for Kyle.
+  - [ ] At 1440x960 and at a short window, the Room tab and the Rooms panel each show exactly one scrollbar, on the log; the composer stays in view without scrolling.
 
 ---
 ## 4. Decisions
@@ -2636,6 +2648,7 @@ with none (Mitch, overriding D837).
 | 2026-10-30 | AL-298 built (partial): the team key derived from the ADO organisation and project, the Peers connection's secret deleted and its peer list moved to Advanced, the UDP beacon, and the Peers tab as a status page with Find peers. D845–D850. `pnpm verify` green apart from renderer tests that time out at 5 s under load and pass when rerun alone. The two e2e criteria were not run, on Mitch's call. |
 | 2026-10-30 | AL-299 added to E18 from the brief (PL§6 idle agent row, PL§8): a room message wakes an idle agent or starts a session for a lane with none, replacing D837. |
 | 2026-10-30 | AL-299 built: room turns wake an idle agent and resume or start a lane with no live session, through the composer's send path. D851; D837 superseded in part. `pnpm verify` green apart from renderer tests that time out under load and pass alone; e2e not run, on Mitch's call. |
+| 2026-10-30 | AL-300 added to E18 from the brief (PL§2, PL§8): the room as a chat room, with the member list in view, joined, left and lost-contact rows in the log, and one scroll region (Mitch's screenshot of two scrollbars); replaces D836. |
 ---
 
 ## 7. Parallel build rules

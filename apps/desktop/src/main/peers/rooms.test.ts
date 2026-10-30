@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { err, ok, peerRoomId, type PeerFrame, type PeerNetworkStatus, type TicketAdoRef } from '@agent-lanes/contracts';
 import { createTicketRecordStore, type TicketRecordStore } from '../tickets';
 import { createMemoryRecordFs, newTicketInput } from '../tickets/testing';
 import type { FrameDraft, PeerEvent, PeerNetwork } from './network';
+import { recordingEmit } from '../agent/testing/sessions';
+import { createRoomLog } from './room-log';
 import { createRooms, type PortfolioParentRef, type Rooms } from './rooms';
+import { createPeerLanes } from './service';
 import { signFrame } from './signer';
 import { TEST_TEAM } from './testing';
 import { peerNetworkFixture } from '@agent-lanes/contracts/testing';
@@ -66,14 +71,22 @@ const parents: Record<string, PortfolioParentRef | null> = {
 let rooms: Rooms | undefined;
 afterEach(() => rooms?.dispose());
 
-async function setup(options: { touched?: () => string[]; presenceMs?: number; expiryMs?: number } = {}) {
+async function setup(options: { touched?: () => string[]; presenceMs?: number; expiryMs?: number; now?: () => number } = {}) {
   const tickets: TicketRecordStore = createTicketRecordStore({ rootDir: join(BASE, 'tickets'), fs: createMemoryRecordFs(), warn: () => undefined });
   const network = fakeNetwork();
   const findParent = vi.fn(async (ado: TicketAdoRef) => {
     const key = `${ado.orgUrl}#${ado.workItemId}`;
     return key in parents ? ok(parents[key] ?? null) : err('INTERNAL', 'ADO is down');
   });
-  rooms = createRooms({ network, tickets, findParent, touched: async () => options.touched?.() ?? [], presenceMs: options.presenceMs ?? 60_000, expiryMs: options.expiryMs ?? 90_000 });
+  rooms = createRooms({
+    network,
+    tickets,
+    findParent,
+    touched: async () => options.touched?.() ?? [],
+    presenceMs: options.presenceMs ?? 60_000,
+    expiryMs: options.expiryMs ?? 90_000,
+    ...(options.now ? { now: options.now } : {}),
+  });
   return { tickets, network, findParent, rooms };
 }
 
@@ -210,6 +223,65 @@ describe('rooms over two networks on loopback (AL-290)', () => {
       for (const side of made) side.dispose();
       await a.network.dispose();
       await b.network.dispose();
+    }
+  });
+});
+
+describe('the room as a chat room (AL-300)', () => {
+  it("logs joined, left and lost-contact rows from hello, bye and expiry, for peers and this app's lanes, and never counts or sends them", async () => {
+    let at = Date.parse('2026-10-30T10:42:00.000Z');
+    const now = () => at;
+    const dir = await mkdtemp(join(tmpdir(), 'agent-lanes-room-rows-'));
+    try {
+      const { tickets, rooms, network } = await setup({ presenceMs: 20, expiryMs: 90_000, now });
+      const events = recordingEmit();
+      const roomLog = createRoomLog({ dir, network, now });
+      const peerLanes = createPeerLanes({
+        network,
+        rooms,
+        roomLog,
+        tickets,
+        git: { status: async () => ok({}) } as never,
+        sessions: { status: (ticketId) => ({ ticketId, state: 'idle', sessionId: null, message: null }) },
+        wake: async () => ok({ held: false }),
+        emit: events.emit,
+        now,
+      });
+      await tickets.create(story(48162));
+      await rooms.ensureRoom('48162');
+      rooms.start();
+      await rooms.sync();
+      const kyle = { ticketId: '48161', workItemId: 48161, title: 'Job DTO', stage: 'implementing', branch: '48161-job-dto', parentId: 48000 };
+      network.deliver({ kind: 'hello', room: ROOM, lane: kyle, text: '', data: {} });
+      at += 60_000;
+      network.deliver({ kind: 'bye', room: ROOM, lane: kyle, text: '', data: {} });
+      network.deliver({ kind: 'hello', room: ROOM, lane: kyle, text: '', data: {} });
+      expect(rooms.members(ROOM).map((member) => member.user)).toEqual(['Mitch Healy', 'Kyle Richards']);
+      at += 91_000;
+      await vi.waitFor(() => expect(rooms.members(ROOM).map((member) => member.user)).toEqual(['Mitch Healy']));
+
+      const rows = (await roomLog.read(ROOM)).messages.filter((message) => message.system);
+      expect(rows.map((row) => [row.system, row.from.user, row.lane?.workItemId, row.own, row.sentAt])).toEqual([
+        ['joined', 'Mitch Healy', 48162, true, '2026-10-30T10:42:00.000Z'],
+        ['joined', 'Kyle Richards', 48161, false, '2026-10-30T10:42:00.000Z'],
+        ['left', 'Kyle Richards', 48161, false, '2026-10-30T10:43:00.000Z'],
+        ['joined', 'Kyle Richards', 48161, false, '2026-10-30T10:43:00.000Z'],
+        ['lost', 'Kyle Richards', 48161, false, '2026-10-30T10:44:31.000Z'],
+      ]);
+      // The renderer hears each one as it happens; none of them counts toward the Assist bubble.
+      const messages = events.of('peers:message');
+      expect(messages.map((event) => (event['message'] as { system?: string }).system)).toEqual(['joined', 'joined', 'left', 'joined', 'lost']);
+      expect(messages.every((event) => (event['unread'] as { total: number }).total === 0)).toBe(true);
+      expect(peerLanes.rooms().rooms[0]?.unread).toBe(0);
+      // Never a frame, never replayed to a late joiner, and still there after a restart.
+      expect(network.sent.map((draft) => draft.kind).every((kind) => ['hello', 'status', 'touched', 'bye'].includes(kind))).toBe(true);
+      expect(await roomLog.replayTo(KYLE.instance, ROOM)).toBe(0);
+      await roomLog.flush();
+      const again = await createRoomLog({ dir, network, now }).read(ROOM);
+      expect(again.messages.map((message) => message.system)).toEqual(['joined', 'joined', 'left', 'joined', 'lost']);
+      await peerLanes.dispose();
+    } finally {
+      await rm(dir, { recursive: true, force: true, maxRetries: 5 });
     }
   });
 });

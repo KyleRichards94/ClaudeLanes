@@ -16,14 +16,35 @@ export function messageSpeaker(message: RoomMessage): string {
   return `${message.from.user}${message.own ? '' : ` · ${message.from.host}`}${item}`;
 }
 
+/** `Kyle Richards's agent joined on #51439 · 10:42`: a system row (AL-300) as one line. */
+export function systemText(message: RoomMessage): string {
+  const who = message.own ? 'Your agent' : `${message.from.user}'s agent`;
+  const item = message.lane?.workItemId ? ` on #${message.lane.workItemId}` : message.lane ? ` on ${message.lane.title}` : '';
+  const time = clock(Date.parse(message.sentAt));
+  if (message.system === 'joined') return `${who} joined${item} · ${time}`;
+  if (message.system === 'left') return `${who} left${item} · ${time}`;
+  return `Lost contact with ${message.own ? 'your agent' : `${message.from.user}'s agent`}${item} · ${time}`;
+}
+
 /** The newest `count` ask, blocked and offer messages from others: what the Assist bubble counts. */
 export function unreadIds(messages: readonly RoomMessage[], count: number): Set<string> {
   if (count <= 0) return new Set();
-  const candidates = messages.filter((message) => !message.own && !message.replay && ASSIST.has(message.kind));
+  const candidates = messages.filter((message) => !message.system && !message.own && !message.replay && ASSIST.has(message.kind));
   return new Set(candidates.slice(-count).map((message) => message.id));
 }
 
+function SystemRow({ message }: { message: RoomMessage }) {
+  return (
+    <View style={styles.system} testID={`room-system-${message.id}`}>
+      <Text variant="meta" size="sm" color={message.system === 'lost' ? tone.attention.text : undefined}>
+        {systemText(message)}
+      </Text>
+    </View>
+  );
+}
+
 function LogRow({ message, unread }: { message: RoomMessage; unread: boolean }) {
+  if (message.system) return <SystemRow message={message} />;
   return (
     <View style={[styles.row, unread ? styles.unread : null]} testID={`room-message-${message.id}`}>
       <View style={styles.rowTop}>
@@ -58,8 +79,9 @@ function LogRow({ message, unread }: { message: RoomMessage; unread: boolean }) 
 }
 
 /**
- * A room's log (AL-295, P9): who, when, the kind as a word, and the text in the agents' own words,
- * oldest first. Unread `ask`, `blocked` and `offer` rows are marked until the room has been shown.
+ * A room's log (AL-295, AL-300, P9): who, when, the kind as a word, and the text in the agents' own
+ * words, oldest first, with a quieter line when a lane joins, leaves or goes quiet. Unread `ask`,
+ * `blocked` and `offer` rows are marked until the room has been shown.
  */
 export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; focus?: string | null; height?: number }) {
   const log = useRoomLog(room.id);
@@ -167,6 +189,10 @@ const styles = StyleSheet.create({
   },
   unread: {
     backgroundColor: tone.attention.band,
+  },
+  system: {
+    alignItems: 'center',
+    paddingVertical: 2,
   },
   rowTop: {
     flexDirection: 'row',

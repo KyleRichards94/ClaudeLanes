@@ -1,16 +1,18 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { RoomMessageSchema, isPeerPostKind, type PeerFrame, type PeerRoomId, type RoomLog, type RoomMessage } from '@agent-lanes/contracts';
+import { RoomMessageSchema, isPeerPostKind, type PeerFrame, type PeerRoomId, type RoomLog, type RoomMember, type RoomMessage, type RoomSystemEvent } from '@agent-lanes/contracts';
 import type { Logger } from '../logging';
 import type { FrameDraft, PeerNetwork } from './network';
 
 /**
- * The room log (AL-291, P7, P9). Each app keeps only what it said: its own frames per room, in memory
- * and in `<userData>/peers/rooms/<hash>.json` (the last 200, at most 7 days old). What peers said is
- * kept in memory for the session. A peer's lane that says `hello` in a room gets this app's own
- * frames for that room again, marked `replay` (the network paces them).
+ * The room log (AL-291, AL-300, P7, P9). Each app keeps only what it said: its own frames per room, in
+ * memory and in `<userData>/peers/rooms/<hash>.json` (the last 200, at most 7 days old). What peers
+ * said is kept in memory for the session. A peer's lane that says `hello` in a room gets this app's
+ * own frames for that room again, marked `replay` (the network paces them). System rows (who joined,
+ * left or went quiet, as this app saw it) are kept in the same file apart from the posts, and are
+ * never sent or replayed.
  */
 
 export const OWN_LOG_MAX = 200;
@@ -24,6 +26,7 @@ const LogFileSchema = z.object({
   room: z.string(),
   capped: z.boolean(),
   messages: z.array(RoomMessageSchema),
+  system: z.array(RoomMessageSchema).default([]),
 });
 
 export function roomLogsDir(peersDir: string): string {
@@ -45,8 +48,27 @@ export function toRoomMessage(frame: PeerFrame, own: boolean): RoomMessage {
   return { ...fields, own };
 }
 
+/** A lane joined, left or went quiet, as a row in the log (AL-300). */
+export function systemRow(event: RoomSystemEvent, room: PeerRoomId, member: RoomMember, at: number): RoomMessage {
+  return {
+    v: 1,
+    id: randomUUID(),
+    room,
+    kind: event === 'joined' ? 'hello' : 'bye',
+    from: { user: member.user, host: member.host, instance: member.instance, person: false },
+    lane: member.lane,
+    text: '',
+    data: {},
+    sentAt: new Date(at).toISOString(),
+    replay: false,
+    own: member.local,
+    system: event,
+  };
+}
+
 interface RoomState {
   own: RoomMessage[];
+  system: RoomMessage[];
   /** Own messages were dropped at the cap. */
   capped: boolean;
   all: RoomMessage[];
@@ -58,6 +80,8 @@ interface RoomState {
 export interface RoomLogStore {
   /** A frame this app sent into a room. */
   recordOwn(frame: PeerFrame): Promise<void>;
+  /** A joined, left or lost-contact row; kept like a post, never sent. */
+  recordSystem(row: RoomMessage): Promise<void>;
   /** A frame a peer sent into a room this app is in. Replays of messages already held are ignored. */
   recordReceived(frame: PeerFrame): boolean;
   read(room: PeerRoomId, since?: string): Promise<RoomLog>;
@@ -83,7 +107,7 @@ export function createRoomLog(options: RoomLogOptions): RoomLogStore {
   function state(room: PeerRoomId): RoomState {
     let found = rooms.get(room);
     if (!found) {
-      found = { own: [], capped: false, all: [], replays: new Map(), loaded: null };
+      found = { own: [], system: [], capped: false, all: [], replays: new Map(), loaded: null };
       rooms.set(room, found);
     }
     return found;
@@ -100,10 +124,12 @@ export function createRoomLog(options: RoomLogOptions): RoomLogStore {
         const file = LogFileSchema.parse(JSON.parse(await readFile(roomLogFile(options.dir, room), 'utf8')));
         if (file.room !== room) return;
         const kept = file.messages.filter(fresh).map((message) => ({ ...message, own: true }));
+        const system = file.system.filter((row) => fresh(row) && row.system !== undefined);
         found.own = [...kept, ...found.own].slice(-OWN_LOG_MAX);
+        found.system = [...system, ...found.system].slice(-OWN_LOG_MAX);
         found.capped = file.capped;
         const ids = new Set(found.all.map((message) => message.id));
-        found.all = [...kept.filter((message) => !ids.has(message.id)), ...found.all];
+        found.all = [...[...kept, ...system].filter((message) => !ids.has(message.id)), ...found.all];
         sortAll(found);
       } catch (cause) {
         if ((cause as { code?: string }).code !== 'ENOENT') options.log?.warn(`Peer lanes: the room log for ${room} could not be read; starting it again.`);
@@ -127,7 +153,7 @@ export function createRoomLog(options: RoomLogOptions): RoomLogStore {
       .then(async () => {
         dirty.delete(room);
         await mkdir(options.dir, { recursive: true });
-        await writeFile(`${file}.tmp`, JSON.stringify({ version: LOG_FILE_VERSION, room, capped: found.capped, messages: found.own }), 'utf8');
+        await writeFile(`${file}.tmp`, JSON.stringify({ version: LOG_FILE_VERSION, room, capped: found.capped, messages: found.own, system: found.system }), 'utf8');
         await rename(`${file}.tmp`, file);
       })
       .catch((cause) => options.log?.warn(`Peer lanes: the room log could not be saved: ${String(cause)}`));
@@ -147,6 +173,14 @@ export function createRoomLog(options: RoomLogOptions): RoomLogStore {
       found.all.push(message);
       sortAll(found);
       save(frame.room, found);
+    },
+    async recordSystem(row) {
+      if (!row.room || !row.system) return;
+      const found = await load(row.room);
+      found.system = [...found.system.filter(fresh), row].slice(-OWN_LOG_MAX);
+      found.all.push(row);
+      sortAll(found);
+      save(row.room, found);
     },
     recordReceived(frame) {
       if (!frame.room || !isLoggedKind(frame.kind)) return false;

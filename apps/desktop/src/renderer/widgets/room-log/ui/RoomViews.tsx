@@ -17,7 +17,10 @@ export function roomHeading(room: PeerRoom): string {
  * were unread stay highlighted while it is on screen.
  */
 function useSeenWhileShown(room: PeerRoom | undefined, shown: boolean): number {
-  const last = useRoomLog(shown && room ? room.id : null).data?.messages.at(-1)?.id;
+  // A system row's id isn't one the unread count knows (AL-300): seen up to the last post.
+  const last = useRoomLog(shown && room ? room.id : null)
+    .data?.messages.filter((message) => !message.system)
+    .at(-1)?.id;
   const { mutate } = useMarkSeen();
   const key = shown && room ? room.id : '';
   const [highlight, setHighlight] = useState({ key: '', count: 0 });
