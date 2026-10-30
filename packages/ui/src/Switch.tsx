@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { Pressable, StyleSheet, View, type KeyDownEvent, type StyleProp, type ViewStyle } from 'react-native';
-import { color, minTarget, radius, selection, space } from '@agent-lanes/tokens';
+import { color, glow, minTarget, radius, selection, space } from '@agent-lanes/tokens';
 import { selectionMotion } from './selectionMotion';
 import { Text } from './Text';
 
@@ -116,6 +116,7 @@ const styles = StyleSheet.create({
   },
   trackOn: {
     backgroundColor: color.claude,
+    boxShadow: glow(color.claude, 0.7),
   },
   trackOff: {
     backgroundColor: selection.switchOff,

@@ -103,6 +103,7 @@
   --al-control-ink: #334155;
   --al-control-primary-shadow: 0 6px 16px rgba(91, 75, 196, 0.28);
   --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 75, 196, 0.34);
+  --al-control-strong-fill: #0f1b2d;
   --al-control-pressed-filter: brightness(0.94);
   --al-control-disabled-opacity: 0.5;
 }
@@ -112,6 +113,11 @@
   --al-overlay-scrim: rgba(238, 242, 247, 0.55);
   --al-overlay-scrim-blur: 8px;
   --al-overlay-shadow: 0 24px 72px rgba(15, 27, 45, 0.18);
+}
+
+/* How strongly colours glow; 0 draws no glow. Mirrors src/glow.ts. */
+:root {
+  --al-glow-level: 0;
 }
 
 /* Dark. Mirrors themes.dark in themes.ts; themes.test.ts checks every block. */
@@ -186,9 +192,12 @@
   --al-control-ink: #d5dee9;
   --al-control-primary-shadow: 0 6px 16px rgba(91, 101, 196, 0.45);
   --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 101, 196, 0.55);
+  --al-control-strong-fill: #e7eef6;
 
   --al-overlay-scrim: rgba(8, 12, 18, 0.55);
   --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
+
+  --al-glow-level: 0;
 }
 
 /* Solarpunk (AL-286). Mirrors themes.solarpunk in themes.ts. */
@@ -263,84 +272,90 @@
   --al-control-ink: #3b4a38;
   --al-control-primary-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
   --al-control-primary-shadow-lifted: 0 12px 28px rgba(15, 118, 110, 0.34);
+  --al-control-strong-fill: #1f2a1e;
 
   --al-overlay-scrim: rgba(247, 243, 232, 0.55);
   --al-overlay-shadow: 0 24px 72px rgba(31, 42, 30, 0.18);
+
+  --al-glow-level: 0;
 }
 
 /* Cyberpunk (AL-286). Mirrors themes.cyberpunk in themes.ts. */
 :root[data-theme='cyberpunk'] {
-  --al-bg: #0b0a16;
-  --al-surface: #161430;
-  --al-ink: #f3f0ff;
-  --al-muted: #b0a8d9;
-  --al-line: #332e5c;
-  --al-claude: #f72fd0;
-  --al-claude-tint: #3a1247;
-  --al-claude-text: #ffb3f0;
-  --al-ado: #2ee6ff;
-  --al-ado-tint: #0b2f3a;
-  --al-ok: #39ff88;
-  --al-attention: #ffc02e;
-  --al-danger: #ff5370;
-  --al-sky-glow: #2ee6ff;
-  --al-progress-gradient: linear-gradient(90deg, #f72fd0, #2ee6ff);
-  --al-on-accent: #0b0a16;
-  --al-on-ink: #0b0a16;
-  --al-ground-from: #0b0a16;
-  --al-ground-to: #140a24;
-  --al-atmosphere-1: rgba(247, 47, 208, 0.5);
-  --al-atmosphere-2: rgba(46, 230, 255, 0.42);
-  --al-atmosphere-3: rgba(124, 58, 237, 0.38);
+  --al-bg: #0a0817;
+  --al-surface: #1e1a42;
+  --al-ink: #e6f7ff;
+  --al-muted: #9da9cf;
+  --al-line: #34306a;
+  --al-claude: #ff2bd6;
+  --al-claude-tint: #3d0f48;
+  --al-claude-text: #ff9bea;
+  --al-ado: #00f0ff;
+  --al-ado-tint: #062f3b;
+  --al-ok: #00ff9f;
+  --al-attention: #fcee0a;
+  --al-danger: #ff3366;
+  --al-sky-glow: #00f0ff;
+  --al-progress-gradient: linear-gradient(90deg, #ff2bd6, #00f0ff);
+  --al-on-accent: #05050a;
+  --al-on-ink: #05050a;
+  --al-ground-from: #0a0817;
+  --al-ground-to: #180b30;
+  --al-atmosphere-1: rgba(255, 43, 214, 0.55);
+  --al-atmosphere-2: rgba(0, 240, 255, 0.45);
+  --al-atmosphere-3: rgba(124, 58, 237, 0.42);
 
-  --al-glass-fill-min: rgba(14, 12, 32, 0.72);
-  --al-glass-fill-max: rgba(14, 12, 32, 0.84);
-  --al-glass-highlight: inset 0 1px 0 rgba(247, 47, 208, 0.22);
-  --al-glass-border: rgba(46, 230, 255, 0.2);
+  --al-glass-fill-min: rgba(26, 22, 58, 0.72);
+  --al-glass-fill-max: rgba(26, 22, 58, 0.9);
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 43, 214, 0.35), 0 0 26px rgba(0, 240, 255, 0.16);
+  --al-glass-border: rgba(0, 240, 255, 0.45);
 
-  --al-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(247, 47, 208, 0.12);
-  --al-shadow-lifted: 0 2px 4px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(247, 47, 208, 0.18);
+  --al-shadow-card: 0 0 0 1px rgba(0, 240, 255, 0.28), 0 0 16px rgba(0, 240, 255, 0.2), 0 10px 28px rgba(0, 0, 0, 0.55);
+  --al-shadow-lifted: 0 0 0 1px rgba(0, 240, 255, 0.4), 0 0 24px rgba(0, 240, 255, 0.3), 0 16px 40px rgba(0, 0, 0, 0.6);
 
-  --al-tone-claude-border: #ff7ae6;
-  --al-tone-claude-wash: #1e1232;
-  --al-tone-claude-band: #3a1247;
-  --al-tone-claude-text: #ffb3f0;
-  --al-tone-claude-dot: #f72fd0;
-  --al-tone-ado-wash: #0a2430;
-  --al-tone-ado-band: #0b2f3a;
-  --al-tone-ado-text: #2ee6ff;
-  --al-tone-ado-fill: #2ee6ff;
-  --al-tone-ado-dot: #2ee6ff;
-  --al-tone-attention-border: #ffc02e;
-  --al-tone-attention-band: #3d2e08;
-  --al-tone-attention-text: #ffe08a;
-  --al-tone-attention-dot: #ffc02e;
-  --al-tone-danger-border: #ff8a9b;
-  --al-tone-danger-wash: #2a0f17;
-  --al-tone-danger-band: #4a1424;
-  --al-tone-danger-text: #ffb3bf;
-  --al-tone-danger-fill: #ff5370;
-  --al-tone-danger-dot: #ff5370;
-  --al-tone-ok-wash: #0a2a1c;
-  --al-tone-ok-band: #0e3a26;
-  --al-tone-ok-text: #9bffc8;
-  --al-tone-ok-fill: #39ff88;
-  --al-tone-ok-dot: #39ff88;
-  --al-tone-neutral-band: #262345;
-  --al-tone-neutral-text: #d6d1f0;
-  --al-tone-neutral-dot: #8d88b3;
+  --al-tone-claude-border: #ff6be3;
+  --al-tone-claude-wash: #22103a;
+  --al-tone-claude-band: #3d0f48;
+  --al-tone-claude-text: #ff9bea;
+  --al-tone-claude-dot: #ff2bd6;
+  --al-tone-ado-wash: #0a2433;
+  --al-tone-ado-band: #062f3b;
+  --al-tone-ado-text: #00f0ff;
+  --al-tone-ado-fill: #00f0ff;
+  --al-tone-ado-dot: #00f0ff;
+  --al-tone-attention-border: #fcee0a;
+  --al-tone-attention-band: #3a3506;
+  --al-tone-attention-text: #fff59a;
+  --al-tone-attention-dot: #fcee0a;
+  --al-tone-danger-border: #ff6b8e;
+  --al-tone-danger-wash: #2c0d1a;
+  --al-tone-danger-band: #4d1226;
+  --al-tone-danger-text: #ff9fb5;
+  --al-tone-danger-fill: #ff3366;
+  --al-tone-danger-dot: #ff3366;
+  --al-tone-ok-wash: #062a20;
+  --al-tone-ok-band: #083a2a;
+  --al-tone-ok-text: #7dffc9;
+  --al-tone-ok-fill: #00ff9f;
+  --al-tone-ok-dot: #00ff9f;
+  --al-tone-neutral-band: #272452;
+  --al-tone-neutral-text: #d3d0f2;
+  --al-tone-neutral-dot: #8e8ac0;
 
-  --al-selection-track: #1c1a38;
-  --al-selection-thumb: #2c2957;
+  --al-selection-track: #1a1838;
+  --al-selection-thumb: #2e2a5e;
   --al-selection-label: #c9c3ea;
   --al-selection-switch-off: #4b467a;
-  --al-selection-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --al-selection-pill-shadow: 0 2px 8px rgba(247, 47, 208, 0.45);
+  --al-selection-thumb-shadow: 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 10px rgba(0, 240, 255, 0.25);
+  --al-selection-pill-shadow: 0 0 10px rgba(255, 43, 214, 0.6), 0 0 22px rgba(255, 43, 214, 0.3);
 
   --al-control-ink: #dcd6f5;
-  --al-control-primary-shadow: 0 6px 16px rgba(247, 47, 208, 0.45);
-  --al-control-primary-shadow-lifted: 0 12px 28px rgba(247, 47, 208, 0.55);
+  --al-control-primary-shadow: 0 0 12px rgba(255, 43, 214, 0.65), 0 0 28px rgba(255, 43, 214, 0.35);
+  --al-control-primary-shadow-lifted: 0 0 16px rgba(255, 43, 214, 0.8), 0 0 36px rgba(255, 43, 214, 0.45);
+  --al-control-strong-fill: #00f0ff;
 
-  --al-overlay-scrim: rgba(6, 5, 16, 0.6);
-  --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.6);
+  --al-overlay-scrim: rgba(3, 3, 8, 0.66);
+  --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 28px rgba(0, 240, 255, 0.22);
+
+  --al-glow-level: 1;
 }

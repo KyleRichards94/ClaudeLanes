@@ -30,8 +30,8 @@ export const solarpunkOverlay: OverlayPalette = {
 };
 
 export const cyberpunkOverlay: OverlayPalette = {
-  scrim: 'rgba(6, 5, 16, 0.6)',
-  shadow: '0 24px 72px rgba(0, 0, 0, 0.6)',
+  scrim: 'rgba(3, 3, 8, 0.66)',
+  shadow: '0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 28px rgba(0, 240, 255, 0.22)',
 };
 
 export const overlay = {

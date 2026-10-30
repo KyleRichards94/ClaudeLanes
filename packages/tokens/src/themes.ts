@@ -1,5 +1,6 @@
 import { cyberpunkControl, darkControl, lightControl, solarpunkControl, type ControlPalette } from './controls';
 import { cyberpunkOverlay, darkOverlay, lightOverlay, solarpunkOverlay, type OverlayPalette } from './overlay';
+import { cyberpunkGlow, darkGlow, lightGlow, solarpunkGlow, type GlowPalette } from './glow';
 import { cyberpunkColor, darkColor, kebab, lightColor, solarpunkColor, type ColorPalette } from './palette';
 import { cyberpunkSelection, darkSelection, lightSelection, solarpunkSelection, type SelectionPalette } from './selection';
 import {
@@ -32,11 +33,12 @@ export interface ThemePalette {
   selection: SelectionPalette;
   control: ControlPalette;
   overlay: OverlayPalette;
+  glow: GlowPalette;
 }
 
 export const themes: Record<Theme, ThemePalette> = {
-  light: { base: 'light', color: lightColor, tone: lightTone, glass: lightGlass, shadow: lightShadow, selection: lightSelection, control: lightControl, overlay: lightOverlay },
-  dark: { base: 'dark', color: darkColor, tone: darkTone, glass: darkGlass, shadow: darkShadow, selection: darkSelection, control: darkControl, overlay: darkOverlay },
+  light: { base: 'light', color: lightColor, tone: lightTone, glass: lightGlass, shadow: lightShadow, selection: lightSelection, control: lightControl, overlay: lightOverlay, glow: lightGlow },
+  dark: { base: 'dark', color: darkColor, tone: darkTone, glass: darkGlass, shadow: darkShadow, selection: darkSelection, control: darkControl, overlay: darkOverlay, glow: darkGlow },
   solarpunk: {
     base: 'light',
     color: solarpunkColor,
@@ -46,6 +48,7 @@ export const themes: Record<Theme, ThemePalette> = {
     selection: solarpunkSelection,
     control: solarpunkControl,
     overlay: solarpunkOverlay,
+    glow: solarpunkGlow,
   },
   cyberpunk: {
     base: 'dark',
@@ -56,6 +59,7 @@ export const themes: Record<Theme, ThemePalette> = {
     selection: cyberpunkSelection,
     control: cyberpunkControl,
     overlay: cyberpunkOverlay,
+    glow: cyberpunkGlow,
   },
 };
 
@@ -73,6 +77,7 @@ export function themeVariables(theme: Theme): Record<string, string> {
   for (const [key, value] of Object.entries(palette.selection)) vars[`selection-${kebab(key)}`] = value;
   for (const [key, value] of Object.entries(palette.control)) vars[`control-${kebab(key)}`] = value;
   for (const [key, value] of Object.entries(palette.overlay)) vars[`overlay-${kebab(key)}`] = value;
+  for (const [key, value] of Object.entries(palette.glow)) vars[`glow-${kebab(key)}`] = value;
   return vars;
 }
 

@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, radius, tone } from '@agent-lanes/tokens';
+import { color, radius, ring, tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 
 /** `default` white, as on most lane headers; `attention` amber when a card in the lane needs the user. */
@@ -29,8 +29,8 @@ export function Badge({ count, tone: badgeTone = 'default', label, style, testID
   const name = label ?? (badgeTone === 'attention' ? `${shown}, needs you` : String(shown));
 
   return (
-    <View testID={testID} role="img" aria-label={name} style={[styles.badge, toneStyles[badgeTone], style]}>
-      <Text variant="title" size="sm" color={textColor[badgeTone]} numberOfLines={1}>
+    <View testID={testID} role="img" aria-label={name} style={[styles.badge, toneStyles[badgeTone], badgeTone === 'default' && shown !== 0 ? styles.busy : null, style]}>
+      <Text variant="title" size="sm" color={textColor[badgeTone]} glow={badgeTone === 'attention'} numberOfLines={1}>
         {shown}
       </Text>
     </View>
@@ -49,11 +49,13 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     borderRadius: radius.pill,
   },
+  /** A lane with cards in it lights its count where the theme glows. */
+  busy: { boxShadow: ring(tone.claude.dot, 0.7) },
 });
 
 const toneStyles = StyleSheet.create({
   default: { backgroundColor: color.surface },
-  attention: { backgroundColor: tone.attention.band },
+  attention: { backgroundColor: tone.attention.band, boxShadow: ring(tone.attention.dot) },
 });
 
 const textColor: Record<BadgeTone, string> = {

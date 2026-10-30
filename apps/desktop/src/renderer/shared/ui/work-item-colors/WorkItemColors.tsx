@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, radius, tone } from '@agent-lanes/tokens';
+import { color, glow, radius, tone } from '@agent-lanes/tokens';
 import { Text } from '@agent-lanes/ui';
 
 /**
@@ -19,7 +19,8 @@ export interface WorkItemTypeBarProps {
 
 /** A 3 × 16 px bar in the work item type's colour, beside the `#id` chip. Decorative: the type is also in words. */
 export function WorkItemTypeBar({ typeColor, style, testID }: WorkItemTypeBarProps) {
-  return <View aria-hidden testID={testID} style={[styles.bar, { backgroundColor: typeColor ?? FALLBACK_TYPE_COLOR }, style]} />;
+  const paint = typeColor ?? FALLBACK_TYPE_COLOR;
+  return <View aria-hidden testID={testID} style={[styles.bar, { backgroundColor: paint, boxShadow: glow(paint) }, style]} />;
 }
 
 export interface WorkItemStateLabelProps {
@@ -34,7 +35,7 @@ export interface WorkItemStateLabelProps {
 export function WorkItemStateLabel({ state, stateColor, testID }: WorkItemStateLabelProps) {
   return (
     <View style={styles.state} testID={testID}>
-      <View aria-hidden testID={testID ? `${testID}-dot` : undefined} style={[styles.dot, { backgroundColor: stateColor ?? FALLBACK_STATE_COLOR }]} />
+      <View aria-hidden testID={testID ? `${testID}-dot` : undefined} style={[styles.dot, { backgroundColor: stateColor ?? FALLBACK_STATE_COLOR, boxShadow: glow(stateColor ?? FALLBACK_STATE_COLOR) }]} />
       <Text variant="meta" size="xs" numberOfLines={1} style={styles.stateText}>
         {state}
       </Text>

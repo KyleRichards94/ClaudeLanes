@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, glow, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
 import { useAgentTicketCount, useAgentTicketTotal } from '@/entities/agent-ticket';
 import { DragStatusPill, DragToLaneProvider, useActiveDrag, type LaunchFromLane } from '@/features/drag-to-lane';
@@ -214,7 +214,7 @@ function Legend() {
     <View style={styles.legend} testID="board-legend">
       {LEGEND.map((entry) => (
         <View key={entry.label} style={styles.legendEntry}>
-          <View aria-hidden style={[styles.swatch, { backgroundColor: entry.swatch }]} />
+          <View aria-hidden style={[styles.swatch, { backgroundColor: entry.swatch, boxShadow: glow(entry.swatch) }]} />
           <Text variant="body" size="sm">
             {entry.label}
           </Text>

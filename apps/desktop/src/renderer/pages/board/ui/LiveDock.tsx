@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, glow, radius, space, tone } from '@agent-lanes/tokens';
 import { GlassPanel, Text } from '@agent-lanes/ui';
 import {
   agentTickets,
@@ -89,6 +89,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.pill,
     backgroundColor: color.claude,
+    boxShadow: glow(color.claude, 0.8),
   },
   liveDot: {
     width: 6,

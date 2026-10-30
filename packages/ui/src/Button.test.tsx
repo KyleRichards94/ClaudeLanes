@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { color, contrastRatio, control, focusRing, fontSize, fontWeight, minTarget, motion, radius, resolveToken, shadow, tone } from '@agent-lanes/tokens';
+import { color, contrastRatio, control, focusRing, fontSize, fontWeight, glow, minTarget, motion, radius, resolveToken, shadow, tone } from '@agent-lanes/tokens';
 import { Button, buttonSizes, buttonVariants, type ButtonVariant } from './Button';
 
 /** Contrast of two colours as the light theme paints them; computed values come back as var() tokens. */
@@ -11,12 +11,13 @@ const contrast = (a: string, b: string) => contrastRatio(resolveToken(a, 'light'
 /**
  * The button row on the "Design tokens" artboard (docs/design/screens/07-design-tokens.png),
  * sampled from the image: 44 px tall, 12 px corners (the soft one a pill), 18 px sides, bold 14 px
- * labels, secondary label in slate #334155; only the primary button casts its violet glow at rest.
+ * labels, secondary label in slate #334155; only the primary button casts its violet glow at rest (the strong one's
+ * glow draws nothing outside cyberpunk).
  * Plus `danger`, the red-bordered Remove button on the Connections artboard.
  */
 const artboard: Record<ButtonVariant, { label: string; fill: string; border: string; ink: string; corner: number; rest: string }> = {
   primary: { label: 'Primary', fill: color.claude, border: color.claude, ink: color.onAccent, corner: radius.control, rest: control.primaryShadow },
-  strong: { label: 'Strong', fill: color.ink, border: color.ink, ink: color.onInk, corner: radius.control, rest: 'none' },
+  strong: { label: 'Strong', fill: control.strongFill, border: control.strongFill, ink: color.onInk, corner: radius.control, rest: glow(control.strongFill, 0.7) },
   secondary: { label: 'Secondary', fill: color.surface, border: color.line, ink: control.ink, corner: radius.control, rest: 'none' },
   soft: { label: 'Soft pill', fill: color.claudeTint, border: color.claudeTint, ink: color.claudeText, corner: radius.pill, rest: 'none' },
   danger: { label: 'Remove', fill: color.surface, border: tone.danger.border, ink: color.danger, corner: radius.control, rest: 'none' },

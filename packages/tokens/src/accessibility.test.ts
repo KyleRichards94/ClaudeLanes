@@ -41,7 +41,7 @@ function pairsOf(palette: ThemePalette): Pair[] {
     text('unselected effort pill text on the surface', selection.label, color.surface),
     text('selected segment label (claude) on the surface', color.claude, color.surface),
     text('Primary button label', color.onAccent, color.claude),
-    text('Strong button label', color.onInk, color.ink),
+    text('Strong button label', color.onInk, control.strongFill),
     text('Secondary button label', control.ink, color.surface),
     text('Soft button label', color.claudeText, color.claudeTint),
     text('Danger button label (Remove) and TextField error text', color.danger, color.surface),

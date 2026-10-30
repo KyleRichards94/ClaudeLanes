@@ -47,12 +47,12 @@ export const solarpunkSelection: SelectionPalette = {
 };
 
 export const cyberpunkSelection: SelectionPalette = {
-  track: '#1C1A38',
-  thumb: '#2C2957',
+  track: '#1A1838',
+  thumb: '#2E2A5E',
   label: '#C9C3EA',
   switchOff: '#4B467A',
-  thumbShadow: '0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4)',
-  pillShadow: '0 2px 8px rgba(247, 47, 208, 0.45)',
+  thumbShadow: '0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 10px rgba(0, 240, 255, 0.25)',
+  pillShadow: '0 0 10px rgba(255, 43, 214, 0.6), 0 0 22px rgba(255, 43, 214, 0.3)',
 };
 
 export const selection = {

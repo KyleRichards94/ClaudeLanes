@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, control, focusRing, minTarget, motion, radius, shadow, space, tone } from '@agent-lanes/tokens';
+import { color, control, focusRing, glow, minTarget, motion, radius, shadow, space, tone } from '@agent-lanes/tokens';
 import { Icon, IconProvider, type IconName } from './Icon';
 import { Text, type TextSize } from './Text';
 import { isFocusVisible, liftTransition } from './interaction';
@@ -86,7 +86,7 @@ const variants: Record<ButtonVariant, VariantSpec> = {
     rest: control.primaryShadow,
     lifted: control.primaryShadowLifted,
   },
-  strong: { fill: color.ink, border: color.ink, ink: color.onInk, corner: radius.control, rest: 'none', lifted: shadow.lifted },
+  strong: { fill: control.strongFill, border: control.strongFill, ink: color.onInk, corner: radius.control, rest: glow(control.strongFill, 0.7), lifted: shadow.lifted },
   secondary: { fill: color.surface, border: color.line, ink: control.ink, corner: radius.control, rest: 'none', lifted: shadow.lifted },
   soft: { fill: color.claudeTint, border: color.claudeTint, ink: color.claudeText, corner: radius.pill, rest: 'none', lifted: shadow.lifted },
   danger: { fill: color.surface, border: tone.danger.border, ink: color.danger, corner: radius.control, rest: 'none', lifted: shadow.lifted },
