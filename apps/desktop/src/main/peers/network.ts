@@ -46,6 +46,8 @@ export const PEER_FORGET_MS = 10 * 60_000;
 const RESOLVE_AGAIN_MS = 10_000;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
 const FIND_WAIT_MS = 3_000;
+/** A connection that has sent no valid frame by then is closed. */
+export const PEER_IDENTIFY_MS = 30_000;
 
 /** WebSocket close codes this app uses. */
 export const CLOSE_DUPLICATE = 4001;
@@ -53,6 +55,7 @@ export const CLOSE_SELF = 4002;
 export const CLOSE_RATE = 4008;
 export const CLOSE_SPOOF = 4003;
 export const CLOSE_TEAM = 4004;
+export const CLOSE_UNIDENTIFIED = 4005;
 
 export interface PeerConfig {
   /** 0 picks a free port (tests). */
@@ -129,6 +132,7 @@ export interface PeerNetworkOptions {
   beaconMs?: number;
   foundMs?: number;
   forgetMs?: number;
+  identifyMs?: number;
   /** Where beacons go instead of the broadcast addresses. */
   beaconTargets?: readonly string[];
 }
@@ -164,6 +168,7 @@ interface Conn {
   link: Link | null;
   instance: string | null;
   lastActivity: number;
+  openedAt: number;
   frameTimes: number[];
   goneReason: PeerGoneReason | null;
   duplicate: boolean;
@@ -218,6 +223,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   const beaconMs = options.beaconMs ?? PEER_BEACON_MS;
   const foundMs = options.foundMs ?? PEER_FOUND_MS;
   const forgetMs = options.forgetMs ?? PEER_FORGET_MS;
+  const identifyMs = options.identifyMs ?? PEER_IDENTIFY_MS;
   const frameListeners = new Set<(frame: PeerFrame) => void>();
   const peerListeners = new Set<(event: PeerEvent) => void>();
   const seen = new Set<string>();
@@ -566,7 +572,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   }
 
   function track(ws: WebSocket, direction: 'in' | 'out', remoteIp: string, link: Link | null): Conn {
-    const conn: Conn = { ws, direction, remoteIp, link, instance: null, lastActivity: now(), frameTimes: [], goneReason: null, duplicate: false, outbox: [], tokens: PEER_SEND_BURST, refilledAt: now(), pumpTimer: null };
+    const conn: Conn = { ws, direction, remoteIp, link, instance: null, lastActivity: now(), openedAt: now(), frameTimes: [], goneReason: null, duplicate: false, outbox: [], tokens: PEER_SEND_BURST, refilledAt: now(), pumpTimer: null };
     const gen = generation;
     conns.add(conn);
     ws.on('message', (data) => onMessage(conn, data));
@@ -700,6 +706,10 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       if (conn.instance && at - conn.lastActivity > expiryMs) {
         conn.goneReason = 'expired';
         conn.ws.terminate();
+      } else if (!conn.instance && at - conn.openedAt > identifyMs) {
+        refused += 1;
+        options.log?.warn(`Peer lanes: closed a connection from ${conn.remoteIp} that sent no valid frame in ${Math.round(identifyMs / 1_000)} s`);
+        conn.ws.close(CLOSE_UNIDENTIFIED, 'unidentified');
       }
     }
     let changed = false;

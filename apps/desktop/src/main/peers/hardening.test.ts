@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import type { PeerFrame } from '@agent-lanes/contracts';
-import { PEER_FRAME_MAX_BYTES, PEER_FRAMES_PER_SECOND, acceptsAddress } from './network';
+import { CLOSE_UNIDENTIFIED, PEER_FRAME_MAX_BYTES, PEER_FRAMES_PER_SECOND, acceptsAddress } from './network';
 import { signFrame } from './signer';
 import type { PeerNetworkOptions } from './network';
 import { OTHER_TEAM, TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, type TestPeer } from './testing';
@@ -116,6 +116,16 @@ describe('caps and filters on a live listener', () => {
     for (let n = 0; n <= PEER_FRAMES_PER_SECOND; n += 1) socket.send(hello(other));
     expect(await closed).toBe(4008);
     expect(peer.network.status().refusedConnections).toBe(1);
+  });
+
+  it('closes a connection that sends no valid frame within the identify window, and counts it', async () => {
+    const other = await freePort();
+    const peer = await listening([`localhost:${other}`], { identifyMs: 300 });
+    const socket = await connect(peer.port);
+    const closed = new Promise<number>((done) => socket.once('close', (code) => done(code)));
+    expect(await closed).toBe(CLOSE_UNIDENTIFIED);
+    expect(peer.network.status().refusedConnections).toBe(1);
+    expect(peer.network.connections()).toEqual([]);
   });
 
   it('counts frames with a bad signature against the peer and shows them as rejected', async () => {
