@@ -65,9 +65,12 @@ export function createPeerLanes(options: PeerLanesOptions): PeerLanes {
     lanesIn,
     me: () => options.network.identity().user,
     send: (ticketId, text) => {
-      void options.wake(ticketId, { text, source: 'app' }).then((sent) => {
-        if (!sent.ok) options.log?.warn(`Peer lanes: a room message for ${ticketId} was not delivered: ${sent.message}`);
-      });
+      void options
+        .wake(ticketId, { text, source: 'app' })
+        .then((sent) => {
+          if (!sent.ok) options.log?.warn(`Peer lanes: a room message for ${ticketId} was not delivered: ${sent.message}`);
+        })
+        .catch((cause) => options.log?.warn(`Peer lanes: a room message for ${ticketId} was not delivered: ${String(cause)}`));
     },
     readLog: (room) => options.roomLog.read(room),
     roomTitle: (room) => {
