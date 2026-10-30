@@ -149,8 +149,9 @@ it has found and how each one is going: **Connected**, **Connecting**, **Unreach
 rejected** or **Other team** (an app in another project, which it leaves alone). **Find peers** looks
 again straight away.
 
-The first time Agent Lanes listens, Windows asks whether to allow it. Allow it on **Private
-networks** only. That covers both ports: TCP 47811 for the apps talking and UDP 47810 for the beacon.
+The first time Agent Lanes listens, Windows asks whether to allow it. Allow it for the network the
+office is on: **Domain networks** on a computer joined to the domain, **Private networks** otherwise,
+never Public. That covers both ports: TCP 47811 for the apps talking and UDP 47810 for the beacon.
 Agent Lanes doesn't add firewall rules itself.
 
 Under **Advanced** you can change the two ports, and add the address of an app the beacon can't reach
