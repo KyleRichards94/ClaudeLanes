@@ -18,7 +18,7 @@ import { createAssignAgentService, type AssignAgentService } from './agent/assig
 import { createAddAgentService, type AddAgentService } from './agent/companions/add-agent';
 import { createRewindService, type RewindService } from './agent/rewind';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
-import { createSendToTicket } from './agent/send-to-ticket';
+import { createSendToTicket, type SendToTicket } from './agent/send-to-ticket';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
 import { createBuildContext } from './agent/build-context';
@@ -243,7 +243,7 @@ export interface ServiceOptions {
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource; peerConfig?: PeerConfigSync; peerRooms?: Rooms } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource; peerConfig?: PeerConfigSync; peerRooms?: Rooms; sendToTicket?: SendToTicket } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -442,11 +442,11 @@ export function createServices(options: ServiceOptions): Services {
     roomLog: createRoomLog({ dir: roomLogsDir(peersDir(options.appDataDir)), network: peerNetwork, log: log.child('peers') }),
     tickets,
     git,
-    // Room messages reach live sessions as user turns (AL-292); the session manager is created below.
     sessions: {
-      send: (ticketId, message) => late.sessions?.send(ticketId, message) ?? err('SESSION_LOST', 'No session manager yet.'),
       status: (ticketId) => late.sessions?.status(ticketId) ?? { ticketId, state: 'stopped', sessionId: null, message: null },
     },
+    // Room messages are user turns, and wake an idle or stopped agent the way the composer does (AL-292, AL-299); created below.
+    wake: (ticketId, message) => late.sendToTicket?.(ticketId, message) ?? Promise.resolve(err('SESSION_LOST', 'No session manager yet.')),
     emit: options.emit,
     log: log.child('peers'),
   });
@@ -553,6 +553,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.launches = launches;
   const sendToTicket = createSendToTicket({ sessions, launches, recovery, tickets });
+  late.sendToTicket = sendToTicket;
   const planLimits = createPlanLimitsService({
     sessions,
     emit: options.emit,

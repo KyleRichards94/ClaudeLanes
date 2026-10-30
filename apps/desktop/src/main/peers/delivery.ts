@@ -3,9 +3,10 @@ import { LANE_LABELS } from '../agent/stages/stage-rules';
 import type { Logger } from '../logging';
 
 /**
- * Delivery (AL-292, P4, PL§3): which room messages reach which of this app's agents, as one user turn
- * per burst, behind a fixed `[Peer lanes]` prefix with the peer's words quoted as data. Also the
- * unread `ask`, `blocked` and `offer` counts behind the Assist bubble.
+ * Delivery (AL-292, AL-299, P4, PL§3): which room messages reach which of this app's agents, as one
+ * user turn per burst, behind a fixed `[Peer lanes]` prefix with the peer's words quoted as data. A
+ * lane gets its turn whether its agent is running, idle or has no session; `send` wakes it or starts
+ * one. Also the unread `ask`, `blocked` and `offer` counts behind the Assist bubble.
  */
 
 export const PEER_PREFIX = '[Peer lanes]';
@@ -53,7 +54,7 @@ export function peerLine(message: Pick<RoomMessage, 'from' | 'lane' | 'kind' | '
 export interface DeliveryLane {
   ticketId: string;
   workItemId: number | null;
-  /** Has a live session that takes messages. */
+  /** Has a live session; only such a lane gets the join turn. */
   live: boolean;
   /** Second agents and single-step lanes read the room but get no turns. */
   receives: boolean;
@@ -64,6 +65,7 @@ export interface DeliveryOptions {
   lanesIn: (room: string) => DeliveryLane[];
   /** The name this app's agents post under, for `answer` addressing. */
   me: () => string;
+  /** Gives the lane's agent the turn: a live session takes it, and an idle or stopped agent is woken or started (AL-299). */
   send: (ticketId: string, text: string) => void;
   /** Messages for the join turn: the room's log as this app has it. */
   readLog: (room: string) => Promise<{ messages: RoomMessage[]; capped: boolean }>;
@@ -126,7 +128,7 @@ export function createDelivery(options: DeliveryOptions): Delivery {
   }
 
   function targets(room: string, frame?: Pick<PeerFrame, 'kind' | 'data'>): DeliveryLane[] {
-    const lanes = options.lanesIn(room).filter((lane) => lane.live && lane.receives);
+    const lanes = options.lanesIn(room).filter((lane) => lane.receives);
     const to = frame?.kind === 'answer' ? frame.data.to : undefined;
     if (!to) return lanes;
     // An answer for another lane, or another person's app, is not delivered here.

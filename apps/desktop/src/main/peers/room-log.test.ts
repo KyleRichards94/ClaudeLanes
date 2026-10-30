@@ -117,7 +117,8 @@ describe('late joiner over two networks (AL-291)', () => {
             roomLog,
             tickets,
             git: { status: async () => ({ branch: null, entries: [], stash: null }) },
-            sessions: { send: () => ok({ held: false }), status: (ticketId) => ({ ticketId, state: 'stopped', sessionId: null, message: null }) },
+            sessions: { status: (ticketId) => ({ ticketId, state: 'stopped', sessionId: null, message: null }) },
+            wake: async () => ok({ held: false }),
           }),
         );
         return { rooms: rooms_, roomLog, tickets };

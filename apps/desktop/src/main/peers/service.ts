@@ -1,6 +1,6 @@
 import { isSoloLane, ok, type PeerRoomId, type PeerRooms, type PeerUnread, type PostToRoomRequest, type Result, type RoomLog, type RoomMessage } from '@agent-lanes/contracts';
 import { LIVE_SESSION_STATES } from '../agent/send-to-ticket';
-import type { SessionManager } from '../agent/session-manager';
+import type { SessionManager, SessionMessageInput } from '../agent/session-manager';
 import type { PeerToolBackend } from '../agent/stages/peer-tools';
 import type { GitService } from '../git';
 import type { Emit } from '../ipc/emit';
@@ -36,7 +36,9 @@ export interface PeerLanesOptions {
   roomLog: RoomLogStore;
   tickets: Pick<TicketRecordStore, 'get'>;
   git: Pick<GitService, 'status'>;
-  sessions: Pick<SessionManager, 'send' | 'status'>;
+  sessions: Pick<SessionManager, 'status'>;
+  /** Gives a lane's agent a message the way the composer does (AL-268): a live session takes it, an ended one is resumed, a lane with none gets one (AL-299). */
+  wake: (ticketId: string, message: SessionMessageInput) => Promise<Result<{ held: boolean }>>;
   emit?: Emit;
   log?: Pick<Logger, 'warn'>;
 }
@@ -59,8 +61,9 @@ export function createPeerLanes(options: PeerLanesOptions): PeerLanes {
     lanesIn,
     me: () => options.network.identity().user,
     send: (ticketId, text) => {
-      const sent = options.sessions.send(ticketId, { text, source: 'app' });
-      if (!sent.ok) options.log?.warn(`Peer lanes: a room message for ${ticketId} was not delivered: ${sent.message}`);
+      void options.wake(ticketId, { text, source: 'app' }).then((sent) => {
+        if (!sent.ok) options.log?.warn(`Peer lanes: a room message for ${ticketId} was not delivered: ${sent.message}`);
+      });
     },
     readLog: (room) => options.roomLog.read(room),
     roomTitle: (room) => {

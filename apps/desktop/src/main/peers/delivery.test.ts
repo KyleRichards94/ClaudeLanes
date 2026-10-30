@@ -121,7 +121,8 @@ describe('delivery to the agents (AL-292)', () => {
       delivery.received(frame('answer', 'not for you', { data: { to: { user: 'Rocky', workItemId: 48162 } } }));
       delivery.received(frame('ask', 'status?', { from: { ...KYLE, user: 'Kyle Richards', person: true }, lane: null }));
       vi.runAllTimers();
-      expect(send.mock.calls.map(([ticketId]) => ticketId).sort()).toEqual(['48162', '48163']);
+      // 48165 has no live session: it gets the person's ask too, and is woken by it (AL-299).
+      expect(send.mock.calls.map(([ticketId]) => ticketId).sort()).toEqual(['48162', '48163', '48165']);
       expect(send.mock.calls.find(([ticketId]) => ticketId === '48163')?.[1]).toContain('answer: "enum is JobStatus" · to Mitch Healy\'s agent on #48163');
       expect(send.mock.calls.find(([ticketId]) => ticketId === '48162')?.[1]).toBe('[Peer lanes] Kyle Richards (person) · ask: "status?"');
     } finally {
