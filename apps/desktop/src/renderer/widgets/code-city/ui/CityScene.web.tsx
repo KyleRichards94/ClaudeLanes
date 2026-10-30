@@ -4,7 +4,7 @@ import { accessibleName, authorOf, pinsFor, plotPair, REVIEW_WORDS, type Pin } f
 import { fileName, type CityBuilding } from '../model/layoutCity';
 import { AgentPins } from './AgentPins.web';
 import { Building } from './Building.web';
-import { CityDecor } from './CityDecor.web';
+import { CityDecor, CityRain } from './CityDecor.web';
 import type { CitySceneProps } from './CityScene.types';
 import { LabelLayer } from './LabelLayer.web';
 import { buildLabels } from './labels';
@@ -174,6 +174,7 @@ export function CityScene({ layout, files, agents, reviewStatus, selectedFilePat
   return (
     <div className="cc-scene-host">
     <div className="cc-scene" ref={sceneRef} data-testid={testID} onClick={onSceneClick} onKeyDown={onSceneKey}>
+      <CityRain />
       <div className="cc-fit" style={{ transform: `scale(${fit})` }}>
         {backdrop ? (
           <div className={`cc-plane${skeleton ? ' cc-skeleton' : ''}`} style={{ width: BACKDROP.width, height: BACKDROP.depth }} aria-hidden="true" data-testid={skeleton ? 'city-skeleton' : undefined}>

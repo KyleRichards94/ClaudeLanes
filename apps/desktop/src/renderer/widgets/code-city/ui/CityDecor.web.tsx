@@ -107,3 +107,37 @@ export function CityDecor({ layout }: { layout: CityLayout }) {
     </div>
   );
 }
+
+/** How many drops fall across the scene in cyberpunk. */
+const DROPS = 85;
+
+/** How far a drop falls in one loop, in vh (from 12vh above the scene to 105vh). */
+const FALL_VH = 117;
+
+/**
+ * Cyberpunk's rain, behind the city: thin streaks of much the same size, all leaning with one wind and falling along
+ * their lean. Position, length, brightness, speed and phase come from a seed, so nothing jumps or lines up. Hidden in
+ * the other themes.
+ */
+export function CityRain() {
+  const drops = Array.from({ length: DROPS }, (_, index) => {
+    const s = decoSeed(`rain:${index}`);
+    const tilt = 6.5 + ((s >>> 14) % 3) / 2;
+    const style: VarStyle = {
+      left: `${-2 + ((s >>> 4) % 1120) / 10}%`,
+      '--len': `${18 + ((s >>> 8) % 11)}px`,
+      '--w': '1px',
+      '--a': String(0.24 + ((s >>> 12) % 11) / 100),
+      '--tilt': `${tilt}deg`,
+      '--drift': `${(-FALL_VH * Math.tan((tilt * Math.PI) / 180)).toFixed(2)}vh`,
+      '--dur': `${0.9 + ((s >>> 20) % 41) / 100}s`,
+      '--phase': `-${((s >>> 23) % 130) / 100}s`,
+    };
+    return <i key={index} className="cc-drop" style={style} />;
+  });
+  return (
+    <div className="cc-rain" aria-hidden="true">
+      {drops}
+    </div>
+  );
+}

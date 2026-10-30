@@ -205,7 +205,7 @@
 /* Cyberpunk: a night city on a cyan grid. */
 :root[data-theme='cyberpunk'] .cc-scene{
   --cc-frame:rgba(0,240,255,.45);
-  --cc-sky:radial-gradient(ellipse at 20% 0%,rgba(255,43,214,.22),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(0,240,255,.16),transparent 55%),linear-gradient(180deg,#0E0B1F 0%,#07060F 100%);
+  --cc-sky:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),radial-gradient(ellipse at 20% 0%,rgba(255,43,214,.22),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(0,240,255,.16),transparent 55%),linear-gradient(180deg,#0E0B1F 0%,#07060F 100%);
   --cc-ground:#0B0A18;
   --cc-ground-edge:rgba(0,240,255,.55);
   --cc-ground-image:linear-gradient(rgba(0,240,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.22) 1px,transparent 1px);
@@ -268,11 +268,13 @@
 
 /* Cyberpunk: a night city in the rain. Lit edges and floors on the buildings, a few neon signs, holographic pins,
    rain and scanlines in the sky, and rubble as a sparking hazard tile. */
-:root[data-theme='cyberpunk'] .cc-scene::before{content:'';position:absolute;inset:-120px 0 0 0;pointer-events:none;
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),
-    repeating-linear-gradient(100deg,transparent 0 22px,rgba(0,240,255,.13) 22px 23px,transparent 23px 47px,rgba(255,43,214,.08) 47px 48px);
-  background-size:auto,120px 120px;animation:cc-rain 1.1s linear infinite}
-@keyframes cc-rain{from{transform:translateY(0)}to{transform:translateY(120px)}}
+/* Rain: single drops behind the city, each with its own length, weight, tilt, drift, speed and phase (CityRain). */
+.cc-rain{position:absolute;inset:0;overflow:hidden;pointer-events:none;display:none}
+:root[data-theme='cyberpunk'] .cc-rain{display:block}
+.cc-drop{position:absolute;top:0;width:var(--w);height:var(--len);border-radius:1px;opacity:var(--a);
+  background:linear-gradient(180deg,rgba(190,240,255,0),rgba(190,240,255,1));will-change:transform;
+  animation:cc-drop var(--dur) linear var(--phase) infinite}
+@keyframes cc-drop{from{transform:translate3d(0,-12vh,0) rotate(var(--tilt))}to{transform:translate3d(var(--drift),105vh,0) rotate(var(--tilt))}}
 /* Night: the author's colour stays, in shadow, so the lit floors and edges carry the light. */
 :root[data-theme='cyberpunk'] .cc-b .top{background:linear-gradient(rgba(6,5,16,.38),rgba(6,5,16,.38)),var(--c1)}
 :root[data-theme='cyberpunk'] .cc-b .s{background:linear-gradient(rgba(6,5,16,.55),rgba(6,5,16,.55)),linear-gradient(0deg,var(--c1),var(--c2))}
@@ -304,7 +306,8 @@
 :root[data-theme='cyberpunk'] .cc-stem{box-shadow:0 0 8px rgba(0,240,255,.7)}
 
 @media (prefers-reduced-motion:reduce){
-  .cc-scene::before,.cc-b .e::before,.cc-b .s::before,.cc-rubble,.cc-sway{animation:none !important}
+  .cc-b .e::before,.cc-b .s::before,.cc-rubble,.cc-sway{animation:none !important}
+  .cc-rain{display:none !important}
 }
 :root[data-theme='solarpunk'] .cc-sway{animation:cc-sway 5.5s ease-in-out infinite alternate;animation-delay:calc(var(--d) * -1)}
 @keyframes cc-sway{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
