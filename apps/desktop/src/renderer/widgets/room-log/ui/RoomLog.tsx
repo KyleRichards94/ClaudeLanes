@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { FlatList, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { PEER_ASSIST_KINDS, PEER_POST_KINDS, type PeerPostKind, type PeerRoom, type RoomMessage } from '@agent-lanes/contracts';
 import { color, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, SegmentedControl, Text, TextField } from '@agent-lanes/ui';
 import { KindPill, MemberRow, clock, peerStageLabel, useMinute } from '@/entities/peer';
 import { useConnections, usePostToRoom, useRoomLog } from '@/shared/api';
+import { arrivals, atBottom, newMessagesLabel } from '../model/follow';
 
 const ASSIST = new Set<string>(PEER_ASSIST_KINDS);
+const NO_MESSAGES: RoomMessage[] = [];
 
 /** `Kyle Richards · KYLE-PC · #48161 (Implementing)`, or `Mitch Healy (person)`. */
 export function messageSpeaker(message: RoomMessage): string {
@@ -79,23 +81,65 @@ function LogRow({ message, unread }: { message: RoomMessage; unread: boolean }) 
 }
 
 /**
- * A room's log (AL-295, AL-300, P9): who, when, the kind as a word, and the text in the agents' own
- * words, oldest first, with a quieter line when a lane joins, leaves or goes quiet. Unread `ask`,
+ * Follows the log like a chat app (AL-301): opens at the bottom (or the message asked for), stays
+ * pinned there as rows arrive, and otherwise leaves the view where it is and counts the new posts for
+ * the pill. Reaching the bottom, by hand or with the pill, clears the count.
+ */
+function useFollow(messages: readonly RoomMessage[], list: RefObject<FlatList<RoomMessage> | null>, focus: string | null) {
+  const [pinned, setPinned] = useState(true);
+  const [follow, setFollow] = useState<{ list: readonly RoomMessage[]; unseen: number; scroll: { n: number; to: number | 'end' } }>({ list: NO_MESSAGES, unseen: 0, scroll: { n: 0, to: 'end' } });
+
+  // New rows are worked out as they render; the effect below only moves the view.
+  if (follow.list !== messages && messages.length > 0) {
+    if (follow.list.length === 0) {
+      const at = focus ? messages.findIndex((message) => message.id === focus) : -1;
+      setFollow({ list: messages, unseen: 0, scroll: { n: follow.scroll.n + 1, to: at >= 0 ? at : 'end' } });
+    } else {
+      const known = new Set(follow.list.map((message) => message.id));
+      const next = arrivals(
+        messages.filter((message) => !known.has(message.id)),
+        pinned,
+      );
+      setFollow({ list: messages, unseen: next.follow ? 0 : follow.unseen + next.unseen, scroll: next.follow ? { n: follow.scroll.n + 1, to: 'end' } : follow.scroll });
+    }
+  }
+
+  useEffect(() => {
+    if (follow.scroll.n === 0) return;
+    const to = follow.scroll.to;
+    if (to === 'end') list.current?.scrollToEnd({ animated: false });
+    else list.current?.scrollToIndex({ index: to, animated: false, viewPosition: 0 });
+  }, [follow.scroll, list]);
+
+  return {
+    unseen: follow.unseen,
+    jump() {
+      setPinned(true);
+      setFollow((current) => ({ ...current, unseen: 0, scroll: { n: current.scroll.n + 1, to: 'end' } }));
+    },
+    onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+      const bottom = atBottom(event.nativeEvent);
+      setPinned(bottom);
+      if (bottom) setFollow((current) => (current.unseen > 0 ? { ...current, unseen: 0 } : current));
+    },
+    // Rows that arrive while pinned are measured after the scroll above: keep the view at the end.
+    onContentSizeChange() {
+      if (pinned) list.current?.scrollToEnd({ animated: false });
+    },
+  };
+}
+
+/**
+ * A room's log (AL-295, AL-300, AL-301, P9): who, when, the kind as a word, and the text in the agents'
+ * own words, oldest first, with a quieter line when a lane joins, leaves or goes quiet. Unread `ask`,
  * `blocked` and `offer` rows are marked until the room has been shown.
  */
 export function RoomLog({ room, focus = null }: { room: PeerRoom; focus?: string | null }) {
   const log = useRoomLog(room.id);
   const list = useRef<FlatList<RoomMessage>>(null);
-  const messages = log.data?.messages ?? [];
+  const messages = log.data?.messages ?? NO_MESSAGES;
   const unread = unreadIds(messages, room.unread);
-  // The message asked for, else the first unread one (the Assist bubble opens the panel there, AL-294).
-  const target = focus ?? messages.find((message) => unread.has(message.id))?.id ?? null;
-  const at = target ? messages.findIndex((message) => message.id === target) : -1;
-
-  useEffect(() => {
-    if (at >= 0) list.current?.scrollToIndex({ index: at, animated: false, viewPosition: 0 });
-    else if (messages.length > 0) list.current?.scrollToEnd({ animated: false });
-  }, [at, messages.length]);
+  const follow = useFollow(messages, list, focus);
 
   if (log.isError) {
     return (
@@ -114,9 +158,17 @@ export function RoomLog({ room, focus = null }: { room: PeerRoom; focus?: string
         keyExtractor={(message) => message.id}
         renderItem={({ item }) => <LogRow message={item} unread={unread.has(item.id)} />}
         onScrollToIndexFailed={() => list.current?.scrollToEnd({ animated: false })}
+        onScroll={follow.onScroll}
+        onContentSizeChange={follow.onContentSizeChange}
+        scrollEventThrottle={50}
         style={styles.list}
         contentContainerStyle={styles.rows}
       />
+      {follow.unseen > 0 ? (
+        <View style={styles.newSlot}>
+          <Button label={newMessagesLabel(follow.unseen)} variant="primary" size="sm" onPress={follow.jump} testID="room-new-messages" />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -185,6 +237,15 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+  },
+  // Over the bottom edge of the log, so it never covers the composer below it.
+  newSlot: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: space.sm,
+    alignItems: 'center',
+    pointerEvents: 'box-none',
   },
   rows: {
     gap: space.xs,

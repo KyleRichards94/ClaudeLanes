@@ -39,7 +39,7 @@ function RoomBody({ room, focus, highlight }: { room: PeerRoom; focus: string | 
         {roomHeading(room)}
       </Text>
       <RoomMembers room={room} />
-      <RoomLog room={{ ...room, unread: highlight }} focus={focus} />
+      <RoomLog key={room.id} room={{ ...room, unread: highlight }} focus={focus} />
       <RoomComposer room={room} />
     </View>
   );

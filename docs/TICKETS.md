@@ -31,7 +31,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | **M4 Design (R10, R11)** | Claude Design beside the ticket; talk to the design at any stage; approve & ship the design to the running agent at any time | E11 | Ship a design while the agent is Implementing; the agent acknowledges and uses it without a restart |
 | **M6 Team board (add-on)** | The team's ADO board under the lanes; drag a card or PR onto a lane to start the right agent, with a 10 s Undo; Backlog popout | E14 (AL-230–AL-241) | Drop a Failed item on Planning: assigned, In Progress, agent planning; Undo restores ADO |
 | **M7 Ticket view parity** | The ticket drill-in works like Claude Code: your messages, expandable tool calls, usage and plan limits, Stop, Assign new agent, a second agent | E15 (AL-250–AL-266) | Assign a new agent to a lost session and hand over; a reviewer runs beside it |
-| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-300) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
+| **M8 Peer lanes (add-on)** | Agent Lanes apps on the office LAN see each other's lanes; lanes under one Feature share a room where their Claudes post `changed`, `blocked` and `ask`; the board flags two agents in one file and shows an Assist bubble | E18 (AL-287–AL-301) | Two apps on one Feature: a `changed` from one agent reaches the other as a turn; the overlap row and the bubble show on both boards |
 | **M5 Release** | Hardened, accessible, tested, packaged | E12, E13, AL-032, AL-033, AL-146, AL-007, AL-008 | Golden-path e2e green; installer installs and runs on a clean Windows machine |
 
 ---
@@ -222,6 +222,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-298 | Automatic discovery and the derived team key | E18 | M | AL-289, AL-296 | partial |
 | AL-299 | Wake an idle agent on a room message | E18 | S | AL-292 | done |
 | AL-300 | The room as a chat room: members in view, joins and leaves in the log | E18 | M | AL-295 | partial |
+| AL-301 | The log follows new messages like a chat app | E18 | S | AL-300 | in-progress |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1566,7 +1567,8 @@ AL-298 was added on 2026-10-30 from the brief's PL§11, after Mitch saw the Peer
 found by a UDP beacon and the key is derived from the ADO project, so there is nothing to type.
 AL-299 was added the same day: a room message wakes an idle agent, or starts a session for a lane
 with none (Mitch, overriding D837). AL-300 makes the room a chat room: members always in view, joins
-and leaves in the log, and one scroll region (Mitch, overriding D836).
+and leaves in the log, and one scroll region (Mitch, overriding D836). AL-301 makes the log follow new
+messages like a chat app, with a "New messages" pill when the user has scrolled up.
 
 #### AL-287 · Peer frame contracts and signing
 - **Design:** PL§3, PL§7 · **Depends on:** AL-011, AL-012
@@ -1687,6 +1689,17 @@ and leaves in the log, and one scroll region (Mitch, overriding D836).
   - [x] System rows don't change the unread count or the bubble. (`rooms.test.ts`: every `peers:message` carries 0 unread; `RoomLog.test.tsx`: never marked new, and showing the room marks it seen up to its last post)
   - [ ] The Room tab and the Rooms panel both show the list and the rows; screenshot for Kyle. (partly: both draw the same room body, checked in `RoomLog.test.tsx`; no screenshot, since the app wasn't run, on Mitch's call: no e2e)
   - [ ] At 1440x960 and at a short window, the Room tab and the Rooms panel each show exactly one scrollbar, on the log; the composer stays in view without scrolling. (partly: `RoomLog.test.tsx` finds exactly one scrolling element in each, inside the log, with the composer and members outside it; not checked at real window sizes, same reason)
+
+#### AL-301 · The log follows new messages like a chat app
+- **Design:** P9, PL§2, PL§8 · **Depends on:** AL-300
+- **Scope:** `widgets/room-log`, both the Rooms panel and the Room tab. When the log is scrolled to the bottom (within a few pixels), a new row scrolls into view on its own and the view stays pinned there as more arrive. When the user has scrolled up, the view does not move; a "New messages" pill appears over the bottom edge of the log, with the count once it's more than one ("3 new messages"), and tapping it scrolls to the bottom and clears. Reaching the bottom by hand clears it too. System rows (joined, left, lost contact) scroll the view when pinned but never raise the pill. Opening a room starts at the bottom. The user's own post always scrolls to the bottom. Unread and the Assist bubble are unchanged: they clear on open as AL-300 set.
+- **Acceptance criteria:**
+  - [ ] Pinned at the bottom, a new post scrolls into view with no pill (fake list height in the test).
+  - [ ] Scrolled up, a new post leaves the scroll position where it was and shows "New messages"; a second shows "2 new messages"; tapping it lands on the last row and the pill is gone.
+  - [ ] Scrolling to the bottom by hand clears the pill.
+  - [ ] A joined row while scrolled up raises no pill.
+  - [ ] Opening the Room tab or the Rooms panel lands at the bottom.
+  - [ ] The pill is a button labelled with its text, reachable by Tab, and never covers the composer.
 
 ---
 ## 4. Decisions
@@ -2651,6 +2664,7 @@ and leaves in the log, and one scroll region (Mitch, overriding D836).
 | 2026-10-30 | AL-299 built: room turns wake an idle agent and resume or start a lane with no live session, through the composer's send path. D851; D837 superseded in part. `pnpm verify` green apart from renderer tests that time out under load and pass alone; e2e not run, on Mitch's call. |
 | 2026-10-30 | AL-300 added to E18 from the brief (PL§2, PL§8): the room as a chat room, with the member list in view, joined, left and lost-contact rows in the log, and one scroll region (Mitch's screenshot of two scrollbars); replaces D836. |
 | 2026-10-30 | AL-300 built (partial): joined, left and lost-contact rows in the room log, member rows with the machine and title, and one scroll region in the Rooms panel and the Room tab. D852; D836 superseded. The screenshot and the real-window scrollbar check weren't done, since the app wasn't run (no e2e, Mitch's call). |
+| 2026-10-30 | AL-301 added to E18 from the brief (PL§2, PL§8): the room log stays pinned to new messages at the bottom, and shows a "New messages" pill when scrolled up. |
 ---
 
 ## 7. Parallel build rules

@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { FlatList } from 'react-native';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PeerKind, PeerRoom, PeerRooms, RoomMessage } from '@agent-lanes/contracts';
+import { roomLogQueryKey } from '@/shared/api';
 import { fakeAdoRow, installFakeBridge } from '@/shared/testing';
 import { closeRooms, openRooms } from '@/shared/model';
 import { RoomLog } from './RoomLog';
@@ -172,5 +174,113 @@ describe('one scroll region, like a chat (AL-300)', () => {
     expect(scrolling).toHaveLength(1);
     expect(log.contains(scrolling[0]!)).toBe(true);
     expect(getComputedStyle(screen.getByTestId('room-tab')).flexGrow).toBe('1');
+  });
+});
+
+describe('the log follows new messages like a chat app (AL-301)', () => {
+  const toEnd = vi.spyOn(FlatList.prototype, 'scrollToEnd');
+  afterEach(() => toEnd.mockClear());
+
+  function mount(children: ReactNode): QueryClient {
+    installFakeBridge({
+      'connections:list': { ok: true, data: [fakeAdoRow({ identity: 'Mitch Healy' })] },
+      'peers:list': { ok: true, data: peerNetworkFixture() },
+      'peers:rooms': { ok: true, data: rooms },
+      'peers:log': { ok: true, data: { room: ROOM, messages, capped: false } },
+      'peers:markSeen': { ok: true, data: { total: 0, byRoom: {}, byTicket: {} } },
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}>{children}</QueryClientProvider>);
+    return client;
+  }
+
+  /** The log's scrolling element, given a fake height: 1000 px of rows in a 400 px view, scrolled to `top`. */
+  function scrollLog(top: number): void {
+    const log = screen.getByTestId('room-log-48000');
+    const list = Array.from(log.querySelectorAll<HTMLElement>('*')).find((element) => getComputedStyle(element).overflowY === 'auto')!;
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, value: 1_000 });
+    Object.defineProperty(list, 'offsetHeight', { configurable: true, value: 400 });
+    Object.defineProperty(list, 'scrollTop', { configurable: true, writable: true, value: top });
+    fireEvent.scroll(list);
+  }
+
+  /** New rows in the cache, as `peers:message` puts them there; React Query tells the log on the next tick. */
+  async function arrive(client: QueryClient, ...added: RoomMessage[]): Promise<void> {
+    await act(async () => {
+      client.setQueryData(roomLogQueryKey(ROOM), (log: { messages: RoomMessage[] }) => ({ ...log, messages: [...log.messages, ...added] }));
+      await new Promise((done) => setTimeout(done, 0));
+    });
+  }
+
+  const pill = () => screen.queryByTestId('room-new-messages');
+
+  it('opens the Room tab and the Rooms panel at the bottom', async () => {
+    mount(<RoomTab ticketId="71273" />);
+    await screen.findByTestId(`room-message-${live.id}`);
+    expect(toEnd).toHaveBeenCalled();
+    toEnd.mockClear();
+    act(() => openRooms());
+    mount(<RoomsPanel />);
+    await waitFor(() => expect(toEnd).toHaveBeenCalled());
+  });
+
+  it('scrolls a new post into view when pinned at the bottom, with no pill', async () => {
+    const client = mount(<RoomLog room={room} />);
+    await screen.findByTestId(`room-message-${live.id}`);
+    scrollLog(600);
+    toEnd.mockClear();
+    await arrive(client, message('ask', 'Who has the mapper?'));
+    expect(toEnd).toHaveBeenCalled();
+    expect(pill()).toBeNull();
+  });
+
+  it('leaves the view where it is when scrolled up, counts new posts on the pill, and the pill lands on the last row', async () => {
+    const client = mount(<RoomLog room={room} />);
+    await screen.findByTestId(`room-message-${live.id}`);
+    scrollLog(100);
+    toEnd.mockClear();
+    await arrive(client, message('ask', 'Who has the mapper?'));
+    expect(toEnd).not.toHaveBeenCalled();
+    expect(pill()?.textContent).toBe('New messages');
+    await arrive(client, message('changed', 'Pushed JobStatus'));
+    expect(pill()?.textContent).toBe('2 new messages');
+    fireEvent.click(screen.getByRole('button', { name: '2 new messages' }));
+    expect(toEnd).toHaveBeenCalled();
+    expect(pill()).toBeNull();
+  });
+
+  it('clears the pill when the user scrolls to the bottom by hand', async () => {
+    const client = mount(<RoomLog room={room} />);
+    await screen.findByTestId(`room-message-${live.id}`);
+    scrollLog(100);
+    await arrive(client, message('ask', 'Who has the mapper?'));
+    expect(pill()).not.toBeNull();
+    scrollLog(600);
+    await waitFor(() => expect(pill()).toBeNull());
+  });
+
+  it('raises no pill for a joined row while scrolled up, and follows the person’s own post', async () => {
+    const client = mount(<RoomLog room={room} />);
+    await screen.findByTestId(`room-message-${live.id}`);
+    scrollLog(100);
+    toEnd.mockClear();
+    await arrive(client, message('hello', '', { system: 'joined' }));
+    expect(pill()).toBeNull();
+    expect(toEnd).not.toHaveBeenCalled();
+    await arrive(client, message('ask', 'Status?', { own: true, from: { ...own.from, person: true } }));
+    expect(toEnd).toHaveBeenCalled();
+    expect(pill()).toBeNull();
+  });
+
+  it('makes the pill a button named by its text, reachable by Tab, inside the log and clear of the composer', async () => {
+    const client = mount(<RoomsPanel />);
+    act(() => openRooms());
+    await screen.findByTestId(`room-message-${live.id}`);
+    scrollLog(100);
+    await arrive(client, message('ask', 'Who has the mapper?'));
+    const button = screen.getByRole('button', { name: 'New messages' });
+    expect(button.tabIndex).toBe(0);
+    expect(screen.getByTestId('room-log-48000').contains(button)).toBe(true);
+    expect(screen.getByTestId('room-composer-48000').contains(button)).toBe(false);
   });
 });
