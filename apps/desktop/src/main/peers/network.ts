@@ -533,12 +533,20 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       return;
     }
     const frame = opened.frame;
-    const age = Math.abs(at - Date.parse(frame.sentAt));
-    if (!frame.replay && age > freshMs) {
-      if (conn.link) conn.link.rejectedFrames += 1;
+    const skewMs = Date.parse(frame.sentAt) - at;
+    if (!frame.replay && Math.abs(skewMs) > freshMs) {
+      const clock = `${Math.round(Math.abs(skewMs) / 60_000)} min ${skewMs > 0 ? 'ahead' : 'behind'}`;
+      const link = conn.link ?? (conn.direction === 'in' ? links.find((item) => item.ips.has(conn.remoteIp)) : null);
+      if (link) {
+        link.rejectedFrames += 1;
+        if (link.state !== 'online') {
+          link.state = 'rejected';
+          link.message = `Its clock is ${clock}, or it sent an old frame again.`;
+        }
+      }
       if (!conn.staleWarned) {
         conn.staleWarned = true;
-        options.log?.warn(`Peer lanes: dropped a ${frame.kind} frame from ${conn.remoteIp} sent ${Math.round(age / 60_000)} min from now: its clock is out, or it is an old frame sent again`);
+        options.log?.warn(`Peer lanes: dropped a ${frame.kind} frame from ${conn.remoteIp}: its time is ${clock}, so its clock is out or it sent an old frame again`);
       }
       emitStatus();
       return;

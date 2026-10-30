@@ -244,6 +244,7 @@ as a spec.
 | Nobody shows on the **Peers** tab | Check Agent Lanes is open on the other computer, both of you have the same Azure DevOps project as **Default project**, and Windows allowed Agent Lanes on private networks. On another subnet, add each other under **Advanced**. |
 | A peer stays **Unreachable** | Agent Lanes closed there, or its computer left the network. One listed under **Advanced**: check the name or IP address, and that it lists your computer too. |
 | A peer shows **Signature rejected** | Its messages don't match the key for your project. Tell whoever looks after Agent Lanes; nothing from it is read. |
+| A peer shows **Signature rejected** and "Its clock is N min behind" (or ahead) | The two computers' clocks are more than 10 minutes apart, so its messages are dropped as stale. Fix the time on the one that's wrong (Windows takes it from the domain; check Date & time settings). It recovers on its own. |
 | The Peers tab says a port is in use | Something else has port 47811 (or UDP 47810). Pick another under **Advanced**. The beacon port has to be the same on every computer. Until then your app can still reach theirs. |
 | Something else went wrong | Press **Copy diagnostics** on the error and paste it into your bug report. It holds versions, settings and recent errors, and never a token. Logs are in `%APPDATA%\Agent Lanes\logs`. |
 | SmartScreen blocks the installer | **More info → Run anyway**. The installer isn't signed yet. |

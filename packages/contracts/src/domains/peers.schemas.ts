@@ -192,7 +192,7 @@ export const PeerLinkSchema = z.object({
   host: z.string().min(1).max(255).nullable(),
   instance: z.uuid().nullable(),
   lastSeenAt: EpochMsSchema.nullable(),
-  /** Frames from it dropped for a bad signature since the app started. */
+  /** Frames from it dropped since the app started: a bad signature, a team this app has no key for, or stale (PL§7). */
   rejectedFrames: CountSchema,
   /** Why it is unreachable or rejected, in words; null otherwise. */
   message: z.string().nullable(),

@@ -172,6 +172,18 @@ describe('caps and filters on a live listener', () => {
     expect(peer.network.status().peers[0]?.rejectedFrames).toBe(1);
   });
 
+  it('counts a stale hello on a new connection against the listed peer and says its clock is out', async () => {
+    const other = await freePort();
+    const peer = await listening([`localhost:${other}`], { freshMs: 60_000 });
+    const socket = await connect(peer.port);
+    const { sig: _sig, ...base } = JSON.parse(hello(other)) as PeerFrame;
+    socket.send(JSON.stringify(signFrame({ ...base, sentAt: new Date(Date.now() - 15 * 60_000).toISOString() }, TEST_TEAM.key)));
+    await vi.waitFor(() =>
+      expect(peer.network.status().peers[0]).toMatchObject({ state: 'rejected', rejectedFrames: 1, message: 'Its clock is 15 min behind, or it sent an old frame again.' }),
+    );
+    expect(peer.network.online()).toEqual([]);
+  });
+
   it('drops a frame whose team tag this app has no key for before reading it, and counts it', async () => {
     const other = await freePort();
     const peer = await listening([`localhost:${other}`]);
