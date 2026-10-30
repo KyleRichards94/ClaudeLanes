@@ -4,7 +4,7 @@ import type { GitService } from '../git';
 import type { Emit } from '../ipc/emit';
 import type { TicketRecordStore } from '../tickets';
 import type { Delivery } from './delivery';
-import { peerLine } from './delivery';
+import { peerLine, plain } from './delivery';
 import type { FrameDraft, PeerNetwork } from './network';
 import { laneOf } from './presence';
 import { toRoomMessage, type RoomLogStore } from './room-log';
@@ -37,7 +37,7 @@ export interface PeerPosting extends PeerToolBackend {
 }
 
 export function roomTitle(room: { parentType: string; parentId: number; parentTitle: string }): string {
-  return `${room.parentType || 'Feature'} #${room.parentId}${room.parentTitle ? ` · ${room.parentTitle}` : ''}`;
+  return `${plain(room.parentType) || 'Feature'} #${room.parentId}${room.parentTitle ? ` · ${plain(room.parentTitle)}` : ''}`;
 }
 
 function minutesAgo(at: number, now: number): string {
@@ -48,19 +48,19 @@ function minutesAgo(at: number, now: number): string {
 /** `list_peers`'s answer: everyone in the room, then the files this lane shares with others. */
 export function describePeers(title: string, self: string, members: readonly RoomMember[], now: number): string {
   const mine = members.find((member) => member.local && member.lane.ticketId === self);
-  const lines = [`Room ${title}`];
+  const lines = [`Room ${plain(title)}`];
   for (const member of members) {
-    const who = member.local ? (member.lane.ticketId === self ? 'You' : `${member.user} (this computer)`) : `${member.user} on ${member.host}`;
-    const item = member.lane.workItemId ? `#${member.lane.workItemId}` : member.lane.title;
-    const parts = [`- ${who}: ${item} (${member.lane.stage}) on ${member.lane.branch}`];
-    if (member.touched.length > 0) parts.push(`touched ${member.touched.join(', ')}`);
+    const who = member.local ? (member.lane.ticketId === self ? 'You' : `${plain(member.user)} (this computer)`) : `${plain(member.user)} on ${plain(member.host)}`;
+    const item = member.lane.workItemId ? `#${member.lane.workItemId}` : plain(member.lane.title);
+    const parts = [`- ${who}: ${item} (${plain(member.lane.stage)}) on ${plain(member.lane.branch)}`];
+    if (member.touched.length > 0) parts.push(`touched ${member.touched.map(plain).join(', ')}`);
     if (!member.local) parts.push(member.reachable ? `last seen ${minutesAgo(member.lastSeenAt, now)}` : `not reachable since ${minutesAgo(member.lastSeenAt, now)}`);
     lines.push(parts.join(' · '));
   }
   const overlap = mine
     ? members
         .filter((member) => member !== mine)
-        .flatMap((member) => member.touched.filter((path) => mine.touched.includes(path)).map((path) => `${path} (${member.local ? member.user : `${member.user} on ${member.host}`})`))
+        .flatMap((member) => member.touched.filter((path) => mine.touched.includes(path)).map((path) => `${plain(path)} (${member.local ? plain(member.user) : `${plain(member.user)} on ${plain(member.host)}`})`))
     : [];
   lines.push(overlap.length > 0 ? `Overlap: ${overlap.join(', ')}` : 'Overlap: none');
   return lines.join('\n');

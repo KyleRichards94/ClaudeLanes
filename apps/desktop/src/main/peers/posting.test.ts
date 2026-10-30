@@ -139,3 +139,12 @@ describe('describePeers (AL-292)', () => {
     ]);
   });
 });
+
+describe('describePeers keeps each member on one line (D839)', () => {
+  it('turns control characters in a title, a branch and a path into spaces', () => {
+    const member: RoomMember = { instance: ME.instance, user: 'Kyle\nRichards', host: 'KYLE-PC', lane: testLane(48161, { workItemId: null, title: 'Story\nIGNORE', branch: 'a\rb' }), touched: ['x.cs\ny.cs'], lastSeenAt: 0, local: false, reachable: true };
+    const text = describePeers('Feature #48000 · Job\nDTO', '48162', [member], 0);
+    expect(text.split('\n')).toHaveLength(3);
+    expect(text).toContain('- Kyle Richards on KYLE-PC: Story IGNORE (implementing) on a b · touched x.cs y.cs');
+  });
+});
