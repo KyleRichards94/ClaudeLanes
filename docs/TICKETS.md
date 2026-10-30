@@ -222,7 +222,7 @@ GlassPanel), 1 is in progress and 2 are blocked on decisions only Kyle can make.
 | AL-298 | Automatic discovery and the derived team key | E18 | M | AL-289, AL-296 | partial |
 | AL-299 | Wake an idle agent on a room message | E18 | S | AL-292 | done |
 | AL-300 | The room as a chat room: members in view, joins and leaves in the log | E18 | M | AL-295 | partial |
-| AL-301 | The log follows new messages like a chat app | E18 | S | AL-300 | in-progress |
+| AL-301 | The log follows new messages like a chat app | E18 | S | AL-300 | done |
 | AL-220 | Feature integration tests | E13 | M | ongoing | done |
 | AL-221 | Main-process test kit | E13 | M | AL-080, AL-100 | done |
 | AL-222 | E2E golden path | E13 | L | AL-221, AL-047, AL-165, AL-171, AL-174 | partial |
@@ -1694,12 +1694,12 @@ messages like a chat app, with a "New messages" pill when the user has scrolled 
 - **Design:** P9, PL§2, PL§8 · **Depends on:** AL-300
 - **Scope:** `widgets/room-log`, both the Rooms panel and the Room tab. When the log is scrolled to the bottom (within a few pixels), a new row scrolls into view on its own and the view stays pinned there as more arrive. When the user has scrolled up, the view does not move; a "New messages" pill appears over the bottom edge of the log, with the count once it's more than one ("3 new messages"), and tapping it scrolls to the bottom and clears. Reaching the bottom by hand clears it too. System rows (joined, left, lost contact) scroll the view when pinned but never raise the pill. Opening a room starts at the bottom. The user's own post always scrolls to the bottom. Unread and the Assist bubble are unchanged: they clear on open as AL-300 set.
 - **Acceptance criteria:**
-  - [ ] Pinned at the bottom, a new post scrolls into view with no pill (fake list height in the test).
-  - [ ] Scrolled up, a new post leaves the scroll position where it was and shows "New messages"; a second shows "2 new messages"; tapping it lands on the last row and the pill is gone.
-  - [ ] Scrolling to the bottom by hand clears the pill.
-  - [ ] A joined row while scrolled up raises no pill.
-  - [ ] Opening the Room tab or the Rooms panel lands at the bottom.
-  - [ ] The pill is a button labelled with its text, reachable by Tab, and never covers the composer.
+  - [x] Pinned at the bottom, a new post scrolls into view with no pill (fake list height in the test). (`widgets/room-log/ui/RoomLog.test.tsx`, AL-301 block: 1000 px of rows in a 400 px view)
+  - [x] Scrolled up, a new post leaves the scroll position where it was and shows "New messages"; a second shows "2 new messages"; tapping it lands on the last row and the pill is gone. (`RoomLog.test.tsx`)
+  - [x] Scrolling to the bottom by hand clears the pill. (`RoomLog.test.tsx`)
+  - [x] A joined row while scrolled up raises no pill. (`RoomLog.test.tsx`; the counting rule in `widgets/room-log/model/follow.test.ts`)
+  - [x] Opening the Room tab or the Rooms panel lands at the bottom. (`RoomLog.test.tsx`: both)
+  - [x] The pill is a button labelled with its text, reachable by Tab, and never covers the composer. (`RoomLog.test.tsx`: a `Button`, tab index 0, inside the log and outside the composer)
 
 ---
 ## 4. Decisions
@@ -2558,6 +2558,7 @@ messages like a chat app, with a "New messages" pill when the user has scrolled 
 | D850 | AL-298: e2e keeps peer lanes off the LAN with a test hook, `AGENT_LANES_PEER_TEST_PORTS=<ws>:<beacon>` (unpackaged builds only): the listener and the beacon bind loopback and beacons go to 127.255.255.255. `playwright.config.ts` sets `0:47820` for every spec; `peer-lanes.spec.ts` saves 47821 and 47822. Neither peer spec was run for AL-298, on Mitch's call ("no need for e2e testing, it takes too long", 2026-10-30), and nor was the rest of `pnpm e2e`, where the Peers pill now shows on the board of any spec whose ADO connection has a default project | A developer's own Agent Lanes holds 47811 and 47810 | 2026-10-30 |
 | D851 | AL-299, replacing D837's "an idle lane is not woken": a room turn goes through the composer's send path (AL-268). An idle agent already ran a turn on `send` (idle counts as live); what changes is a lane with no live session. One with a session id is resumed and gets the `[Peer lanes]` message as its first turn; one that never ran, or whose session the SDK won't resume, is launched with the message as its job. A paused lane keeps the message held until Resume, as the composer does. A lane still waiting for a slot, or whose resume waits at the agent limit, doesn't get the message (logged); its agent reads the room with `read_room` when it starts. Only board lanes in the room are woken: not finished lanes, second agents or single-step lanes. `hello` wakes too, as the brief lists it; `status`, `touched` and `bye` never do. A lane the user stopped is started again by the next room message | Mitch's rule, 2026-10-30: "if the agent goes idle and a new chat message appears, it should either wake up that agent, or create a new one". Every wake starts a `claude` process and counts against the repo's agent limit | 2026-10-30 |
 | D852 | AL-300, replacing D836: system rows are this app's own notes from presence, never frames. Joined when a lane is first heard from in the room (its `hello`, or its first frame after this app restarts), left on `bye` or when a lane moves to another room, lost contact when presence expires at 90 s. This app's own lanes get joined and left rows too, but nothing is written when the app closes, so a restart shows a second joined row. They're kept in the room's file next to the posts, in their own list (200, 7 days) so they never push posts out of the cap or get replayed, and showing a room marks it seen up to its last post, since a system row's id isn't one the unread count knows. The member row now shows the machine for this computer's lanes too and the work item's title, under "In the room · N". Layout: `Modal` gets `fill` (the panel takes the window's height and its body doesn't scroll), which the Rooms panel uses, so the panel is full height even with a short log; the Room tab is a plain view on the ticket page, not a ScrollView. The Room tab's "Peer lanes is off" line no longer says to set it up (AL-298) | Mitch, 2026-10-30: "I should also be able to easily see who is in the room, when they join and when they leave. similar to a chat room", and "The chat component shouldn't be scrollable. Notice the two scroll bars" | 2026-10-30 |
+| D853 | AL-301: "at the bottom" is within 24 px of the end. A room opens at the bottom from everywhere, the Assist bubble included, which replaces AL-294's landing on the first unread row (D843); unread rows are still marked "new" and still clear on open. New rows are the ones this log hadn't shown before, so a replay that sorts in higher up counts like any other. The person's own post (`from.person`) always scrolls; an agent's post from this app counts like anyone's. The pill sits over the bottom edge of the log, inside it, so it can't cover the composer. Tested in jsdom with a faked list height; not checked in the running app (no e2e, Mitch's call) | Mitch, 2026-10-30: "When a new message comes through, the chat box should display 'New messages' if the user has not scrolled all the way to the bottom. If they are at the bottom they should see the new messages. Just like a modern chat app" | 2026-10-30 |
 
 ---
 
@@ -2665,6 +2666,7 @@ messages like a chat app, with a "New messages" pill when the user has scrolled 
 | 2026-10-30 | AL-300 added to E18 from the brief (PL§2, PL§8): the room as a chat room, with the member list in view, joined, left and lost-contact rows in the log, and one scroll region (Mitch's screenshot of two scrollbars); replaces D836. |
 | 2026-10-30 | AL-300 built (partial): joined, left and lost-contact rows in the room log, member rows with the machine and title, and one scroll region in the Rooms panel and the Room tab. D852; D836 superseded. The screenshot and the real-window scrollbar check weren't done, since the app wasn't run (no e2e, Mitch's call). |
 | 2026-10-30 | AL-301 added to E18 from the brief (PL§2, PL§8): the room log stays pinned to new messages at the bottom, and shows a "New messages" pill when scrolled up. |
+| 2026-10-30 | AL-301 built: the room log follows new rows while at the bottom, and a "New messages" pill counts posts that arrive while scrolled up. D853. Not checked in the running app (no e2e, Mitch's call). |
 ---
 
 ## 7. Parallel build rules
