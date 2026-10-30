@@ -4,6 +4,7 @@ import { accessibleName, authorOf, pinsFor, plotPair, REVIEW_WORDS, type Pin } f
 import { fileName, type CityBuilding } from '../model/layoutCity';
 import { AgentPins } from './AgentPins.web';
 import { Building } from './Building.web';
+import { CityDecor } from './CityDecor.web';
 import type { CitySceneProps } from './CityScene.types';
 import { LabelLayer } from './LabelLayer.web';
 import { buildLabels } from './labels';
@@ -185,6 +186,7 @@ export function CityScene({ layout, files, agents, reviewStatus, selectedFilePat
         ) : (
           <div className="cc-plane" role="listbox" aria-label="Changed files" style={{ width: layout.width, height: layout.depth }}>
             <div className="cc-ground" aria-hidden="true" />
+            <CityDecor layout={layout} />
             {layout.districts.map((d, index) => {
               const pair = plotPair(index);
               const style: VarStyle = { left: d.x, top: d.y, width: d.w, height: d.d, '--plot-bg': pair.bg, '--plot-border': pair.border };

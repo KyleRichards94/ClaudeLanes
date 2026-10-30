@@ -224,3 +224,87 @@
   --cc-error-shadow:rgba(0,0,0,.5);
 }
 :root[data-theme='cyberpunk']{--cc-stage-done:var(--al-ok);--cc-road-done:var(--al-tone-ok-fill)}
+
+/* ── Decorations per theme (AL-286) ───────────────────────────────────────────────────────────────
+   Scenery only: aria-hidden, no pointer events, placed from the file path or plot key so nothing moves between renders.
+   Light and Dark are the plain city. */
+.cc-deco{position:absolute;inset:0;transform-style:preserve-3d;pointer-events:none;display:none}
+.cc-tree{position:absolute;width:0;height:0;transform-style:preserve-3d}
+/* A billboard: undo the plane's tilt so the tree stands up facing the viewer, rooted at its spot. */
+.cc-tree svg{position:absolute;left:-15px;bottom:0;overflow:visible;transform-origin:50% 100%;
+  transform:rotateZ(42deg) rotateX(-58deg) scale(var(--s))}
+.cc-tree::before{content:'';position:absolute;left:-13px;top:-6px;width:26px;height:12px;border-radius:50%;
+  background:rgba(60,80,30,.28);filter:blur(3px)}
+.cc-sway{transform-box:fill-box;transform-origin:50% 100%}
+
+/* Solarpunk: a meadow town under a summer sun. Trees and shrubs on the plots, moss and vines on the taller buildings,
+   roof gardens, warm light on the faces, and rubble turned into a planted bed. */
+:root[data-theme='solarpunk'] .cc-scene{
+  --cc-sky:radial-gradient(circle at 62% 6%,rgba(255,236,170,.95) 0 2.5%,rgba(255,214,120,.55) 6%,rgba(255,214,120,0) 26%),linear-gradient(180deg,#CDE6F2 0%,#E9F2E0 48%,#F3EEDA 100%);
+  --cc-ground:#D4E7B2;
+  --cc-ground-edge:#B7D08E;
+  --cc-ground-image:radial-gradient(rgba(64,112,42,.22) 1px,transparent 1.6px),radial-gradient(rgba(255,252,225,.45) 1px,transparent 1.6px),radial-gradient(ellipse at 30% 40%,rgba(126,176,84,.35),transparent 60%),radial-gradient(ellipse at 70% 70%,rgba(230,214,140,.35),transparent 55%);
+  --cc-ground-size:9px 9px,14px 14px,260px 180px,340px 240px;
+  --cc-plot-1-bg:rgba(250,246,230,.82);
+  --cc-plot-2-bg:rgba(247,234,214,.82);
+  --cc-plot-3-bg:rgba(232,242,236,.82);
+  --cc-plot-4-bg:rgba(242,236,220,.85);
+  --cc-rubble-ring:#7A5634;
+  --cc-rubble:radial-gradient(circle,#6FA650 0 2px,transparent 2.6px) 0 0/11px 11px,radial-gradient(circle,#F2B033 0 1.4px,transparent 1.9px) 5px 6px/22px 19px,linear-gradient(#8A6440,#73502F);
+}
+:root[data-theme='solarpunk'] .cc-garden{display:block}
+:root[data-theme='solarpunk'] .cc-b .s{background:linear-gradient(0deg,rgba(255,214,130,.0),rgba(255,226,160,.16)),linear-gradient(0deg,var(--c1),var(--c2))}
+:root[data-theme='solarpunk'] .cc-b .e{background:linear-gradient(270deg,rgba(255,206,110,.32),rgba(255,206,110,0) 70%),linear-gradient(270deg,var(--c3),var(--c2))}
+:root[data-theme='solarpunk'] .cc-b[data-tall] .s::after,
+:root[data-theme='solarpunk'] .cc-b[data-tall] .e::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(0deg,rgba(70,128,52,.95) 0,rgba(78,140,58,.7) 16%,rgba(78,140,58,0) 38%),
+    radial-gradient(circle at 50% 100%,rgba(96,160,70,.9) 0 3px,transparent 3.5px) 0 0/12px 10px,
+    repeating-linear-gradient(90deg,transparent 0 8px,rgba(52,108,42,.85) 8px 11px,transparent 11px 17px);
+  -webkit-mask-image:linear-gradient(0deg,#000 0,#000 40%,transparent 82%);mask-image:linear-gradient(0deg,#000 0,#000 40%,transparent 82%)}
+:root[data-theme='solarpunk'] .cc-b[data-deco='1']:not(.slab) .win,
+:root[data-theme='solarpunk'] .cc-b[data-deco='4']:not(.slab) .win{opacity:1;
+  background-image:radial-gradient(circle at 30% 35%,#6BAA52 0 16%,transparent 17%),radial-gradient(circle at 62% 58%,#5E9E48 0 20%,transparent 21%),
+    radial-gradient(circle at 70% 26%,#8CC46C 0 11%,transparent 12%),radial-gradient(circle at 34% 72%,#F2B033 0 5%,transparent 6%);background-size:100% 100%}
+
+/* Cyberpunk: a night city in the rain. Lit edges and floors on the buildings, a few neon signs, holographic pins,
+   rain and scanlines in the sky, and rubble as a sparking hazard tile. */
+:root[data-theme='cyberpunk'] .cc-scene::before{content:'';position:absolute;inset:-120px 0 0 0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(100deg,transparent 0 22px,rgba(0,240,255,.13) 22px 23px,transparent 23px 47px,rgba(255,43,214,.08) 47px 48px);
+  background-size:auto,120px 120px;animation:cc-rain 1.1s linear infinite}
+@keyframes cc-rain{from{transform:translateY(0)}to{transform:translateY(120px)}}
+/* Night: the author's colour stays, in shadow, so the lit floors and edges carry the light. */
+:root[data-theme='cyberpunk'] .cc-b .top{background:linear-gradient(rgba(6,5,16,.38),rgba(6,5,16,.38)),var(--c1)}
+:root[data-theme='cyberpunk'] .cc-b .s{background:linear-gradient(rgba(6,5,16,.55),rgba(6,5,16,.55)),linear-gradient(0deg,var(--c1),var(--c2))}
+:root[data-theme='cyberpunk'] .cc-b .e{background:linear-gradient(rgba(6,5,16,.65),rgba(6,5,16,.65)),linear-gradient(270deg,var(--c3),var(--c2))}
+:root[data-theme='cyberpunk'] .cc-b .s,
+:root[data-theme='cyberpunk'] .cc-b .e{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c1) 80%,#fff)}
+:root[data-theme='cyberpunk'] .cc-b:not(.slab) .s::after,
+:root[data-theme='cyberpunk'] .cc-b:not(.slab) .e::after{content:'';position:absolute;inset:4px 3px;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 8px,rgba(0,240,255,.55) 8px 9px);opacity:.75}
+:root[data-theme='cyberpunk'] .cc-b[data-deco='1'] .s::after,
+:root[data-theme='cyberpunk'] .cc-b[data-deco='3'] .e::after{background:repeating-linear-gradient(0deg,transparent 0 8px,rgba(255,43,214,.6) 8px 9px)}
+:root[data-theme='cyberpunk'] .cc-b:not([aria-selected="true"]):not(:focus-visible) .top{
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c1) 70%,#fff),0 0 14px color-mix(in srgb,var(--c1) 75%,transparent)}
+/* A neon sign down the east face of every third tall building. */
+:root[data-theme='cyberpunk'] .cc-b[data-tall][data-deco='0'] .e::before,
+:root[data-theme='cyberpunk'] .cc-b[data-tall][data-deco='2'] .e::before,
+:root[data-theme='cyberpunk'] .cc-b[data-tall][data-deco='5'] .s::before{content:'';position:absolute;top:14%;left:38%;width:7px;height:52%;border-radius:4px;
+  background:#FF2BD6;box-shadow:0 0 6px #FF2BD6,0 0 18px rgba(255,43,214,.75);animation:cc-flicker 4.2s steps(1) infinite}
+:root[data-theme='cyberpunk'] .cc-b[data-tall][data-deco='2'] .e::before{background:#00F0FF;box-shadow:0 0 6px #00F0FF,0 0 18px rgba(0,240,255,.75);animation-delay:1.3s}
+@keyframes cc-flicker{0%,100%{opacity:1}46%{opacity:1}47%{opacity:.25}49%{opacity:1}51%{opacity:.4}53%{opacity:1}}
+:root[data-theme='cyberpunk'] .cc-rubble:not([aria-selected="true"]):not(:focus-visible){
+  --cc-rubble:repeating-linear-gradient(45deg,#FCEE0A 0 8px,#141209 8px 16px);
+  box-shadow:inset 0 0 0 2px var(--cc-rubble-ring),0 0 16px rgba(252,238,10,.45);animation:cc-spark 2.6s steps(1) infinite}
+@keyframes cc-spark{0%,100%{filter:none}62%{filter:brightness(1.6) drop-shadow(0 0 6px #FF3366)}64%{filter:none}70%{filter:brightness(1.4)}72%{filter:none}}
+:root[data-theme='cyberpunk'] .cc-pill{position:relative;overflow:hidden;opacity:.9;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 0 14px rgba(0,240,255,.55)}
+:root[data-theme='cyberpunk'] .cc-pill::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.14) 0 1px,transparent 1px 3px)}
+:root[data-theme='cyberpunk'] .cc-stem{box-shadow:0 0 8px rgba(0,240,255,.7)}
+
+@media (prefers-reduced-motion:reduce){
+  .cc-scene::before,.cc-b .e::before,.cc-b .s::before,.cc-rubble,.cc-sway{animation:none !important}
+}
+:root[data-theme='solarpunk'] .cc-sway{animation:cc-sway 5.5s ease-in-out infinite alternate;animation-delay:calc(var(--d) * -1)}
+@keyframes cc-sway{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from 'react';
 import { usePrefersReducedMotion } from '@/shared/lib';
-import { faceColors } from '../model/cityData';
+import { decoSeed, faceColors } from '../model/cityData';
 
 export interface BuildingProps {
   path: string;
@@ -25,6 +25,9 @@ export interface BuildingProps {
 }
 
 type VarStyle = CSSProperties & Record<`--${string}`, string>;
+
+/** Buildings at least this tall carry `data-tall`, which theme decorations hang moss, vines or signs on. */
+const DECO_TALL = 90;
 
 /** How long a growing building keeps the `rising` class (handoff: 400 ms). */
 const RISING_MS = 400;
@@ -73,6 +76,8 @@ export function Building({ path, x, y, side, height, color, label, selected, tab
     <div
       className={className}
       style={style}
+      data-deco={decoSeed(path) % 6}
+      data-tall={height >= DECO_TALL ? '' : undefined}
       role="option"
       aria-selected={selected}
       aria-label={label}

@@ -148,3 +148,10 @@ export const PLOT_PAIRS = [
 ] as const;
 
 export const plotPair = (districtIndex: number): { bg: string; border: string } => PLOT_PAIRS[districtIndex % PLOT_PAIRS.length] ?? PLOT_PAIRS[0];
+
+/** A small stable number from a path or key, so theme decorations land in the same place on every render. */
+export function decoSeed(key: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
+  return hash >>> 0;
+}
