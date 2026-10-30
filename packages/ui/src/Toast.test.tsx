@@ -1,29 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { color, control, fontSize, fontWeight, glass, lightOf, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, contrastRatio, control, fontSize, fontWeight, glass, radius, resolveToken, shadow, tone } from '@agent-lanes/tokens';
 import { Toast, toastTones, toastWidth, type ToastTone } from './Toast';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-/** WCAG 2 contrast ratio of two #RRGGBB colours. */
-function contrast(a: string, b: string): number {
-  const luminance = (value: string) => {
-    const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-    const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
-      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
+/** Contrast of two colours as the light theme paints them; computed values come back as var() tokens. */
+const contrast = (a: string, b: string) => contrastRatio(resolveToken(a, 'light'), resolveToken(b, 'light'));
 
 /** The visible surface inside a Button's pressable target. */
 function surfaceOf(button: HTMLElement): HTMLElement {
@@ -71,7 +53,7 @@ describe('Toast', () => {
       expect(panel.borderTopLeftRadius).toBe(`${radius.card}px`);
       expect(panel.paddingTop).toBe('14px');
       expect(panel.paddingLeft).toBe('16px');
-      expect(panel.backgroundColor).toBe(lightOf(glass.fillMax).replace(/\s/g, '').replace(/,/g, ', '));
+      expect(panel.backgroundColor).toBe(glass.fillMax);
       expect(panel.boxShadow).toBe(`${glass.highlight}, ${shadow.card}`);
 
       const alert = screen.getByRole('alert');
@@ -79,23 +61,23 @@ describe('Toast', () => {
       expect(tile.width).toBe('32px');
       expect(tile.height).toBe('32px');
       expect(tile.borderTopLeftRadius).toBe(`${radius.chip}px`);
-      expect(tile.backgroundColor).toBe(rgb(tone.danger.band));
-      expect(alert.querySelector('svg')?.getAttribute('stroke')).toBe(color.danger);
+      expect(tile.backgroundColor).toBe(tone.danger.band);
+      expect(alert.querySelector('svg')?.getAttribute('stroke')).toBe(tone.danger.dot);
 
       const title = getComputedStyle(screen.getByText('MCP bridge lost the session'));
       expect(title.fontWeight).toBe(fontWeight.heading);
       expect(title.fontSize).toBe(`${fontSize.md}px`);
-      expect(title.color).toBe(rgb(color.ink));
+      expect(title.color).toBe(color.ink);
       const body = getComputedStyle(screen.getByText('cc-71288 stopped responding. The worktree is intact.'));
-      expect(body.color).toBe(rgb(color.muted));
+      expect(body.color).toBe(color.muted);
       expect(body.fontSize).toBe(`${fontSize.md}px`);
 
       const reconnect = screen.getByRole('button', { name: 'Reconnect' });
       const dismiss = screen.getByRole('button', { name: 'Dismiss' });
-      expect(getComputedStyle(surfaceOf(reconnect)).backgroundColor).toBe(rgb(color.claude));
+      expect(getComputedStyle(surfaceOf(reconnect)).backgroundColor).toBe(color.claude);
       expect(getComputedStyle(surfaceOf(reconnect)).minHeight).toBe('38px');
-      expect(getComputedStyle(surfaceOf(dismiss)).backgroundColor).toBe(rgb(color.surface));
-      expect(getComputedStyle(screen.getByText('Dismiss')).color).toBe(rgb(control.ink));
+      expect(getComputedStyle(surfaceOf(dismiss)).backgroundColor).toBe(color.surface);
+      expect(getComputedStyle(screen.getByText('Dismiss')).color).toBe(control.ink);
       // Reconnect comes first, then Dismiss.
       expect(reconnect.compareDocumentPosition(dismiss) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     });
@@ -115,7 +97,7 @@ describe('Toast', () => {
     it('draws its tile in the tone band with the icon in the tone colour', () => {
       render(<Toast tone={toneName} title="x" />);
       const region = screen.getByRole(want.role);
-      expect(getComputedStyle(tileOf(region)).backgroundColor).toBe(rgb(want.band));
+      expect(getComputedStyle(tileOf(region)).backgroundColor).toBe(want.band);
       expect(region.querySelector('svg')?.getAttribute('stroke')).toBe(want.ink);
     });
 
@@ -142,8 +124,8 @@ describe('Toast', () => {
         />,
       );
 
-      expect(getComputedStyle(surfaceOf(screen.getByRole('button', { name: 'Open ticket' }))).backgroundColor).toBe(rgb(color.claude));
-      expect(getComputedStyle(surfaceOf(screen.getByRole('button', { name: 'Board' }))).backgroundColor).toBe(rgb(color.surface));
+      expect(getComputedStyle(surfaceOf(screen.getByRole('button', { name: 'Open ticket' }))).backgroundColor).toBe(color.claude);
+      expect(getComputedStyle(surfaceOf(screen.getByRole('button', { name: 'Board' }))).backgroundColor).toBe(color.surface);
 
       await user.click(screen.getByRole('button', { name: 'Open ticket' }));
       await user.click(screen.getByRole('button', { name: 'Board' }));

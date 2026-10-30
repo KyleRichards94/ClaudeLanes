@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, edgeGlow, glow, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, IdChip, Text } from '@agent-lanes/ui';
 import { LaneDragCard } from '@/features/drag-to-lane';
 import { FALLBACK_TYPE_COLOR, WorkItemStateLabel } from '@/shared/ui';
@@ -57,7 +57,7 @@ export function TeamBoardItemCard({ card, onOpen }: { card: TeamBoardItemView; o
       drag={card.drag}
       label={summary}
       onClick={onOpen ? () => onOpen() : undefined}
-      style={[styles.card, styles.typeEdge, { borderLeftColor: card.typeColor ?? FALLBACK_TYPE_COLOR }, card.agentTag ? styles.cardAgent : null]}
+      style={[styles.card, styles.typeEdge, { borderLeftColor: card.typeColor ?? FALLBACK_TYPE_COLOR, boxShadow: cardGlow(card.typeColor ?? FALLBACK_TYPE_COLOR, Boolean(card.agentTag)) }, card.agentTag ? styles.cardAgent : null]}
       testID={`team-card-${card.id}`}
     >
       <View style={styles.cardTop}>
@@ -136,6 +136,11 @@ export function TeamBoardPullRequestCard({ card }: { card: TeamBoardPullRequestV
       ) : null}
     </LaneDragCard>
   );
+}
+
+/** The type band lights the card from its left edge; a card with an agent on it also glows violet all round. */
+function cardGlow(typeColor: string, agent: boolean): string {
+  return agent ? `${edgeGlow(typeColor)}, ${glow(tone.claude.border, 0.6)}` : edgeGlow(typeColor);
 }
 
 const styles = StyleSheet.create({

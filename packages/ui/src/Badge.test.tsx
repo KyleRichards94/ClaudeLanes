@@ -3,34 +3,27 @@ import { describe, expect, it } from 'vitest';
 import { color, radius, tone } from '@agent-lanes/tokens';
 import { Badge } from './Badge';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 describe('Badge', () => {
   it('is a white 40 × 24 lane count with the slate number, as on artboard 1', () => {
     render(<Badge testID="badge" count={1} />);
     const box = getComputedStyle(screen.getByTestId('badge'));
     const number = getComputedStyle(screen.getByText('1'));
 
-    expect(box.backgroundColor).toBe(rgb(color.surface));
+    expect(box.backgroundColor).toBe(color.surface);
     expect(box.borderTopLeftRadius).toBe(`${radius.pill}px`);
     expect(box.minWidth).toBe('40px');
     expect(parseFloat(box.paddingTop) + parseFloat(number.lineHeight) + parseFloat(box.paddingBottom)).toBe(24);
     expect(box.alignItems).toBe('center');
     expect(box.justifyContent).toBe('center');
-    expect(number.color).toBe(rgb(tone.neutral.text));
+    expect(number.color).toBe(tone.neutral.text);
     expect(number.fontSize).toBe('12px');
     expect(number.fontWeight).toBe('700');
   });
 
   it('has an amber variant for a lane with a card that needs the user', () => {
     render(<Badge testID="badge" count={1} tone="attention" />);
-    expect(getComputedStyle(screen.getByTestId('badge')).backgroundColor).toBe(rgb(tone.attention.band));
-    expect(getComputedStyle(screen.getByText('1')).color).toBe(rgb(tone.attention.text));
+    expect(getComputedStyle(screen.getByTestId('badge')).backgroundColor).toBe(tone.attention.band);
+    expect(getComputedStyle(screen.getByText('1')).color).toBe(tone.attention.text);
   });
 
   it('is named by its count', () => {

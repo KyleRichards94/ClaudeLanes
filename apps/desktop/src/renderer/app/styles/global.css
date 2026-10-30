@@ -5,23 +5,22 @@ body,
   margin: 0;
 }
 
-/* The first paint follows the computer. AppearanceSync overrides this once settings have loaded. */
+/* The first paint follows the computer. AppearanceSync sets data-theme and color-scheme once settings have loaded. */
 :root {
   color-scheme: light dark;
 }
 
 html {
-  background-color: light-dark(#f4f7fb, #101820);
-  animation: al-ground-light 36s ease-in-out infinite alternate;
-}
-
-:root[data-theme='dark'] {
-  animation-name: al-ground-dark;
+  background-color: var(--al-bg);
+  background-image: var(--al-ground-sky);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  animation: al-ground 36s ease-in-out infinite alternate;
 }
 
 body {
   background-color: transparent;
-  color: light-dark(#0f1b2d, #e7eef6);
+  color: var(--al-ink);
   font-family: var(--al-font-sans);
   -webkit-font-smoothing: antialiased;
   /* No ligatures anywhere: "<=" in the agent's prose and code must read as it was written (AL-254). */
@@ -37,10 +36,37 @@ body::before {
   inset: -30%;
   background-repeat: no-repeat;
   background-image:
-    radial-gradient(closest-side at 22% 18%, light-dark(rgba(91, 75, 196, 0.42), rgba(124, 108, 240, 0.62)), transparent 72%),
-    radial-gradient(closest-side at 82% 78%, light-dark(rgba(56, 189, 248, 0.48), rgba(56, 189, 248, 0.55)), transparent 70%),
-    radial-gradient(closest-side at 58% 42%, light-dark(rgba(16, 185, 129, 0.2), rgba(196, 181, 253, 0.38)), transparent 68%);
+    radial-gradient(closest-side at 22% 18%, var(--al-atmosphere-1), transparent 72%),
+    radial-gradient(closest-side at 82% 78%, var(--al-atmosphere-2), transparent 70%),
+    radial-gradient(closest-side at 58% 42%, var(--al-atmosphere-3), transparent 68%);
   animation: al-atmosphere 42s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
+}
+
+/* The sun and its long low rays, the one light source in themes that have one (--al-sun). */
+html::before {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background: var(--al-sun);
+  -webkit-mask-image: var(--al-sun-mask);
+  mask-image: var(--al-sun-mask);
+  transform-origin: 94% 2%;
+  animation: var(--al-sun-motion);
+}
+
+/* Sunlight through leaves, drifting slowly; only themes that set --al-dapple draw it. */
+body::after {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  inset: -8%;
+  background: var(--al-dapple);
+  -webkit-mask-image: var(--al-dapple-mask);
+  mask-image: var(--al-dapple-mask);
+  animation: var(--al-dapple-motion);
 }
 
 #root {
@@ -49,21 +75,12 @@ body::before {
   display: flex;
 }
 
-@keyframes al-ground-light {
+@keyframes al-ground {
   from {
-    background-color: #f4f7fb;
+    background-color: var(--al-ground-from);
   }
   to {
-    background-color: #e3eefb;
-  }
-}
-
-@keyframes al-ground-dark {
-  from {
-    background-color: #101820;
-  }
-  to {
-    background-color: #1a1630;
+    background-color: var(--al-ground-to);
   }
 }
 
@@ -78,9 +95,31 @@ body::before {
   }
 }
 
+@keyframes al-dapple {
+  from {
+    transform: translate3d(-3%, -2%, 0) rotate(-1deg);
+    opacity: 0.75;
+  }
+  to {
+    transform: translate3d(3%, 2.5%, 0) rotate(1.5deg);
+    opacity: 1;
+  }
+}
+
+@keyframes al-sun {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(2.5deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html,
-  body::before {
+  html::before,
+  body::before,
+  body::after {
     animation: none;
   }
 }

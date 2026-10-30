@@ -1,15 +1,7 @@
 import { isSoloLane, type Lane as LaneName } from "@agent-lanes/contracts";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useState, type ReactNode } from "react";
-import {
-  color,
-  focusRing,
-  glass,
-  minTarget,
-  radius,
-  space,
-  tone,
-} from "@agent-lanes/tokens";
+import { color, focusRing, glass, minTarget, motif, radius, space, tone } from "@agent-lanes/tokens";
 import { Badge, GlassPanel, Icon, Text } from "@agent-lanes/ui";
 import {
   agentTickets,
@@ -296,6 +288,7 @@ const styles = StyleSheet.create({
     minWidth: LANE_MIN_WIDTH,
     alignSelf: "flex-start",
     paddingBottom: space.md,
+    backgroundImage: motif.lane,
   },
   headerRow: {
     flexDirection: "row",

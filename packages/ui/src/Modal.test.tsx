@@ -3,16 +3,9 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TextInput, type TextInputInstance } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
-import { color, focusRing, glass, lightOf, overlay, radius } from '@agent-lanes/tokens';
+import { color, focusRing, glass, overlay, radius } from '@agent-lanes/tokens';
 import { Button } from './Button';
 import { Modal, type ModalProps } from './Modal';
-
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
 
 type HarnessProps = Omit<ModalProps, 'visible' | 'onClose' | 'blocking' | 'title'> & {
   title?: string;
@@ -110,7 +103,7 @@ describe('Modal', () => {
       const panel = screen.getByTestId('connections-panel');
       const style = getComputedStyle(panel);
       expect(style.borderTopLeftRadius).toBe(`${radius.modal}px`);
-      expect(style.backgroundColor).toBe(lightOf(glass.fillMax).replace(/\s+/g, ' '));
+      expect(style.backgroundColor).toBe(glass.fillMax);
       expect(panel.getAttribute('style') ?? '').toContain(`blur(${glass.blurXl}px)`);
       expect(style.boxShadow).toContain(glass.highlight);
       expect(style.boxShadow).toContain(overlay.shadow);
@@ -120,7 +113,7 @@ describe('Modal', () => {
       render(<Modal visible title="Connections" onClose={() => {}} testID="connections" />);
       const backdrop = screen.getByTestId('connections-backdrop');
       expect(backdrop.getAttribute('aria-hidden')).toBe('true');
-      expect(getComputedStyle(backdrop).backgroundColor).toBe(lightOf(overlay.scrim));
+      expect(getComputedStyle(backdrop).backgroundColor).toBe(overlay.scrim);
       expect(backdrop.getAttribute('style') ?? '').toContain(`blur(${overlay.scrimBlur}px)`);
       // A sibling of the panel, so the panel's own glass still blurs what lies behind both.
       expect(backdrop.contains(screen.getByTestId('connections-panel'))).toBe(false);
@@ -129,19 +122,19 @@ describe('Modal', () => {
     it('puts the icon in a tinted tile in the chosen tone', () => {
       const { rerender } = render(<Modal visible title="New agent ticket" icon="plus" onClose={() => {}} testID="m" />);
       const tile = () => getComputedStyle(screen.getByTestId('m-icon'));
-      expect(tile().backgroundColor).toBe(rgb(color.claudeTint));
+      expect(tile().backgroundColor).toBe(color.claudeTint);
       expect(tile().width).toBe('40px');
       expect(screen.getByTestId('m-icon').querySelector('svg')?.getAttribute('stroke')).toBe(color.claude);
 
       rerender(<Modal visible title="Connections" icon="link" iconTone="ado" onClose={() => {}} testID="m" />);
-      expect(tile().backgroundColor).toBe(rgb(color.adoTint));
+      expect(tile().backgroundColor).toBe(color.adoTint);
       expect(screen.getByTestId('m-icon').querySelector('svg')?.getAttribute('stroke')).toBe(color.ado);
     });
 
     it('renders the title in the display face and the subtitle in muted text', () => {
       render(<Modal visible title="Connections" subtitle="Tokens are encrypted." onClose={() => {}} />);
       expect(getComputedStyle(screen.getByText('Connections')).fontWeight).toBe('800');
-      expect(getComputedStyle(screen.getByText('Tokens are encrypted.')).color).toBe(rgb(color.muted));
+      expect(getComputedStyle(screen.getByText('Tokens are encrypted.')).color).toBe(color.muted);
     });
 
     it('shows the body and the footer slot under a divider', () => {
@@ -153,7 +146,7 @@ describe('Modal', () => {
       expect(screen.getByRole('button', { name: 'Test connection' })).toBeTruthy();
       const save = screen.getByRole('button', { name: 'Save connections' });
       const footerRow = save.parentElement as HTMLElement;
-      expect(getComputedStyle(footerRow).borderTopColor).toBe(rgb(color.line));
+      expect(getComputedStyle(footerRow).borderTopColor).toBe(color.line);
       expect(getComputedStyle(footerRow).borderTopWidth).toBe('1px');
       expect(getComputedStyle(footerRow).justifyContent).toBe('flex-end');
     });
@@ -324,7 +317,7 @@ describe('Modal', () => {
       const opener = screen.getByRole('button', { name: 'Open connections' });
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(document.activeElement).toBe(opener);
-      expect(getComputedStyle(opener.firstElementChild as HTMLElement).outlineColor).toBe(rgb(focusRing.color));
+      expect(getComputedStyle(opener.firstElementChild as HTMLElement).outlineColor).toBe(focusRing.color);
     });
 
     it('returns focus to the opener after the close button is clicked', async () => {

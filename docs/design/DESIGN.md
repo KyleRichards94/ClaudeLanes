@@ -317,6 +317,12 @@ variables for webview and Electron chrome); primitives live in `packages/ui`.
 | Radius | 8 chip · 12 control · 16 card · 20 panel · 28 modal · pill | All surfaces |
 | Type | Plus Jakarta Sans 500–800; JetBrains Mono for ids, branches, logs | All text |
 
+Themes (AL-286, D825): the table is the light theme. Dark, Solarpunk and Cyberpunk are further
+palettes, each a `:root[data-theme]` block in `agent-lanes-tokens.css` and a palette in
+`packages/tokens/src/themes.ts`; components paint through `var(--al-*)` and never see a hex. Every
+theme is light- or dark-based for the window frame, and every text and UI pair is contrast-checked
+per theme.
+
 - Primitives: Button (primary, strong, secondary, soft), Pill/Badge, SegmentedControl, Switch, TextField, GlassPanel, Card, ProgressBar, Toast, Modal, Tabs.
 - Glass in React Native: react-native-web passes `backdropFilter` through to CSS in Electron's Chromium; a future native mobile build would swap GlassPanel for expo-blur.
 - Accessibility: text meets 4.5:1, targets ≥ 44 px, focus shows a violet ring, status never by colour alone (each pill has a word).

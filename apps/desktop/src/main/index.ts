@@ -1,11 +1,11 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, dialog, nativeTheme, screen, shell } from 'electron';
-import { darkColor, lightColor } from '@agent-lanes/tokens';
-import { appearanceOf, type Settings } from '@agent-lanes/contracts';
+import { appearanceOf, type Appearance, type Settings } from '@agent-lanes/contracts';
 import { createQuitConfirmation, quitQuestion, type QuitConfirmation } from './app/quit-confirmation';
 import { watchWindowVisibility } from './app/window-visibility';
 import { createBacklogWindowController } from './app/backlog-window';
 import { MIN_WINDOW_SIZE, currentWindowState, readWindowState, windowPlacement, windowStateFile, writeWindowState } from './app/window-state';
+import { nativeThemeSource, windowBackground } from './app/appearance';
 import { createEmitter, type EventFrame } from './ipc/emit';
 import { checkGitOnStartup, showGitStartupNotice } from './git';
 import { createInvokeHandlers } from './ipc/handlers';
@@ -33,6 +33,7 @@ const testHooks = __TEST_HOOKS__ ? testHooksFor({ isPackaged: app.isPackaged, en
 let mainWindow: BrowserWindow | null = null;
 let services: Services | null = null;
 let quitConfirmation: QuitConfirmation | null = null;
+let appearance: Appearance = 'system';
 
 /** Events go to the main window's top frame only (AL-012); nothing while there is no live window. */
 function mainWindowFrame(): EventFrame | undefined {
@@ -73,13 +74,19 @@ function loadRenderer(window: BrowserWindow, hash?: string): void {
   }
 }
 
-/** The window frame follows Settings › Appearance, including System. */
+/** The window frame and ground follow Settings › Appearance, including System. */
 function syncAppearance(settings: Settings): void {
-  nativeTheme.themeSource = appearanceOf(settings.ui);
+  appearance = appearanceOf(settings.ui);
+  nativeTheme.themeSource = nativeThemeSource(appearance);
+  paintWindowBackgrounds();
+}
+
+function currentBackground(): string {
+  return windowBackground(appearance, nativeTheme.shouldUseDarkColors);
 }
 
 function paintWindowBackgrounds(): void {
-  const background = nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg;
+  const background = currentBackground();
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.setBackgroundColor(background);
   }
@@ -100,7 +107,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: MIN_WINDOW_SIZE.height,
     show: false,
     title: 'Agent Lanes',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg,
+    backgroundColor: currentBackground(),
     autoHideMenuBar: true,
     webPreferences: WEB_PREFERENCES,
   });
@@ -142,7 +149,7 @@ function createBacklogWindow(team: string | undefined): BrowserWindow | null {
     minHeight: 480,
     show: false,
     title: 'Backlog · Agent Lanes',
-    backgroundColor: nativeTheme.shouldUseDarkColors ? darkColor.bg : lightColor.bg,
+    backgroundColor: currentBackground(),
     autoHideMenuBar: true,
     webPreferences: WEB_PREFERENCES,
   });

@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type KeyDownEvent, type PressableInstance } from 'react-native';
+import { Pressable, StyleSheet, View, type KeyDownEvent, type PressableInstance, type ViewStyle } from 'react-native';
 import { useRef } from 'react';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, glow, radius, shadow, space, themes, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, Icon, IdChip, Pill, ProgressBar, Text, type CardSectionTone, type ProgressTone } from '@agent-lanes/ui';
 import { LANE_LABELS } from '@/shared/config';
+import { usePrefersReducedMotion } from '@/shared/lib';
+import { useResolvedTheme } from '@/shared/model';
 import { WorkItemStateLabel, WorkItemTypeBar } from '@/shared/ui';
 import { useAgentTicket } from '../model/hooks';
 import type { AgentTicketStore } from '../model/store';
@@ -64,10 +66,14 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
   const cardTone = selected ? 'selected' : view.border;
   const activityTone = activityTones[view.activity.tone];
   const name = agentCardName(ticket);
+  const reducedMotion = usePrefersReducedMotion();
+  const theme = useResolvedTheme();
+  // A running card shows it is alive the theme's way (a breathing halo, a slow sunlit lift), never under reduced motion.
+  const alive = view.state === 'running' && !reducedMotion ? themes[theme].alive : 'none';
 
   const content = (
     <>
-      <Card tone={cardTone} footer={view.footer ?? undefined} testID={testID ? `${testID}-card` : undefined}>
+      <Card tone={cardTone} footer={view.footer ?? undefined} style={alive === 'glow' ? breathing : alive === 'daylight' ? basking : undefined} testID={testID ? `${testID}-card` : undefined}>
         <CardSection>
           <View style={styles.idRow}>
             {ticket.ado ? (
@@ -110,8 +116,8 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
         </CardSection>
         <CardSection tone={sectionTone(view.activity.tone)} style={view.activity.tone === 'neutral' ? styles.neutralWash : undefined}>
           <View style={styles.activityRow}>
-            <View aria-hidden style={[styles.dot, { backgroundColor: activityTone.dot }]} />
-            <Text variant="body" size="sm" color={activityTone.text} numberOfLines={2} style={styles.activityText}>
+            <View aria-hidden style={[styles.dot, { backgroundColor: activityTone.dot, boxShadow: glow(activityTone.dot) }]} />
+            <Text variant="body" size="sm" color={activityTone.text} glow={0.5} numberOfLines={2} style={styles.activityText}>
               {view.activity.text}
             </Text>
           </View>
@@ -170,6 +176,25 @@ export function AgentTicketCard({ ticketId, store, ...props }: AgentTicketCardPr
   if (!ticket) return null;
   return <AgentTicketCardView ticket={ticket} {...props} />;
 }
+
+// react-native-web turns animationKeyframes into a CSS animation, but only through StyleSheet.create; the style types do not know it.
+const { breathing, basking } = StyleSheet.create({
+  breathing: {
+    animationKeyframes: {
+      '0%, 100%': { boxShadow: `${shadow.card}, ${glow(tone.claude.dot, 0.5)}` },
+      '50%': { boxShadow: `${shadow.card}, ${glow(tone.claude.dot, 1)}` },
+    },
+    animationDuration: '3.4s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out',
+  } as unknown as ViewStyle,
+  basking: {
+    animationKeyframes: { '0%, 100%': { boxShadow: shadow.card }, '50%': { boxShadow: shadow.lifted } },
+    animationDuration: '7s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out',
+  } as unknown as ViewStyle,
+});
 
 const activityTones: Record<CardActivityTone, { dot: string; text: string }> = {
   claude: { dot: tone.claude.dot, text: tone.claude.text },

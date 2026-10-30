@@ -6,13 +6,6 @@ import { color, fontSize, fontWeight, radius } from '@agent-lanes/tokens';
 import { Text } from './Text';
 import { TextField, type SecureTextFieldHandle, type TextFieldHandle } from './TextField';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 /** Types into a react-native-web TextInput the way the browser reports it. */
 function type(input: HTMLElement, value: string) {
   fireEvent.change(input, { target: { value } });
@@ -123,14 +116,14 @@ describe('TextField', () => {
     render(<TextField label="Organisation URL" />);
     const input = screen.getByRole('textbox', { name: 'Organisation URL' });
     const box = getComputedStyle(boxOf(input));
-    expect(box.backgroundColor).toBe(rgb(color.surface));
-    expect(box.borderTopColor).toBe(rgb(color.line));
+    expect(box.backgroundColor).toBe(color.surface);
+    expect(box.borderTopColor).toBe(color.line);
     expect(box.borderTopWidth).toBe('1px');
     expect(box.borderTopLeftRadius).toBe(`${radius.control}px`);
     expect(box.minHeight).toBe('46px');
     // The value is set in body type.
     expect(getComputedStyle(input).fontSize).toBe(`${fontSize.md}px`);
-    expect(getComputedStyle(input).color).toBe(rgb(color.ink));
+    expect(getComputedStyle(input).color).toBe(color.ink);
   });
 
   it('passes value and edits through for single-line fields', () => {
@@ -175,7 +168,7 @@ describe('TextField', () => {
 
     fireEvent.focus(input);
     expect(getComputedStyle(box).outlineStyle).toBe('solid');
-    expect(getComputedStyle(box).outlineColor).toBe(rgb(color.claude));
+    expect(getComputedStyle(box).outlineColor).toBe(color.claude);
     expect(getComputedStyle(box).outlineWidth).toBe('2px');
     // The input's own outline would sit inside the box, between the icon and the text.
     expect(input.style.outlineWidth).toBe('0px');
@@ -233,7 +226,7 @@ describe('TextField', () => {
     const input = screen.getByRole('textbox', { name: 'Default project' });
     expect(input).toHaveProperty('readOnly', true);
     expect(input.getAttribute('aria-disabled')).toBe('true');
-    expect(getComputedStyle(boxOf(input)).backgroundColor).toBe(rgb(color.bg));
+    expect(getComputedStyle(boxOf(input)).backgroundColor).toBe(color.bg);
   });
 
   it('puts an accessory beside the box (Test connection)', () => {
@@ -274,9 +267,9 @@ describe('TextField help and error text', () => {
     render(<TextField label="Organisation URL" error="Enter an https://dev.azure.com/ URL." />);
     const input = screen.getByRole('textbox', { name: 'Organisation URL' });
     const message = screen.getByText('Enter an https://dev.azure.com/ URL.');
-    expect(getComputedStyle(message).color).toBe(rgb(color.danger));
+    expect(getComputedStyle(message).color).toBe(color.danger);
     expect(message.parentElement?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
-    expect(getComputedStyle(boxOf(input)).borderTopColor).toBe(rgb(color.danger));
+    expect(getComputedStyle(boxOf(input)).borderTopColor).toBe(color.danger);
   });
 
   it('links help text the same way, after the error', () => {
@@ -284,7 +277,7 @@ describe('TextField help and error text', () => {
     render(<TextField label="Personal access token" help={help} error="This token has expired." />);
     const input = screen.getByRole('textbox', { name: 'Personal access token' });
     expect(describedBy(input)).toEqual(['This token has expired.', help]);
-    expect(getComputedStyle(screen.getByText(help)).color).toBe(rgb(color.muted));
+    expect(getComputedStyle(screen.getByText(help)).color).toBe(color.muted);
     expect(getComputedStyle(screen.getByText(help)).fontSize).toBe(`${fontSize.sm}px`);
   });
 

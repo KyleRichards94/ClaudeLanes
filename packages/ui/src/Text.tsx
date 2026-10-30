@@ -6,7 +6,7 @@ import {
   type TextProps as NativeTextProps,
   type TextStyle,
 } from 'react-native';
-import { color, font, fontSize, fontWeight } from '@agent-lanes/tokens';
+import { color, font, fontSize, fontWeight, textGlow } from '@agent-lanes/tokens';
 
 /**
  * The app's type ramp (design §11 Type, artboard 7):
@@ -36,6 +36,8 @@ interface VariantSpec {
   leading: number;
   /** Letter spacing in em. */
   tracking: number;
+  /** A halo behind the letters in themes that glow. */
+  halo?: string;
 }
 
 /**
@@ -43,7 +45,7 @@ interface VariantSpec {
  * the board title 40/44 with -1 px tracking, logs and ids in 12 px mono with room between lines.
  */
 const variants: Record<TextVariant, VariantSpec> = {
-  display: { fontFamily: font.sans, fontWeight: fontWeight.display, color: color.ink, size: 'display', leading: 1.1, tracking: -0.025 },
+  display: { fontFamily: font.sans, fontWeight: fontWeight.display, color: color.ink, size: 'display', leading: 1.1, tracking: -0.025, halo: color.ado },
   title: { fontFamily: font.sans, fontWeight: fontWeight.heading, color: color.ink, size: 'md', leading: 1.3, tracking: 0 },
   body: { fontFamily: font.sans, fontWeight: fontWeight.body, color: color.ink, size: 'md', leading: 1.45, tracking: 0 },
   meta: { fontFamily: font.sans, fontWeight: fontWeight.body, color: color.muted, size: 'sm', leading: 1.35, tracking: 0 },
@@ -51,8 +53,13 @@ const variants: Record<TextVariant, VariantSpec> = {
 };
 
 function faceOf(variant: TextVariant): TextStyle {
-  const { fontFamily, fontWeight: weight, color: ink } = variants[variant];
-  return { fontFamily, fontWeight: weight, color: ink };
+  const { fontFamily, fontWeight: weight, color: ink, halo } = variants[variant];
+  return { fontFamily, fontWeight: weight, color: ink, ...(halo ? lit(halo, 0.8) : undefined) };
+}
+
+// react-native-web passes a textShadow string through; React Native's style types don't list it.
+function lit(halo: string, strength: number): TextStyle {
+  return { textShadow: textGlow(halo, strength) } as unknown as TextStyle;
 }
 
 function metricsOf(variant: TextVariant, size: TextSize): TextStyle {
@@ -102,13 +109,15 @@ export interface TextProps extends Omit<NativeTextProps, 'style' | 'children'> {
    * its parent unless set.
    */
   selectable?: boolean;
+  /** Lights the letters from behind in their own colour where the theme glows (cyberpunk); a number sets the strength. */
+  glow?: boolean | number;
   /** Layout extras (margins, alignment). Set type through `variant`, `size` and `color`. */
   style?: StyleProp<TextStyle>;
   children?: ReactNode;
 }
 
 /** All text in the app goes through this, in one of the five variants (design §11 Type). */
-export function Text({ variant, size, color: colorOverride, selectable, style, children, ...rest }: TextProps) {
+export function Text({ variant, size, color: colorOverride, selectable, glow, style, children, ...rest }: TextProps) {
   const enclosing = useContext(EnclosingVariant);
   const nested = enclosing !== null;
   const resolved = variant ?? enclosing ?? 'body';
@@ -116,13 +125,16 @@ export function Text({ variant, size, color: colorOverride, selectable, style, c
   const face = !nested || variant ? faces[resolved] : undefined;
   const metricsSize = size ?? (nested ? undefined : variants[resolved].size);
   const sized = metricsSize ? metrics[`${resolved}-${metricsSize}`] : undefined;
+  // A lit variant in another colour takes its halo in that colour.
+  const ownHalo = variants[resolved].halo && colorOverride && face ? lit(colorOverride, 0.8) : undefined;
+  const halo = glow ? lit(colorOverride ?? variants[resolved].color, glow === true ? 0.6 : glow) : ownHalo;
 
   return (
     <EnclosingVariant.Provider value={resolved}>
       <NativeText
         {...rest}
         selectable={selectable ?? (nested ? undefined : false)}
-        style={[face, sized, colorOverride ? { color: colorOverride } : undefined, style]}
+        style={[face, sized, colorOverride ? { color: colorOverride } : undefined, halo, style]}
       >
         {children}
       </NativeText>

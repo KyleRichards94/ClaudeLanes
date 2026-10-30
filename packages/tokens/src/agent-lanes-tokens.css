@@ -1,5 +1,5 @@
 /*
- * Agent Lanes design tokens (design §11). Mirrors src/index.ts.
+ * Agent Lanes design tokens (design §11). The :root block is the light theme; each :root[data-theme] block is another theme. Mirrors src/themes.ts.
  * Glass recipe adapted from "Pure CSS Glassmorphism Liquid Glass UI Kit"
  * by Margarita-the-solid on CodePen.
  */
@@ -20,6 +20,21 @@
   --al-sky-glow: #38bdf8;
   --al-on-accent: #ffffff;
   --al-on-ink: #ffffff;
+  --al-ground-from: #f4f7fb;
+  --al-ground-to: #e3eefb;
+  --al-atmosphere-1: rgba(91, 75, 196, 0.42);
+  --al-atmosphere-2: rgba(56, 189, 248, 0.48);
+  --al-atmosphere-3: rgba(16, 185, 129, 0.2);
+  --al-ground-sky: none;
+  --al-dapple: none;
+  --al-dapple-motion: none;
+  --al-dapple-mask: none;
+  --al-sun: none;
+  --al-sun-mask: none;
+  --al-sun-motion: none;
+  --al-card-motif: none;
+  --al-lane-motif: none;
+  --al-solar-cell: none;
 
   --al-glass-fill-min: rgba(255, 255, 255, 0.62);
   --al-glass-fill-max: rgba(255, 255, 255, 0.72);
@@ -98,6 +113,7 @@
   --al-control-ink: #334155;
   --al-control-primary-shadow: 0 6px 16px rgba(91, 75, 196, 0.28);
   --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 75, 196, 0.34);
+  --al-control-strong-fill: #0f1b2d;
   --al-control-pressed-filter: brightness(0.94);
   --al-control-disabled-opacity: 0.5;
 }
@@ -109,7 +125,14 @@
   --al-overlay-shadow: 0 24px 72px rgba(15, 27, 45, 0.18);
 }
 
-/* Dark palette. Mirrors darkColor / darkTone / darkGlass in the TypeScript tokens. */
+/* How strongly colours glow; 0 draws no glow. Mirrors src/glow.ts. */
+:root {
+  --al-glow-level: 0;
+  --al-glow-reach: 0;
+  --al-glow-text: 0;
+}
+
+/* Dark. Mirrors themes.dark in themes.ts; themes.test.ts checks every block. */
 :root[data-theme='dark'] {
   --al-bg: #101820;
   --al-surface: #1a2432;
@@ -128,6 +151,21 @@
   --al-progress-gradient: linear-gradient(90deg, #5b65c4, #38bdf8);
   --al-on-accent: #f7f9fc;
   --al-on-ink: #101820;
+  --al-ground-from: #101820;
+  --al-ground-to: #1a1630;
+  --al-atmosphere-1: rgba(124, 108, 240, 0.62);
+  --al-atmosphere-2: rgba(56, 189, 248, 0.55);
+  --al-atmosphere-3: rgba(196, 181, 253, 0.38);
+  --al-ground-sky: none;
+  --al-dapple: none;
+  --al-dapple-motion: none;
+  --al-dapple-mask: none;
+  --al-sun: none;
+  --al-sun-mask: none;
+  --al-sun-motion: none;
+  --al-card-motif: none;
+  --al-lane-motif: none;
+  --al-solar-cell: none;
 
   --al-glass-fill-min: rgba(18, 26, 40, 0.74);
   --al-glass-fill-max: rgba(18, 26, 40, 0.84);
@@ -176,7 +214,196 @@
   --al-control-ink: #d5dee9;
   --al-control-primary-shadow: 0 6px 16px rgba(91, 101, 196, 0.45);
   --al-control-primary-shadow-lifted: 0 12px 28px rgba(91, 101, 196, 0.55);
+  --al-control-strong-fill: #e7eef6;
 
   --al-overlay-scrim: rgba(8, 12, 18, 0.55);
   --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.5);
+
+  --al-glow-level: 0;
+  --al-glow-reach: 0;
+  --al-glow-text: 0;
+}
+
+/* Solarpunk (AL-286). Mirrors themes.solarpunk in themes.ts. */
+:root[data-theme='solarpunk'] {
+  --al-bg: #f7f1e0;
+  --al-surface: #fffcf3;
+  --al-ink: #1f2a1e;
+  --al-muted: #55634c;
+  --al-line: #e4cf9c;
+  --al-claude: #2d7a3e;
+  --al-claude-tint: #ddf0d6;
+  --al-claude-text: #1f5c2b;
+  --al-ado: #7a4622;
+  --al-ado-tint: #f7e5d2;
+  --al-ok: #1c6a93;
+  --al-attention: #cc5f2e;
+  --al-danger: #a8261c;
+  --al-sky-glow: #f2b033;
+  --al-progress-gradient: linear-gradient(90deg, #2d7a3e, #f2b033);
+  --al-on-accent: #ffffff;
+  --al-on-ink: #ffffff;
+  --al-ground-from: #f7f1e0;
+  --al-ground-to: #eef5e4;
+  --al-atmosphere-1: rgba(245, 184, 46, 0.5);
+  --al-atmosphere-2: rgba(76, 160, 80, 0.3);
+  --al-atmosphere-3: rgba(110, 185, 225, 0.34);
+  --al-ground-sky: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='620' height='430' viewBox='0 0 620 430'> <g fill='%232F6B33' fill-opacity='.12'> <path d='M-20 40 C 60 0 150 12 230 70 C 140 104 50 92 -20 40Z'/> <path d='M14 -12 C 66 52 88 128 76 204 C 22 152 0 76 14 -12Z'/> <path d='M130 16 C 214 36 276 92 318 168 C 232 156 160 104 130 16Z'/> <path d='M64 118 C 116 160 138 232 126 304 C 74 254 52 182 64 118Z'/> <path d='M214 -24 C 298 -2 370 32 424 86 C 338 96 254 54 214 -24Z'/> <path d='M-34 168 C 30 178 84 220 116 284 C 40 274 -12 232 -34 168Z'/> <path d='M330 6 C 392 16 446 44 486 90 C 418 96 360 66 330 6Z'/> </g> <g fill='none' stroke='%232F6B33' stroke-opacity='.11' stroke-width='3'> <path d='M-20 40 Q 160 52 318 168'/> <path d='M14 -12 Q 64 130 126 304'/> <path d='M214 -24 Q 330 30 486 90'/> </g> </svg>"), linear-gradient(180deg, rgba(190, 224, 240, 0.85) 0%, rgba(206, 232, 240, 0.45) 28%, rgba(247, 241, 224, 0) 60%);
+  --al-dapple: radial-gradient(ellipse 70px 26px at 30% 40%, rgba(255, 220, 130, 0.42), transparent 75%) 0 0 / 300px 240px, radial-gradient(ellipse 46px 18px at 70% 60%, rgba(255, 232, 160, 0.38), transparent 75%) 0 0 / 210px 280px, radial-gradient(ellipse 140px 70px at 50% 50%, rgba(60, 100, 40, 0.09), transparent 72%) 0 0 / 460px 380px;
+  --al-dapple-motion: al-dapple 54s ease-in-out infinite alternate;
+  --al-dapple-mask: radial-gradient(ellipse 75% 70% at 10% 8%, #000 0 32%, rgba(0, 0, 0, 0.4) 68%, transparent 100%);
+  --al-sun: radial-gradient(circle at 94% 2%, #fff7d6 0 30px, #ffe38c 37px, rgba(255, 212, 110, 0.8) 48px, rgba(255, 204, 96, 0.32) 96px, rgba(255, 204, 96, 0) 300px), repeating-conic-gradient(from 190deg at 94% 2%, rgba(255, 214, 120, 0.24) 0deg 2deg, rgba(255, 214, 120, 0) 2deg 7deg);
+  --al-sun-mask: radial-gradient(circle at 94% 2%, #000 0 8%, rgba(0, 0, 0, 0.55) 30%, transparent 66%);
+  --al-sun-motion: al-sun 48s ease-in-out infinite alternate;
+  --al-card-motif: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'> <svg x='100%' y='100%' overflow='visible'> <g transform='translate(-40 -34)'> <path d='M6 30 Q 20 26 34 8' fill='none' stroke='%235E8F45' stroke-opacity='.55' stroke-width='1.4'/> <path d='M20 23 C 24 14 31 10 38 9 C 35 18 28 23 20 23Z' fill='%236FA650' fill-opacity='.5'/> <path d='M14 27 C 12 20 14 13 19 9 C 21 17 19 23 14 27Z' fill='%2386BE84' fill-opacity='.55'/> <path d='M27 16 C 29 10 33 6 38 4 C 37 10 33 14 27 16Z' fill='%235E9E48' fill-opacity='.45'/> </g> </svg> </svg>");
+  --al-lane-motif: linear-gradient(180deg, rgba(122, 170, 80, 0.2) 0, rgba(122, 170, 80, 0.09) 46px, rgba(122, 170, 80, 0) 54px), url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'> <svg x='100%' y='100%' overflow='visible'> <g transform='translate(-78 -86)'> <path d='M76 84 C 60 70 64 50 48 38 C 34 28 36 12 22 4' fill='none' stroke='%235E8F45' stroke-opacity='.45' stroke-width='1.6'/> <path d='M60 64 C 66 56 74 54 80 55 C 76 62 68 66 60 64Z' fill='%236FA650' fill-opacity='.45'/> <path d='M50 42 C 44 36 43 28 46 22 C 52 28 53 36 50 42Z' fill='%2386BE84' fill-opacity='.5'/> <path d='M38 28 C 44 22 52 21 58 23 C 52 29 44 31 38 28Z' fill='%235E9E48' fill-opacity='.42'/> <path d='M26 10 C 22 5 22 0 25 -4 C 29 1 29 6 26 10Z' fill='%236FA650' fill-opacity='.45'/> <circle cx='66' cy='74' r='2.2' fill='%23F2B033' fill-opacity='.7'/> </g> </svg> </svg>");
+  --al-solar-cell: repeating-linear-gradient(90deg, rgba(242, 196, 90, 0.7) 0 1px, transparent 1px 8px), repeating-linear-gradient(0deg, rgba(242, 196, 90, 0.45) 0 1px, transparent 1px 8px), linear-gradient(135deg, #2a4e7e, #17325a);
+
+  --al-glass-fill-min: rgba(255, 251, 238, 0.66);
+  --al-glass-fill-max: rgba(255, 251, 238, 0.84);
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.95), -10px 14px 28px -12px rgba(150, 104, 30, 0.22);
+  --al-glass-border: rgba(206, 160, 72, 0.55);
+
+  --al-shadow-card: -2px 3px 4px rgba(120, 84, 30, 0.1), -12px 16px 30px -8px rgba(120, 84, 30, 0.2);
+  --al-shadow-lifted: -3px 5px 8px rgba(120, 84, 30, 0.12), -22px 30px 46px -10px rgba(120, 84, 30, 0.26);
+
+  --al-tone-claude-border: #86be84;
+  --al-tone-claude-wash: #eef7e8;
+  --al-tone-claude-band: #ddf0d6;
+  --al-tone-claude-text: #1f5c2b;
+  --al-tone-claude-dot: #2d7a3e;
+  --al-tone-ado-wash: #fbf2e6;
+  --al-tone-ado-band: #f7e5d2;
+  --al-tone-ado-text: #7a4622;
+  --al-tone-ado-fill: #f2b033;
+  --al-tone-ado-dot: #7a4622;
+  --al-tone-attention-border: #e2a07c;
+  --al-tone-attention-band: #f9e2d3;
+  --al-tone-attention-text: #7a3214;
+  --al-tone-attention-dot: #cc5f2e;
+  --al-tone-danger-border: #e7a9a1;
+  --al-tone-danger-wash: #fcefeb;
+  --al-tone-danger-band: #f7d9d3;
+  --al-tone-danger-text: #86190f;
+  --al-tone-danger-fill: #d2574a;
+  --al-tone-danger-dot: #a8261c;
+  --al-tone-ok-wash: #eaf3f7;
+  --al-tone-ok-band: #d7e9f2;
+  --al-tone-ok-text: #14557a;
+  --al-tone-ok-fill: #4a9ac2;
+  --al-tone-ok-dot: #1c6a93;
+  --al-tone-neutral-band: #efe7d3;
+  --al-tone-neutral-text: #4c5844;
+  --al-tone-neutral-dot: #9ea48c;
+
+  --al-selection-track: #f0e6cc;
+  --al-selection-thumb: #fffcf3;
+  --al-selection-label: #4c5844;
+  --al-selection-switch-off: #cdbf9a;
+  --al-selection-thumb-shadow: -1px 2px 3px rgba(120, 84, 30, 0.16), -3px 5px 9px rgba(120, 84, 30, 0.1);
+  --al-selection-pill-shadow: -3px 5px 12px rgba(45, 122, 62, 0.28);
+
+  --al-control-ink: #3b4a38;
+  --al-control-primary-shadow: -4px 8px 18px rgba(45, 122, 62, 0.3);
+  --al-control-primary-shadow-lifted: -8px 14px 28px rgba(45, 122, 62, 0.34);
+  --al-control-strong-fill: #1f2a1e;
+
+  --al-overlay-scrim: rgba(247, 241, 224, 0.58);
+  --al-overlay-shadow: 0 24px 72px rgba(110, 76, 24, 0.12), -26px 32px 60px rgba(110, 76, 24, 0.16), 0 0 0 1px rgba(206, 160, 72, 0.35);
+
+  --al-glow-level: 0;
+  --al-glow-reach: 0;
+  --al-glow-text: 0;
+}
+
+/* Cyberpunk (AL-286). Mirrors themes.cyberpunk in themes.ts. */
+:root[data-theme='cyberpunk'] {
+  --al-bg: #0a0817;
+  --al-surface: #1e1a42;
+  --al-ink: #e6f7ff;
+  --al-muted: #9da9cf;
+  --al-line: #34306a;
+  --al-claude: #ff2bd6;
+  --al-claude-tint: #3d0f48;
+  --al-claude-text: #ff9bea;
+  --al-ado: #00f0ff;
+  --al-ado-tint: #062f3b;
+  --al-ok: #00ff9f;
+  --al-attention: #fcee0a;
+  --al-danger: #ff3366;
+  --al-sky-glow: #00f0ff;
+  --al-progress-gradient: linear-gradient(90deg, #ff2bd6, #00f0ff);
+  --al-on-accent: #05050a;
+  --al-on-ink: #05050a;
+  --al-ground-from: #0a0817;
+  --al-ground-to: #180b30;
+  --al-atmosphere-1: rgba(255, 43, 214, 0.55);
+  --al-atmosphere-2: rgba(0, 240, 255, 0.45);
+  --al-atmosphere-3: rgba(124, 58, 237, 0.42);
+  --al-ground-sky: none;
+  --al-dapple: none;
+  --al-dapple-motion: none;
+  --al-dapple-mask: none;
+  --al-sun: none;
+  --al-sun-mask: none;
+  --al-sun-motion: none;
+  --al-card-motif: none;
+  --al-lane-motif: none;
+  --al-solar-cell: none;
+
+  --al-glass-fill-min: rgba(26, 22, 58, 0.72);
+  --al-glass-fill-max: rgba(26, 22, 58, 0.9);
+  --al-glass-highlight: inset 0 1px 0 rgba(255, 43, 214, 0.35), 0 0 26px rgba(0, 240, 255, 0.16);
+  --al-glass-border: rgba(0, 240, 255, 0.45);
+
+  --al-shadow-card: 0 0 0 1px rgba(0, 240, 255, 0.28), 0 0 16px rgba(0, 240, 255, 0.2), 0 10px 28px rgba(0, 0, 0, 0.55);
+  --al-shadow-lifted: 0 0 0 1px rgba(0, 240, 255, 0.4), 0 0 24px rgba(0, 240, 255, 0.3), 0 16px 40px rgba(0, 0, 0, 0.6);
+
+  --al-tone-claude-border: #ff6be3;
+  --al-tone-claude-wash: #22103a;
+  --al-tone-claude-band: #3d0f48;
+  --al-tone-claude-text: #ff9bea;
+  --al-tone-claude-dot: #ff2bd6;
+  --al-tone-ado-wash: #0a2433;
+  --al-tone-ado-band: #062f3b;
+  --al-tone-ado-text: #00f0ff;
+  --al-tone-ado-fill: #00f0ff;
+  --al-tone-ado-dot: #00f0ff;
+  --al-tone-attention-border: #fcee0a;
+  --al-tone-attention-band: #3a3506;
+  --al-tone-attention-text: #fff59a;
+  --al-tone-attention-dot: #fcee0a;
+  --al-tone-danger-border: #ff6b8e;
+  --al-tone-danger-wash: #2c0d1a;
+  --al-tone-danger-band: #4d1226;
+  --al-tone-danger-text: #ff9fb5;
+  --al-tone-danger-fill: #ff3366;
+  --al-tone-danger-dot: #ff3366;
+  --al-tone-ok-wash: #062a20;
+  --al-tone-ok-band: #083a2a;
+  --al-tone-ok-text: #7dffc9;
+  --al-tone-ok-fill: #00ff9f;
+  --al-tone-ok-dot: #00ff9f;
+  --al-tone-neutral-band: #272452;
+  --al-tone-neutral-text: #d3d0f2;
+  --al-tone-neutral-dot: #8e8ac0;
+
+  --al-selection-track: #1a1838;
+  --al-selection-thumb: #2e2a5e;
+  --al-selection-label: #c9c3ea;
+  --al-selection-switch-off: #4b467a;
+  --al-selection-thumb-shadow: 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 10px rgba(0, 240, 255, 0.25);
+  --al-selection-pill-shadow: 0 0 10px rgba(255, 43, 214, 0.6), 0 0 22px rgba(255, 43, 214, 0.3);
+
+  --al-control-ink: #dcd6f5;
+  --al-control-primary-shadow: 0 0 12px rgba(255, 43, 214, 0.65), 0 0 28px rgba(255, 43, 214, 0.35);
+  --al-control-primary-shadow-lifted: 0 0 16px rgba(255, 43, 214, 0.8), 0 0 36px rgba(255, 43, 214, 0.45);
+  --al-control-strong-fill: #00f0ff;
+
+  --al-overlay-scrim: rgba(3, 3, 8, 0.66);
+  --al-overlay-shadow: 0 24px 72px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 28px rgba(0, 240, 255, 0.22);
+
+  --al-glow-level: 1;
+  --al-glow-reach: 1;
+  --al-glow-text: 1;
 }

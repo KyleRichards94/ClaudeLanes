@@ -3,13 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { font, fontSize, fontWeight, radius, tone } from '@agent-lanes/tokens';
 import { Pill, pillTones, type PillSize } from './Pill';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 /** Box and type for each size; height = 2 × vertical padding + line height (jsdom does no layout). */
 const sizes: Record<PillSize, { height: number; padX: number; padY: number; fontSize: number; weight: string }> = {
   sm: { height: 22, padX: 8, padY: 3, fontSize: fontSize.sm, weight: fontWeight.heading },
@@ -24,14 +17,14 @@ describe('Pill', () => {
   it.each(pillTones)('%s sets its label in the tone text on the tone band', (pillTone) => {
     render(<Pill testID="pill" tone={pillTone} label="Running" />);
     const pill = screen.getByTestId('pill');
-    expect(getComputedStyle(pill).backgroundColor).toBe(rgb(tone[pillTone].band));
+    expect(getComputedStyle(pill).backgroundColor).toBe(tone[pillTone].band);
     expect(getComputedStyle(pill).borderTopLeftRadius).toBe(`${radius.pill}px`);
-    expect(getComputedStyle(screen.getByText('Running')).color).toBe(rgb(tone[pillTone].text));
+    expect(getComputedStyle(screen.getByText('Running')).color).toBe(tone[pillTone].text);
   });
 
   it('is neutral and small with no dot by default', () => {
     render(<Pill testID="pill" label="1 queued" />);
-    expect(getComputedStyle(screen.getByTestId('pill')).backgroundColor).toBe(rgb(tone.neutral.band));
+    expect(getComputedStyle(screen.getByTestId('pill')).backgroundColor).toBe(tone.neutral.band);
     expect(getComputedStyle(screen.getByText('1 queued')).fontSize).toBe(`${fontSize.sm}px`);
     expect(screen.queryByTestId('pill-dot')).toBeNull();
   });
@@ -40,7 +33,7 @@ describe('Pill', () => {
     render(<Pill testID="pill" tone={pillTone} dot label="MCP online" />);
     const dot = screen.getByTestId('pill-dot');
     const style = getComputedStyle(dot);
-    expect(style.backgroundColor).toBe(rgb(tone[pillTone].dot));
+    expect(style.backgroundColor).toBe(tone[pillTone].dot);
     expect(style.width).toBe('6px');
     expect(style.height).toBe('6px');
     expect(style.borderTopLeftRadius).toBe('3px');

@@ -46,7 +46,7 @@ describe('BoardTicketCard', () => {
   it('keeps the token colours and leaves the state out when ADO cannot be read', async () => {
     renderCard({});
     await screen.findByTestId('card');
-    expect(getComputedStyle(screen.getByTestId('card-type')).backgroundColor).toBe(rgb(tone.ado.dot));
+    expect(getComputedStyle(screen.getByTestId('card-type')).backgroundColor).toBe(tone.ado.dot);
     expect(screen.queryByTestId('card-state')).toBeNull();
   });
 });

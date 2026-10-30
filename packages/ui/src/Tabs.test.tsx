@@ -6,13 +6,6 @@ import { color, minTarget, radius, selection, tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 import { TabPanel, Tabs, tabId, tabPanelId, type TabItem, type TabsProps } from './Tabs';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 type DrillTab = 'output' | 'diff' | 'build-log' | 'ado' | 'design';
 
 /** The drill-in's tab bar (artboard 3). */
@@ -226,19 +219,19 @@ describe('Tabs', () => {
     it('draws a grey track with the selected tab as a raised white thumb in ink', () => {
       render(<Tabs label="Ticket views" tabs={drillIn} value="output" onChange={() => {}} testID="tabs" />);
       const track = getComputedStyle(screen.getByTestId('tabs'));
-      expect(track.backgroundColor).toBe(rgb(selection.track));
+      expect(track.backgroundColor).toBe(selection.track);
       expect(track.borderTopLeftRadius).toBe(`${radius.control}px`);
 
       const on = getComputedStyle(thumbOf(tab('Output')));
-      expect(on.backgroundColor).toBe(rgb(color.surface));
+      expect(on.backgroundColor).toBe(selection.thumb);
       expect(on.boxShadow).toBe(selection.thumbShadow);
       expect(on.borderTopLeftRadius).toBe(`${radius.chip}px`);
-      expect(getComputedStyle(screen.getByText('Output')).color).toBe(rgb(color.ink));
+      expect(getComputedStyle(screen.getByText('Output')).color).toBe(color.ink);
       expect(getComputedStyle(screen.getByText('Output')).fontWeight).toBe('700');
 
       const off = getComputedStyle(thumbOf(tab('Diff')));
       expect(['', 'transparent', 'rgba(0, 0, 0, 0)']).toContain(off.backgroundColor);
-      expect(getComputedStyle(screen.getByText('Diff')).color).toBe(rgb(selection.label));
+      expect(getComputedStyle(screen.getByText('Diff')).color).toBe(selection.label);
     });
 
     it('makes every tab a 44 px target', () => {
@@ -252,7 +245,7 @@ describe('Tabs', () => {
       const user = userEvent.setup();
       render(<Tabs label="Ticket views" tabs={drillIn} value="output" onChange={() => {}} />);
       await user.hover(tab('Diff'));
-      expect(getComputedStyle(screen.getByText('Diff')).color).toBe(rgb(color.ink));
+      expect(getComputedStyle(screen.getByText('Diff')).color).toBe(color.ink);
     });
 
     it('draws the trailing ↗ on a tab that opens elsewhere, in the label colour and hidden from screen readers', () => {
@@ -269,9 +262,9 @@ describe('Tabs', () => {
       render(<Tabs label="Connection type" tabs={connections} value="ado" onChange={() => {}} testID="conn" />);
       const ado = screen.getByTestId('conn-ado-dot');
       expect(ado.getAttribute('aria-hidden')).toBe('true');
-      expect(getComputedStyle(ado).backgroundColor).toBe(rgb(tone.attention.dot));
+      expect(getComputedStyle(ado).backgroundColor).toBe(tone.attention.dot);
       expect(getComputedStyle(ado).width).toBe('7px');
-      expect(getComputedStyle(screen.getByTestId('conn-claude-dot')).backgroundColor).toBe(rgb(tone.ok.dot));
+      expect(getComputedStyle(screen.getByTestId('conn-claude-dot')).backgroundColor).toBe(tone.ok.dot);
 
       expect(tab('Azure DevOps, Needs attention')).toBeTruthy();
       expect(tab('Claude, Connected')).toBeTruthy();

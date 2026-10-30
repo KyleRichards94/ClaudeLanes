@@ -4,13 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { color, minTarget, selection } from '@agent-lanes/tokens';
 import { SegmentedControl, stepIndex, type SegmentedControlProps, type SegmentedOption } from './SegmentedControl';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 const efforts: readonly SegmentedOption<Effort>[] = [
@@ -206,14 +199,14 @@ describe('SegmentedControl', () => {
     it('draws the selected segment as a white thumb with violet text on the grey track', () => {
       render(<SegmentedControl testID="effort" label="Effort" options={efforts} value="xhigh" onChange={() => {}} fill />);
 
-      expect(getComputedStyle(screen.getByTestId('effort')).backgroundColor).toBe(rgb(selection.track));
-      expect(getComputedStyle(screen.getByTestId('effort-xhigh-thumb')).backgroundColor).toBe(rgb(color.surface));
-      expect(labelColour('XHigh')).toBe(rgb(color.claudeText));
+      expect(getComputedStyle(screen.getByTestId('effort')).backgroundColor).toBe(selection.track);
+      expect(getComputedStyle(screen.getByTestId('effort-xhigh-thumb')).backgroundColor).toBe(selection.thumb);
+      expect(labelColour('XHigh')).toBe(color.claudeText);
       expect(getComputedStyle(screen.getByText('XHigh')).fontWeight).toBe('700');
 
       // Unselected segments show the track through and use the slate label colour.
-      expect(getComputedStyle(screen.getByTestId('effort-low-thumb')).backgroundColor).not.toBe(rgb(color.surface));
-      expect(labelColour('Low')).toBe(rgb(selection.label));
+      expect(getComputedStyle(screen.getByTestId('effort-low-thumb')).backgroundColor).not.toBe(selection.thumb);
+      expect(labelColour('Low')).toBe(selection.label);
       // Same weight in both states, so selecting never reflows the neighbours.
       expect(getComputedStyle(screen.getByText('Low')).fontWeight).toBe('700');
     });
@@ -221,8 +214,8 @@ describe('SegmentedControl', () => {
     it('uses ink for the selected label where the artboard does (Sprint 42 / Search / No ticket)', () => {
       render(<SegmentedControl label="Work item" options={sources} value="sprint" tone="ink" onChange={() => {}} />);
 
-      expect(labelColour('Sprint 42')).toBe(rgb(color.ink));
-      expect(labelColour('Search')).toBe(rgb(selection.label));
+      expect(labelColour('Sprint 42')).toBe(color.ink);
+      expect(labelColour('Search')).toBe(selection.label);
     });
 
     it('stretches equal segments with `fill` and hugs the labels without it', () => {
@@ -243,13 +236,13 @@ describe('SegmentedControl', () => {
       );
 
       const selected = getComputedStyle(screen.getByTestId('pills-xhigh-thumb'));
-      expect(selected.backgroundColor).toBe(rgb(color.claude));
-      expect(labelColour('XHigh')).toBe(rgb(color.surface));
+      expect(selected.backgroundColor).toBe(color.claude);
+      expect(labelColour('XHigh')).toBe(color.onAccent);
 
       const other = getComputedStyle(screen.getByTestId('pills-low-thumb'));
-      expect(other.backgroundColor).toBe(rgb(color.surface));
-      expect(other.borderTopColor).toBe(rgb(color.line));
-      expect(labelColour('Low')).toBe(rgb(selection.label));
+      expect(other.backgroundColor).toBe(color.surface);
+      expect(other.borderTopColor).toBe(color.line);
+      expect(labelColour('Low')).toBe(selection.label);
       expect(getComputedStyle(screen.getByText('Low')).fontWeight).toBe('500');
       expect(getComputedStyle(screen.getByText('XHigh')).fontWeight).toBe('700');
       // The radios are the same 44 px targets as the track variant.

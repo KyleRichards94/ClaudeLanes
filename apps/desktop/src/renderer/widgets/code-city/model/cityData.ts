@@ -141,10 +141,17 @@ export function nudgeLabels(labels: readonly LabelBox[], fixed: readonly Rect[] 
 
 /** Four rotating plot colour pairs: blue, violet, teal, slate (handoff "District plots"). */
 export const PLOT_PAIRS = [
-  { bg: 'rgba(224,242,254,.6)', border: '#7DD3FC' },
-  { bg: 'rgba(238,235,255,.6)', border: '#C4B5FD' },
-  { bg: 'rgba(204,251,241,.5)', border: '#5EEAD4' },
-  { bg: 'rgba(241,245,249,.8)', border: '#CBD5E1' },
+  { bg: 'var(--cc-plot-1-bg)', border: 'var(--cc-plot-1-line)' },
+  { bg: 'var(--cc-plot-2-bg)', border: 'var(--cc-plot-2-line)' },
+  { bg: 'var(--cc-plot-3-bg)', border: 'var(--cc-plot-3-line)' },
+  { bg: 'var(--cc-plot-4-bg)', border: 'var(--cc-plot-4-line)' },
 ] as const;
 
 export const plotPair = (districtIndex: number): { bg: string; border: string } => PLOT_PAIRS[districtIndex % PLOT_PAIRS.length] ?? PLOT_PAIRS[0];
+
+/** A small stable number from a path or key, so theme decorations land in the same place on every render. */
+export function decoSeed(key: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 16777619);
+  return hash >>> 0;
+}

@@ -49,8 +49,9 @@ against Azure DevOps work items at once, one git worktree per ticket.
   shared`, imports only downward, slices are imported through their `index.ts`, and same-layer
   slices never import each other. Use `@/layer/slice` aliases across slices, relative paths inside.
 - **UI is React Native.** Import from `react-native`; web-only code goes in `*.web.tsx` files next
-  to the component. Primitives live in `packages/ui`, values in `packages/tokens` (keep the TS and
-  CSS token files in sync; a test checks them).
+  to the component. Primitives live in `packages/ui`, values in `packages/tokens`. Paintable tokens
+  are `var(--al-*)` references; a theme is a `:root[data-theme]` block in `agent-lanes-tokens.css`
+  plus a palette in `themes.ts`, and `themes.test.ts` fails when a block and its palette differ.
 - No databases and no user-edited config files (R2, R5). App-written JSON in the app data folder
   is fine.
 
