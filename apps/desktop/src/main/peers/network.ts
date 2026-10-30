@@ -472,6 +472,8 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     conn.instance = frame.from.instance;
     conn.link = linkFor(conn, frame);
     if (conn.link) {
+      // Identified, so the backoff starts over; a connection closed before this keeps backing off.
+      conn.link.attempt = 0;
       conn.link.instance = frame.from.instance;
       conn.link.user = frame.from.user;
       conn.link.hostName = frame.from.host;
@@ -636,7 +638,6 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
     const conn = track(ws, 'out', plainIp(link.host), link);
     link.out = conn;
     ws.on('open', () => {
-      link.attempt = 0;
       hello(conn);
     });
     ws.on('unexpected-response', (_request, response) => {
@@ -721,9 +722,12 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       if (conn.instance && at - conn.lastActivity > expiryMs) {
         conn.goneReason = 'expired';
         conn.ws.terminate();
-      } else if (!conn.instance && at - conn.openedAt > identifyMs) {
-        refused += 1;
-        options.log?.warn(`Peer lanes: closed a connection from ${conn.remoteIp} that sent no valid frame in ${Math.round(identifyMs / 1_000)} s`);
+      } else if (!conn.instance && conn.goneReason === null && at - conn.openedAt > identifyMs) {
+        conn.goneReason = 'closed';
+        if (conn.direction === 'in') refused += 1;
+        options.log?.warn(
+          `Peer lanes: closed the connection ${conn.direction === 'in' ? 'from' : 'to'} ${conn.remoteIp}: no valid frame in ${Math.round(identifyMs / 1_000)} s`,
+        );
         conn.ws.close(CLOSE_UNIDENTIFIED, 'unidentified');
       }
     }

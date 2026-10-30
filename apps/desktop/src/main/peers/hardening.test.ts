@@ -128,6 +128,21 @@ describe('caps and filters on a live listener', () => {
     expect(peer.network.connections()).toEqual([]);
   });
 
+  it('backs off between dials to an app that never identifies it, and counts the refusal on the listening side only', async () => {
+    // The listener is in another project and lists a dead loopback address, so it accepts the dialler's
+    // upgrade (loopback is listed) but neither side ever passes the other's signature.
+    const listener = createTestPeer('kyle', await freePort(), { identifyMs: 100 });
+    started.push(listener);
+    await listener.network.configure(testConfig(listener.port, ['127.0.0.1:1'], [OTHER_TEAM]));
+    const dialler = await listening([`localhost:${listener.port}`], { identifyMs: 100, backoffMs: { min: 100, max: 400 } });
+    await new Promise((done) => setTimeout(done, 2_000));
+    // A flat 100 ms backoff would close about six times in this window; a growing one about four.
+    expect(listener.network.status().refusedConnections).toBeGreaterThanOrEqual(2);
+    expect(listener.network.status().refusedConnections).toBeLessThanOrEqual(5);
+    expect(dialler.network.status().refusedConnections).toBe(0);
+    expect(dialler.network.online()).toEqual([]);
+  });
+
   it('counts frames with a bad signature against the peer and shows them as rejected', async () => {
     const other = await freePort();
     const peer = await listening([`localhost:${other}`]);
