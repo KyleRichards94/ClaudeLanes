@@ -32,6 +32,12 @@ export const solarpunkControl: ControlPalette = {
   primaryShadowLifted: '0 12px 28px rgba(15, 118, 110, 0.34)',
 };
 
+export const cyberpunkControl: ControlPalette = {
+  ink: '#DCD6F5',
+  primaryShadow: '0 6px 16px rgba(247, 47, 208, 0.45)',
+  primaryShadowLifted: '0 12px 28px rgba(247, 47, 208, 0.55)',
+};
+
 export const control = {
   ...varsFor('control-', keysOf(lightControl)),
   pressedFilter: 'brightness(0.94)',

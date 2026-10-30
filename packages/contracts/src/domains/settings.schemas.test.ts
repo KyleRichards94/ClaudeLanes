@@ -79,6 +79,7 @@ describe('settings contract', () => {
     it('accepts an appearance and refuses anything else named like a theme', () => {
       expect(SettingsPatchSchema.parse({ ui: { appearance: 'dark' } })).toEqual({ ui: { appearance: 'dark' } });
       expect(SettingsPatchSchema.parse({ ui: { appearance: 'solarpunk' } })).toEqual({ ui: { appearance: 'solarpunk' } });
+      expect(SettingsPatchSchema.parse({ ui: { appearance: 'cyberpunk' } })).toEqual({ ui: { appearance: 'cyberpunk' } });
       expect(SettingsPatchSchema.safeParse({ ui: { appearance: 'dim' } }).success).toBe(false);
       expect(defaultSettings().ui.appearance).toBe('system');
     });

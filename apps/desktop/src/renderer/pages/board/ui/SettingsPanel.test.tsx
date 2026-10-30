@@ -88,6 +88,16 @@ describe('SettingsPanel', () => {
     expect(save().getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('offers Cyberpunk as a fifth appearance and applies it straight away', async () => {
+    renderPanel();
+    fireEvent.click(await screen.findByRole('tab', { name: 'Appearance' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Cyberpunk' }));
+
+    await waitFor(() => expect(fake.updates.at(-1)).toMatchObject({ ui: { appearance: 'cyberpunk' } }));
+    expect(screen.getByText('Near-black ground, neon magenta and cyan. Dark window frame.')).toBeTruthy();
+    expect(save().getAttribute('aria-disabled')).toBe('true');
+  });
+
   it('edits the agent defaults, the build queue and ADO state changes, and saves only what changed', async () => {
     const { onClose } = renderPanel();
     await screen.findByRole('radio', { name: 'Opus' });

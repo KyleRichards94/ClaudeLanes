@@ -67,6 +67,26 @@ export const solarpunkColor = {
   onInk: '#FFFFFF',
 } as const satisfies ColorPalette;
 
+/** Cyberpunk: near-black ground, neon magenta for Claude, cyan for ADO; dark text on the neon fills. */
+export const cyberpunkColor = {
+  bg: '#0B0A16',
+  surface: '#161430',
+  ink: '#F3F0FF',
+  muted: '#B0A8D9',
+  line: '#332E5C',
+  claude: '#F72FD0',
+  claudeTint: '#3A1247',
+  claudeText: '#FFB3F0',
+  ado: '#2EE6FF',
+  adoTint: '#0B2F3A',
+  ok: '#39FF88',
+  attention: '#FFC02E',
+  danger: '#FF5370',
+  skyGlow: '#2EE6FF',
+  onAccent: '#0B0A16',
+  onInk: '#0B0A16',
+} as const satisfies ColorPalette;
+
 export const kebab = (key: string): string => key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
 export function keysOf<T extends object>(value: T): (keyof T & string)[] {

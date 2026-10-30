@@ -13,7 +13,7 @@
  * "1 queued" count on artboard 1).
  */
 
-import { cssVar, darkColor, keysOf, lightColor, solarpunkColor, varsFor } from './palette';
+import { cssVar, cyberpunkColor, darkColor, keysOf, lightColor, solarpunkColor, varsFor } from './palette';
 
 export const lightTone = {
   claude: {
@@ -143,6 +143,49 @@ export const solarpunkTone = {
     band: '#EEEAE0',
     text: '#4E5A4A',
     dot: '#9AA394',
+  },
+} as const satisfies TonePalette;
+
+export const cyberpunkTone = {
+  claude: {
+    border: '#FF7AE6',
+    wash: '#1E1232',
+    band: cyberpunkColor.claudeTint,
+    text: cyberpunkColor.claudeText,
+    dot: cyberpunkColor.claude,
+  },
+  ado: {
+    wash: '#0A2430',
+    band: cyberpunkColor.adoTint,
+    text: cyberpunkColor.ado,
+    fill: cyberpunkColor.skyGlow,
+    dot: cyberpunkColor.ado,
+  },
+  attention: {
+    border: '#FFC02E',
+    band: '#3D2E08',
+    text: '#FFE08A',
+    dot: cyberpunkColor.attention,
+  },
+  danger: {
+    border: '#FF8A9B',
+    wash: '#2A0F17',
+    band: '#4A1424',
+    text: '#FFB3BF',
+    fill: '#FF5370',
+    dot: cyberpunkColor.danger,
+  },
+  ok: {
+    wash: '#0A2A1C',
+    band: '#0E3A26',
+    text: '#9BFFC8',
+    fill: '#39FF88',
+    dot: cyberpunkColor.ok,
+  },
+  neutral: {
+    band: '#262345',
+    text: '#D6D1F0',
+    dot: '#8D88B3',
   },
 } as const satisfies TonePalette;
 

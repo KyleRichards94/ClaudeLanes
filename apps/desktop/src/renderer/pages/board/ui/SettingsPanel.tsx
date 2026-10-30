@@ -85,6 +85,7 @@ const APPEARANCE_OPTIONS = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'solarpunk', label: 'Solarpunk' },
+  { value: 'cyberpunk', label: 'Cyberpunk' },
 ] as const;
 
 const APPEARANCE_HELP: Readonly<Record<Appearance, string>> = {
@@ -92,6 +93,7 @@ const APPEARANCE_HELP: Readonly<Record<Appearance, string>> = {
   light: 'The pale ground, whatever this computer is set to.',
   dark: 'Blue-black ground. The colour behind the glass keeps moving.',
   solarpunk: 'Cream ground, leaf green and sun gold. Light window frame.',
+  cyberpunk: 'Near-black ground, neon magenta and cyan. Dark window frame.',
 };
 
 function SettingsForm({ settings, tab, onTab, idPrefix, initialRepo, onClose }: SettingsFormProps) {

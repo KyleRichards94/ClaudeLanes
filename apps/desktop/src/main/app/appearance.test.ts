@@ -1,4 +1,4 @@
-import { darkColor, lightColor, solarpunkColor } from '@agent-lanes/tokens';
+import { cyberpunkColor, darkColor, lightColor, solarpunkColor } from '@agent-lanes/tokens';
 import { describe, expect, it } from 'vitest';
 import { nativeThemeSource, resolvedTheme, windowBackground } from './appearance';
 
@@ -8,6 +8,7 @@ describe('appearance', () => {
     expect(nativeThemeSource('light')).toBe('light');
     expect(nativeThemeSource('dark')).toBe('dark');
     expect(nativeThemeSource('solarpunk')).toBe('light');
+    expect(nativeThemeSource('cyberpunk')).toBe('dark');
   });
 
   it('resolves System by what the computer prefers and leaves a picked theme alone', () => {
@@ -21,5 +22,6 @@ describe('appearance', () => {
     expect(windowBackground('system', true)).toBe(darkColor.bg);
     expect(windowBackground('system', false)).toBe(lightColor.bg);
     expect(windowBackground('solarpunk', true)).toBe(solarpunkColor.bg);
+    expect(windowBackground('cyberpunk', false)).toBe(cyberpunkColor.bg);
   });
 });

@@ -9,8 +9,8 @@
 import { keysOf, lightColor, varsFor } from './palette';
 import { lightGlass, lightShadow } from './surfaces';
 
-export { cssVar, darkColor, kebab, keysOf, lightColor, solarpunkColor, varsFor, type ColorPalette, type PaletteColor } from './palette';
-export { darkGlass, darkShadow, lightGlass, lightShadow, solarpunkGlass, solarpunkShadow, type GlassPalette, type ShadowPalette } from './surfaces';
+export { cssVar, cyberpunkColor, darkColor, kebab, keysOf, lightColor, solarpunkColor, varsFor, type ColorPalette, type PaletteColor } from './palette';
+export { cyberpunkGlass, cyberpunkShadow, darkGlass, darkShadow, lightGlass, lightShadow, solarpunkGlass, solarpunkShadow, type GlassPalette, type ShadowPalette } from './surfaces';
 
 /** Paintable colours: `var(--al-*)` references, which the theme's block in agent-lanes-tokens.css fills in. */
 export const color = varsFor('', keysOf(lightColor));

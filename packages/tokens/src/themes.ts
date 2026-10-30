@@ -1,12 +1,23 @@
-import { darkControl, lightControl, solarpunkControl, type ControlPalette } from './controls';
-import { darkOverlay, lightOverlay, solarpunkOverlay, type OverlayPalette } from './overlay';
-import { darkColor, kebab, lightColor, solarpunkColor, type ColorPalette } from './palette';
-import { darkSelection, lightSelection, solarpunkSelection, type SelectionPalette } from './selection';
-import { darkGlass, darkShadow, lightGlass, lightShadow, solarpunkGlass, solarpunkShadow, type GlassPalette, type ShadowPalette } from './surfaces';
-import { darkTone, lightTone, solarpunkTone, type TonePalette } from './tones';
+import { cyberpunkControl, darkControl, lightControl, solarpunkControl, type ControlPalette } from './controls';
+import { cyberpunkOverlay, darkOverlay, lightOverlay, solarpunkOverlay, type OverlayPalette } from './overlay';
+import { cyberpunkColor, darkColor, kebab, lightColor, solarpunkColor, type ColorPalette } from './palette';
+import { cyberpunkSelection, darkSelection, lightSelection, solarpunkSelection, type SelectionPalette } from './selection';
+import {
+  cyberpunkGlass,
+  cyberpunkShadow,
+  darkGlass,
+  darkShadow,
+  lightGlass,
+  lightShadow,
+  solarpunkGlass,
+  solarpunkShadow,
+  type GlassPalette,
+  type ShadowPalette,
+} from './surfaces';
+import { cyberpunkTone, darkTone, lightTone, solarpunkTone, type TonePalette } from './tones';
 
 /** Mirrors `THEMES` in @agent-lanes/contracts (the setting); `themes[appearance]` fails the typecheck where they drift. */
-export const THEMES = ['light', 'dark', 'solarpunk'] as const;
+export const THEMES = ['light', 'dark', 'solarpunk', 'cyberpunk'] as const;
 export type Theme = (typeof THEMES)[number];
 
 /** What the window frame and native controls follow. */
@@ -35,6 +46,16 @@ export const themes: Record<Theme, ThemePalette> = {
     selection: solarpunkSelection,
     control: solarpunkControl,
     overlay: solarpunkOverlay,
+  },
+  cyberpunk: {
+    base: 'dark',
+    color: cyberpunkColor,
+    tone: cyberpunkTone,
+    glass: cyberpunkGlass,
+    shadow: cyberpunkShadow,
+    selection: cyberpunkSelection,
+    control: cyberpunkControl,
+    overlay: cyberpunkOverlay,
   },
 };
 

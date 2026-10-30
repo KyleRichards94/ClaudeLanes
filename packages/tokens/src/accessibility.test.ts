@@ -107,6 +107,10 @@ const exemptions: Record<Theme, Record<string, string>> = {
     'merged progress fill on its track': PROGRESS_FILL,
     'neutral (Queued) status dot on its pill': DECORATIVE_DOT,
   },
+  cyberpunk: {
+    'switch track when off': SWITCH_OFF,
+    'TextField border': FIELD_BORDER,
+  },
 };
 
 describe.each(THEMES)('%s: contrast of the token pairs in use (AL-033)', (theme) => {
