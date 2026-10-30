@@ -48,6 +48,8 @@ const HANDSHAKE_TIMEOUT_MS = 5_000;
 const FIND_WAIT_MS = 3_000;
 /** A connection that has sent no valid frame by then is closed. */
 export const PEER_IDENTIFY_MS = 30_000;
+/** A frame sent longer ago than this is dropped unless it is a replay: a clock far out, or a captured frame sent again. */
+export const PEER_FRESH_MS = 10 * 60_000;
 
 /** WebSocket close codes this app uses. */
 export const CLOSE_DUPLICATE = 4001;
@@ -133,6 +135,7 @@ export interface PeerNetworkOptions {
   foundMs?: number;
   forgetMs?: number;
   identifyMs?: number;
+  freshMs?: number;
   /** Where beacons go instead of the broadcast addresses. */
   beaconTargets?: readonly string[];
 }
@@ -172,6 +175,7 @@ interface Conn {
   frameTimes: number[];
   goneReason: PeerGoneReason | null;
   duplicate: boolean;
+  staleWarned: boolean;
   outbox: string[];
   tokens: number;
   refilledAt: number;
@@ -224,6 +228,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   const foundMs = options.foundMs ?? PEER_FOUND_MS;
   const forgetMs = options.forgetMs ?? PEER_FORGET_MS;
   const identifyMs = options.identifyMs ?? PEER_IDENTIFY_MS;
+  const freshMs = options.freshMs ?? PEER_FRESH_MS;
   const frameListeners = new Set<(frame: PeerFrame) => void>();
   const peerListeners = new Set<(event: PeerEvent) => void>();
   const seen = new Set<string>();
@@ -526,6 +531,16 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
       return;
     }
     const frame = opened.frame;
+    const age = Math.abs(at - Date.parse(frame.sentAt));
+    if (!frame.replay && age > freshMs) {
+      if (conn.link) conn.link.rejectedFrames += 1;
+      if (!conn.staleWarned) {
+        conn.staleWarned = true;
+        options.log?.warn(`Peer lanes: dropped a ${frame.kind} frame from ${conn.remoteIp} sent ${Math.round(age / 60_000)} min from now: its clock is out, or it is an old frame sent again`);
+      }
+      emitStatus();
+      return;
+    }
     if (frame.room !== null && roomOrg(frame.room) !== teams.get(frame.team)?.orgUrl) {
       options.log?.warn(`Peer lanes: dropped a ${frame.kind} frame for a room outside its team's organisation`);
       return;
@@ -572,7 +587,7 @@ export function createPeerNetwork(options: PeerNetworkOptions): PeerNetwork {
   }
 
   function track(ws: WebSocket, direction: 'in' | 'out', remoteIp: string, link: Link | null): Conn {
-    const conn: Conn = { ws, direction, remoteIp, link, instance: null, lastActivity: now(), openedAt: now(), frameTimes: [], goneReason: null, duplicate: false, outbox: [], tokens: PEER_SEND_BURST, refilledAt: now(), pumpTimer: null };
+    const conn: Conn = { ws, direction, remoteIp, link, instance: null, lastActivity: now(), openedAt: now(), frameTimes: [], goneReason: null, duplicate: false, staleWarned: false, outbox: [], tokens: PEER_SEND_BURST, refilledAt: now(), pumpTimer: null };
     const gen = generation;
     conns.add(conn);
     ws.on('message', (data) => onMessage(conn, data));

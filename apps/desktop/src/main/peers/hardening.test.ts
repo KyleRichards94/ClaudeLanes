@@ -5,7 +5,7 @@ import type { PeerFrame } from '@agent-lanes/contracts';
 import { CLOSE_UNIDENTIFIED, PEER_FRAME_MAX_BYTES, PEER_FRAMES_PER_SECOND, acceptsAddress } from './network';
 import { signFrame } from './signer';
 import type { PeerNetworkOptions } from './network';
-import { OTHER_TEAM, TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, type TestPeer } from './testing';
+import { OTHER_TEAM, TEST_ROOM, TEST_TEAM, createTestPeer, freePort, testConfig, testLane, type TestPeer } from './testing';
 
 /** AL-296 (PL§7): who may connect, and the caps that close a connection. */
 
@@ -137,6 +137,24 @@ describe('caps and filters on a live listener', () => {
     socket.send(JSON.stringify(signFrame({ ...forged, id: randomUUID() }, OTHER_TEAM.key)));
     await vi.waitFor(() => expect(peer.network.status().peers[0]).toMatchObject({ state: 'rejected', rejectedFrames: 2 }));
     expect(peer.network.online()).toEqual([]);
+  });
+
+  it('drops a frame sent longer ago than the fresh window unless it is a replay, and counts it', async () => {
+    const other = await freePort();
+    const peer = await listening([`localhost:${other}`], { freshMs: 60_000 });
+    const frames = vi.fn();
+    peer.network.onFrame(frames);
+    const socket = await connect(peer.port);
+    socket.send(hello(other));
+    await vi.waitFor(() => expect(peer.network.online()).toHaveLength(1));
+    const { sig: _sig, ...base } = JSON.parse(hello(other)) as PeerFrame;
+    const stale = new Date(Date.now() - 2 * 60_000).toISOString();
+    const old = { ...base, kind: 'ask' as const, room: TEST_ROOM, lane: testLane(48161), sentAt: stale };
+    socket.send(JSON.stringify(signFrame({ ...old, id: randomUUID(), text: 'sent again' }, TEST_TEAM.key)));
+    socket.send(JSON.stringify(signFrame({ ...old, id: randomUUID(), text: 'replayed', replay: true }, TEST_TEAM.key)));
+    await vi.waitFor(() => expect(frames).toHaveBeenCalledTimes(1));
+    expect(frames.mock.calls[0]?.[0]).toMatchObject({ text: 'replayed', replay: true });
+    expect(peer.network.status().peers[0]?.rejectedFrames).toBe(1);
   });
 
   it('drops a frame whose team tag this app has no key for before reading it, and counts it', async () => {
