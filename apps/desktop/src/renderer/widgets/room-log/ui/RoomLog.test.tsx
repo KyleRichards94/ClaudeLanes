@@ -146,3 +146,31 @@ describe('the room as a chat room (AL-300)', () => {
     await waitFor(() => expect(bridge.invoke).toHaveBeenCalledWith('peers:markSeen', { room: ROOM, upTo: live.id }));
   });
 });
+
+describe('one scroll region, like a chat (AL-300)', () => {
+  const scrollers = (root: HTMLElement) =>
+    [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))].filter((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY));
+
+  it('scrolls only the log in the Rooms panel, between the members and the composer', async () => {
+    setup(<RoomsPanel />);
+    act(() => openRooms());
+    const log = await screen.findByTestId('room-log-48000');
+    const panel = screen.getByTestId('rooms-panel-panel');
+    const scrolling = scrollers(panel);
+    expect(scrolling).toHaveLength(1);
+    expect(log.contains(scrolling[0]!)).toBe(true);
+    expect(getComputedStyle(log).flexGrow).toBe('1');
+    expect(getComputedStyle(log).height).not.toMatch(/px$/);
+    expect(log.contains(screen.getByTestId('room-composer-48000'))).toBe(false);
+    expect(log.contains(screen.getByTestId('room-members-48000'))).toBe(false);
+  });
+
+  it('scrolls only the log on the Room tab', async () => {
+    setup(<RoomTab ticketId="71273" />);
+    const log = await screen.findByTestId('room-log-48000');
+    const scrolling = scrollers(screen.getByTestId('room-tab'));
+    expect(scrolling).toHaveLength(1);
+    expect(log.contains(scrolling[0]!)).toBe(true);
+    expect(getComputedStyle(screen.getByTestId('room-tab')).flexGrow).toBe('1');
+  });
+});

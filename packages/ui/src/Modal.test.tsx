@@ -165,6 +165,19 @@ describe('Modal', () => {
       expect(style.maxWidth).toBe('100%');
       expect(style.maxHeight).toBe('100%');
     });
+
+    it('with fill, takes the window height and leaves the scrolling to its content', () => {
+      render(
+        <Modal visible fill title="Rooms" onClose={() => {}} testID="m">
+          <div data-testid="chat" />
+        </Modal>,
+      );
+      expect(getComputedStyle(screen.getByTestId('m-panel')).height).toBe('100%');
+      const bodyStyle = getComputedStyle(screen.getByTestId('chat').parentElement as HTMLElement);
+      expect(bodyStyle.flexGrow).toBe('1');
+      expect(bodyStyle.overflowY).not.toBe('auto');
+      expect(bodyStyle.overflowY).not.toBe('scroll');
+    });
   });
 
   describe('closing', () => {

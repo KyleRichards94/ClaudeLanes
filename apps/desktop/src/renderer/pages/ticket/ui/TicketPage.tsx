@@ -458,10 +458,10 @@ function TicketFrame({
       {tab === "build-log" ? (
         <BuildLog ticketId={ticket.id} style={styles.buildLog} />
       ) : tab === "room" ? (
-        // Peer lanes: the ticket's room, with a composer (AL-295).
-        <ScrollView style={styles.tabScroll} contentContainerStyle={styles.tabContent}>
+        // Peer lanes: the ticket's room (AL-295). Not in a ScrollView: only its log scrolls (AL-300).
+        <View style={[styles.tabScroll, styles.tabContent]}>
           <RoomTab ticketId={ticket.id} />
-        </ScrollView>
+        </View>
       ) : (
         <ScrollView
           style={styles.tabScroll}

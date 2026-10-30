@@ -35,6 +35,11 @@ interface ModalContentProps {
    */
   padded?: boolean;
   /**
+   * The panel takes the window's height and the body doesn't scroll: its content lays out the height
+   * and scrolls its own part, like a chat whose log scrolls between a header and a composer.
+   */
+  fill?: boolean;
+  /**
    * Control that takes focus when the modal opens. Defaults to the first focusable element (the close
    * button, or the first control of a blocking modal).
    */
@@ -83,6 +88,7 @@ export function Modal({
   footer,
   width = defaultWidth,
   padded = true,
+  fill = false,
   initialFocusRef,
   closeLabel = 'Close',
   testID,
@@ -110,7 +116,7 @@ export function Modal({
       <View style={styles.root}>
         {/* A sibling of the panel, not its parent: a backdrop-filter ancestor would stop the panel's own glass blurring what is behind. */}
         <View aria-hidden testID={testID ? `${testID}-backdrop` : undefined} style={[StyleSheet.absoluteFill, styles.backdrop, backdropBlur]} />
-        <GlassPanel level="xl" testID={testID ? `${testID}-panel` : undefined} style={[styles.panel, { width }, panelShadow]}>
+        <GlassPanel level="xl" testID={testID ? `${testID}-panel` : undefined} style={[styles.panel, { width }, fill ? styles.fillPanel : null, panelShadow]}>
           <View style={styles.header}>
             {icon ? (
               <View testID={testID ? `${testID}-icon` : undefined} style={[styles.iconTile, tileStyles[iconTone]]}>
@@ -129,9 +135,13 @@ export function Modal({
             </View>
             {blocking || !onClose ? null : <Button iconOnly icon="close" label={closeLabel} onPress={onClose} />}
           </View>
-          <ScrollView style={styles.body} contentContainerStyle={padded ? styles.padded : undefined}>
-            {children}
-          </ScrollView>
+          {fill ? (
+            <View style={[styles.fillBody, padded ? styles.padded : null]}>{children}</View>
+          ) : (
+            <ScrollView style={styles.body} contentContainerStyle={padded ? styles.padded : undefined}>
+              {children}
+            </ScrollView>
+          )}
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </GlassPanel>
       </View>
@@ -201,6 +211,13 @@ const styles = StyleSheet.create({
   },
   body: {
     flexShrink: 1,
+  },
+  fillPanel: {
+    height: '100%',
+  },
+  fillBody: {
+    flex: 1,
+    minHeight: 0,
   },
   padded: {
     paddingHorizontal: sidePadding,

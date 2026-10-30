@@ -31,14 +31,15 @@ function useSeenWhileShown(room: PeerRoom | undefined, shown: boolean): number {
   return highlight.count;
 }
 
-function RoomBody({ room, focus, highlight, height }: { room: PeerRoom; focus: string | null; highlight: number; height: number }) {
+/** A room laid out like a chat (AL-300): title and members at the top, the composer at the bottom, and only the log between them scrolls. */
+function RoomBody({ room, focus, highlight }: { room: PeerRoom; focus: string | null; highlight: number }) {
   return (
-    <View style={styles.body}>
+    <View style={styles.chat}>
       <Text variant="title" testID="room-heading">
         {roomHeading(room)}
       </Text>
       <RoomMembers room={room} />
-      <RoomLog room={{ ...room, unread: highlight }} focus={focus} height={height} />
+      <RoomLog room={{ ...room, unread: highlight }} focus={focus} />
       <RoomComposer room={room} />
     </View>
   );
@@ -60,12 +61,13 @@ export function RoomsPanel() {
       subtitle={rooms.length === 0 ? 'None of your lanes is in a room yet' : 'Agents on the same Feature, on this computer and others'}
       icon="link"
       width={760}
+      fill
       onClose={closeRooms}
       footer={<Button label="Close" onPress={closeRooms} />}
       testID="rooms-panel"
     >
       {room ? (
-        <View style={styles.body}>
+        <View style={styles.chat}>
           {rooms.length > 1 ? (
             <SegmentedControl<string>
               label="Room"
@@ -76,7 +78,7 @@ export function RoomsPanel() {
               testID="rooms-picker"
             />
           ) : null}
-          <RoomBody room={room} focus={focus} highlight={highlight} height={360} />
+          <RoomBody room={room} focus={focus} highlight={highlight} />
         </View>
       ) : (
         <Text variant="body">A lane joins a room when its work item sits under a Feature or Epic and peer lanes is set up.</Text>
@@ -93,7 +95,7 @@ export function RoomTab({ ticketId }: { ticketId: string }) {
   if (network.data?.listener.state === 'off') {
     return (
       <View style={styles.body} testID="room-tab">
-        <Text variant="body">Peer lanes is off. Set it up in Connections › Peers to talk to agents on the same Feature on other computers.</Text>
+        <Text variant="body">Peer lanes is off. It starts once an Azure DevOps connection has a default project; Connections › Peers says how it stands.</Text>
         <View style={styles.buttons}>
           <Button label="Open Connections" onPress={() => openConnections({ tab: 'peers' })} />
         </View>
@@ -108,14 +110,19 @@ export function RoomTab({ ticketId }: { ticketId: string }) {
     );
   }
   return (
-    <View testID="room-tab">
-      <RoomBody room={room} focus={null} highlight={highlight} height={420} />
+    <View style={styles.chat} testID="room-tab">
+      <RoomBody room={room} focus={null} highlight={highlight} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   body: {
+    gap: space.md,
+  },
+  chat: {
+    flex: 1,
+    minHeight: 0,
     gap: space.md,
   },
   buttons: {

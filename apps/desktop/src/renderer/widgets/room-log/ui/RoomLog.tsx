@@ -83,7 +83,7 @@ function LogRow({ message, unread }: { message: RoomMessage; unread: boolean }) 
  * words, oldest first, with a quieter line when a lane joins, leaves or goes quiet. Unread `ask`,
  * `blocked` and `offer` rows are marked until the room has been shown.
  */
-export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; focus?: string | null; height?: number }) {
+export function RoomLog({ room, focus = null }: { room: PeerRoom; focus?: string | null }) {
   const log = useRoomLog(room.id);
   const list = useRef<FlatList<RoomMessage>>(null);
   const messages = log.data?.messages ?? [];
@@ -105,7 +105,7 @@ export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; 
     );
   }
   return (
-    <View style={[styles.log, { height }]} aria-live="polite" testID={`room-log-${room.parentId}`}>
+    <View style={styles.log} aria-live="polite" testID={`room-log-${room.parentId}`}>
       {log.data?.capped ? <Text variant="meta">Older messages were left out.</Text> : null}
       {messages.length === 0 && log.isSuccess ? <Text variant="meta">Nothing has been said in this room yet.</Text> : null}
       <FlatList
@@ -114,6 +114,7 @@ export function RoomLog({ room, focus = null, height = 360 }: { room: PeerRoom; 
         keyExtractor={(message) => message.id}
         renderItem={({ item }) => <LogRow message={item} unread={unread.has(item.id)} />}
         onScrollToIndexFailed={() => list.current?.scrollToEnd({ animated: false })}
+        style={styles.list}
         contentContainerStyle={styles.rows}
       />
     </View>
@@ -176,8 +177,14 @@ export function RoomComposer({ room }: { room: PeerRoom }) {
 }
 
 const styles = StyleSheet.create({
+  // The one part of a room that scrolls (AL-300): it takes whatever height is left.
   log: {
+    flex: 1,
+    minHeight: 0,
     gap: space.xs,
+  },
+  list: {
+    flex: 1,
   },
   rows: {
     gap: space.xs,
