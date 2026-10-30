@@ -38,12 +38,12 @@ export const darkSelection = {
 export type SelectionPalette = Record<keyof typeof lightSelection, string>;
 
 export const solarpunkSelection: SelectionPalette = {
-  track: '#ECE7D8',
-  thumb: '#FFFFFF',
-  label: '#4E5A4A',
-  switchOff: '#C9C2AE',
-  thumbShadow: '0 1px 2px rgba(31, 42, 30, 0.1), 0 1px 3px rgba(31, 42, 30, 0.08)',
-  pillShadow: '0 2px 8px rgba(15, 118, 110, 0.28)',
+  track: '#F0E6CC',
+  thumb: '#FFFCF3',
+  label: '#4C5844',
+  switchOff: '#CDBF9A',
+  thumbShadow: '0 1px 2px rgba(120, 84, 30, 0.14), 0 2px 6px rgba(120, 84, 30, 0.12)',
+  pillShadow: '0 2px 10px rgba(45, 122, 62, 0.3)',
 };
 
 export const cyberpunkSelection: SelectionPalette = {

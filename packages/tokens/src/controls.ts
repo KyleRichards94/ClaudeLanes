@@ -31,8 +31,8 @@ export type ControlPalette = Record<keyof typeof lightControl, string>;
 
 export const solarpunkControl: ControlPalette = {
   ink: '#3B4A38',
-  primaryShadow: '0 6px 16px rgba(15, 118, 110, 0.28)',
-  primaryShadowLifted: '0 12px 28px rgba(15, 118, 110, 0.34)',
+  primaryShadow: '0 6px 18px rgba(45, 122, 62, 0.3), 0 0 24px rgba(242, 176, 51, 0.25)',
+  primaryShadowLifted: '0 12px 30px rgba(45, 122, 62, 0.36), 0 0 32px rgba(242, 176, 51, 0.3)',
   strongFill: '#1F2A1E',
 };
 

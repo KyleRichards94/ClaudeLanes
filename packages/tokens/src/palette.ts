@@ -47,22 +47,22 @@ export const darkColor = {
   onInk: '#101820',
 } as const satisfies ColorPalette;
 
-/** Solarpunk (AL-286): cream ground, teal-green for Claude, sea blue for ADO, sun gold for the glow. */
+/** Solarpunk (AL-286): paper on a cream ground under a pale sky; leaf green for Claude, copper for ADO, terracotta for attention, sky blue when done, sun gold for the glow. */
 export const solarpunkColor = {
-  bg: '#F7F3E8',
-  surface: '#FFFDF7',
+  bg: '#F7F1E0',
+  surface: '#FFFCF3',
   ink: '#1F2A1E',
-  muted: '#5C6B57',
-  line: '#E3DCC8',
-  claude: '#0F766E',
-  claudeTint: '#D9F2EC',
-  claudeText: '#0B5A54',
-  ado: '#1A669A',
-  adoTint: '#DCEEF9',
-  ok: '#2E7D32',
-  attention: '#B45309',
-  danger: '#B3261E',
-  skyGlow: '#F5B82E',
+  muted: '#55634C',
+  line: '#E4CF9C',
+  claude: '#2D7A3E',
+  claudeTint: '#DDF0D6',
+  claudeText: '#1F5C2B',
+  ado: '#7A4622',
+  adoTint: '#F7E5D2',
+  ok: '#1C6A93',
+  attention: '#CC5F2E',
+  danger: '#A8261C',
+  skyGlow: '#F2B033',
   onAccent: '#FFFFFF',
   onInk: '#FFFFFF',
 } as const satisfies ColorPalette;
