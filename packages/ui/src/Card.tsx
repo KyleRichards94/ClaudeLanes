@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, edgeGlow, glow, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, edgeGlow, glow, motif, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 
 /**
@@ -73,6 +73,7 @@ const inset = 14;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: color.surface,
+    backgroundImage: motif.card,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: color.line,

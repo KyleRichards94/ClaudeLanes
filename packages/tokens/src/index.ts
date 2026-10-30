@@ -6,7 +6,7 @@
  * by Margarita-the-solid on CodePen. Keep this credit with the tokens.
  */
 
-import { keysOf, lightColor, varsFor } from './palette';
+import { cssVar, keysOf, lightColor, varsFor } from './palette';
 import { lightGlass, lightShadow } from './surfaces';
 
 export { cssVar, cyberpunkColor, darkColor, kebab, keysOf, lightColor, solarpunkColor, varsFor, type ColorPalette, type PaletteColor } from './palette';
@@ -96,3 +96,6 @@ export * from './overlay';
 export * from './contrast';
 export * from './themes';
 export * from './glow';
+
+/** Theme scenery painted on surfaces; none in themes without it (agent-lanes-tokens.css). */
+export const motif = { card: cssVar('card-motif'), lane: cssVar('lane-motif'), solarCell: cssVar('solar-cell') } as const;

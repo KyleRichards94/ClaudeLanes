@@ -24,8 +24,12 @@ export type Theme = (typeof THEMES)[number];
 /** What the window frame and native controls follow. */
 export type ThemeBase = 'light' | 'dark';
 
+/** How a running agent's card shows it is alive: a breathing halo, a slow sunlit lift, or holding still. */
+export type ThemeAlive = 'glow' | 'daylight' | 'none';
+
 export interface ThemePalette {
   base: ThemeBase;
+  alive: ThemeAlive;
   color: ColorPalette;
   tone: TonePalette;
   glass: GlassPalette;
@@ -37,10 +41,11 @@ export interface ThemePalette {
 }
 
 export const themes: Record<Theme, ThemePalette> = {
-  light: { base: 'light', color: lightColor, tone: lightTone, glass: lightGlass, shadow: lightShadow, selection: lightSelection, control: lightControl, overlay: lightOverlay, glow: lightGlow },
-  dark: { base: 'dark', color: darkColor, tone: darkTone, glass: darkGlass, shadow: darkShadow, selection: darkSelection, control: darkControl, overlay: darkOverlay, glow: darkGlow },
+  light: { base: 'light', alive: 'none', color: lightColor, tone: lightTone, glass: lightGlass, shadow: lightShadow, selection: lightSelection, control: lightControl, overlay: lightOverlay, glow: lightGlow },
+  dark: { base: 'dark', alive: 'none', color: darkColor, tone: darkTone, glass: darkGlass, shadow: darkShadow, selection: darkSelection, control: darkControl, overlay: darkOverlay, glow: darkGlow },
   solarpunk: {
     base: 'light',
+    alive: 'daylight',
     color: solarpunkColor,
     tone: solarpunkTone,
     glass: solarpunkGlass,
@@ -52,6 +57,7 @@ export const themes: Record<Theme, ThemePalette> = {
   },
   cyberpunk: {
     base: 'dark',
+    alive: 'glow',
     color: cyberpunkColor,
     tone: cyberpunkTone,
     glass: cyberpunkGlass,

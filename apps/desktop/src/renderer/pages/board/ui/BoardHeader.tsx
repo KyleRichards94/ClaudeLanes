@@ -1,6 +1,6 @@
 import type { Sprint } from '@agent-lanes/contracts';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { color, minTarget, radius, space } from '@agent-lanes/tokens';
+import { color, minTarget, motif, radius, space } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Pill, Text } from '@agent-lanes/ui';
 import { agentTickets, useAgentTicketCount, type AgentTicketStore } from '@/entities/agent-ticket';
 import { useAddRepo, useRepos, useTeams } from '@/shared/api';
@@ -213,6 +213,7 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: radius.chip,
     backgroundColor: color.claude,
+    backgroundImage: motif.solarCell,
     alignItems: 'center',
     justifyContent: 'center',
   },

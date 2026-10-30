@@ -3,8 +3,8 @@ import { edgeGlow, glow, ring, textGlow } from './glow';
 import { themes } from './themes';
 
 describe('glow', () => {
-  it('light and dark draw no glow', () => {
-    for (const theme of ['light', 'dark'] as const) expect(themes[theme].glow, theme).toMatchObject({ level: '0', reach: '0', text: '0', tintShare: '0%' });
+  it('only cyberpunk glows', () => {
+    for (const theme of ['light', 'dark', 'solarpunk'] as const) expect(themes[theme].glow, theme).toEqual({ level: '0', reach: '0', text: '0' });
   });
 
   // With the theme's values at 0 every layer is a 0 px, fully transparent shadow, so nothing is drawn.

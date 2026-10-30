@@ -26,7 +26,7 @@ export type OverlayPalette = Record<keyof typeof lightOverlay, string>;
 
 export const solarpunkOverlay: OverlayPalette = {
   scrim: 'rgba(247, 241, 224, 0.58)',
-  shadow: '0 24px 72px rgba(110, 76, 24, 0.22), 0 0 0 1px rgba(206, 160, 72, 0.35)',
+  shadow: '0 24px 72px rgba(110, 76, 24, 0.12), -26px 32px 60px rgba(110, 76, 24, 0.16), 0 0 0 1px rgba(206, 160, 72, 0.35)',
 };
 
 export const cyberpunkOverlay: OverlayPalette = {

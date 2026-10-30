@@ -28,7 +28,7 @@ export const darkGlass: GlassPalette = {
 export const solarpunkGlass: GlassPalette = {
   fillMin: 'rgba(255, 251, 238, 0.66)',
   fillMax: 'rgba(255, 251, 238, 0.84)',
-  highlight: 'inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 6px 24px rgba(160, 112, 40, 0.1)',
+  highlight: 'inset 0 1px 0 rgba(255, 255, 255, 0.95), -10px 14px 28px -12px rgba(150, 104, 30, 0.22)',
   border: 'rgba(206, 160, 72, 0.55)',
 };
 
@@ -50,8 +50,8 @@ export const darkShadow: ShadowPalette = {
 };
 
 export const solarpunkShadow: ShadowPalette = {
-  card: '0 1px 2px rgba(120, 84, 30, 0.1), 0 10px 26px rgba(120, 84, 30, 0.14)',
-  lifted: '0 2px 4px rgba(120, 84, 30, 0.12), 0 18px 42px rgba(120, 84, 30, 0.2)',
+  card: '-2px 3px 4px rgba(120, 84, 30, 0.1), -12px 16px 30px -8px rgba(120, 84, 30, 0.2)',
+  lifted: '-3px 5px 8px rgba(120, 84, 30, 0.12), -22px 30px 46px -10px rgba(120, 84, 30, 0.26)',
 };
 
 export const cyberpunkShadow: ShadowPalette = {

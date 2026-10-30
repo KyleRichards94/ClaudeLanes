@@ -68,12 +68,12 @@ export function AgentTicketCardView({ ticket, adoState, typeColor = null, stateC
   const name = agentCardName(ticket);
   const reducedMotion = usePrefersReducedMotion();
   const theme = useResolvedTheme();
-  // A running card's glow breathes, like the cs-qa tracker's frame; only where the theme glows, and never under reduced motion.
-  const breathe = view.state === 'running' && !reducedMotion && themes[theme].glow.level !== '0';
+  // A running card shows it is alive the theme's way (a breathing halo, a slow sunlit lift), never under reduced motion.
+  const alive = view.state === 'running' && !reducedMotion ? themes[theme].alive : 'none';
 
   const content = (
     <>
-      <Card tone={cardTone} footer={view.footer ?? undefined} style={breathe ? breathing : undefined} testID={testID ? `${testID}-card` : undefined}>
+      <Card tone={cardTone} footer={view.footer ?? undefined} style={alive === 'glow' ? breathing : alive === 'daylight' ? basking : undefined} testID={testID ? `${testID}-card` : undefined}>
         <CardSection>
           <View style={styles.idRow}>
             {ticket.ado ? (
@@ -178,13 +178,19 @@ export function AgentTicketCard({ ticketId, store, ...props }: AgentTicketCardPr
 }
 
 // react-native-web turns animationKeyframes into a CSS animation, but only through StyleSheet.create; the style types do not know it.
-const { breathing } = StyleSheet.create({
+const { breathing, basking } = StyleSheet.create({
   breathing: {
     animationKeyframes: {
       '0%, 100%': { boxShadow: `${shadow.card}, ${glow(tone.claude.dot, 0.5)}` },
       '50%': { boxShadow: `${shadow.card}, ${glow(tone.claude.dot, 1)}` },
     },
     animationDuration: '3.4s',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out',
+  } as unknown as ViewStyle,
+  basking: {
+    animationKeyframes: { '0%, 100%': { boxShadow: shadow.card }, '50%': { boxShadow: shadow.lifted } },
+    animationDuration: '7s',
     animationIterationCount: 'infinite',
     animationTimingFunction: 'ease-in-out',
   } as unknown as ViewStyle,

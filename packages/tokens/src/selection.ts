@@ -42,8 +42,8 @@ export const solarpunkSelection: SelectionPalette = {
   thumb: '#FFFCF3',
   label: '#4C5844',
   switchOff: '#CDBF9A',
-  thumbShadow: '0 1px 2px rgba(120, 84, 30, 0.14), 0 2px 6px rgba(120, 84, 30, 0.12)',
-  pillShadow: '0 2px 10px rgba(45, 122, 62, 0.3)',
+  thumbShadow: '-1px 2px 3px rgba(120, 84, 30, 0.16), -3px 5px 9px rgba(120, 84, 30, 0.1)',
+  pillShadow: '-3px 5px 12px rgba(45, 122, 62, 0.28)',
 };
 
 export const cyberpunkSelection: SelectionPalette = {

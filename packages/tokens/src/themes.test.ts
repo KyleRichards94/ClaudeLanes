@@ -7,8 +7,8 @@ import { THEMES, resolveToken, themeVariables, themes } from './themes';
 const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
 const cssThemes = cssThemeVariables(css);
 
-/** Defined in CSS only: the ground, its sky, the atmosphere blooms and the dappled light (global.css reads them). */
-const CSS_ONLY = ['ground-from', 'ground-to', 'atmosphere-1', 'atmosphere-2', 'atmosphere-3', 'ground-sky', 'dapple', 'dapple-motion'];
+/** Defined in CSS only: the ground and its sky, the atmosphere, the sun and dappled light, and the surface motifs. */
+const CSS_ONLY = ['ground-from', 'ground-to', 'atmosphere-1', 'atmosphere-2', 'atmosphere-3', 'ground-sky', 'dapple', 'dapple-motion', 'dapple-mask', 'sun', 'sun-mask', 'sun-motion', 'card-motif', 'lane-motif', 'solar-cell'];
 
 const normalise = (value: string) => value.toLowerCase().replace(/\s+/g, ' ').trim();
 

@@ -13,6 +13,7 @@ body,
 html {
   background-color: var(--al-bg);
   background-image: var(--al-ground-sky);
+  background-repeat: no-repeat;
   background-attachment: fixed;
   animation: al-ground 36s ease-in-out infinite alternate;
 }
@@ -41,6 +42,20 @@ body::before {
   animation: al-atmosphere 42s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite alternate;
 }
 
+/* The sun and its long low rays, the one light source in themes that have one (--al-sun). */
+html::before {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background: var(--al-sun);
+  -webkit-mask-image: var(--al-sun-mask);
+  mask-image: var(--al-sun-mask);
+  transform-origin: 94% 2%;
+  animation: var(--al-sun-motion);
+}
+
 /* Sunlight through leaves, drifting slowly; only themes that set --al-dapple draw it. */
 body::after {
   content: '';
@@ -49,6 +64,8 @@ body::after {
   pointer-events: none;
   inset: -8%;
   background: var(--al-dapple);
+  -webkit-mask-image: var(--al-dapple-mask);
+  mask-image: var(--al-dapple-mask);
   animation: var(--al-dapple-motion);
 }
 
@@ -89,8 +106,18 @@ body::after {
   }
 }
 
+@keyframes al-sun {
+  from {
+    transform: rotate(-2deg);
+  }
+  to {
+    transform: rotate(2.5deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html,
+  html::before,
   body::before,
   body::after {
     animation: none;
