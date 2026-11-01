@@ -33,7 +33,7 @@ describe('themes', () => {
 
   it('resolves a token to its value in a theme', () => {
     expect(resolveToken('var(--al-claude)', 'light')).toBe('#5B4BC4');
-    expect(resolveToken('var(--al-claude)', 'solarpunk')).toBe('#0F766E');
+    expect(resolveToken('var(--al-claude)', 'solarpunk')).toBe('#2D7A3E');
     expect(resolveToken('var(--al-tone-ok-band)', 'dark')).toBe('#134535');
     expect(resolveToken('#123456', 'dark')).toBe('#123456');
   });
