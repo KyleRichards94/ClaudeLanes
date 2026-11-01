@@ -11,15 +11,9 @@
  *
  * `neutral` is the grey of "Queued" and other idle states (status badges on artboard 6, the
  * "1 queued" count on artboard 1).
- *
- * Values that repeat a `color` token are spelled out rather than imported, because index.ts
- * re-exports this file (an import back would be circular); tones.test.ts checks they still match.
- * Keep the light hex in sync with the tone block in agent-lanes-tokens.css.
  */
 
-import { darkColor, lightColor, lightDark } from './palette';
-
-const pair = lightDark;
+import { cssVar, cyberpunkColor, darkColor, keysOf, lightColor, solarpunkColor, varsFor } from './palette';
 
 export const lightTone = {
   claude: {
@@ -64,6 +58,8 @@ export const lightTone = {
   },
 } as const;
 
+export type TonePalette = { [T in keyof typeof lightTone]: { [K in keyof (typeof lightTone)[T]]: string } };
+
 export const darkTone = {
   claude: {
     border: '#A99BF2',
@@ -105,29 +101,109 @@ export const darkTone = {
     text: '#D5DEEA',
     dot: '#94A3B8',
   },
-} as const;
+} as const satisfies TonePalette;
 
-function themedTone<T extends Record<string, string>>(light: T, dark: { [K in keyof T]: string }): { [K in keyof T]: string } {
-  const themed = {} as { [K in keyof T]: string };
-  for (const key of Object.keys(light) as (keyof T)[]) themed[key] = pair(String(light[key]), String(dark[key]));
-  return themed;
-}
+export const solarpunkTone = {
+  claude: {
+    border: '#86BE84',
+    wash: '#EEF7E8',
+    band: solarpunkColor.claudeTint,
+    text: solarpunkColor.claudeText,
+    dot: solarpunkColor.claude,
+  },
+  ado: {
+    wash: '#FBF2E6',
+    band: solarpunkColor.adoTint,
+    text: solarpunkColor.ado,
+    fill: solarpunkColor.skyGlow,
+    dot: solarpunkColor.ado,
+  },
+  attention: {
+    border: '#E2A07C',
+    band: '#F9E2D3',
+    text: '#7A3214',
+    dot: solarpunkColor.attention,
+  },
+  danger: {
+    border: '#E7A9A1',
+    wash: '#FCEFEB',
+    band: '#F7D9D3',
+    text: '#86190F',
+    fill: '#D2574A',
+    dot: solarpunkColor.danger,
+  },
+  ok: {
+    wash: '#EAF3F7',
+    band: '#D7E9F2',
+    text: '#14557A',
+    fill: '#4A9AC2',
+    dot: solarpunkColor.ok,
+  },
+  neutral: {
+    band: '#EFE7D3',
+    text: '#4C5844',
+    dot: '#9EA48C',
+  },
+} as const satisfies TonePalette;
+
+export const cyberpunkTone = {
+  claude: {
+    border: '#FF6BE3',
+    wash: '#22103A',
+    band: cyberpunkColor.claudeTint,
+    text: cyberpunkColor.claudeText,
+    dot: cyberpunkColor.claude,
+  },
+  ado: {
+    wash: '#0A2433',
+    band: cyberpunkColor.adoTint,
+    text: cyberpunkColor.ado,
+    fill: cyberpunkColor.skyGlow,
+    dot: cyberpunkColor.ado,
+  },
+  attention: {
+    border: '#FCEE0A',
+    band: '#3A3506',
+    text: '#FFF59A',
+    dot: cyberpunkColor.attention,
+  },
+  danger: {
+    border: '#FF6B8E',
+    wash: '#2C0D1A',
+    band: '#4D1226',
+    text: '#FF9FB5',
+    fill: '#FF3366',
+    dot: cyberpunkColor.danger,
+  },
+  ok: {
+    wash: '#062A20',
+    band: '#083A2A',
+    text: '#7DFFC9',
+    fill: '#00FF9F',
+    dot: cyberpunkColor.ok,
+  },
+  neutral: {
+    band: '#272452',
+    text: '#D3D0F2',
+    dot: '#8E8AC0',
+  },
+} as const satisfies TonePalette;
 
 export const tone = {
-  claude: themedTone(lightTone.claude, darkTone.claude),
-  ado: themedTone(lightTone.ado, darkTone.ado),
-  attention: themedTone(lightTone.attention, darkTone.attention),
-  danger: themedTone(lightTone.danger, darkTone.danger),
-  ok: themedTone(lightTone.ok, darkTone.ok),
-  neutral: themedTone(lightTone.neutral, darkTone.neutral),
+  claude: varsFor('tone-claude-', keysOf(lightTone.claude)),
+  ado: varsFor('tone-ado-', keysOf(lightTone.ado)),
+  attention: varsFor('tone-attention-', keysOf(lightTone.attention)),
+  danger: varsFor('tone-danger-', keysOf(lightTone.danger)),
+  ok: varsFor('tone-ok-', keysOf(lightTone.ok)),
+  neutral: varsFor('tone-neutral-', keysOf(lightTone.neutral)),
 } as const;
 
 export type Tone = keyof typeof tone;
 
-/** Running progress: Claude violet into the sky glow, left to right. */
+/** Running progress: the Claude colour into the sky glow, left to right. */
 export const progressGradient = {
-  from: pair(lightColor.claude, darkColor.claude),
-  to: pair(lightColor.skyGlow, darkColor.skyGlow),
+  from: cssVar('claude'),
+  to: cssVar('sky-glow'),
 } as const;
 
 /**

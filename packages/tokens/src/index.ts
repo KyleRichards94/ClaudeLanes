@@ -1,54 +1,31 @@
 /**
  * Agent Lanes design tokens (design §11 and the "Design tokens" artboard).
- * Soft corporate: cool pale ground, white rounded cards, light liquid glass,
- * violet for Claude activity, blue for Azure DevOps. Dark mode keeps that palette
- * and sets it on a blue-black ground (`palette.ts`).
- *
+ * Paintable tokens are `var(--al-*)` references; each theme fills them in from its block in
+ * agent-lanes-tokens.css. The hex palettes live in themes.ts.
  * Glass recipe adapted from "Pure CSS Glassmorphism Liquid Glass UI Kit"
  * by Margarita-the-solid on CodePen. Keep this credit with the tokens.
- *
- * Paintable colours are `light-dark()` pairs. The hex palettes stay in `palette.ts`
- * and match agent-lanes-tokens.css; tokens.test.ts checks the two agree.
  */
 
-import { darkColor, lightColor, lightDark, themedColors } from './palette';
+import { cssVar, keysOf, lightColor, varsFor } from './palette';
+import { lightGlass, lightShadow } from './surfaces';
 
-export { darkColor, lightColor, lightOf } from './palette';
+export { cssVar, cyberpunkColor, darkColor, kebab, keysOf, lightColor, solarpunkColor, varsFor, type ColorPalette, type PaletteColor } from './palette';
+export { cyberpunkGlass, cyberpunkShadow, darkGlass, darkShadow, lightGlass, lightShadow, solarpunkGlass, solarpunkShadow, type GlassPalette, type ShadowPalette } from './surfaces';
 
-export const color = themedColors(lightColor, darkColor);
+/** Paintable colours: `var(--al-*)` references, which the theme's block in agent-lanes-tokens.css fills in. */
+export const color = varsFor('', keysOf(lightColor));
 
 export type ColorToken = keyof typeof color;
 
-/** Light glass fills. Dark glass is darker and a little clearer, so the moving ground reads through it. */
-const lightGlass = {
-  fillMin: 'rgba(255, 255, 255, 0.62)',
-  fillMax: 'rgba(255, 255, 255, 0.72)',
-  highlight: 'rgba(255, 255, 255, 0.9)',
-  border: 'rgba(255, 255, 255, 0.7)',
-} as const;
-
-const darkGlass = {
-  fillMin: 'rgba(18, 26, 40, 0.74)',
-  fillMax: 'rgba(18, 26, 40, 0.84)',
-  highlight: 'rgba(255, 255, 255, 0.22)',
-  border: 'rgba(255, 255, 255, 0.16)',
-} as const;
-
 export const glass = {
-  /** Fill opacity range for glass surfaces. */
-  fillMin: lightDark(lightGlass.fillMin, darkGlass.fillMin),
-  fillMax: lightDark(lightGlass.fillMax, darkGlass.fillMax),
+  ...varsFor('glass-', keysOf(lightGlass)),
   /** Chips and toolbar buttons. */
   blurSm: 8,
   /** Panels, header, live dock. */
   blurMd: 18,
   /** Modals and sheets. */
   blurXl: 40,
-  highlight: `inset 0 1px 0 ${lightDark(lightGlass.highlight, darkGlass.highlight)}`,
-  border: lightDark(lightGlass.border, darkGlass.border),
 } as const;
-
-export { lightGlass, darkGlass };
 
 export type GlassLevel = 'sm' | 'md' | 'xl';
 
@@ -91,10 +68,7 @@ export const space = {
   xxl: 32,
 } as const;
 
-export const shadow = {
-  card: `0 1px 2px ${lightDark('rgba(15, 27, 45, 0.04)', 'rgba(0, 0, 0, 0.28)')}, 0 8px 24px ${lightDark('rgba(15, 27, 45, 0.06)', 'rgba(0, 0, 0, 0.35)')}`,
-  lifted: `0 2px 4px ${lightDark('rgba(15, 27, 45, 0.06)', 'rgba(0, 0, 0, 0.32)')}, 0 16px 40px ${lightDark('rgba(15, 27, 45, 0.10)', 'rgba(0, 0, 0, 0.45)')}`,
-} as const;
+export const shadow = varsFor('shadow-', keysOf(lightShadow));
 
 export const motion = {
   /** Ease-out 150–220 ms; hover lifts 3 px with a deeper soft shadow. No skew, no hard offset shadows. */
@@ -120,3 +94,8 @@ export * from './selection';
 export * from './controls';
 export * from './overlay';
 export * from './contrast';
+export * from './themes';
+export * from './glow';
+
+/** Theme scenery painted on surfaces; none in themes without it (agent-lanes-tokens.css). */
+export const motif = { card: cssVar('card-motif'), lane: cssVar('lane-motif'), solarCell: cssVar('solar-cell') } as const;

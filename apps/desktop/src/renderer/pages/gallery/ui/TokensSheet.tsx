@@ -1,6 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { color, glass, lightColor, radius, shadow, space, type ColorToken, type GlassLevel } from '@agent-lanes/tokens';
+import { color, glass, radius, shadow, space, themes, type ColorToken, type GlassLevel } from '@agent-lanes/tokens';
 import { Button, GlassPanel, Text } from '@agent-lanes/ui';
+import { useResolvedTheme } from '@/shared/model';
 import { GalleryBlock, GalleryRow, GallerySheet } from './GallerySection';
 
 /** The colour swatches on artboard 7, in its order, plus the two tokens the artboard leaves out. */
@@ -39,6 +40,7 @@ const radii: readonly { value: number; name: string }[] = [
 
 /** Artboard 7, "Design tokens": colours, liquid glass levels, type, radii and the button variants. */
 export function TokensSheet() {
+  const theme = useResolvedTheme();
   return (
     <GallerySheet
       kicker="agent-lanes-tokens.css"
@@ -56,7 +58,7 @@ export function TokensSheet() {
                   {swatch.name}
                 </Text>
                 <Text variant="mono" size="xs" color={color.muted}>
-                  {lightColor[swatch.token]}
+                  {themes[theme].color[swatch.token]}
                 </Text>
                 <Text variant="meta">{swatch.use}</Text>
               </View>

@@ -1,33 +1,20 @@
 import { useEffect } from 'react';
-import { useAppearance } from '@/shared/model';
+import { themes } from '@agent-lanes/tokens';
+import { useAppearance, useResolvedTheme } from '@/shared/model';
 
 /**
- * Applies the saved appearance to the document. `light-dark()` colours follow `color-scheme`;
- * the ground animation follows `data-theme`, which is the computer's choice when appearance is system.
+ * `data-theme` picks the theme's variable block in agent-lanes-tokens.css; `color-scheme` tells
+ * Chromium whether native controls and scrollbars are light or dark (both, for System).
  */
 export function AppearanceSync() {
   const appearance = useAppearance();
+  const theme = useResolvedTheme();
 
   useEffect(() => {
     const root = document.documentElement;
-    if (appearance === 'system') {
-      root.style.colorScheme = 'light dark';
-      if (typeof window.matchMedia !== 'function') {
-        root.dataset.theme = 'light';
-        return undefined;
-      }
-      const query = window.matchMedia('(prefers-color-scheme: dark)');
-      const sync = () => {
-        root.dataset.theme = query.matches ? 'dark' : 'light';
-      };
-      sync();
-      query.addEventListener('change', sync);
-      return () => query.removeEventListener('change', sync);
-    }
-    root.style.colorScheme = appearance;
-    root.dataset.theme = appearance;
-    return undefined;
-  }, [appearance]);
+    root.dataset.theme = theme;
+    root.style.colorScheme = appearance === 'system' ? 'light dark' : themes[theme].base;
+  }, [appearance, theme]);
 
   return null;
 }

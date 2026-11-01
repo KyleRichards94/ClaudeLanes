@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
-import { color, space } from '@agent-lanes/tokens';
+import { color, space, tone } from '@agent-lanes/tokens';
 import { GlassPanel, Text } from '@agent-lanes/ui';
 import { usePrefersReducedMotion } from '@/shared/lib';
 import { crewStatus, type CrewTone } from '../model/cityData';
@@ -16,7 +16,7 @@ export interface CrewPanelProps {
 /** Status word colours; every one is at least 4.5:1 on the glass. */
 const toneColor: Record<CrewTone, string> = {
   running: color.claudeText,
-  done: '#047857',
+  done: tone.ok.text,
   error: color.danger,
   idle: color.muted,
 };

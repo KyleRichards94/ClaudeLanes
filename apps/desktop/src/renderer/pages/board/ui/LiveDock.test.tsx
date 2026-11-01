@@ -7,12 +7,6 @@ import { RouterProvider, createRouter, selectRoute, type Router } from '@/shared
 import { fakeTicketRecord } from '@/shared/testing';
 import { LiveDock } from './LiveDock';
 
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 let store: AgentTicketStore;
 let router: Router;
 let renders = 0;
@@ -74,8 +68,8 @@ describe('LiveDock', () => {
       '14:05 #71310 Needs you · 1 gap. Open ticket',
       '14:03 #71301 review found 2 issues. Open ticket',
     ]);
-    expect(getComputedStyle(screen.getByText('14:05').parentElement as HTMLElement).color).toBe(rgb(tone.attention.text));
-    expect(getComputedStyle(screen.getByText('14:06').parentElement as HTMLElement).color).toBe(rgb(color.ink));
+    expect(getComputedStyle(screen.getByText('14:05').parentElement as HTMLElement).color).toBe(tone.attention.text);
+    expect(getComputedStyle(screen.getByText('14:06').parentElement as HTMLElement).color).toBe(color.ink);
   });
 
   it('counts running sub-agents and builds', () => {

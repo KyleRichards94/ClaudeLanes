@@ -113,3 +113,18 @@ test('sets the agents team board drops start, per lane, on the Drops tab (AL-240
   await expect.poll(() => savedSettings().dropDefaults?.qa).toEqual({ skills: ['cs-qa-wip', 'cs-smoke'], model: 'haiku', effort: 'medium' });
   expect(savedSettings().dropDefaults?.['code-review']).toEqual({ skills: ['code-review', 'pr-comment-actioner'], model: 'opus', effort: 'high' });
 });
+
+test('picks Solarpunk on the Appearance tab: the document, the window frame and settings.json follow (AL-286)', async () => {
+  const page = await launch();
+  if (!app) throw new Error('the app did not launch');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const panel = page.getByRole('dialog', { name: 'Settings' });
+  await panel.getByRole('tab', { name: 'Appearance' }).click();
+  await panel.getByRole('radio', { name: 'Solarpunk' }).click();
+
+  await expect.poll(() => page.evaluate('document.documentElement.dataset.theme')).toBe('solarpunk');
+  await expect.poll(() => page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--al-bg').trim()")).toBe('#f7f3e8');
+  await expect.poll(() => app?.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('light');
+  await page.screenshot({ path: test.info().outputPath('settings-solarpunk.png') });
+  await expect.poll(() => savedSettings().ui.appearance).toBe('solarpunk');
+});

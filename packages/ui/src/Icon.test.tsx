@@ -65,7 +65,7 @@ describe('Icon', () => {
       }
       // currentColor and 1em resolve against the text the icon sits in.
       const computed = getComputedStyle(svg);
-      expect(computed.color).toBe('rgb(91, 75, 196)'); // color.claude
+      expect(computed.color).toBe(color.claude);
       expect(computed.fontSize).toBe('20px');
     });
 

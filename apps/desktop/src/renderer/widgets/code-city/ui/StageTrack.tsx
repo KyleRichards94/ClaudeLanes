@@ -7,10 +7,11 @@ export interface StageTrackProps {
   stages: readonly CityStage[];
 }
 
-const DONE = '#059669';
+// The --cc-* colours are set per theme in code-city.css.
+const DONE = 'var(--cc-stage-done)';
 const ACTIVE = color.claude;
 const FUTURE = color.line;
-const DONE_ROAD = '#34D399';
+const DONE_ROAD = 'var(--cc-road-done)';
 
 const web = (style: Record<string, string>) => style as unknown as ViewStyle;
 
@@ -36,13 +37,13 @@ export function StageTrack({ stages }: StageTrackProps) {
               <View
                 style={[
                   styles.square,
-                  stage.state === 'done' ? { backgroundColor: DONE } : current ? { backgroundColor: ACTIVE, ...web({ boxShadow: '0 0 0 6px rgba(91,75,196,.18)' }) } : { backgroundColor: FUTURE },
+                  stage.state === 'done' ? { backgroundColor: DONE } : current ? { backgroundColor: ACTIVE, ...web({ boxShadow: `0 0 0 6px color-mix(in srgb, ${color.claude} 18%, transparent)` }) } : { backgroundColor: FUTURE },
                 ]}
               >
                 {stage.state === 'done' ? (
-                  <Icon name="check" size={18} color="#FFFFFF" />
+                  <Icon name="check" size={18} color={color.onAccent} />
                 ) : (
-                  <Text variant="body" size="md" color={current ? '#FFFFFF' : color.muted} style={styles.number}>
+                  <Text variant="body" size="md" color={current ? color.onAccent : color.muted} style={styles.number}>
                     {index + 1}
                   </Text>
                 )}

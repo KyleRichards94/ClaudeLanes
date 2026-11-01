@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, edgeGlow, glow, motif, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 
 /**
@@ -38,7 +38,7 @@ export function Card({ tone = 'default', footer, style, children, testID }: Card
       {footer ? (
         <View testID={testID ? `${testID}-footer` : undefined} style={[styles.footer, footerStyles[footer.tone]]}>
           {typeof footer.label === 'string' ? (
-            <Text variant="title" size="sm" color={footerTextColor[footer.tone]}>
+            <Text variant="title" size="sm" color={footerTextColor[footer.tone]} glow>
               {footer.label}
             </Text>
           ) : (
@@ -73,6 +73,7 @@ const inset = 14;
 const styles = StyleSheet.create({
   card: {
     backgroundColor: color.surface,
+    backgroundImage: motif.card,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: color.line,
@@ -92,18 +93,18 @@ const styles = StyleSheet.create({
 
 const toneStyles = StyleSheet.create({
   default: {},
-  selected: { borderColor: tone.claude.border },
-  attention: { borderColor: tone.attention.border },
-  danger: { borderColor: tone.danger.border },
+  selected: { borderColor: tone.claude.border, boxShadow: `${shadow.card}, ${glow(tone.claude.border, 0.9)}` },
+  attention: { borderColor: tone.attention.border, boxShadow: `${shadow.card}, ${glow(tone.attention.border, 0.8)}` },
+  danger: { borderColor: tone.danger.border, boxShadow: `${shadow.card}, ${glow(tone.danger.border, 0.8)}` },
   // AL-033: mostly a loss of colour, which keeps text contrast; the light opacity on top fades it back.
   muted: { opacity: mutedOpacity, filter: mutedFilter },
 });
 
 const footerStyles = StyleSheet.create({
-  attention: { backgroundColor: tone.attention.band },
-  ado: { backgroundColor: tone.ado.band },
-  danger: { backgroundColor: tone.danger.band },
-  ok: { backgroundColor: tone.ok.band },
+  attention: { backgroundColor: tone.attention.band, boxShadow: edgeGlow(tone.attention.dot, 'top') },
+  ado: { backgroundColor: tone.ado.band, boxShadow: edgeGlow(tone.ado.dot, 'top') },
+  danger: { backgroundColor: tone.danger.band, boxShadow: edgeGlow(tone.danger.dot, 'top') },
+  ok: { backgroundColor: tone.ok.band, boxShadow: edgeGlow(tone.ok.dot, 'top') },
 });
 
 /** Footer labels are bold 12/16 (`title` at `sm`) in the tone's text colour. */

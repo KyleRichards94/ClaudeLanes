@@ -13,11 +13,9 @@
  * - `thumbShadow`: the thumb's and the switch knob's shadow.
  * - `pillShadow`: the soft violet glow under the selected effort pill.
  * - `disabledOpacity`: a disabled segment or switch fades back.
- *
- * The light hex stays in sync with the selection block in agent-lanes-tokens.css.
  */
 
-import { lightDark } from './palette';
+import { keysOf, varsFor } from './palette';
 
 export const lightSelection = {
   track: '#EEF2F7',
@@ -37,12 +35,27 @@ export const darkSelection = {
   pillShadow: '0 2px 8px rgba(91, 101, 196, 0.45)',
 } as const;
 
+export type SelectionPalette = Record<keyof typeof lightSelection, string>;
+
+export const solarpunkSelection: SelectionPalette = {
+  track: '#F0E6CC',
+  thumb: '#FFFCF3',
+  label: '#4C5844',
+  switchOff: '#CDBF9A',
+  thumbShadow: '-1px 2px 3px rgba(120, 84, 30, 0.16), -3px 5px 9px rgba(120, 84, 30, 0.1)',
+  pillShadow: '-3px 5px 12px rgba(45, 122, 62, 0.28)',
+};
+
+export const cyberpunkSelection: SelectionPalette = {
+  track: '#1A1838',
+  thumb: '#2E2A5E',
+  label: '#C9C3EA',
+  switchOff: '#4B467A',
+  thumbShadow: '0 0 0 1px rgba(0, 240, 255, 0.35), 0 0 10px rgba(0, 240, 255, 0.25)',
+  pillShadow: '0 0 10px rgba(255, 43, 214, 0.6), 0 0 22px rgba(255, 43, 214, 0.3)',
+};
+
 export const selection = {
-  track: lightDark(lightSelection.track, darkSelection.track),
-  thumb: lightDark(lightSelection.thumb, darkSelection.thumb),
-  label: lightDark(lightSelection.label, darkSelection.label),
-  switchOff: lightDark(lightSelection.switchOff, darkSelection.switchOff),
-  thumbShadow: `0 1px 2px ${lightDark('rgba(15, 27, 45, 0.1)', 'rgba(0, 0, 0, 0.35)')}, 0 1px 3px ${lightDark('rgba(15, 27, 45, 0.08)', 'rgba(0, 0, 0, 0.28)')}`,
-  pillShadow: `0 2px 8px ${lightDark('rgba(91, 75, 196, 0.28)', 'rgba(91, 101, 196, 0.45)')}`,
+  ...varsFor('selection-', keysOf(lightSelection)),
   disabledOpacity: 0.5,
 } as const;

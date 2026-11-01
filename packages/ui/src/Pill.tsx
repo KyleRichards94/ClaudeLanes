@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { radius, tone, type Tone } from '@agent-lanes/tokens';
+import { glow, radius, ring, tone, type Tone } from '@agent-lanes/tokens';
 import { Text } from './Text';
 
 /**
@@ -41,7 +41,7 @@ export function Pill({ label, tone: pillTone = 'neutral', dot = false, size = 's
       {dot ? (
         <View testID={testID ? `${testID}-dot` : undefined} aria-hidden style={[styles.dot, dotStyles[pillTone]]} />
       ) : null}
-      <Text {...labelType[size]} color={tone[pillTone].text} numberOfLines={1}>
+      <Text {...labelType[size]} color={tone[pillTone].text} glow={0.5} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -81,9 +81,9 @@ const labelType = {
 } as const;
 
 const bandStyles = StyleSheet.create(
-  Object.fromEntries(pillTones.map((name) => [name, { backgroundColor: tone[name].band }])) as Record<PillTone, ViewStyle>,
+  Object.fromEntries(pillTones.map((name) => [name, { backgroundColor: tone[name].band, boxShadow: ring(tone[name].dot) }])) as Record<PillTone, ViewStyle>,
 );
 
 const dotStyles = StyleSheet.create(
-  Object.fromEntries(pillTones.map((name) => [name, { backgroundColor: tone[name].dot }])) as Record<PillTone, ViewStyle>,
+  Object.fromEntries(pillTones.map((name) => [name, { backgroundColor: tone[name].dot, boxShadow: glow(tone[name].dot) }])) as Record<PillTone, ViewStyle>,
 );

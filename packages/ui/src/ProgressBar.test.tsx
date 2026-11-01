@@ -3,12 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { color, tone } from '@agent-lanes/tokens';
 import { ProgressBar, toPercent, type ProgressTone } from './ProgressBar';
 
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 describe('ProgressBar', () => {
   it('is announced as a progressbar with its name and value', () => {
     render(<ProgressBar progress={0.42} label="Implementing progress" />);
@@ -22,7 +16,7 @@ describe('ProgressBar', () => {
     render(<ProgressBar testID="bar" progress={0.75} label="Progress" />);
     expect(getComputedStyle(screen.getByTestId('bar-fill')).width).toBe('75%');
     const track = getComputedStyle(screen.getByTestId('bar'));
-    expect(track.backgroundColor).toBe(rgb(color.line));
+    expect(track.backgroundColor).toBe(color.line);
     expect(track.height).toBe('6px');
   });
 
@@ -52,7 +46,7 @@ describe('ProgressBar', () => {
   it.each(solid)('%s tone is a solid fill', (fillTone, fill) => {
     render(<ProgressBar testID="bar" progress={1} tone={fillTone} label="Progress" />);
     const style = getComputedStyle(screen.getByTestId('bar-fill'));
-    expect(style.backgroundColor).toBe(rgb(fill));
+    expect(style.backgroundColor).toBe(fill);
     expect(style.backgroundImage === '' || style.backgroundImage === 'none').toBe(true);
   });
 });

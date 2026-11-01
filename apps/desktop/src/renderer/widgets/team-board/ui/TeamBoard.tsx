@@ -1,7 +1,7 @@
 import type { TeamRef } from '@agent-lanes/contracts';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { color, radius, space, tone } from '@agent-lanes/tokens';
+import { color, glow, radius, space, tone } from '@agent-lanes/tokens';
 import { Button, GlassPanel, SegmentedControl, Text } from '@agent-lanes/ui';
 import { useWorkItemLanes, type AgentTicketStore } from '@/entities/agent-ticket';
 import { ago, peerOnWorkItem, peerStageLabel, useMinute } from '@/entities/peer';
@@ -217,7 +217,7 @@ function Column({ column, note, onOpenItem, peerTagFor }: { column: TeamBoardCol
   return (
     <View style={[styles.column, prs && styles.prColumn]} testID={`team-column-${column.kind === 'active-prs' ? 'active-prs' : column.id}`}>
       <View style={styles.columnHeader}>
-        <View aria-hidden style={[styles.dot, { backgroundColor: DOTS[column.tone] }]} />
+        <View aria-hidden style={[styles.dot, { backgroundColor: DOTS[column.tone], boxShadow: glow(DOTS[column.tone]) }]} />
         <Text variant="title" size="sm" role="heading" aria-level={3} numberOfLines={1} style={styles.flexText}>
           {column.name}
         </Text>

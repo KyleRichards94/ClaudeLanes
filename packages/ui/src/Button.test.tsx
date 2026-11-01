@@ -2,40 +2,23 @@ import type { ReactElement } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { color, control, focusRing, fontSize, fontWeight, minTarget, motion, radius, shadow, tone } from '@agent-lanes/tokens';
+import { color, contrastRatio, control, focusRing, fontSize, fontWeight, glow, minTarget, motion, radius, resolveToken, shadow, tone } from '@agent-lanes/tokens';
 import { Button, buttonSizes, buttonVariants, type ButtonVariant } from './Button';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-/** WCAG 2 contrast ratio of two colours. `light-dark()` is read as its light half, which jsdom computes. */
-function contrast(a: string, b: string): number {
-  const luminance = (value: string) => {
-    const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-    const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
-      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
+/** Contrast of two colours as the light theme paints them; computed values come back as var() tokens. */
+const contrast = (a: string, b: string) => contrastRatio(resolveToken(a, 'light'), resolveToken(b, 'light'));
 
 /**
  * The button row on the "Design tokens" artboard (docs/design/screens/07-design-tokens.png),
  * sampled from the image: 44 px tall, 12 px corners (the soft one a pill), 18 px sides, bold 14 px
- * labels, secondary label in slate #334155; only the primary button casts its violet glow at rest.
+ * labels, secondary label in slate #334155; only the primary button casts its violet glow at rest (the strong one's
+ * glow draws nothing outside cyberpunk).
  * Plus `danger`, the red-bordered Remove button on the Connections artboard.
  */
 const artboard: Record<ButtonVariant, { label: string; fill: string; border: string; ink: string; corner: number; rest: string }> = {
   primary: { label: 'Primary', fill: color.claude, border: color.claude, ink: color.onAccent, corner: radius.control, rest: control.primaryShadow },
-  strong: { label: 'Strong', fill: color.ink, border: color.ink, ink: color.onInk, corner: radius.control, rest: 'none' },
-  secondary: { label: 'Secondary', fill: color.surface, border: color.line, ink: '#334155', corner: radius.control, rest: 'none' },
+  strong: { label: 'Strong', fill: control.strongFill, border: control.strongFill, ink: color.onInk, corner: radius.control, rest: glow(control.strongFill, 0.7) },
+  secondary: { label: 'Secondary', fill: color.surface, border: color.line, ink: control.ink, corner: radius.control, rest: 'none' },
   soft: { label: 'Soft pill', fill: color.claudeTint, border: color.claudeTint, ink: color.claudeText, corner: radius.pill, rest: 'none' },
   danger: { label: 'Remove', fill: color.surface, border: tone.danger.border, ink: color.danger, corner: radius.control, rest: 'none' },
 };
@@ -72,8 +55,8 @@ describe('Button', () => {
       const button = screen.getByRole('button', { name: want.label });
       const surface = getComputedStyle(surfaceOf(button));
 
-      expect(surface.backgroundColor).toBe(rgb(want.fill));
-      expect(surface.borderTopColor).toBe(rgb(want.border));
+      expect(surface.backgroundColor).toBe(want.fill);
+      expect(surface.borderTopColor).toBe(want.border);
       expect(surface.borderTopWidth).toBe('1px');
       expect(surface.borderTopLeftRadius).toBe(`${want.corner}px`);
       expect(surface.minHeight).toBe('44px');
@@ -83,7 +66,7 @@ describe('Button', () => {
       expectAtRest(surfaceOf(button));
 
       const label = getComputedStyle(screen.getByText(want.label));
-      expect(label.color).toBe(rgb(want.ink));
+      expect(label.color).toBe(want.ink);
       expect(label.fontWeight).toBe(fontWeight.heading);
       expect(label.fontSize).toBe(`${fontSize.md}px`);
     });
@@ -95,8 +78,8 @@ describe('Button', () => {
 
     it('is secondary when no variant is given', () => {
       render(<Button label="Cancel" />);
-      expect(getComputedStyle(surfaceOf(screen.getByRole('button'))).backgroundColor).toBe(rgb(color.surface));
-      expect(getComputedStyle(screen.getByText('Cancel')).color).toBe(rgb(control.ink));
+      expect(getComputedStyle(surfaceOf(screen.getByRole('button'))).backgroundColor).toBe(color.surface);
+      expect(getComputedStyle(screen.getByText('Cancel')).color).toBe(control.ink);
     });
 
     it('renders a native button, so the platform handles activation and disabled state', () => {
@@ -171,7 +154,7 @@ describe('Button', () => {
       expect(document.activeElement).toBe(button);
       const surface = getComputedStyle(surfaceOf(button));
       expect(surface.outlineStyle).toBe('solid');
-      expect(surface.outlineColor).toBe(rgb(focusRing.color));
+      expect(surface.outlineColor).toBe(focusRing.color);
       expect(surface.outlineWidth).toBe(`${focusRing.width}px`);
       expect(surface.outlineOffset).toBe(`${focusRing.offset}px`);
       // The target's own outline (the app's global :focus-visible rule) stays off, so there is one ring.

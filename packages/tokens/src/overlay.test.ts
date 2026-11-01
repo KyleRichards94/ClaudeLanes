@@ -1,40 +1,32 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { glass, lightColor } from './index';
-import { lightOverlay, overlay } from './overlay';
-
-const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
-
-function cssVar(name: string): string | undefined {
-  return new RegExp(`--al-${name}:\\s*([^;]+);`).exec(css)?.[1]?.trim();
-}
-
-const rgbOf = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(', ');
+import { parseHex } from './contrast';
+import { glass } from './index';
+import { overlay } from './overlay';
+import { THEMES, themes } from './themes';
 
 describe('overlay tokens', () => {
-  it('CSS variables mirror the TS values', () => {
-    expect(cssVar('overlay-scrim')).toBe(lightOverlay.scrim);
-    expect(cssVar('overlay-scrim-blur')).toBe(`${overlay.scrimBlur}px`);
-    expect(cssVar('overlay-shadow')).toBe(lightOverlay.shadow);
-  });
-
   it('blurs the app behind a modal with the small glass step, less than the modal glass itself', () => {
     expect(overlay.scrimBlur).toBe(glass.blurSm);
     expect(overlay.scrimBlur).toBeLessThan(glass.blurXl);
   });
 
-  it('keeps the scrim a pale, see-through wash rather than a dark dim', () => {
-    const [r = 0, g = 0, b = 0, alpha = 1] = /rgba\(([^)]+)\)/
-      .exec(lightOverlay.scrim)?.[1]
-      ?.split(',')
-      .map(Number) ?? [];
-    expect(Math.min(r, g, b)).toBeGreaterThanOrEqual(220);
-    expect(alpha).toBeGreaterThan(0);
-    expect(alpha).toBeLessThan(1);
+  it('casts the light shadow in the ink colour', () => {
+    expect(themes.light.overlay.shadow).toContain(`rgba(${parseHex(themes.light.color.ink).join(', ')},`);
   });
 
-  it('casts the shadow in the ink colour, offset downwards', () => {
-    expect(lightOverlay.shadow).toContain(`rgba(${rgbOf(lightColor.ink)},`);
-    expect(overlay.shadow).toMatch(/^0 \d+px /);
+  describe.each(THEMES)('%s', (theme) => {
+    const { base, overlay: palette } = themes[theme];
+
+    it('keeps the scrim see-through: pale on a light theme, dim on a dark one', () => {
+      const [r = 0, g = 0, b = 0, alpha = 1] = /rgba\(([^)]+)\)/.exec(palette.scrim)?.[1]?.split(',').map(Number) ?? [];
+      if (base === 'light') expect(Math.min(r, g, b)).toBeGreaterThanOrEqual(220);
+      else expect(Math.max(r, g, b)).toBeLessThanOrEqual(40);
+      expect(alpha).toBeGreaterThan(0);
+      expect(alpha).toBeLessThan(1);
+    });
+
+    it('casts a large soft shadow, offset downwards', () => {
+      expect(palette.shadow).toMatch(/^0 24px 72px rgba\(/);
+    });
   });
 });

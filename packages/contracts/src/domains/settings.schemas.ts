@@ -90,8 +90,10 @@ export const AgentDefaultsSchema = z.object({
 });
 export type AgentDefaults = z.infer<typeof AgentDefaultsSchema>;
 
-/** How the app chooses light or dark. `system` follows the computer. */
-export const APPEARANCES = ['system', 'light', 'dark'] as const;
+/** The themes Settings › Appearance can pick. Mirrors `THEMES` in @agent-lanes/tokens, which holds their palettes. */
+export const THEMES = ['light', 'dark', 'solarpunk', 'cyberpunk'] as const;
+/** How the app chooses its theme. `system` follows the computer between light and dark. */
+export const APPEARANCES = ['system', ...THEMES] as const;
 export const AppearanceSchema = z.enum(APPEARANCES);
 export type Appearance = z.infer<typeof AppearanceSchema>;
 

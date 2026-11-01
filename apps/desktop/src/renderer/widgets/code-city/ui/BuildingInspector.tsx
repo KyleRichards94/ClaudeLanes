@@ -54,7 +54,7 @@ export function BuildingInspector({ file, author, district, review, anyUncommitt
   }
   const faces = faceColors(author.color);
   const binary = file.kind === 'binary';
-  const tone = reviewTone[review];
+  const inspection = reviewTone[review];
   return (
     <Card style={styles.card} testID="city-inspector">
       <View style={styles.head}>
@@ -79,9 +79,9 @@ export function BuildingInspector({ file, author, district, review, anyUncommitt
         </Text>
       ) : null}
       <View style={styles.stats}>
-        <StatTile testID="city-stat-added" value={`+${file.added}`} label="floors added" background="#ECFDF5" ink="#047857" />
-        <StatTile testID="city-stat-removed" value={`−${file.removed}`} label="demolished" background="#FEF2F2" ink="#B91C1C" />
-        <StatTile testID="city-stat-review" value={REVIEW_WORDS[review]} label="inspection" background={tone.background} ink={tone.ink} />
+        <StatTile testID="city-stat-added" value={`+${file.added}`} label="floors added" background={tone.ok.wash} ink={tone.ok.text} />
+        <StatTile testID="city-stat-removed" value={`−${file.removed}`} label="demolished" background={tone.danger.wash} ink={color.danger} />
+        <StatTile testID="city-stat-review" value={REVIEW_WORDS[review]} label="inspection" background={inspection.background} ink={inspection.ink} />
       </View>
       {chip}
     </Card>

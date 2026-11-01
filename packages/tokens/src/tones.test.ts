@@ -1,70 +1,41 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { color, lightColor } from './index';
-import { darkTone, lightTone, mutedFilter, mutedOpacity, progressGradient, tone } from './tones';
-
-const css = readFileSync(new URL('./agent-lanes-tokens.css', import.meta.url), 'utf8');
-
-function cssVar(name: string): string | undefined {
-  return new RegExp(`--al-${name}:\\s*([^;]+);`).exec(css)?.[1]?.trim();
-}
-
-/** WCAG 2 relative luminance contrast ratio of two #RRGGBB colours. */
-function contrast(a: string, b: string): number {
-  const luminance = (hex: string) => {
-    const [r = 0, g = 0, bl = 0] = [1, 3, 5].map((i) => {
-      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-    });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
-  };
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-const entries = Object.entries(lightTone).flatMap(([name, values]) =>
-  Object.entries(values).map(([key, value]) => [`${name}-${key}`, value] as const),
-);
+import { contrastRatio } from './contrast';
+import { color } from './index';
+import { THEMES, themes } from './themes';
+import { mutedFilter, mutedOpacity, progressGradient, tone } from './tones';
 
 describe('tone tints', () => {
-  it.each(entries)('CSS variable --al-tone-%s mirrors the TS value', (name, value) => {
-    expect(cssVar(`tone-${name}`)?.toLowerCase()).toBe(value.toLowerCase());
+  it('runs progress from the Claude colour into the sky glow', () => {
+    expect(progressGradient).toEqual({ from: color.claude, to: color.skyGlow });
   });
 
-  it('repeats the colour tokens it shares with `color` exactly', () => {
-    expect(tone.claude.band).toBe(color.claudeTint);
-    expect(tone.claude.text).toBe(color.claudeText);
-    expect(tone.ado.band).toBe(color.adoTint);
-    expect(tone.ado.text).toBe(color.ado);
-    expect(tone.ado.fill).toBe(color.skyGlow);
-    expect(progressGradient).toEqual({ from: color.claude, to: color.skyGlow });
-    expect(tone.claude.dot).toBe(color.claude);
-    expect(tone.ado.dot).toBe(color.ado);
-    expect(tone.attention.dot).toBe(color.attention);
-    expect(tone.danger.dot).toBe(color.danger);
-    expect(tone.ok.dot).toBe(color.ok);
+  it('fades merged cards mostly by colour, a little by opacity', () => {
+    expect(mutedOpacity).toBe(0.95);
+    expect(mutedFilter).toBe('grayscale(0.7)');
   });
 
   it.each(Object.entries(tone))('%s has a band, text and dot for pills', (_name, values) => {
-    expect(values).toEqual(
-      expect.objectContaining({ band: expect.any(String), text: expect.any(String), dot: expect.any(String) }),
-    );
+    expect(values).toEqual(expect.objectContaining({ band: expect.any(String), text: expect.any(String), dot: expect.any(String) }));
   });
 
-  it.each(Object.entries(lightTone))('%s text meets 4.5:1 on its band', (_name, values) => {
-    expect(contrast(values.text, values.band)).toBeGreaterThanOrEqual(4.5);
-  });
+  describe.each(THEMES)('%s', (theme) => {
+    const { color: palette, tone: tones } = themes[theme];
 
-  it.each(Object.entries(darkTone))('dark %s text meets 4.5:1 on its band', (_name, values) => {
-    expect(contrast(values.text, values.band)).toBeGreaterThanOrEqual(4.5);
-  });
+    it('repeats the colour tokens it shares with the palette exactly', () => {
+      expect(tones.claude.band).toBe(palette.claudeTint);
+      expect(tones.claude.text).toBe(palette.claudeText);
+      expect(tones.claude.dot).toBe(palette.claude);
+      expect(tones.ado.band).toBe(palette.adoTint);
+      expect(tones.ado.text).toBe(palette.ado);
+      expect(tones.ado.fill).toBe(palette.skyGlow);
+      expect(tones.ado.dot).toBe(palette.ado);
+      expect(tones.attention.dot).toBe(palette.attention);
+      expect(tones.danger.dot).toBe(palette.danger);
+      expect(tones.ok.dot).toBe(palette.ok);
+    });
 
-  it('mirrors the progress gradient and muted opacity in CSS', () => {
-    expect(cssVar('progress-gradient')?.toLowerCase()).toBe(
-      `linear-gradient(90deg, ${lightColor.claude}, ${lightColor.skyGlow})`.toLowerCase(),
-    );
-    expect(css.toLowerCase()).toContain('linear-gradient(90deg, #5b65c4, #38bdf8)');
-    expect(cssVar('muted-opacity')).toBe(String(mutedOpacity));
-    expect(cssVar('muted-filter')).toBe(mutedFilter);
+    it.each(Object.entries(tones))('%s text meets 4.5:1 on its band', (_name, values) => {
+      expect(contrastRatio(values.text, values.band)).toBeGreaterThanOrEqual(4.5);
+    });
   });
 });

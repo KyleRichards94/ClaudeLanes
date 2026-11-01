@@ -4,13 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { color, mutedFilter, mutedOpacity, radius, shadow, tone } from '@agent-lanes/tokens';
 import { Card, CardSection, type CardFooterTone, type CardSectionTone, type CardTone } from './Card';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 const borderFor: Record<CardTone, string> = {
   default: color.line,
   selected: tone.claude.border,
@@ -40,7 +33,7 @@ const artboard6: { state: string; tone: CardTone; footer?: { tone: CardFooterTon
 
 function expectOutline(element: HTMLElement, cardTone: CardTone) {
   const style = getComputedStyle(element);
-  expect(style.borderTopColor).toBe(rgb(borderFor[cardTone]));
+  expect(style.borderTopColor).toBe(borderFor[cardTone]);
   expect(style.borderTopWidth).toBe('1px');
   expect(style.opacity).toBe(cardTone === 'muted' ? String(mutedOpacity) : '1');
   // AL-033: the merged card fades mostly by losing colour, which keeps its text at 4.5:1.
@@ -49,10 +42,10 @@ function expectOutline(element: HTMLElement, cardTone: CardTone) {
 
 function expectFooter(cardTestId: string, footerTone: CardFooterTone, label: string) {
   const band = screen.getByTestId(`${cardTestId}-footer`);
-  expect(getComputedStyle(band).backgroundColor).toBe(rgb(footerFor[footerTone].band));
+  expect(getComputedStyle(band).backgroundColor).toBe(footerFor[footerTone].band);
   const text = screen.getByText(label);
   expect(band.contains(text)).toBe(true);
-  expect(getComputedStyle(text).color).toBe(rgb(footerFor[footerTone].text));
+  expect(getComputedStyle(text).color).toBe(footerFor[footerTone].text);
 }
 
 describe('Card', () => {
@@ -65,7 +58,7 @@ describe('Card', () => {
     const card = screen.getByTestId('card');
     const style = getComputedStyle(card);
     expect(screen.getByText('Cutover frmJobControl to Blazor')).toBeTruthy();
-    expect(style.backgroundColor).toBe(rgb(color.surface));
+    expect(style.backgroundColor).toBe(color.surface);
     expect(style.borderTopLeftRadius).toBe(`${radius.card}px`);
     expect(style.boxShadow).toBe(shadow.card);
     // The radius clips the square sections and footer band.
@@ -139,6 +132,6 @@ describe('CardSection', () => {
 
   it.each(washes)('%s section uses its wash tint', (sectionTone, wash) => {
     render(<CardSection testID="body" tone={sectionTone} />);
-    expect(getComputedStyle(screen.getByTestId('body')).backgroundColor).toBe(rgb(wash));
+    expect(getComputedStyle(screen.getByTestId('body')).backgroundColor).toBe(wash);
   });
 });

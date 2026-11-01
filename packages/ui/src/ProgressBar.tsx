@@ -1,5 +1,5 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { color, progressGradient, radius, tone } from '@agent-lanes/tokens';
+import { color, glow, progressGradient, radius, tone } from '@agent-lanes/tokens';
 
 /**
  * Fill tone, from the "Agent card states" artboard: `claude` violet→sky gradient while an agent
@@ -53,7 +53,6 @@ const styles = StyleSheet.create({
     height: barHeight,
     borderRadius: radius.pill,
     backgroundColor: color.line,
-    overflow: 'hidden',
   },
   fill: {
     height: '100%',
@@ -66,8 +65,9 @@ const fillStyles = StyleSheet.create({
     // Solid violet underneath in case a renderer has no gradient support.
     backgroundColor: progressGradient.from,
     backgroundImage: 'var(--al-progress-gradient)',
+    boxShadow: glow(tone.claude.dot, 0.6),
   },
-  ado: { backgroundColor: tone.ado.fill },
-  danger: { backgroundColor: tone.danger.fill },
-  ok: { backgroundColor: tone.ok.fill },
+  ado: { backgroundColor: tone.ado.fill, boxShadow: glow(tone.ado.fill, 0.6) },
+  danger: { backgroundColor: tone.danger.fill, boxShadow: glow(tone.danger.fill, 0.6) },
+  ok: { backgroundColor: tone.ok.fill, boxShadow: glow(tone.ok.fill, 0.6) },
 });

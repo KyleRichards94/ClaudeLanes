@@ -8,7 +8,7 @@ import { AgentTicketCard, AgentTicketCardView } from './AgentTicketCard';
 import { ticketFromRecord } from '../model/ticket';
 import { agentFinished, cardView, needsYouLabel, type CardState } from './card-view';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
+/** jsdom reports computed colours as rgb(); ADO colours are #RRGGBB. */
 function rgb(value: string): string {
   const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
@@ -137,7 +137,7 @@ describe('AgentTicketCard', () => {
     if (subAgents) expect(screen.getByText(subAgents)).toBeTruthy();
 
     const card = screen.getByTestId('ticket-card');
-    expect(getComputedStyle(card).borderTopColor).toBe(rgb(border));
+    expect(getComputedStyle(card).borderTopColor).toBe(border);
     expect(getComputedStyle(card).opacity).toBe(state === 'merged' ? String(mutedOpacity) : '1');
     if (footer) {
       const band = screen.getByTestId('ticket-card-footer');
@@ -159,13 +159,13 @@ describe('AgentTicketCard', () => {
 
   it('falls back to the token colours when ADO colours are unknown', () => {
     render(<AgentTicketCard ticketId={ID} store={runningStore()} adoState="Active" testID="ticket" />);
-    expect(getComputedStyle(screen.getByTestId('ticket-type')).backgroundColor).toBe(rgb(tone.ado.dot));
-    expect(getComputedStyle(screen.getByTestId('ticket-state-dot')).backgroundColor).toBe(rgb(tone.neutral.dot));
+    expect(getComputedStyle(screen.getByTestId('ticket-type')).backgroundColor).toBe(tone.ado.dot);
+    expect(getComputedStyle(screen.getByTestId('ticket-state-dot')).backgroundColor).toBe(tone.neutral.dot);
   });
 
   it('shows the violet outline when selected', () => {
     render(<AgentTicketCard ticketId={ID} store={runningStore()} selected testID="ticket" />);
-    expect(getComputedStyle(screen.getByTestId('ticket-card')).borderTopColor).toBe(rgb(tone.claude.border));
+    expect(getComputedStyle(screen.getByTestId('ticket-card')).borderTopColor).toBe(tone.claude.border);
   });
 
   it('opens with a click, and is a focusable button named after the ticket and its state', () => {
@@ -249,12 +249,12 @@ describe('AgentTicketCard design indicator (AL-200)', () => {
 
     act(() => store.setDesignSpec(ID, 3, 'shipped', 4_000));
     expect(screen.getByTestId('ticket-design').textContent).toBe('Design v3 not yet used');
-    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(rgb(tone.attention.band));
+    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(tone.attention.band);
     expect(screen.getByRole('button').getAttribute('aria-label')).toContain('Design v3 not yet used');
 
     act(() => store.setDesignSpec(ID, 3, 'used', 4_100));
     expect(screen.getByTestId('ticket-design').textContent).toBe('Design v3');
-    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(rgb(tone.claude.band));
+    expect(getComputedStyle(screen.getByTestId('ticket-design')).backgroundColor).toBe(tone.claude.band);
   });
 
   it('reads the indicator from the record at start-up', () => {

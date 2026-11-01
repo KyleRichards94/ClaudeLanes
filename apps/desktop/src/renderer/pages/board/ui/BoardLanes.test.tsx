@@ -9,13 +9,6 @@ import { RouterProvider, createRouter, selectRoute, type Router } from '@/shared
 import { fakeTicketRecord, installFakeSettings, type FakeSettings } from '@/shared/testing';
 import { BoardLanes, LANES_MIN_WIDTH } from './BoardLanes';
 
-/** jsdom reports computed colours as rgb(); tokens are #RRGGBB. */
-function rgb(value: string): string {
-  const hex = /#[0-9a-fA-F]{6}/.exec(value)?.[0] ?? value;
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
 /** Artboard 1: one card per lane, two in Implementing, nothing in Done yet. */
 const BOARD: readonly TicketRecord[] = [
   fakeTicketRecord({ id: '71330', stage: 'queued', stageEnteredAt: 100, title: 'Asset register paging slow above 5k rows' }),
@@ -121,11 +114,11 @@ describe('BoardLanes', () => {
     renderLanes();
     const badge = () => within(screen.getByTestId('lane-code-review')).getByRole('img');
     expect(badge().getAttribute('aria-label')).toBe('1 ticket');
-    expect(getComputedStyle(badge()).backgroundColor).toBe(rgb(color.surface));
+    expect(getComputedStyle(badge()).backgroundColor).toBe(color.surface);
 
     act(() => store.openGate('71301', 'code-review', 1_000));
     expect(badge().getAttribute('aria-label')).toBe('1 ticket, 1 needs you');
-    expect(getComputedStyle(badge()).backgroundColor).toBe(rgb(tone.attention.band));
+    expect(getComputedStyle(badge()).backgroundColor).toBe(tone.attention.band);
   });
 
   it('shows the empty-lane copy in a lane with no cards', () => {
