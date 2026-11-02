@@ -65,6 +65,16 @@ export function rowOffsets(rows: readonly StreamRow[], measured: ReadonlyMap<str
   return offsets;
 }
 
+/**
+ * What to do with a row's newly measured height: `ignore` it (no size, or the one already known), `hold` it (the row
+ * is the newest and the view follows it, so the view is right without it and a commit per frame of text is saved),
+ * or `apply` it. A row never measured before is always applied.
+ */
+export function heightChange(known: number | undefined, height: number, followedTail: boolean): 'ignore' | 'hold' | 'apply' {
+  if (height <= 0 || (known !== undefined && Math.abs(known - height) < 0.5)) return 'ignore';
+  return known !== undefined && followedTail ? 'hold' : 'apply';
+}
+
 /** The last index whose offset is at or above `y` (binary search over the sorted offsets). */
 function indexAt(offsets: Float64Array, count: number, y: number): number {
   let low = 0;

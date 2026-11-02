@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -12,12 +12,12 @@ import {
 } from 'react-native';
 import { space } from '@agent-lanes/tokens';
 import { Button, Text } from '@agent-lanes/ui';
-import { useAgentOutput } from '../model/hooks';
+import { useAgentOutput, useAgentOutputSkeleton } from '../model/hooks';
 import { expandRow, toggleRowExpanded, useExpandedKeys } from '../model/expanded';
-import { displayRows, findToolUse, groupTurns, outputRows, turnRowKey, withoutThinking, type OutputRow, type StreamRow, type TurnHeaderRow } from '../model/rows';
+import { displayRows, findToolUse, groupTurns, liveTexts, outputRows, turnRowKey, withLiveText, withoutThinking, type OutputRow, type StreamRow, type TurnHeaderRow } from '../model/rows';
 import { TURN_SCROLL_PREFIX, clearOutputScroll, useOutputScrollRequest } from '../model/scroll-request';
 import type { AgentOutputStore } from '../model/store';
-import { rowOffsets, windowFor } from '../model/virtual';
+import { heightChange, rowOffsets, windowFor } from '../model/virtual';
 import { OutputRowView, type RenderUserActions } from './OutputRowView';
 
 /** Where the tool row a permission request waits on is (AL-260): not drawn yet, in view, or scrolled away. */
@@ -82,13 +82,22 @@ const PAD_Y = space.lg;
  */
 export function OutputStream({ ticketId, store, style, testID = 'output-stream', waitingToolUseId = null, renderWaitingRow, onWaitingRow, showThinking = true, renderUserActions, grouping }: OutputStreamProps) {
   const events = useAgentOutput(ticketId, store);
-  const allRows = outputRows(events);
+  const skeleton = useAgentOutputSkeleton(ticketId, store);
+  const grouped = grouping !== undefined;
+  // Rows are folded from the skeleton, so streamed text does not rebuild them; the text being written is laid over them.
+  const allRows = useMemo(() => outputRows(skeleton), [skeleton]);
   const openKeys = useExpandedKeys(ticketId);
   // Turns are cut from every row, thinking included, so their numbers match the turn strip's; thinking is dropped after.
-  const groups = grouping
-    ? groupTurns(allRows).map((group) => (showThinking ? group : { ...group, rows: withoutThinking(group.rows) }))
-    : null;
-  const rows: StreamRow[] = groups ? displayRows(groups, openKeys) : showThinking ? allRows : withoutThinking(allRows);
+  const groups = useMemo(
+    () => (grouped ? groupTurns(allRows).map((group) => (showThinking ? group : { ...group, rows: withoutThinking(group.rows) })) : null),
+    [allRows, grouped, showThinking],
+  );
+  const shapedRows = useMemo<readonly StreamRow[]>(
+    () => (groups ? displayRows(groups, openKeys) : showThinking ? allRows : withoutThinking(allRows)),
+    [groups, openKeys, allRows, showThinking],
+  );
+  const live = useMemo(() => liveTexts(events), [events]);
+  const rows = useMemo(() => withLiveText(shapedRows, live), [shapedRows, live]);
   const scrollRef = useRef<ScrollViewInstance>(null);
   // Heights of rows drawn so far, by row key; a new map on each change so the offsets follow it.
   const [measured, setMeasured] = useState<ReadonlyMap<string, number>>(() => new Map());
@@ -103,10 +112,38 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
   const top = follow ? tailTop : scrollTop;
   const { start, end } = windowFor(offsets, rows.length, top - PAD_Y, viewport.height);
 
-  // New output (or turning follow back on) keeps the newest row in view.
+  // New output (or turning follow back on) keeps the newest row in view; scroll and measure renders leave it alone.
   useLayoutEffect(() => {
     if (follow) scrollRef.current?.scrollToEnd({ animated: false });
-  }, [follow, tailTop]);
+  }, [follow, tailTop, rows]);
+
+  const measuredRef = useRef(measured);
+  const tailRef = useRef<{ key: string | null; follow: boolean }>({ key: null, follow: true });
+  // A height change of the newest row, held back while it is followed so each frame of text does not add a commit.
+  const heldRef = useRef<{ key: string; height: number } | null>(null);
+  useLayoutEffect(() => {
+    measuredRef.current = measured;
+    tailRef.current = { key: rows.at(-1)?.key ?? null, follow };
+  });
+
+  const setHeights = useCallback((updates: readonly { key: string; height: number }[]) => {
+    setMeasured((heights) => {
+      let next: Map<string, number> | null = null;
+      for (const { key, height } of updates) {
+        if (Math.abs(((next ?? heights).get(key) ?? -1) - height) < 0.5) continue;
+        next ??= new Map(heights);
+        next.set(key, height);
+      }
+      return next ?? heights;
+    });
+  }, []);
+
+  const releaseHeld = useCallback(() => {
+    const held = heldRef.current;
+    if (!held) return;
+    heldRef.current = null;
+    setHeights([held]);
+  }, [setHeights]);
 
   // A sub-agent card asked for its Spawn row (AL-261): open it and scroll there once the stream has it.
   const scrollRequest = useOutputScrollRequest(ticketId);
@@ -134,10 +171,11 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
     // After this layout pass the view stops following the newest output and moves to the row.
     queueMicrotask(() => {
       setFollow(false);
+      releaseHeld();
       setScrollTop(y);
       scrollRef.current?.scrollTo({ y, animated: true });
     });
-  }, [scrollRequest, ticketId, rows, groups, offsets]);
+  }, [scrollRequest, ticketId, rows, groups, offsets, releaseHeld]);
 
   // The row a permission request waits on (AL-260), and whether it is in view.
   const waitingIndex = waitingToolUseId === null ? -1 : rows.findIndex((row) => row.type === 'tool' && row.toolUseIds.includes(waitingToolUseId));
@@ -155,9 +193,13 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
     const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
     const height = layoutMeasurement.height > 0 ? layoutMeasurement.height : viewport.height;
     const content = contentSize.height > 0 ? contentSize.height : total + 2 * PAD_Y;
-    setScrollTop(contentOffset.y);
     const atTail = contentOffset.y + height >= content - TAIL_SLACK;
-    if (follow !== atTail && content > height) setFollow(atTail);
+    // While following, the view sits at the tail whatever the scroll position says, so our own scrolling needs no render.
+    if (!(follow && atTail)) setScrollTop(contentOffset.y);
+    if (follow !== atTail && content > height) {
+      setFollow(atTail);
+      if (!atTail) releaseHeld();
+    }
   };
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -166,12 +208,22 @@ export function OutputStream({ ticketId, store, style, testID = 'output-stream',
   };
 
   const onRowLayout = (key: string, height: number) => {
-    setMeasured((heights) => {
-      if (height <= 0 || Math.abs((heights.get(key) ?? -1) - height) < 0.5) return heights;
-      const next = new Map(heights);
-      next.set(key, height);
-      return next;
-    });
+    const tail = tailRef.current;
+    switch (heightChange(measuredRef.current.get(key), height, tail.follow && key === tail.key)) {
+      case 'ignore':
+        if (height > 0 && heldRef.current?.key === key) heldRef.current = null;
+        break;
+      case 'hold':
+        heldRef.current = { key, height };
+        scrollRef.current?.scrollToEnd({ animated: false });
+        break;
+      case 'apply': {
+        const held = heldRef.current;
+        heldRef.current = null;
+        setHeights(held ? [held, { key, height }] : [{ key, height }]);
+        break;
+      }
+    }
   };
 
   const jumpToLatest = () => {

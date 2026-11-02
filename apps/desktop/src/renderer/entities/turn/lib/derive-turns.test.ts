@@ -115,6 +115,28 @@ describe('deriveTurns (AL-278)', () => {
     expect(deriveTurns([result(5_100, 0.5, 400)], history)[0]).toMatchObject({ startedAt: 4_700, endedAt: 5_100 });
     expect(deriveTurns([], history)).toEqual([]);
   });
+
+  it('works out a finished text’s summary once, however often the turns are derived again', () => {
+    let reads = 0;
+    const finished = text('Built it. Then tested it.', 1_300);
+    Object.defineProperty(finished.item, 'text', {
+      get: () => {
+        reads += 1;
+        return 'Built it. Then tested it.';
+      },
+    });
+    const events = [user(1_000), tool('a', 'Edit', 1_100), finished, result(1_400, 0.1)];
+
+    expect(deriveTurns(events, history)[0]!.summary).toBe('Built it.');
+    expect(deriveTurns(events, history)[0]!.summary).toBe('Built it.');
+    expect(reads).toBe(1);
+  });
+
+  it('summarises the lead’s newest finished text, not a sub-agent’s or a half-streamed one', () => {
+    const delta = ev({ kind: 'text-delta', streamId: 'live', text: 'Half way throu' }, 1_350);
+    const turns = deriveTurns([user(1_000), text('Lead first.', 1_100), text('Sub-agent says hi.', 1_200, 'toolu_x'), text('Lead last. More.', 1_300), delta], history);
+    expect(turns[0]!.summary).toBe('Lead last.');
+  });
 });
 
 describe('turn stage', () => {
@@ -146,6 +168,39 @@ describe('turn summaries and tool chips', () => {
     expect(firstSentence('I am cutting over `frmJobFilter` now\nthen the next one')).toBe('I am cutting over frmJobFilter now');
     expect(firstSentence('')).toBe('');
     expect(firstSentence('x'.repeat(300))).toHaveLength(140);
+  });
+
+  it('reads the same first sentence as splitting the whole text did, past blank lines, fences and list marks', () => {
+    const legacy = (value: string) => {
+      const lines = value
+        .split('\n')
+        .map((line) => line.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, '').trim())
+        .filter((line) => line !== '' && !/^```/.test(line));
+      const plain = (lines[0] ?? '')
+        .replace(/\*\*|__|`/g, '')
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .trim();
+      const end = /[.!?](?=\s|$)/.exec(plain);
+      const sentence = end ? plain.slice(0, end.index + 1) : plain;
+      return sentence.length > 140 ? `${sentence.slice(0, 139).trimEnd()}…` : sentence;
+    };
+    const samples = [
+      '',
+      '\n',
+      '\n\n   \n',
+      '```\n```\n',
+      '\n\n```ts\nconst x = 1;\n```\nThen the grid.',
+      'Line one\r\nLine two',
+      '\r\n\r\n- Wire the grid. Then test it.',
+      '   12) Numbered point! More.',
+      '> quoted? yes\nnext',
+      '[link text](https://example.com/a) opens it. Done.',
+      `${'\n'.repeat(500)}Late start.`,
+      `${'word '.repeat(80)}end.`,
+      'no newline at all',
+      'ends with newline\n',
+    ];
+    for (const sample of samples) expect(firstSentence(sample)).toBe(legacy(sample));
   });
 
   it('writes the chip with the busiest two tools', () => {

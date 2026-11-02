@@ -47,13 +47,23 @@ export function stageAt(history: readonly TicketStageEntry[], at: number): TurnS
 
 const SUMMARY_LIMIT = 140;
 
+const LINE_MARKUP = /^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/;
+
+/** The first line with something to say: not blank, not a code fence, list and heading marks removed. */
+function firstUsableLine(text: string): string {
+  for (let start = 0; start <= text.length; ) {
+    const newline = text.indexOf('\n', start);
+    const end = newline === -1 ? text.length : newline;
+    const line = text.slice(start, end).replace(LINE_MARKUP, '').trim();
+    if (line !== '' && !line.startsWith('```')) return line;
+    start = end + 1;
+  }
+  return '';
+}
+
 /** The first sentence of some assistant prose, without the markdown around it, clipped to one line. */
 export function firstSentence(text: string): string {
-  const lines = text
-    .split('\n')
-    .map((line) => line.replace(/^\s*(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, '').trim())
-    .filter((line) => line !== '' && !/^```/.test(line));
-  const plain = (lines[0] ?? '')
+  const plain = firstUsableLine(text)
     .replace(/\*\*|__|`/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .trim();
@@ -62,17 +72,31 @@ export function firstSentence(text: string): string {
   return sentence.length > SUMMARY_LIMIT ? `${sentence.slice(0, SUMMARY_LIMIT - 1).trimEnd()}…` : sentence;
 }
 
+/** A finished text's summary, worked out once however many times its turn is derived again. */
+const SUMMARIES = new WeakMap<object, string>();
+
+function summaryOf(item: { readonly text: string } | null): string {
+  if (!item) return '';
+  let summary = SUMMARIES.get(item);
+  if (summary === undefined) {
+    summary = firstSentence(item.text);
+    SUMMARIES.set(item, summary);
+  }
+  return summary;
+}
+
 interface Draft {
   startedAt: number;
   lastAt: number;
   rows: Set<string>;
   byAgent: Map<string, number>;
   toolCounts: Record<string, number>;
-  lastText: string;
+  /** The turn's newest finished text from the lead. */
+  lastText: { readonly text: string } | null;
 }
 
 function draftAt(at: number): Draft {
-  return { startedAt: at, lastAt: at, rows: new Set(), byAgent: new Map(), toolCounts: {}, lastText: '' };
+  return { startedAt: at, lastAt: at, rows: new Set(), byAgent: new Map(), toolCounts: {}, lastText: null };
 }
 
 function leadOf(draft: Draft, ticketId: string): string {
@@ -109,7 +133,7 @@ export function deriveTurns(events: readonly AgentOutputEvent[], stageHistory: r
     durationMs: end ? (end.durationMs > 0 ? end.durationMs : Math.max(0, end.at - draft.startedAt)) : Math.max(0, draft.lastAt - draft.startedAt),
     costUsd: end?.costUsd ?? 0,
     stage: stageAt(stageHistory, draft.startedAt),
-    summary: firstSentence(draft.lastText),
+    summary: summaryOf(draft.lastText),
     toolCounts: draft.toolCounts,
   });
 
@@ -136,7 +160,7 @@ export function deriveTurns(events: readonly AgentOutputEvent[], stageHistory: r
       case 'thinking-delta': {
         open ??= draftAt(at);
         open.lastAt = at;
-        if (item.kind === 'text' && item.parentToolUseId === null) open.lastText = item.text;
+        if (item.kind === 'text' && item.parentToolUseId === null) open.lastText = item;
         break;
       }
       case 'tool-result':

@@ -242,6 +242,93 @@ export function withoutThinking(rows: readonly OutputRow[]): OutputRow[] {
   });
 }
 
+/**
+ * The text of streams still being written, by the key of the row it fills. Rows folded from the store's skeleton
+ * (`TicketOutput.skeleton`) carry only a stream's first fragment; `withLiveText` puts these over them.
+ */
+export function liveTexts(events: readonly AgentOutputEvent[]): ReadonlyMap<string, string> {
+  const live = new Map<string, string>();
+  for (const { item } of events) {
+    const prefix = item.parentToolUseId === null ? '' : `${item.parentToolUseId}/`;
+    switch (item.kind) {
+      case 'text-delta':
+      case 'thinking-delta': {
+        const key = `${prefix}${item.kind === 'text-delta' ? 'd' : 'k'}${item.streamId}`;
+        live.set(key, (live.get(key) ?? '') + item.text);
+        break;
+      }
+      // A finished block's row already holds its whole text; deltas after it start a new stream.
+      case 'text':
+        live.delete(`${prefix}d${item.streamId}`);
+        break;
+      case 'thinking':
+        live.delete(`${prefix}k${item.streamId}`);
+        break;
+      default:
+        break;
+    }
+  }
+  return live;
+}
+
+/** `claimed` holds the keys already given their text: a stream id reused after its block finished has two rows, and only the newest is live. */
+function withLiveRow(row: OutputRow, live: ReadonlyMap<string, string>, claimed: Set<string>): OutputRow {
+  switch (row.type) {
+    case 'streaming':
+    case 'thinking': {
+      if (claimed.has(row.key)) return row;
+      claimed.add(row.key);
+      const text = live.get(row.key);
+      return text === undefined || text === row.text ? row : { ...row, text };
+    }
+    case 'tool': {
+      if (row.subagents.length === 0) return row;
+      let changed = false;
+      const subagents = row.subagents.map((sub) => {
+        const rows = withLiveRows(sub.rows, live);
+        if (rows === sub.rows) return sub;
+        changed = true;
+        return { ...sub, rows, latest: latestLine(rows) };
+      });
+      return changed ? { ...row, subagents } : row;
+    }
+    default:
+      return row;
+  }
+}
+
+function withLiveRows(rows: readonly OutputRow[], live: ReadonlyMap<string, string>): readonly OutputRow[] {
+  let patched: OutputRow[] | null = null;
+  const claimed = new Set<string>();
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const row = rows[index]!;
+    const next = withLiveRow(row, live, claimed);
+    if (next === row) continue;
+    patched ??= [...rows];
+    patched[index] = next;
+  }
+  return patched ?? rows;
+}
+
+/**
+ * The rows with each streaming and thinking row's text brought up to date from `liveTexts`, in every lane. Rows
+ * (and the list) that did not change keep their identity, so only the row being written is new.
+ */
+export function withLiveText(rows: readonly StreamRow[], live: ReadonlyMap<string, string>): readonly StreamRow[] {
+  if (live.size === 0) return rows;
+  let patched: StreamRow[] | null = null;
+  const claimed = new Set<string>();
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const row = rows[index]!;
+    if (row.type === 'turn-header') continue;
+    const next = withLiveRow(row, live, claimed);
+    if (next === row) continue;
+    patched ??= [...rows];
+    patched[index] = next;
+  }
+  return patched ?? rows;
+}
+
 /** The newest thing a sub-agent did, in one line. */
 export function latestLine(rows: readonly OutputRow[]): string | null {
   for (let index = rows.length - 1; index >= 0; index--) {

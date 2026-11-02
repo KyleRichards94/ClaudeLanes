@@ -11,6 +11,12 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 export interface TicketOutput {
   /** Oldest first, by seq, at most TRANSCRIPT_CAPACITY. */
   readonly events: readonly AgentOutputEvent[];
+  /**
+   * `events` with each stream's later text and thinking deltas left out (its first stays, so the stream still has a
+   * place). Keeps its identity while deltas stream, so what is derived from it (turns, agents, rows) only
+   * re-derives when the transcript's structure changes.
+   */
+  readonly skeleton: readonly AgentOutputEvent[];
   /** True once the backfill from main has been merged. */
   readonly backfilled: boolean;
 }
@@ -73,6 +79,37 @@ function withoutSupersededDeltas(events: readonly AgentOutputEvent[]): readonly 
   return kept.length === events.length ? events : kept;
 }
 
+function isDelta(item: AgentOutputEvent['item']): item is Extract<AgentOutputEvent['item'], { kind: 'text-delta' | 'thinking-delta' }> {
+  return item.kind === 'text-delta' || item.kind === 'thinking-delta';
+}
+
+function sameEvents(a: readonly AgentOutputEvent[], b: readonly AgentOutputEvent[]): boolean {
+  return a.length === b.length && a.every((event, index) => event === b[index]);
+}
+
+/** The events without each stream's later deltas; `previous` itself when nothing structural changed. */
+function skeletonOf(events: readonly AgentOutputEvent[], previous: readonly AgentOutputEvent[]): readonly AgentOutputEvent[] {
+  const opened = new Set<string>();
+  const kept: AgentOutputEvent[] = [];
+  for (const event of events) {
+    const { item } = event;
+    if (isDelta(item)) {
+      const stream = `${item.kind}:${item.parentToolUseId ?? ''}:${item.streamId}`;
+      if (opened.has(stream)) continue;
+      opened.add(stream);
+    } else if (item.kind === 'text' || item.kind === 'thinking') {
+      // A stream id reused after its block finished opens a new stream.
+      opened.delete(`${item.kind}-delta:${item.parentToolUseId ?? ''}:${item.streamId}`);
+    }
+    kept.push(event);
+  }
+  return sameEvents(previous, kept) ? previous : kept;
+}
+
+function outputOf(events: readonly AgentOutputEvent[], previous: TicketOutput, backfilled = previous.backfilled): TicketOutput {
+  return { events, skeleton: skeletonOf(events, previous.skeleton), backfilled };
+}
+
 export function createAgentOutputStore(capacity = TRANSCRIPT_CAPACITY): AgentOutputStore {
   const store = createStore<AgentOutputState>()(() => ({ byTicket: new Map() }));
 
@@ -85,7 +122,7 @@ export function createAgentOutputStore(capacity = TRANSCRIPT_CAPACITY): AgentOut
       if (store.getState().byTicket.has(ticketId)) return false;
       store.setState((state) => {
         const byTicket = new Map(state.byTicket);
-        byTicket.set(ticketId, { events: EMPTY, backfilled: false });
+        byTicket.set(ticketId, { events: EMPTY, skeleton: EMPTY, backfilled: false });
         return { byTicket };
       });
       return true;
@@ -105,7 +142,7 @@ export function createAgentOutputStore(capacity = TRANSCRIPT_CAPACITY): AgentOut
         const byTicket = new Map(state.byTicket);
         for (const [ticketId, list] of grouped) {
           const output = byTicket.get(ticketId);
-          if (output) byTicket.set(ticketId, { ...output, events: withoutSupersededDeltas(mergeOutput(output.events, list, capacity)) });
+          if (output) byTicket.set(ticketId, outputOf(withoutSupersededDeltas(mergeOutput(output.events, list, capacity)), output));
         }
         return { byTicket };
       });
@@ -117,7 +154,7 @@ export function createAgentOutputStore(capacity = TRANSCRIPT_CAPACITY): AgentOut
         if (!output) return state;
         const byTicket = new Map(state.byTicket);
         // Live events kept while main answered win over the same seq in the transcript.
-        byTicket.set(transcript.ticketId, { events: withoutSupersededDeltas(mergeOutput(transcript.events, output.events, capacity)), backfilled: true });
+        byTicket.set(transcript.ticketId, outputOf(withoutSupersededDeltas(mergeOutput(transcript.events, output.events, capacity)), output, true));
         return { byTicket };
       });
     },
@@ -139,4 +176,9 @@ export const agentOutput: AgentOutputStore = createAgentOutputStore();
 /** A ticket's events, or an empty list while it is not watched. */
 export function selectTicketOutput(state: AgentOutputState, ticketId: string): readonly AgentOutputEvent[] {
   return state.byTicket.get(ticketId)?.events ?? EMPTY;
+}
+
+/** A ticket's events without each stream's later deltas (`TicketOutput.skeleton`), or an empty list while it is not watched. */
+export function selectTicketSkeleton(state: AgentOutputState, ticketId: string): readonly AgentOutputEvent[] {
+  return state.byTicket.get(ticketId)?.skeleton ?? EMPTY;
 }

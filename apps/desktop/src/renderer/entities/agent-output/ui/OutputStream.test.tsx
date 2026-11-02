@@ -4,8 +4,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeOutputEvent, installFakeBridge } from '@/shared/testing';
 import { resetExpandedRows } from '../model/expanded';
 import { requestOutputScroll, requestOutputTurnScroll, resetOutputScrollRequests } from '../model/scroll-request';
+import type * as Rows from '../model/rows';
 import { createAgentOutputStore, type AgentOutputStore } from '../model/store';
 import { OutputStream } from './OutputStream';
+
+// Counts how often the rows are folded from the stream's events.
+const rowFolds = vi.hoisted(() => ({ count: 0 }));
+vi.mock('../model/rows', async (importOriginal) => {
+  const original = await importOriginal<typeof Rows>();
+  return {
+    ...original,
+    outputRows: (...args: Parameters<typeof original.outputRows>) => {
+      rowFolds.count += 1;
+      return original.outputRows(...args);
+    },
+  };
+});
 
 const lead = { parentToolUseId: null };
 
@@ -426,5 +440,90 @@ describe('OutputStream grouping (AL-279)', () => {
     act(() => store.receive(turnOne));
     expect(screen.queryByTestId('turn-1')).toBeNull();
     expect(screen.getByText('Filter added.')).toBeTruthy();
+  });
+});
+
+describe('OutputStream while text streams', () => {
+  beforeEach(() => {
+    resetExpandedRows();
+    rowFolds.count = 0;
+  });
+  const delta = (seq: number, text: string, streamId = 'msg_live', parentToolUseId: string | null = null) =>
+    itemEvent(seq, { kind: 'text-delta', streamId, text, parentToolUseId });
+  const readTool = (seq: number) => itemEvent(seq, { kind: 'tool', rowId: `r${seq}`, toolUseIds: [`r${seq}`], tool: 'read', label: 'Read', detail: `file${seq}.cs`, stats: null, ...lead });
+
+  it('grows the line being written without folding the rows again, and folds them on a structural event', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([readTool(1), textEvent(2, 'Finished earlier.'), delta(3, 'Wiring')]));
+    const folds = rowFolds.count;
+    expect(screen.getByTestId('output-streaming').textContent).toBe('Wiring▍');
+
+    act(() => store.receive([delta(4, ' the grid')]));
+    act(() => store.receive([delta(5, ' filters')]));
+    expect(screen.getByTestId('output-streaming').textContent).toBe('Wiring the grid filters▍');
+    expect(screen.getByText('Finished earlier.')).toBeTruthy();
+    expect(rowFolds.count).toBe(folds);
+
+    act(() => store.receive([readTool(6)]));
+    expect(rowFolds.count).toBe(folds + 1);
+    expect(screen.getAllByTestId('output-tool')).toHaveLength(2);
+    // No longer the newest row: it reads as finished prose.
+    expect(screen.getByText('Wiring the grid filters')).toBeTruthy();
+  });
+
+  it('keeps the grouped stream’s live turn growing the same way', () => {
+    render(<OutputStream ticketId="71273" store={store} grouping={{ renderHeader: (header) => <div data-testid={`turn-${header.index}`}>{`Turn ${header.index}`}</div> }} />);
+    act(() => store.receive([itemEvent(1, { kind: 'user', messageId: null, text: 'go', priority: null, source: 'composer', ...lead }), delta(2, 'Work')]));
+    const folds = rowFolds.count;
+    act(() => store.receive([delta(3, 'ing')]));
+    expect(screen.getByTestId('turn-1')).toBeTruthy();
+    expect(screen.getByTestId('output-streaming').textContent).toBe('Working▍');
+    expect(rowFolds.count).toBe(folds);
+  });
+
+  it('updates a sub-agent’s line on its closed Spawn row from its streamed text', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    const spawn = itemEvent(1, { kind: 'tool', rowId: 'spawn_1', toolUseIds: ['toolu_a'], names: ['explore'], tool: 'spawn', label: 'Spawn', detail: 'explore', stats: null, input: null, edit: null, ...lead });
+    act(() => store.receive([spawn, delta(2, 'Found ', 'm_a', 'toolu_a')]));
+    expect(screen.getByTestId('output-spawn-latest').textContent).toBe('explore · Found');
+    act(() => store.receive([delta(3, 'four forms', 'm_a', 'toolu_a')]));
+    expect(screen.getByTestId('output-spawn-latest').textContent).toBe('explore · Found four forms');
+  });
+
+  it('does not fold the rows again when the view scrolls', () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive(Array.from({ length: 300 }, (_, index) => textEvent(index + 1))));
+    const folds = rowFolds.count;
+    act(() => scrollTo(0, 9_600));
+    act(() => scrollTo(1_000, 9_600));
+    expect(screen.getByTestId('output-jump-latest')).toBeTruthy();
+    expect(rowFolds.count).toBe(folds);
+  });
+
+  it('scrolls to the end for new output only while following, and not for a scroll', async () => {
+    render(<OutputStream ticketId="71273" store={store} />);
+    act(() => store.receive([textEvent(1)]));
+    const node = scrollNode(2_000);
+    const scrolled = vi.fn();
+    Object.defineProperty(node, 'scroll', { configurable: true, value: scrolled });
+
+    // At the end the view keeps following: our own scroll event is no news.
+    node.scrollTop = 1_500;
+    act(() => {
+      fireEvent.scroll(node);
+    });
+    expect(scrolled).not.toHaveBeenCalled();
+
+    act(() => store.receive([delta(2, 'new')]));
+    expect(scrolled).toHaveBeenCalledTimes(1);
+    act(() => store.receive([delta(3, ' words')]));
+    expect(scrolled).toHaveBeenCalledTimes(2);
+
+    // Scrolled up: output no longer pulls the view down. The scroll view drops events inside its throttle and scroll-end timer.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    act(() => scrollTo(0, 2_000));
+    scrolled.mockClear();
+    act(() => store.receive([delta(4, ' more')]));
+    expect(scrolled).not.toHaveBeenCalled();
   });
 });
