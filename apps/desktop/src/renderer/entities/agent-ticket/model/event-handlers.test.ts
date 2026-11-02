@@ -135,7 +135,7 @@ describe('agent ticket event handlers', () => {
     handlers['agent:output']?.(Array.from({ length: 1000 }, (_, at) => fakeOutputEvent('71273', at)));
 
     expect(commits).toHaveBeenCalledOnce();
-    expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(999);
+    expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(0);
     expect(selectTicket(store.getState(), '71288')?.lastOutputAt).toBeNull();
   });
 

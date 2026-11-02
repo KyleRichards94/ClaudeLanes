@@ -4,7 +4,7 @@ import { agentTickets, type AgentTicketStore } from './store';
 /**
  * The agent ticket store's handlers for the app's event hub (AL-015). `app/entrypoint/event-routes.ts`
  * registers `agentTicketEventHandlers` once; the hub hands `agent:output` over as one batch per
- * animation frame, so a burst of output is one store commit per frame.
+ * animation frame, and a batch commits only when a ticket's output time moves.
  *
  * `agent:stage` (AL-103) and `agent:gate` (AL-104) are delivered as each event arrives, so a
  * `set_stage` call moves the card, and a waiting gate turns it amber, in the next frame. Only channels

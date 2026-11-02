@@ -222,9 +222,12 @@ export function withActivity(
   };
 }
 
-/** Stamps the newest output time; output older than the last one seen changes nothing. */
+/** Output arrives every frame while an agent streams; the stamp moves at most this often so the ticket object stays put. */
+export const OUTPUT_AT_RESOLUTION_MS = 60_000;
+
+/** Stamps the first output at once, then only moves it forward by a full resolution step; older output changes nothing. */
 export function withOutputAt(ticket: AgentTicket, at: number): AgentTicket {
-  if (ticket.lastOutputAt !== null && at <= ticket.lastOutputAt) return ticket;
+  if (ticket.lastOutputAt !== null && at < ticket.lastOutputAt + OUTPUT_AT_RESOLUTION_MS) return ticket;
   return { ...ticket, lastOutputAt: at };
 }
 
