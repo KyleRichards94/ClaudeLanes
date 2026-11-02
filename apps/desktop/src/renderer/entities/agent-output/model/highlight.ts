@@ -148,24 +148,78 @@ const GRAMMARS: Record<Exclude<Language, 'diff' | 'plain' | 'xml'>, Grammar> = {
   },
 };
 
+/** Keyword sets as the tokeniser looks them up: lowercased once for the case-insensitive grammars. */
+const KEYWORD_LOOKUP: ReadonlyMap<Grammar, ReadonlySet<string>> = new Map(
+  Object.values(GRAMMARS).map((grammar) => [grammar, grammar.caseInsensitive ? new Set([...grammar.keywords].map((keyword) => keyword.toLowerCase())) : grammar.keywords]),
+);
+
 const NUMBER = /^(?:0x[\da-f]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?[fdmlu]*)\b/i;
 const WORD = /^[A-Za-z_$@][\w$-]*/;
 
 /** The tokens of each line of `code`, one array per line. */
 export function highlight(code: string, language: Language): Token[][] {
-  const lines = code.replace(/\r\n?/g, '\n').split('\n');
-  if (language === 'plain') return lines.map((line) => (line === '' ? [] : [{ kind: 'plain', text: line }]));
-  if (language === 'diff') return lines.map(diffLine);
-  if (language === 'xml') return lines.map(xmlLine);
+  return createHighlighter()(code, language);
+}
+
+/** What a line carries into the next: an open block comment or multiline string. */
+interface LineState {
+  readonly inBlockComment: boolean;
+  readonly inMultiline: string | null;
+}
+
+interface LineEntry {
+  readonly text: string;
+  readonly from: LineState;
+  readonly tokens: Token[];
+  readonly to: LineState;
+}
+
+const START: LineState = { inBlockComment: false, inMultiline: null };
+
+const sameState = (a: LineState, b: LineState): boolean => a.inBlockComment === b.inBlockComment && a.inMultiline === b.inMultiline;
+
+function lineTokeniser(language: Language): (line: string, state: LineState) => { tokens: Token[] } & LineState {
+  if (language === 'plain') return (line, state) => ({ tokens: line === '' ? [] : [{ kind: 'plain', text: line }], ...state });
+  if (language === 'diff') return (line, state) => ({ tokens: diffLine(line), ...state });
+  if (language === 'xml') return (line, state) => ({ tokens: xmlLine(line), ...state });
   const grammar = GRAMMARS[language];
-  let inBlockComment = false;
-  let inMultiline: string | null = null;
-  return lines.map((line) => {
-    const result = tokeniseLine(line, grammar, inBlockComment, inMultiline);
-    inBlockComment = result.inBlockComment;
-    inMultiline = result.inMultiline;
-    return result.tokens;
-  });
+  return (line, state) => tokeniseLine(line, grammar, state);
+}
+
+/**
+ * A highlighter that remembers the last block it saw. A line is re-tokenised only when its text or the
+ * state it starts in changed; unchanged lines keep their token arrays, and a call with nothing changed
+ * returns the previous array.
+ */
+export function createHighlighter(): (code: string, language: Language) => Token[][] {
+  let entries: LineEntry[] = [];
+  let entriesLanguage: Language | null = null;
+  let result: Token[][] = [];
+  return (code, language) => {
+    const lines = code.replace(/\r\n?/g, '\n').split('\n');
+    if (language !== entriesLanguage) {
+      entries = [];
+      entriesLanguage = language;
+    }
+    const tokenise = lineTokeniser(language);
+    let unchanged = lines.length === entries.length;
+    let state = START;
+    const next = lines.map((line, index): LineEntry => {
+      const known = entries[index];
+      if (known !== undefined && known.text === line && sameState(known.from, state)) {
+        state = known.to;
+        return known;
+      }
+      unchanged = false;
+      const { tokens, ...to } = tokenise(line, state);
+      const entry = { text: line, from: state, tokens, to };
+      state = to;
+      return entry;
+    });
+    entries = next;
+    if (!unchanged) result = next.map((entry) => entry.tokens);
+    return result;
+  };
 }
 
 function diffLine(line: string): Token[] {
@@ -207,11 +261,12 @@ function splitStrings(text: string): Token[] {
   return out;
 }
 
-function tokeniseLine(line: string, grammar: Grammar, startInBlockComment: boolean, startMultiline: string | null): { tokens: Token[]; inBlockComment: boolean; inMultiline: string | null } {
+function tokeniseLine(line: string, grammar: Grammar, start: LineState): { tokens: Token[] } & LineState {
+  const keywords = KEYWORD_LOOKUP.get(grammar)!;
   const tokens: Token[] = [];
   let plain = '';
-  let inBlockComment = startInBlockComment;
-  let inMultiline = startMultiline;
+  let inBlockComment = start.inBlockComment;
+  let inMultiline = start.inMultiline;
   const flush = () => {
     if (plain !== '') tokens.push({ kind: 'plain', text: plain });
     plain = '';
@@ -298,7 +353,7 @@ function tokeniseLine(line: string, grammar: Grammar, startInBlockComment: boole
     if (word) {
       const text = word[0];
       const key = grammar.caseInsensitive ? text.toLowerCase() : text;
-      const isKeyword = grammar.keywords.has(key) || (grammar.caseInsensitive && [...grammar.keywords].some((entry) => entry.toLowerCase() === key)) || (grammar.variablePrefix !== undefined && text.startsWith(grammar.variablePrefix));
+      const isKeyword = keywords.has(key) || (grammar.variablePrefix !== undefined && text.startsWith(grammar.variablePrefix));
       if (isKeyword) {
         flush();
         tokens.push({ kind: 'keyword', text });

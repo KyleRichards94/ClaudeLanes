@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { color, font, fontSize, fontWeight, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, Text } from '@agent-lanes/ui';
 import { copyText } from '@/shared/lib';
-import { highlight, languageOf, type TokenKind } from '../model/highlight';
+import { createHighlighter, languageOf, type Token, type TokenKind } from '../model/highlight';
 import { parseMarkdown, spansText, type InlineSpan, type MarkdownBlock } from '../model/markdown';
 
 export interface MarkdownProps {
@@ -165,7 +165,9 @@ const TOKEN_INKS: Record<TokenKind, string> = {
 const COPIED_MS = 1_500;
 
 function CodeBlock({ language, text, caret }: { language: string | null; text: string; caret: boolean }) {
-  const lines = highlight(text, languageOf(language));
+  // Keeps the last block's tokens, so a growing block re-tokenises only its changed tail lines.
+  const [highlightLive] = useState(createHighlighter);
+  const lines = useMemo(() => highlightLive(text, languageOf(language)), [highlightLive, text, language]);
   return (
     <View style={styles.code} testID="md-code">
       <View style={styles.codeBar}>
@@ -176,15 +178,22 @@ function CodeBlock({ language, text, caret }: { language: string | null; text: s
       </View>
       <View style={styles.codeBody}>
         {lines.map((tokens, index) => (
-          <Text key={index} variant="mono" size="sm" selectable style={styles.codeLine}>
-            {tokens.length === 0 ? ' ' : tokens.map((token, tokenIndex) => <Text key={tokenIndex} color={TOKEN_INKS[token.kind]}>{token.text}</Text>)}
-            {caret && index === lines.length - 1 ? <Caret /> : null}
-          </Text>
+          <CodeLine key={index} tokens={tokens} caret={caret && index === lines.length - 1} />
         ))}
       </View>
     </View>
   );
 }
+
+/** A line of a code block; memoised on its token array, which the highlighter keeps for unchanged lines. */
+const CodeLine = memo(function CodeLine({ tokens, caret }: { tokens: readonly Token[]; caret: boolean }) {
+  return (
+    <Text variant="mono" size="sm" selectable style={styles.codeLine}>
+      {tokens.length === 0 ? ' ' : tokens.map((token, tokenIndex) => <Text key={tokenIndex} color={TOKEN_INKS[token.kind]}>{token.text}</Text>)}
+      {caret ? <Caret /> : null}
+    </Text>
+  );
+});
 
 /** A small Copy button: on a code block's bar, and on each message (AL-255). */
 export function CopyButton({ text, label = 'Copy', testID }: { text: string; label?: string; testID?: string }) {
