@@ -139,6 +139,9 @@ export interface ConnectionsServiceOptions {
 
 export const CLAUDE_CONNECTION_ID = 'claude';
 export const CLAUDE_API_KEY_SECRET_ID = 'claude:api-key';
+export const PEERS_CONNECTION_ID = 'peers';
+/** Where the Peers connection kept its team secret before AL-298; start-up deletes it. */
+export const LEGACY_PEERS_SECRET_ID = 'peers:team-secret';
 /** Env var the Agent SDK's `claude` process reads an API key from (AL-044, AL-100). */
 export const ANTHROPIC_API_KEY_ENV = 'ANTHROPIC_API_KEY';
 
@@ -149,8 +152,8 @@ const DRAFT_TEST_LIMIT = 16;
 
 export const RECONNECT_MESSAGE = "The saved token can't be read on this computer. Replace it to reconnect.";
 
-const KIND_LABEL: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP server' };
-const KIND_ORDER: Record<ConnectionKind, number> = { ado: 0, claude: 1, mcp: 2 };
+const KIND_LABEL: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP server', peers: 'Peers' };
+const KIND_ORDER: Record<ConnectionKind, number> = { ado: 0, claude: 1, mcp: 2, peers: 3 };
 
 type DraftTester = (draft: ConnectionDraft, signal: AbortSignal) => Promise<ConnectionTestOutcome>;
 type AdoRecord = Extract<StoredConnection, { kind: 'ado' }>;
@@ -200,6 +203,23 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       warn(`Could not load ${file.location}: ${describe(cause)}`);
     }
     await reconcileSecrets(clean);
+    await dropPeersSecret();
+  }
+
+  /**
+   * AL-298: peers sign with a key derived from the ADO project, so the team secret goes. The record
+   * keeps its port and its peer list (read as the Advanced addresses); the file is written first, so
+   * a stop in between leaves an unused token that the next start-up deletes.
+   */
+  async function dropPeersSecret(): Promise<void> {
+    const old = records.find((record) => record.kind === 'peers' && record.secretId !== null);
+    if (!old?.secretId || !writable) return;
+    const written = writeRecords(records.map((record) => (record === old ? { ...record, secretId: null, maskedToken: null } : record)));
+    if (!written.ok) {
+      warn(`Could not drop the Peers team secret: ${written.message}`);
+      return;
+    }
+    await deleteSecretQuietly(old.secretId);
   }
 
   /** Reads connections.json; true when every record in it was usable (or there is no file yet). */
@@ -322,13 +342,14 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
       if (record.id === exceptId) return false;
       if (record.kind === 'ado' && draft.kind === 'ado') return record.orgUrl.toLowerCase() === draft.orgUrl.toLowerCase();
       if (record.kind === 'mcp' && draft.kind === 'mcp') return record.name.toLowerCase() === draft.name.toLowerCase();
-      return record.kind === 'claude' && draft.kind === 'claude';
+      return (record.kind === 'claude' && draft.kind === 'claude') || (record.kind === 'peers' && draft.kind === 'peers');
     });
   }
 
   function newId(draft: ConnectionDraft): string {
     const taken = new Set([...records.map((record) => record.id), ...builtIns().map((entry) => entry.id)]);
     if (draft.kind === 'claude') return CLAUDE_CONNECTION_ID;
+    if (draft.kind === 'peers') return PEERS_CONNECTION_ID;
     return draft.kind === 'ado' ? uniqueId('ado', orgNameFromUrl(draft.orgUrl), taken) : uniqueId('mcp', draft.name, taken);
   }
 
@@ -379,6 +400,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return { ...common, kind: 'claude', name: 'Claude', mode: draft.mode };
       case 'mcp':
         return { ...common, kind: 'mcp', name: draft.name, transport: draft.transport, ...(test?.tools ? { tools: test.tools } : {}) };
+      case 'peers':
+        return { ...common, kind: 'peers', name: 'Peers', port: draft.port, beaconPort: draft.beaconPort, addresses: draft.addresses };
     }
   }
 
@@ -511,7 +534,9 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         ? ['ado', draft.orgUrl.toLowerCase(), draft.pat]
         : draft.kind === 'claude'
           ? ['claude', draft.mode, draft.apiKey ?? '']
-          : ['mcp', JSON.stringify(draft.transport), draft.token ?? ''];
+          : draft.kind === 'peers'
+            ? ['peers', String(draft.port), String(draft.beaconPort), draft.addresses.join(' ').toLowerCase()]
+            : ['mcp', JSON.stringify(draft.transport), draft.token ?? ''];
     return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
   }
 
@@ -595,6 +620,8 @@ export function createConnectionsService(options: ConnectionsServiceOptions): Co
         return { kind: 'claude', mode: record.mode, ...(token === undefined ? {} : { apiKey: token }), expiresAt: record.expiresAt };
       case 'mcp':
         return { kind: 'mcp', name: record.name, transport: record.transport, ...(token === undefined ? {} : { token }), expiresAt: record.expiresAt };
+      case 'peers':
+        return { kind: 'peers', port: record.port, beaconPort: record.beaconPort, addresses: record.addresses, expiresAt: record.expiresAt };
     }
   }
 
@@ -881,6 +908,8 @@ function tokenOf(draft: ConnectionDraft): string | undefined {
       return draft.apiKey;
     case 'mcp':
       return draft.token;
+    case 'peers':
+      return undefined;
   }
 }
 

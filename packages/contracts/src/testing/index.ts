@@ -3,3 +3,4 @@
  * Test-only; the app never imports it.
  */
 export * from './ado-fixtures';
+export * from './peer-fixtures';

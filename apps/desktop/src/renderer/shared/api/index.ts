@@ -67,3 +67,4 @@ export {
   useSendDesignMessage,
 } from './design-thread';
 export { sessionStatusEventHandlers, sessionStatusQueryKey, useSessionStatus } from './session-status';
+export { peerNetworkQueryKey, peerRoomsQueryKey, peersEventHandlers, roomLogQueryKey, useFindPeers, useMarkSeen, usePeerNetwork, usePeerRooms, usePostToRoom, useRoomLog } from './peers';

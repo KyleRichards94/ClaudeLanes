@@ -7,6 +7,7 @@ import { createChangesHandlers } from '../changes/handlers';
 import { createConnectionsHandlers } from '../connections/handlers';
 import { createDesignHandlers } from '../design/handlers';
 import { createDiagnosticsHandlers } from '../diagnostics/handlers';
+import { createPeersHandlers } from '../peers/handlers';
 import { createPrHandlers } from '../pull-requests/handlers';
 import { createReposHandlers } from '../repos/handlers';
 import type { Services } from '../services';
@@ -39,5 +40,6 @@ export function createInvokeHandlers(services: Services): InvokeHandlers {
     ...createPrHandlers(services),
     ...createBacklogWindowHandlers(services),
     ...createChangesHandlers(services),
+    ...createPeersHandlers(services),
   };
 }

@@ -74,6 +74,7 @@ import { useLayoutShortcut } from "../model/layout-shortcut";
 import { useNow } from "../model/use-now";
 import { CreatePullRequestPanel } from "./CreatePullRequestPanel";
 import { AdoTab } from "./AdoTab";
+import { RoomTab } from "@/widgets/room-log";
 import { FlightDeckPanel } from "./FlightDeckPanel";
 import { LayoutSwitch } from "./LayoutSwitch";
 import { TicketHeaderBand } from "./TicketHeader";
@@ -456,6 +457,11 @@ function TicketFrame({
     >
       {tab === "build-log" ? (
         <BuildLog ticketId={ticket.id} style={styles.buildLog} />
+      ) : tab === "room" ? (
+        // Peer lanes: the ticket's room (AL-295). Not in a ScrollView: only its log scrolls (AL-300).
+        <View style={[styles.tabScroll, styles.tabContent]}>
+          <RoomTab ticketId={ticket.id} />
+        </View>
       ) : (
         <ScrollView
           style={styles.tabScroll}
@@ -634,6 +640,7 @@ const TAB_TITLES: Record<TicketPageTab, string> = {
   diff: "Output & diff",
   "build-log": "Build log",
   ado: "ADO",
+  room: "Room",
 };
 
 function MissingTicket({

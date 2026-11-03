@@ -5,6 +5,7 @@ import { specForAgent, specStatusText, type DesignSpecService } from '../../desi
 import type { ClaudeSdkModule } from '../claude-sdk';
 import { REVIEW_FINDINGS_INSTRUCTION } from '../review/findings';
 import type { SessionExtras } from '../session-manager';
+import { PEER_POST_TOOL, PEER_READ_TOOLS, peerProtocol, peerTools, type PeerToolBackend, type PeerToolShape } from './peer-tools';
 import { LANE_LABELS } from './stage-rules';
 import type { StageChange, StageService } from './stage-service';
 
@@ -135,7 +136,8 @@ type StageToolShape =
   | typeof getDesignSpecShape
   | typeof listDesignSpecsShape
   | typeof ackDesignSpecShape
-  | typeof openPullRequestShape;
+  | typeof openPullRequestShape
+  | PeerToolShape;
 
 /** Opens the ticket's pull request the way the drill-in's Create PR does: pushes the branch, opens it, links the work item. */
 export type OpenPullRequest = (ticketId: string, title: string, description: string) => Promise<Result<{ id: number; webUrl: string | null; created: boolean }>>;
@@ -239,6 +241,8 @@ export interface StageSessionExtrasOptions {
   createServer: (tools: SdkMcpToolDefinition<StageToolShape>[]) => McpServerConfig | Promise<McpServerConfig>;
   /** Opens a Create PR only ticket's pull request; without it that lane's agent has no `open_pull_request`. */
   openPullRequest?: OpenPullRequest;
+  /** Peer lanes (AL-292): the room tools and protocol for a lane in a room. Without it, or out of a room, neither. */
+  peers?: PeerToolBackend;
 }
 
 /** The SDK's `createSdkMcpServer`, for `createServer`. */
@@ -252,14 +256,26 @@ export function sdkStageServer(loadSdk: () => Promise<ClaudeSdkModule>): StageSe
  * asking, and the protocol. Starting a Queued ticket moves it to Planning.
  */
 export function stageSessionExtras(options: StageSessionExtrasOptions): (record: TicketRecord) => Promise<SessionExtras> {
+  /** Second agents and single-step lanes read the room; only a full-workflow lead posts in it (AL-292). */
+  async function peerPart(ticketId: string, canPost: boolean) {
+    const room = options.peers ? await options.peers.room(ticketId) : null;
+    if (!options.peers || !room) return { tools: [], allowed: [], protocol: [] };
+    return {
+      tools: peerTools(ticketId, options.peers, canPost) as SdkMcpToolDefinition<StageToolShape>[],
+      allowed: canPost ? [...PEER_READ_TOOLS, PEER_POST_TOOL] : [...PEER_READ_TOOLS],
+      protocol: [peerProtocol(room, canPost)],
+    };
+  }
+
   return async (record) => {
     // A second agent (AL-266) has no stages: only `report_activity`, and a shorter protocol.
     if (record.companion) {
       const tools = stageServerTools(record.id, options.stages).filter((tool) => tool.name === 'report_activity');
+      const peers = await peerPart(record.id, false);
       return {
-        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer(tools) },
-        allowedTools: [STAGE_SERVER_TOOLS[1]],
-        systemPromptAppend: COMPANION_PROTOCOL,
+        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer([...tools, ...peers.tools]) },
+        allowedTools: [STAGE_SERVER_TOOLS[1], ...peers.allowed],
+        systemPromptAppend: [COMPANION_PROTOCOL, ...peers.protocol].join('\n\n'),
       };
     }
     const lane = await options.stages.sessionStarting(record.id);
@@ -267,16 +283,18 @@ export function stageSessionExtras(options: StageSessionExtrasOptions): (record:
     if (isSoloLane(lane)) {
       const base = stageServerTools(record.id, options.stages, options.designSpecs).filter((tool) => tool.name !== 'set_stage');
       const pr = lane === 'pr-only' && options.openPullRequest ? [openPullRequestTool(record.id, options.openPullRequest)] : [];
+      const peers = await peerPart(record.id, false);
       return {
-        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer([...base, ...pr]) },
-        allowedTools: [STAGE_SERVER_TOOLS[1], ...(options.designSpecs ? DESIGN_SPEC_TOOLS : []), ...(pr.length > 0 ? [OPEN_PULL_REQUEST_TOOL] : [])],
-        systemPromptAppend: soloProtocol(lane),
+        mcpServers: { [STAGE_SERVER_NAME]: await options.createServer([...base, ...pr, ...peers.tools]) },
+        allowedTools: [STAGE_SERVER_TOOLS[1], ...(options.designSpecs ? DESIGN_SPEC_TOOLS : []), ...(pr.length > 0 ? [OPEN_PULL_REQUEST_TOOL] : []), ...peers.allowed],
+        systemPromptAppend: [soloProtocol(lane), ...peers.protocol].join('\n\n'),
       };
     }
+    const peers = await peerPart(record.id, true);
     return {
-      mcpServers: { [STAGE_SERVER_NAME]: await options.createServer(stageServerTools(record.id, options.stages, options.designSpecs)) },
-      allowedTools: [...STAGE_SERVER_TOOLS, ...(options.designSpecs ? DESIGN_SPEC_TOOLS : [])],
-      systemPromptAppend: STAGE_PROTOCOL,
+      mcpServers: { [STAGE_SERVER_NAME]: await options.createServer([...stageServerTools(record.id, options.stages, options.designSpecs), ...peers.tools]) },
+      allowedTools: [...STAGE_SERVER_TOOLS, ...(options.designSpecs ? DESIGN_SPEC_TOOLS : []), ...peers.allowed],
+      systemPromptAppend: [STAGE_PROTOCOL, ...peers.protocol].join('\n\n'),
       firstTurnAppendix: [STAGE_PROTOCOL_REMINDER],
     };
   };

@@ -3,8 +3,10 @@ import { workItemStateColor, workItemTypeColor } from '@agent-lanes/contracts';
 import { AgentTicketCardView, agentCardName, useAgentTicket, type AgentTicketStore } from '@/entities/agent-ticket';
 import { LaneDragCard, agentTicketDrag, useDragToLaneAvailable } from '@/features/drag-to-lane';
 import type { MenuAnchor } from '@/shared/ui';
+import { PeerCardRows } from './PeerCardRows';
 import { TicketContextMenu, TicketMenuButton } from './TicketContextMenu';
-import { useConnections, useWorkItem, useWorkItemColors } from '@/shared/api';
+import { roomOfTicket } from '@/entities/peer';
+import { useConnections, usePeerRooms, useWorkItem, useWorkItemColors } from '@/shared/api';
 
 export interface BoardTicketCardProps {
   ticketId: string;
@@ -35,6 +37,7 @@ export function BoardTicketCard({ ticketId, store, onPress, testID }: BoardTicke
   const [menuAt, setMenuAt] = useState<MenuAnchor | null>(null);
   // Inside the board's drag provider the card is a draggable (AL-274): the wrapper is the button and the press.
   const draggable = useDragToLaneAvailable();
+  const room = roomOfTicket(usePeerRooms().data, ticketId);
   if (!ticket) return null;
 
   const type = workItem.data?.type ?? null;
@@ -46,6 +49,7 @@ export function BoardTicketCard({ ticketId, store, onPress, testID }: BoardTicke
       typeColor={workItemTypeColor(colors.data, type)}
       stateColor={workItemStateColor(colors.data, type, state)}
       cornerAction={<TicketMenuButton onOpen={setMenuAt} testID={`ticket-menu-${ticketId}`} />}
+      peers={room ? <PeerCardRows room={room} ticketId={ticketId} workItemId={ado?.workItemId ?? null} /> : undefined}
       onContextMenu={setMenuAt}
       embedded={draggable}
       {...(onPress && !draggable ? { onPress } : {})}

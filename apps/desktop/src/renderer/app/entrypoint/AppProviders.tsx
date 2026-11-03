@@ -7,6 +7,7 @@ import {
   createDesignSpecEventHandlers,
   designThreadEventHandlers,
   mcpStatusEventHandlers,
+  peersEventHandlers,
   planLimitsEventHandlers,
 } from '@/shared/api';
 import { subAgentEventHandlers } from '@/entities/sub-agent';
@@ -57,6 +58,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
   useEffect(() => runningEventHub()?.register(designThreadEventHandlers(queryClient)), [queryClient]);
   // `agent:status` keeps each ticket's session status current, e.g. Queued and Start now (AL-111).
   useEffect(() => runningEventHub()?.register(sessionStatusEventHandlers(queryClient)), [queryClient]);
+  // `peers:status` keeps the Peers tab's status dots current (AL-289).
+  useEffect(() => runningEventHub()?.register(peersEventHandlers(queryClient)), [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -31,6 +31,7 @@ export * from './domains/design.canvas';
 export * from './domains/design.specs';
 export * from './domains/design.thread';
 export * from './domains/git.schemas';
+export * from './domains/peers.schemas';
 export * from './domains/pr.schemas';
 export * from './domains/repos.schemas';
 export * from './domains/settings.schemas';

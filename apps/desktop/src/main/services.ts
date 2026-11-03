@@ -18,7 +18,7 @@ import { createAssignAgentService, type AssignAgentService } from './agent/assig
 import { createAddAgentService, type AddAgentService } from './agent/companions/add-agent';
 import { createRewindService, type RewindService } from './agent/rewind';
 import { createSessionRecovery, type SessionRecovery } from './agent/recovery';
-import { createSendToTicket } from './agent/send-to-ticket';
+import { createSendToTicket, type SendToTicket } from './agent/send-to-ticket';
 import { createLaunchQueue, type LaunchQueue } from './agent/launch-queue';
 import { createPlanLimitsService, type PlanLimitsService } from './agent/plan-limits';
 import { createBuildContext } from './agent/build-context';
@@ -76,6 +76,15 @@ import { createReconcileService, ignoredWorktreesFile, type ReconcileService } f
 import { createCredentialFailureService, type CredentialFailureService } from './credentials/credential-failures';
 import { createBacklogWindowController, type BacklogWindowController } from './app/backlog-window';
 import { createChangesService, type ChangesService } from './changes/service';
+import { createPeerNetwork, type PeerNetwork } from './peers/network';
+import { createPeerIdentity, peersDir, type PeerIdentitySource } from './peers/identity';
+import { createPeerConfigSync, type PeerConfigSync, type PeerDefaults } from './peers/config';
+import { createRooms, type Rooms } from './peers/rooms';
+import { isLiveLane, touchedFiles } from './peers/presence';
+import { createPeerTeams } from './peers/teams';
+import { createRoomLog, roomLogsDir } from './peers/room-log';
+import { createPeerLanes, type PeerLanes } from './peers/service';
+import { nearestPortfolioParent, projectIdOf } from '@agent-lanes/ado-client';
 
 /**
  * Composition root for main-process services (design §4: each service owns one external system).
@@ -197,6 +206,16 @@ export interface Services {
   readonly launchUndo: LaunchUndo;
   /** The popped-out Backlog window (AL-239); index.ts supplies the real one. */
   readonly backlogWindow: BacklogWindowController;
+  /** Who this app is to its peers: the ADO identity, the computer and an instance id (AL-288, PL§4). */
+  readonly peerIdentity: PeerIdentitySource;
+  /** The WebSocket mesh with the other apps (AL-288, E18); off until the app has a team (AL-298). */
+  readonly peerNetwork: PeerNetwork;
+  /** Keeps the network on the app's teams and the Peers connection's Advanced settings (AL-298). */
+  readonly peerConfig: PeerConfigSync;
+  /** Rooms by parent Feature or Epic and every lane's presence (AL-290, P2, P3). */
+  readonly peerRooms: Rooms;
+  /** The room log on disk and the replay to late joiners (AL-291); delivery and posting from AL-292. */
+  readonly peerLanes: PeerLanes;
 }
 
 export interface ServiceOptions {
@@ -218,11 +237,13 @@ export interface ServiceOptions {
   backlogWindow?: BacklogWindowController;
   /** Settings as loaded, and after each accepted update. The window chrome follows the appearance. */
   onSettingsChange?: (settings: Settings) => void;
+  /** Peer lanes' ports when there is no Peers connection, and e2e's loopback-only switch (AL-298). */
+  peers: PeerDefaults;
 }
 
 export function createServices(options: ServiceOptions): Services {
   // Assigned once the session manager exists (AL-048); connections and ADO report to it from then on.
-  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue } = {};
+  const late: { credentialFailures?: CredentialFailureService; subagents?: SubagentTracker; adoLauncher?: AdoLauncher; planLimits?: PlanLimitsService; tickets?: TicketRecordStore; sessions?: SessionManager; launches?: LaunchQueue; peerIdentity?: PeerIdentitySource; peerConfig?: PeerConfigSync; peerRooms?: Rooms; sendToTicket?: SendToTicket } = {};
   const log = options.log ?? createLogger({ directory: join(options.appDataDir, LOG_DIRECTORY_NAME) });
   const secrets = createSecretStore({
     filePath: join(options.appDataDir, SECRETS_FILE_NAME),
@@ -327,14 +348,28 @@ export function createServices(options: ServiceOptions): Services {
     file: createElectronConnectionsFile(options.appDataDir),
     secrets,
     emit: options.emit,
-    testers: { ado: createAdoConnectionTester(), claude: createClaudeConnectionTester(claude), mcp: createMcpConnectionTester() },
+    testers: {
+      ado: createAdoConnectionTester(),
+      claude: createClaudeConnectionTester(claude),
+      mcp: createMcpConnectionTester(),
+    },
     detectClaudeLogin: createClaudeLoginDetector(claude),
     // Each Azure DevOps Services organisation brings the official ADO MCP server (AL-045, AL-108).
     adoMcpServer: adoMcpServerFor,
     warn: (message) => log.child('connections').warn(message),
     // A reconnect resumes the agents a 401 paused (AL-048); created below, after the sessions.
-    onChanged: () => void late.credentialFailures?.connectionsChanged(),
+    onChanged: () => {
+      void late.credentialFailures?.connectionsChanged();
+      // A new ADO test may have signed in as someone (AL-288).
+      void late.peerIdentity?.refresh();
+      // A new ADO project, or changed Advanced settings, reaches the peer network (AL-298).
+      void late.peerConfig?.sync();
+    },
   });
+  const peerIdentity = createPeerIdentity({ dir: peersDir(options.appDataDir), connections, warn: (message) => log.child('peers').warn(message) });
+  late.peerIdentity = peerIdentity;
+  void peerIdentity.refresh();
+  const peerNetwork = createPeerNetwork({ identity: () => peerIdentity.current(), emit: options.emit, log: log.child('peers') });
 
   const designPolicy = createDesignNavigationPolicy({ claudeOrigins: options.designTestOrigin ? [options.designTestOrigin] : [] });
   const designView = createDesignViewService({
@@ -366,6 +401,54 @@ export function createServices(options: ServiceOptions): Services {
     onUnauthorized: (connectionId) => void late.credentialFailures?.adoUnauthorized(connectionId),
     // AL-232: a PR in a repo that isn't registered here is flagged, so its drop asks to add the repo.
     registeredRemotes: () => readRegisteredRemotes(settings.get().repos, git.run),
+  });
+  // A team per ADO organisation and project: each connection's default project and each live lane's (AL-298, PL§11).
+  const peerTeams = createPeerTeams({
+    sources: async () => [
+      ...(await connections.list()).flatMap((row) => (row.kind === 'ado' && row.defaultProject ? [{ orgUrl: row.orgUrl, project: row.defaultProject }] : [])),
+      ...(await tickets.list()).filter(isLiveLane).flatMap((record) => (record.ado ? [{ orgUrl: record.ado.orgUrl, project: record.ado.project }] : [])),
+    ],
+    projectId: async (orgUrl, project) => {
+      const connectionId = await adoConnectionIdFor(connections, orgUrl);
+      if (!connectionId) return err('ADO_UNAUTHORIZED', `${orgUrl} is not connected.`);
+      const client = await ado.clientFor(connectionId);
+      return client.ok ? projectIdOf(client.data, project) : client;
+    },
+    log: log.child('peers'),
+  });
+  // Presence goes out as soon as the network is up, not at the next tick (AL-290).
+  const peerConfig = createPeerConfigSync({ connections, teams: peerTeams, network: peerNetwork, defaults: options.peers, log: log.child('peers'), onApplied: () => void late.peerRooms?.sync() });
+  late.peerConfig = peerConfig;
+  const peerRooms = createRooms({
+    network: peerNetwork,
+    tickets,
+    // ADO is read for the parent id only (P11).
+    findParent: async (ref) => {
+      const connectionId = await adoConnectionIdFor(connections, ref.orgUrl);
+      if (!connectionId) return err('ADO_UNAUTHORIZED', `${ref.orgUrl} is not connected.`);
+      const client = await ado.clientFor(connectionId);
+      return client.ok ? nearestPortfolioParent(client.data, { id: ref.workItemId }) : client;
+    },
+    touched: (record) => touchedFiles(record, diffs),
+    emit: options.emit,
+    log: log.child('peers'),
+  });
+  late.peerRooms = peerRooms;
+  peerRooms.start();
+  peerConfig.start();
+  const peerLanes = createPeerLanes({
+    network: peerNetwork,
+    rooms: peerRooms,
+    roomLog: createRoomLog({ dir: roomLogsDir(peersDir(options.appDataDir)), network: peerNetwork, log: log.child('peers') }),
+    tickets,
+    git,
+    sessions: {
+      status: (ticketId) => late.sessions?.status(ticketId) ?? { ticketId, state: 'stopped', sessionId: null, message: null },
+    },
+    // Room messages are user turns, and wake an idle or stopped agent the way the composer does (AL-292, AL-299); created below.
+    wake: (ticketId, message) => late.sendToTicket?.(ticketId, message) ?? Promise.resolve(err('SESSION_LOST', 'No session manager yet.')),
+    emit: options.emit,
+    log: log.child('peers'),
   });
 
   const sessions = createSessionManager({
@@ -416,7 +499,11 @@ export function createServices(options: ServiceOptions): Services {
     transcripts,
     log: log.child('agent'),
     // Each lane change posts one comment to the work item (AL-115).
-    onStageChanged: (change) => stageComments.stageChanged(change),
+    onStageChanged: (change) => {
+      stageComments.stageChanged(change);
+      // A lane's new stage reaches its peers now, not at the next presence tick (AL-290).
+      late.peerRooms?.stageChanged(change.ticketId);
+    },
     // A team board drop starts its ticket in the lane it was dropped on (AL-236).
     startLane: (ticketId) => late.adoLauncher?.startLane(ticketId),
   });
@@ -466,6 +553,7 @@ export function createServices(options: ServiceOptions): Services {
   });
   late.launches = launches;
   const sendToTicket = createSendToTicket({ sessions, launches, recovery, tickets });
+  late.sendToTicket = sendToTicket;
   const planLimits = createPlanLimitsService({
     sessions,
     emit: options.emit,
@@ -479,6 +567,8 @@ export function createServices(options: ServiceOptions): Services {
     stages,
     designSpecs,
     createServer: sdkStageServer(loadClaudeSdk),
+    // list_peers, post_to_room and read_room, and the Peer lanes protocol for lanes in a room (AL-292).
+    peers: peerLanes.tools,
     // A Create PR only ticket's agent opens its PR the way the drill-in does.
     openPullRequest: async (ticketId, title, description) => {
       const opened = await pullRequests.create({ ticketId, title, description });
@@ -494,6 +584,12 @@ export function createServices(options: ServiceOptions): Services {
     permissions.sessionExtras,
     (record) => ({ hooks: subWorktreeHooks(subWorktrees, record.id, log.child('worktrees'), (sub) => subagents.noteSubBranch(record.id, sub)) }),
     (record) => ({ hooks: subagents.hooks(record.id) }),
+    // A launched lane's room is looked up as its session starts, once its project's team is in (AL-290, AL-298).
+    async (record) => {
+      await peerConfig.sync();
+      if (peerNetwork.status().listener.state !== 'off') await peerRooms.ensureRoom(record.id);
+      return {};
+    },
   ]);
   const mcpStatus = createMcpStatusMonitor({ sessions, emit: options.emit, log: log.child('agent') });
   const credentialFailureService = createCredentialFailureService({ connections, sessions, tickets, emit: options.emit, log: log.child('credentials') });
@@ -595,6 +691,11 @@ export function createServices(options: ServiceOptions): Services {
     ticketLauncher,
     adoLauncher,
     launchUndo,
+    peerIdentity,
+    peerNetwork,
+    peerConfig,
+    peerRooms,
+    peerLanes,
   };
 }
 
@@ -602,6 +703,11 @@ export function createServices(options: ServiceOptions): Services {
 export async function disposeServices(services: Services): Promise<void> {
   // First, so each claude process is closed and its session id is already saved (AL-100).
   await services.sessions.dispose();
+  // Peers drop this app's lanes at once instead of waiting for them to expire (AL-288).
+  services.peerConfig.dispose();
+  await services.peerLanes.dispose();
+  services.peerRooms.dispose();
+  await services.peerNetwork.dispose();
   // Then any other claude still open: a design artboard read, a login check or a connection test (AL-213).
   services.claude.closeAll();
   services.mcpStatus.dispose();

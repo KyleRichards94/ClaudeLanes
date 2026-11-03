@@ -55,6 +55,10 @@ export interface TeamBoardAppOptions {
   claude?: Omit<FakeClaudeState, 'login' | 'log'>;
   /** Ticket records on the board at start-up, given the registered repo's path. */
   tickets?: (repo: string) => readonly TicketRecord[];
+  /** A fake organisation another app already uses (AL-297: two apps in one room); left running on close. */
+  ado?: FakeAdoServer;
+  /** Test the ADO token, which sets the identity peers see. Default true. */
+  testAdo?: boolean;
 }
 
 interface Bridge {
@@ -62,7 +66,7 @@ interface Bridge {
 }
 
 export async function startTeamBoardApp(options: TeamBoardAppOptions): Promise<TeamBoardApp> {
-  const ado = await startFakeAdoServer({ teamBoard: true, orgName: 'CompanionSystems', ...(options.teamItems ? { teamItems: options.teamItems } : {}) });
+  const ado = options.ado ?? (await startFakeAdoServer({ teamBoard: true, orgName: 'CompanionSystems', ...(options.teamItems ? { teamItems: options.teamItems } : {}) }));
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), `agent-lanes-e2e-${options.name}-`)));
   const userDataDir = join(root, 'profile');
   mkdirSync(userDataDir);
@@ -125,7 +129,7 @@ export async function startTeamBoardApp(options: TeamBoardAppOptions): Promise<T
 
   expect(await invoke('connections:save', { kind: 'ado', orgUrl: ado.orgUrl, pat: ado.pat, defaultProject: ADO_FIXTURE_PROJECT })).toMatchObject({ ok: true });
   // The token test returns the identity "Assign to me" and the board's "Me" use (TB§6).
-  expect(await invoke('connections:test', { id: 'ado:companionsystems' })).toMatchObject({ ok: true, data: { status: 'ok' } });
+  if (options.testAdo !== false) expect(await invoke('connections:test', { id: 'ado:companionsystems' })).toMatchObject({ ok: true, data: { status: 'ok' } });
   expect(await invoke('connections:save', { kind: 'claude', mode: 'login' })).toMatchObject({ ok: true });
 
   return {
@@ -143,7 +147,7 @@ export async function startTeamBoardApp(options: TeamBoardAppOptions): Promise<T
     },
     async close() {
       await app.close();
-      await ado.close();
+      if (!options.ado) await ado.close();
       rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     },
   };

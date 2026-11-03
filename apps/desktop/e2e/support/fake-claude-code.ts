@@ -31,7 +31,7 @@ export interface FakeAgentTurn {
 
 export type FakeAgentStep =
   /** Calls a tool of the app's `agent_lanes` server through the SDK and waits for its result. */
-  | { tool: 'set_stage' | 'report_activity' | 'get_design_spec' | 'list_design_specs' | 'ack_design_spec'; input: Record<string, unknown> }
+  | { tool: 'set_stage' | 'report_activity' | 'get_design_spec' | 'list_design_specs' | 'ack_design_spec' | 'list_peers' | 'post_to_room' | 'read_room'; input: Record<string, unknown> }
   /** Writes a file in the worktree and commits it. */
   | { commit: { file: string; content: string; message: string } }
   /** Asks canUseTool for permission and records the answer in the log's `tools` (AL-260). */

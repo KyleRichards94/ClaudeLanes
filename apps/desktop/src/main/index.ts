@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { BrowserWindow, app, dialog, nativeTheme, screen, shell } from 'electron';
-import { appearanceOf, type Appearance, type Settings } from '@agent-lanes/contracts';
+import { DEFAULT_PEER_BEACON_PORT, DEFAULT_PEER_PORT, appearanceOf, type Appearance, type Settings } from '@agent-lanes/contracts';
 import { createQuitConfirmation, quitQuestion, type QuitConfirmation } from './app/quit-confirmation';
 import { watchWindowVisibility } from './app/window-visibility';
 import { createBacklogWindowController } from './app/backlog-window';
@@ -210,6 +210,8 @@ if (!app.requestSingleInstanceLock()) {
       designTestOrigin: testHooks.designTestOrigin,
       // e2e starts a fake `claude` instead of the real one (AL-044); never honoured in the installed app.
       claudeExecutable: testHooks.claudeExecutable,
+      // e2e keeps peer lanes on loopback and off 47811/47810 (AL-298); never honoured in the installed app.
+      peers: testHooks.peerPorts ? { ...testHooks.peerPorts, loopback: true } : { port: DEFAULT_PEER_PORT, beaconPort: DEFAULT_PEER_BEACON_PORT, loopback: false },
       // AL-267: Open worktree folder.
       openPath: (path) => shell.openPath(path),
       // AL-239: Pop out opens the Backlog in its own window.

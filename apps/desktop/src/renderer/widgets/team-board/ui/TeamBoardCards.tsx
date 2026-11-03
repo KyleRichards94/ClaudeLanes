@@ -39,7 +39,8 @@ function Grip({ enabled }: { enabled: boolean }) {
  * agent works on has an "Agent in Implementing" tag. Both say so in words and an icon, never by
  * colour alone. One that can be dragged goes to an agent lane by pointer, Space or its Enter menu (AL-235).
  */
-export function TeamBoardItemCard({ card, onOpen }: { card: TeamBoardItemView; onOpen?: () => void }) {
+/** `peerTag`: another person's agent on the item, from peer lanes presence (AL-293). */
+export function TeamBoardItemCard({ card, onOpen, peerTag = null }: { card: TeamBoardItemView; onOpen?: () => void; peerTag?: string | null }) {
   const summary = [
     `${card.idLabel} ${card.type}`,
     card.title,
@@ -48,6 +49,7 @@ export function TeamBoardItemCard({ card, onOpen }: { card: TeamBoardItemView; o
     card.avatar ? `assigned to ${card.avatar.mine ? 'you' : card.avatar.name}` : 'unassigned',
     card.lock ? `locked: ${card.lock}` : null,
     card.agentTag,
+    peerTag,
     onOpen ? 'Opens to read it and change its person or status' : null,
   ]
     .filter(Boolean)
@@ -86,6 +88,14 @@ export function TeamBoardItemCard({ card, onOpen }: { card: TeamBoardItemView; o
           <Icon name="lock" size={12} color={tone.neutral.text} />
           <Text variant="meta" size="sm" color={tone.neutral.text} numberOfLines={1}>
             {card.lock}
+          </Text>
+        </View>
+      ) : null}
+      {peerTag ? (
+        <View style={[styles.band, styles.lockBand]} testID={`team-card-${card.id}-peer`}>
+          <Icon name="link" size={12} color={tone.neutral.text} />
+          <Text variant="meta" size="sm" color={tone.neutral.text} numberOfLines={1}>
+            {peerTag}
           </Text>
         </View>
       ) : null}

@@ -1,13 +1,15 @@
 import { useId, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import type { AdoConnectionSummary, ClaudeConnectionSummary, ConnectionKind, McpConnectionSummary } from '@agent-lanes/contracts';
+import type { AdoConnectionSummary, ClaudeConnectionSummary, ConnectionKind, McpConnectionSummary, PeersConnectionSummary } from '@agent-lanes/contracts';
 import { color, space, tone } from '@agent-lanes/tokens';
 import { Button, Icon, Modal, TabPanel, Tabs, Text, type TabItem } from '@agent-lanes/ui';
 import { connectionTabStatus, type ConnectionDraftController } from '@/entities/connection';
+import { peersTabStatus } from '@/entities/peer';
 import { AdoConnectionsPanel, useAdoDraft } from '@/features/ado-organisations';
 import { ClaudeConnectionPanel, useClaudeDraft } from '@/features/claude-sign-in';
 import { McpServersPanel, useMcpDraft } from '@/features/mcp-servers';
-import { useConnections } from '@/shared/api';
+import { PeersPanel, usePeersDraft } from '@/widgets/peer-network';
+import { useConnections, usePeerNetwork } from '@/shared/api';
 import { closeConnections, showConnectionsTab, useConnectionsModal } from '@/shared/model';
 
 export const CONNECTIONS_SUBTITLE = 'Tokens are encrypted on this computer and never shown again after you save them.';
@@ -15,7 +17,7 @@ export const CONNECTIONS_LOCK_NOTE = "Stored with your operating system's keycha
 
 export const FIRST_RUN_HINT = 'Connect one Azure DevOps organisation and Claude to open the board. MCP servers can wait.';
 
-const tabLabels: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP servers' };
+const tabLabels: Record<ConnectionKind, string> = { ado: 'Azure DevOps', claude: 'Claude', mcp: 'MCP servers', peers: 'Peers' };
 
 /**
  * Whether Save connections can run (AL-046): at least one draft row has passed Test connection, and
@@ -37,9 +39,11 @@ export function ConnectionsModal() {
   const target = useConnectionsModal((state) => state.target);
   const request = useConnectionsModal((state) => state.request);
   const connections = useConnections();
+  const network = usePeerNetwork();
   const ado = useAdoDraft();
   const claude = useClaudeDraft();
   const mcp = useMcpDraft();
+  const peers = usePeersDraft();
   const idPrefix = useId();
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -47,19 +51,20 @@ export function ConnectionsModal() {
   const adoRows = rows.filter((row): row is AdoConnectionSummary => row.kind === 'ado');
   const claudeRow = rows.find((row): row is ClaudeConnectionSummary => row.kind === 'claude');
   const mcpRows = rows.filter((row): row is McpConnectionSummary => row.kind === 'mcp');
+  const peersRow = rows.find((row): row is PeersConnectionSummary => row.kind === 'peers');
 
-  const drafts = [ado, claude, mcp];
+  const drafts = [ado, claude, mcp, peers];
   const canSave = canSaveDrafts(drafts);
   const saving = drafts.some((draft) => draft.saving);
 
-  const tabs: TabItem<ConnectionKind>[] = (['ado', 'claude', 'mcp'] as const).map((kind) => ({
+  const tabs: TabItem<ConnectionKind>[] = (['ado', 'claude', 'mcp', 'peers'] as const).map((kind) => ({
     value: kind,
     label: tabLabels[kind],
-    status: connectionTabStatus(rows, kind),
+    status: kind === 'peers' ? peersTabStatus(network.data) : connectionTabStatus(rows, kind),
   }));
 
   // A reconnect target focuses its own token field; otherwise the modal's first control takes focus.
-  const initialFocusRef = target === 'claude' ? claude.keyRef : target?.startsWith('mcp:') ? mcp.tokenRef : target ? ado.patRef : undefined;
+  const initialFocusRef = target === 'claude' ? claude.keyRef : target === 'peers' ? undefined : target?.startsWith('mcp:') ? mcp.tokenRef : target ? ado.patRef : undefined;
 
   function close() {
     for (const draft of drafts) draft.clear();
@@ -126,6 +131,9 @@ export function ConnectionsModal() {
       </TabPanel>
       <TabPanel idPrefix={idPrefix} value="mcp" style={tab === 'mcp' ? undefined : styles.hidden}>
         <McpServersPanel draft={mcp} rows={mcpRows} allRows={rows} target={tab === 'mcp' ? target : null} request={request} />
+      </TabPanel>
+      <TabPanel idPrefix={idPrefix} value="peers" style={tab === 'peers' ? undefined : styles.hidden}>
+        <PeersPanel draft={peers} row={peersRow} />
       </TabPanel>
     </View>
   );

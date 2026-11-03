@@ -3,9 +3,11 @@ import {
   AdoConnectionSummarySchema,
   AdoScopeCheckSchema,
   ClaudeConnectionSummarySchema,
+  DEFAULT_PEER_BEACON_PORT,
   MASKED_TOKEN_BULLETS,
   MASKED_TOKEN_VISIBLE_CHARS,
   McpConnectionSummarySchema,
+  PeersConnectionSummarySchema,
 } from '@agent-lanes/contracts';
 
 /**
@@ -33,6 +35,7 @@ export const StoredConnectionSchema = z.discriminatedUnion('kind', [
   ClaudeConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
   // Built-in MCP servers (AL-045) are derived from the ADO connections when listing, never stored.
   McpConnectionSummarySchema.omit({ needsReconnect: true, builtInFor: true }).extend(secretRef),
+  PeersConnectionSummarySchema.omit({ needsReconnect: true }).extend(secretRef),
 ]);
 export type StoredConnection = z.infer<typeof StoredConnectionSchema>;
 
@@ -63,7 +66,7 @@ export function parseConnectionsDocument(document: unknown): ParsedDocument {
   const connections: StoredConnection[] = [];
   let dropped = 0;
   for (const item of shape.data.connections) {
-    const record = StoredConnectionSchema.safeParse(item);
+    const record = StoredConnectionSchema.safeParse(upgradeRecord(item));
     if (record.success && !connections.some((existing) => existing.id === record.data.id)) {
       connections.push(record.data);
     } else {
@@ -73,9 +76,16 @@ export function parseConnectionsDocument(document: unknown): ParsedDocument {
   return { connections, dropped, unsupported: false };
 }
 
+/** A Peers record from before AL-298: its peer list is the Advanced addresses, with the default beacon port. */
+function upgradeRecord(item: unknown): unknown {
+  if (item === null || typeof item !== 'object' || (item as { kind?: unknown }).kind !== 'peers') return item;
+  const { peers, ...rest } = item as Record<string, unknown>;
+  return { beaconPort: DEFAULT_PEER_BEACON_PORT, ...rest, ...(rest['addresses'] === undefined && Array.isArray(peers) ? { addresses: peers } : {}) };
+}
+
 /** SecretStore ids this service owns; start-up removes those no connection refers to any more. */
 export function isConnectionSecretId(id: string): boolean {
-  return /^(?:ado|claude|mcp):/.test(id);
+  return /^(?:ado|claude|mcp|peers):/.test(id);
 }
 
 /** Tokens shorter than this show bullets only: four characters of a short token give too much away. */
