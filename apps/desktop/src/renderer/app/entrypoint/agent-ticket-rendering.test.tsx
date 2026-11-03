@@ -119,20 +119,42 @@ afterEach(() => {
 });
 
 describe('agent ticket rendering (React Profiler)', () => {
-  it('re-renders only the streaming card, once per frame, during a burst of 1,000 output events', () => {
+  it('re-renders only the streaming card, once for its first output stamp, during a burst of 1,000 output events', () => {
     const view = render(<Board />);
     resetRenders();
 
     streamOutput(STREAMING, 1_000, 10);
 
-    // One store commit per frame, so the streaming card renders once per frame.
-    expect(rendersOf(`card:${STREAMING}`)).toBe(10);
+    // The first output stamps the ticket; the rest of the burst is inside the stamp's resolution and commits nothing.
+    expect(rendersOf(`card:${STREAMING}`)).toBe(1);
     for (const id of otherCards) expect(rendersOf(`card:${id}`), `card ${id}`).toBe(0);
     // Lanes the streaming card is not in, and the header counts, never render.
     for (const lane of LANES.filter((lane) => lane !== 'implementing')) expect(rendersOf(`lane:${lane}`), `lane ${lane}`).toBe(0);
     expect(rendersOf('header')).toBe(0);
 
-    expect(view.getByTestId(`card-${STREAMING}`).getAttribute('aria-label')).toBe('Cutover frmJobControl to Blazor · 1999');
+    expect(view.getByTestId(`card-${STREAMING}`).getAttribute('aria-label')).toBe('Cutover frmJobControl to Blazor · 1000');
+  });
+
+  it('re-renders the streaming card once per 60 s step of output time and not in between', () => {
+    const view = render(<Board />);
+    resetRenders();
+
+    let crossings = 0;
+    for (let frame = 0; frame < 10; frame += 1) {
+      // Frames are 30 s apart in output time: every other frame crosses a step.
+      const base = 1_000 + frame * 30_000;
+      for (let i = 0; i < 100; i += 1) bridge.emit('agent:output', fakeOutputEvent(STREAMING, base + i));
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      if (frame % 2 === 0) crossings += 1;
+      expect(rendersOf(`card:${STREAMING}`), `after frame ${frame}`).toBe(crossings);
+    }
+
+    expect(crossings).toBe(5);
+    for (const id of otherCards) expect(rendersOf(`card:${id}`), `card ${id}`).toBe(0);
+    expect(rendersOf('header')).toBe(0);
+    expect(view.getByTestId(`card-${STREAMING}`).getAttribute('aria-label')).toBe('Cutover frmJobControl to Blazor · 241000');
   });
 
   it('keeps the other cards still when two tickets stream in the same frames', () => {
@@ -149,8 +171,8 @@ describe('agent ticket rendering (React Profiler)', () => {
       });
     }
 
-    expect(rendersOf(`card:${STREAMING}`)).toBe(5);
-    expect(rendersOf('card:71301')).toBe(5);
+    expect(rendersOf(`card:${STREAMING}`)).toBe(1);
+    expect(rendersOf('card:71301')).toBe(1);
     for (const id of otherCards.filter((id) => id !== '71301')) expect(rendersOf(`card:${id}`), `card ${id}`).toBe(0);
   });
 
@@ -189,7 +211,9 @@ describe('agent ticket rendering (React Profiler)', () => {
     );
     resetRenders();
 
-    streamOutput(STREAMING, 100, 2);
+    for (let frame = 0; frame < 2; frame += 1) {
+      act(() => agentTickets.setActivity(STREAMING, { text: `Step ${frame}` }, 4_000 + frame));
+    }
 
     expect(rendersOf('naive:71288')).toBe(2);
   });

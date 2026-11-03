@@ -3,12 +3,13 @@ export {
   createAgentOutputStore,
   mergeOutput,
   selectTicketOutput,
+  selectTicketSkeleton,
   type AgentOutputState,
   type AgentOutputStore,
   type TicketOutput,
 } from './model/store';
 export { openTicketOutput } from './model/backfill';
-export { useAgentOutput } from './model/hooks';
+export { useAgentOutput, useAgentOutputSkeleton } from './model/hooks';
 export { agentOutputEventHandlers, createAgentOutputEventHandlers } from './model/event-handlers';
 export { OutputStream, type OutputGrouping, type OutputStreamProps, type TurnHeader, type WaitingRowState } from './ui/OutputStream';
 export { type RenderUserActions } from './ui/OutputRowView';

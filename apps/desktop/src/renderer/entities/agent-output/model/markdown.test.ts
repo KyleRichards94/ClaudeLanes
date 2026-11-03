@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hasMarkdown, parseInline, parseMarkdown } from './markdown';
-import { highlight, languageOf } from './highlight';
+import { createHighlighter, highlight, languageOf, type Language } from './highlight';
 
 /** The audit's sample message (UXA Output): headings, a list, a diff fence and a link. */
 const SAMPLE = [
@@ -120,5 +120,56 @@ describe('highlight (AL-255)', () => {
     ]);
     expect(highlight('@@ -1 +1 @@\n-old\n+new\n same', 'diff')).toEqual([[{ kind: 'meta', text: '@@ -1 +1 @@' }], [{ kind: 'removed', text: '-old' }], [{ kind: 'added', text: '+new' }], [{ kind: 'plain', text: ' same' }]]);
     expect(highlight('x', 'plain')).toEqual([[{ kind: 'plain', text: 'x' }]]);
+  });
+
+  it('finds keywords in a case-insensitive grammar whatever the casing', () => {
+    const kinds = (line: string, language: Language) => highlight(line, language)[0]!.filter((token) => token.kind === 'keyword').map((token) => token.text);
+    expect(kinds('DIM x AS integer', 'vb')).toEqual(['DIM', 'AS', 'integer']);
+    expect(kinds('end sub', 'vb')).toEqual(['end', 'sub']);
+    expect(kinds('SELECT a From t', 'sql')).toEqual(['SELECT', 'From']);
+    expect(kinds('Dimension', 'vb')).toEqual([]);
+  });
+
+  describe('createHighlighter', () => {
+    const vb = ['Public Sub Run()', "  Dim x As Integer = 1 ' one", '  /* not a VB comment */', 'End Sub'].join('\n');
+    const cs = ['/* open', 'still comment', 'end */ int a = 1;', 'var s = @"one', 'two";', 'return a;'].join('\n');
+
+    it('gives the same tokens as a cold highlight at every length of a growing block', () => {
+      for (const [code, language] of [[vb, 'vb'], [cs, 'csharp']] as const) {
+        const live = createHighlighter();
+        for (let length = 0; length <= code.length; length += 1) {
+          expect(live(code.slice(0, length), language)).toEqual(highlight(code.slice(0, length), language));
+        }
+      }
+    });
+
+    it('keeps the token arrays of unchanged lines and re-tokenises only the tail', () => {
+      const live = createHighlighter();
+      const first = live(vb, 'vb');
+      const grown = live(`${vb}\nEnd Cla`, 'vb');
+      expect(grown).toHaveLength(first.length + 1);
+      first.forEach((tokens, index) => expect(grown[index]).toBe(tokens));
+      const edited = live(`${vb}\nEnd Class`, 'vb');
+      expect(edited[first.length]).not.toBe(grown[first.length]);
+      expect(edited[first.length - 1]).toBe(grown[first.length - 1]);
+    });
+
+    it('returns the same array when nothing changed', () => {
+      const live = createHighlighter();
+      expect(live(vb, 'vb')).toBe(live(vb, 'vb'));
+    });
+
+    it('re-tokenises a line whose incoming state changed even though its text did not', () => {
+      const live = createHighlighter();
+      live('int a;\nint b;', 'csharp');
+      expect(live('/* open\nint b;', 'csharp')).toEqual(highlight('/* open\nint b;', 'csharp'));
+      expect(live('/* open */\nint b;', 'csharp')).toEqual(highlight('/* open */\nint b;', 'csharp'));
+    });
+
+    it('starts again when the language changes', () => {
+      const live = createHighlighter();
+      live(vb, 'vb');
+      expect(live(vb, 'csharp')).toEqual(highlight(vb, 'csharp'));
+    });
   });
 });

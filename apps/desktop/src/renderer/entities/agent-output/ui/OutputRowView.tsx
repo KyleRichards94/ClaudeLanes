@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { color, font, fontSize, fontWeight, radius, space, tone } from '@agent-lanes/tokens';
 import { Icon, Text } from '@agent-lanes/ui';
@@ -16,7 +16,7 @@ import { CopyButton, Markdown, markdownPlainText } from './Markdown';
 /** A user row's actions (AL-265: Rewind to here, Fork from here), drawn in the bubble while the pointer is over it. */
 export type RenderUserActions = (row: Extract<OutputRow, { type: 'user' }>) => ReactNode;
 
-export function OutputRowView({ row, ticketId, waiting = false, renderUserActions }: { row: OutputRow; ticketId: string; waiting?: boolean; renderUserActions?: RenderUserActions }) {
+function OutputRowContent({ row, ticketId, waiting = false, renderUserActions }: { row: OutputRow; ticketId: string; waiting?: boolean; renderUserActions?: RenderUserActions }) {
   switch (row.type) {
     case 'system':
       return (
@@ -72,6 +72,9 @@ export function OutputRowView({ row, ticketId, waiting = false, renderUserAction
       );
   }
 }
+
+/** Rows keep their identity while text streams elsewhere, so only the row being written draws again. */
+export const OutputRowView = memo(OutputRowContent);
 
 /** One of the user's messages (AL-251), with its actions (AL-265) shown while the pointer is over it. */
 function UserRow({ row, actions }: { row: Extract<OutputRow, { type: 'user' }>; actions: ReactNode }) {

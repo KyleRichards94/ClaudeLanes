@@ -64,7 +64,7 @@ export interface AgentTicketStore extends Pick<StoreApi<AgentTicketsState>, 'get
   setStage(ticketId: string, stage: Lane, at: number): void;
   /** The card's activity row and progress bar (`report_activity`, AL-103). */
   setActivity(ticketId: string, activity: { text: string | null; progress?: number | null }, at: number): void;
-  /** A frame's batch of `agent:output` events, across tickets, in one commit. */
+  /** A frame's batch of `agent:output` events, across tickets, in one commit; commits nothing when no ticket's output time moves. */
   recordOutput(events: readonly { readonly ticketId: string; readonly at: number }[]): void;
   /** The session's state (`agent:status`): the card's corner reads "Done" from it. */
   setSession(ticketId: string, session: AgentSessionState): void;

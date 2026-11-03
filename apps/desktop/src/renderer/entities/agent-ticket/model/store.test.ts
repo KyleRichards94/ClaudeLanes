@@ -11,6 +11,7 @@ import {
   selectWorkItemLanes,
 } from './selectors';
 import { createAgentTicketStore, type AgentTicketStore } from './store';
+import { OUTPUT_AT_RESOLUTION_MS } from './ticket';
 
 /** The artboard 1 board: one card in Queued, Planning, Code review, QA and Create PR; two in Implementing. */
 function boardRecords(): TicketRecord[] {
@@ -96,7 +97,7 @@ describe('agent ticket store', () => {
     expect(commits).toHaveBeenCalledTimes(1);
   });
 
-  it('commits a frame of output across tickets once, stamping each ticket with its newest output', () => {
+  it('commits a frame of output across tickets once, stamping each ticket with its first output', () => {
     const store = loadedStore();
     const commits = vi.fn();
     store.subscribe(commits);
@@ -109,8 +110,28 @@ describe('agent ticket store', () => {
     ]);
 
     expect(commits).toHaveBeenCalledOnce();
-    expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(503);
+    expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(500);
     expect(selectTicket(store.getState(), '71288')?.lastOutputAt).toBe(502);
+  });
+
+  it('keeps the ticket, the ticket map and every subscriber untouched while output streams inside the resolution step', () => {
+    const store = loadedStore();
+    store.recordOutput([{ ticketId: '71273', at: 500 }]);
+    const before = store.getState();
+    const commits = vi.fn();
+    store.subscribe(commits);
+
+    store.recordOutput([{ ticketId: '71273', at: 516 }]);
+    store.recordOutput([{ ticketId: '71273', at: 500 + OUTPUT_AT_RESOLUTION_MS - 1 }]);
+
+    expect(commits).not.toHaveBeenCalled();
+    expect(store.getState()).toBe(before);
+
+    store.recordOutput([{ ticketId: '71273', at: 500 + OUTPUT_AT_RESOLUTION_MS }]);
+    expect(commits).toHaveBeenCalledOnce();
+    expect(selectTicket(store.getState(), '71273')).not.toBe(selectTicket(before, '71273'));
+    expect(selectTicket(store.getState(), '71273')?.lastOutputAt).toBe(500 + OUTPUT_AT_RESOLUTION_MS);
+    expect(selectTicket(store.getState(), '71288')).toBe(selectTicket(before, '71288'));
   });
 
   it('keeps live state across a reload of the records and drops tickets that are gone', () => {

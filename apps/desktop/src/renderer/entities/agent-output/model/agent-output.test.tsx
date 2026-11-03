@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { fakeOutputEvent, installFakeBridge } from '@/shared/testing';
 import { openTicketOutput } from './backfill';
 import { createAgentOutputEventHandlers } from './event-handlers';
-import { useAgentOutput } from './hooks';
-import { createAgentOutputStore, mergeOutput, selectTicketOutput } from './store';
+import { useAgentOutput, useAgentOutputSkeleton } from './hooks';
+import { createAgentOutputStore, mergeOutput, selectTicketOutput, selectTicketSkeleton } from './store';
 
 function texts(events: readonly AgentOutputEvent[]): string[] {
   return events.map((event) => (event.item.kind === 'text' || event.item.kind === 'text-delta' || event.item.kind === 'system' ? event.item.text : event.item.kind));
@@ -95,5 +95,109 @@ describe('agent output store (AL-102)', () => {
     expect(await screen.findByText('line 1 | line 2')).toBeTruthy();
     act(() => store.receive([fakeOutputEvent('71273', 3)]));
     expect(screen.getByTestId('output').textContent).toBe('line 1 | line 2 | line 3');
+  });
+});
+
+describe('output skeleton', () => {
+  const textDelta = (seq: number, text: string, streamId = 'msg_9', parent: string | null = null) =>
+    fakeOutputEvent('71273', seq, { item: { kind: 'text-delta', streamId, text, parentToolUseId: parent } });
+  const thinkingDelta = (seq: number, text: string, streamId = 'th_1') =>
+    fakeOutputEvent('71273', seq, { item: { kind: 'thinking-delta', streamId, text, parentToolUseId: null } });
+  const finished = (seq: number, streamId = 'msg_9') => fakeOutputEvent('71273', seq, { item: { kind: 'text', streamId, text: 'done', parentToolUseId: null } });
+  const tool = (seq: number) =>
+    fakeOutputEvent('71273', seq, { item: { kind: 'tool', rowId: `r${seq}`, toolUseIds: [`r${seq}`], tool: 'read', label: 'Read', detail: 'a.cs', stats: null, parentToolUseId: null } });
+  const skeletonOf = (store: ReturnType<typeof createAgentOutputStore>) => selectTicketSkeleton(store.getState(), '71273');
+
+  function watched() {
+    const store = createAgentOutputStore();
+    store.watch('71273');
+    return store;
+  }
+
+  it('keeps its identity while a stream’s deltas arrive, so nothing derived from it re-derives', () => {
+    const store = watched();
+    store.receive([tool(1), textDelta(2, 'Wiring')]);
+    const before = skeletonOf(store);
+    expect(before.map((event) => event.seq)).toEqual([1, 2]);
+
+    store.receive([textDelta(3, ' the grid')]);
+    store.receive([textDelta(4, ' filters'), thinkingDelta(5, 'hm')]);
+    store.receive([textDelta(6, '.')]);
+
+    // The thinking stream's first delta is structural (a new row), the rest are not.
+    const after = skeletonOf(store);
+    expect(after).not.toBe(before);
+    expect(after.map((event) => event.seq)).toEqual([1, 2, 5]);
+    store.receive([thinkingDelta(7, ' more'), textDelta(8, ' text')]);
+    expect(skeletonOf(store)).toBe(after);
+    // The full list still has every delta, for the row being written.
+    expect(selectTicketOutput(store.getState(), '71273')).toHaveLength(8);
+  });
+
+  it('changes on a structural event, and drops a text stream’s first delta once its finished text arrives', () => {
+    const store = watched();
+    store.receive([textDelta(1, 'a'), textDelta(2, 'b')]);
+    const streaming = skeletonOf(store);
+    store.receive([tool(3)]);
+    expect(skeletonOf(store)).not.toBe(streaming);
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([1, 3]);
+
+    store.receive([finished(4)]);
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([3, 4]);
+  });
+
+  it('keeps a sub-agent’s stream apart from the lead’s with the same id, and thinking apart from text', () => {
+    const store = watched();
+    store.receive([textDelta(1, 'a'), textDelta(2, 'b', 'msg_9', 'toolu_x'), thinkingDelta(3, 'c', 'msg_9'), textDelta(4, 'd'), textDelta(5, 'e', 'msg_9', 'toolu_x')]);
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('opens a new stream when a stream id is used again after its thinking block finished', () => {
+    const store = watched();
+    const finishedThinking = (seq: number) => fakeOutputEvent('71273', seq, { item: { kind: 'thinking', streamId: 'th_1', text: 'A', parentToolUseId: null } });
+    store.receive([thinkingDelta(1, 'a'), thinkingDelta(2, 'a2'), finishedThinking(3), tool(4), thinkingDelta(5, 'b')]);
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([1, 3, 4, 5]);
+    const before = skeletonOf(store);
+    store.receive([thinkingDelta(6, 'c')]);
+    expect(skeletonOf(store)).toBe(before);
+  });
+
+  it('is rebuilt when out-of-order events or a backfill change what comes first', () => {
+    const store = watched();
+    store.receive([textDelta(5, 'late')]);
+    store.receive([textDelta(4, 'early')]);
+    // The earlier delta is now the stream's first.
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([4]);
+
+    store.backfill({ ticketId: '71273', lastSeq: 5, events: [tool(1), textDelta(3, 'oldest')] });
+    expect(skeletonOf(store).map((event) => event.seq)).toEqual([1, 3]);
+  });
+
+  it('is the same list as the events when there are no deltas, and empty for a ticket nobody watches', () => {
+    const store = watched();
+    store.receive([tool(1), finished(2)]);
+    expect(skeletonOf(store)).toEqual(selectTicketOutput(store.getState(), '71273'));
+    expect(selectTicketSkeleton(store.getState(), '99999')).toEqual([]);
+  });
+
+  it('useAgentOutputSkeleton re-renders for structural events only', async () => {
+    const store = createAgentOutputStore();
+    installFakeBridge({ 'agent:getTranscript': { ok: true, data: { ticketId: '71273', lastSeq: 0, events: [] } } });
+    const renders = vi.fn();
+    function Skeleton() {
+      const events = useAgentOutputSkeleton('71273', store);
+      renders(events.length);
+      return <Text testID="skeleton">{events.length}</Text>;
+    }
+    render(<Skeleton />);
+    await act(async () => undefined);
+    act(() => store.receive([textDelta(1, 'a')]));
+    const settled = renders.mock.calls.length;
+    act(() => store.receive([textDelta(2, 'b')]));
+    act(() => store.receive([textDelta(3, 'c')]));
+    expect(renders).toHaveBeenCalledTimes(settled);
+
+    act(() => store.receive([tool(4)]));
+    expect(screen.getByTestId('skeleton').textContent).toBe('2');
   });
 });

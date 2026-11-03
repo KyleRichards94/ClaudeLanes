@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fakeTicketRecord } from '@/shared/testing';
 import {
   NO_SUB_AGENTS,
+  OUTPUT_AT_RESOLUTION_MS,
   clampProgress,
   subAgentTotal,
   ticketFromRecord,
@@ -136,12 +137,14 @@ describe('ticket changes', () => {
     ]);
   });
 
-  it('keeps the newest output time and ignores older output', () => {
+  it('stamps the first output at once, then moves it forward only a full minute at a time', () => {
     const streamed = withOutputAt(ticket(), 100);
     expect(streamed.lastOutputAt).toBe(100);
     expect(withOutputAt(streamed, 90)).toBe(streamed);
     expect(withOutputAt(streamed, 100)).toBe(streamed);
-    expect(withOutputAt(streamed, 101).lastOutputAt).toBe(101);
+    expect(withOutputAt(streamed, 101)).toBe(streamed);
+    expect(withOutputAt(streamed, 100 + OUTPUT_AT_RESOLUTION_MS - 1)).toBe(streamed);
+    expect(withOutputAt(streamed, 100 + OUTPUT_AT_RESOLUTION_MS).lastOutputAt).toBe(100 + OUTPUT_AT_RESOLUTION_MS);
   });
 
   it('keeps the approval reason in step with the gate', () => {

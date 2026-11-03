@@ -55,6 +55,7 @@ import {
   setOutputDiffLayout,
   setTicketPageTab,
   toast,
+  useNow,
   useOutputDiffLayout,
   useShowThinking,
   useTicketPageTab,
@@ -71,7 +72,6 @@ import {
 import { companionLabel, companionsOf } from "../lib/companions";
 import { sessionStartedAt } from "../lib/stage-steps";
 import { useLayoutShortcut } from "../model/layout-shortcut";
-import { useNow } from "../model/use-now";
 import { CreatePullRequestPanel } from "./CreatePullRequestPanel";
 import { AdoTab } from "./AdoTab";
 import { RoomTab } from "@/widgets/room-log";

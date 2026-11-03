@@ -88,8 +88,9 @@ export function FlightDeckPanel({
   const ticketId = ticket.id;
   const diff = useDiffFiles(ticketId);
   const agents = useAgents(ticketId, companions);
-  const turns = useTurns(activeId, history);
   const leadTurns = useTurns(ticketId, history);
+  const secondTurns = useTurns(activeId === ticketId ? null : activeId, history);
+  const turns = activeId === ticketId ? leadTurns : secondTurns;
   const selectedFilePath = useSelectedFilePath(ticketId);
   const selectedTurn = useSelectedTurn(ticketId);
   const followAgent = useFollowAgent(ticketId);

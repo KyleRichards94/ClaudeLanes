@@ -1,8 +1,9 @@
 import type { AgentOutputItem } from '@agent-lanes/contracts';
 import { describe, expect, it } from 'vitest';
 import { fakeOutputEvent } from '@/shared/testing';
-import { displayRows, findToolUse, groupTurns, outputRows, proseSpans, statSpans, turnEndLabel, turnRowKey, userCaption, withoutThinking, type OutputRow } from './rows';
-import { estimateRowHeight, rowOffsets, windowFor } from './virtual';
+import { displayRows, findToolUse, groupTurns, liveTexts, outputRows, proseSpans, statSpans, turnEndLabel, turnRowKey, userCaption, withLiveText, withoutThinking, type OutputRow } from './rows';
+import { createAgentOutputStore } from './store';
+import { estimateRowHeight, heightChange, rowOffsets, windowFor } from './virtual';
 
 let seq = 0;
 function event(item: AgentOutputItem, at = 1_000) {
@@ -140,6 +141,16 @@ describe('output windowing', () => {
       expect(offsets[end] ?? total).toBeGreaterThanOrEqual(Math.min(top + 600, total));
     }
     expect(windowFor(offsets, 0, 0, 600)).toEqual({ start: 0, end: 0 });
+  });
+
+  it('applies a new height, holds back the followed newest row’s growth, and ignores noise', () => {
+    // Never measured: always applied, even for the row being followed.
+    expect(heightChange(undefined, 40, true)).toBe('apply');
+    expect(heightChange(40, 80, false)).toBe('apply');
+    expect(heightChange(40, 80, true)).toBe('hold');
+    expect(heightChange(40, 40.3, false)).toBe('ignore');
+    expect(heightChange(40, 0, true)).toBe('ignore');
+    expect(heightChange(undefined, 0, false)).toBe('ignore');
   });
 });
 
@@ -288,5 +299,101 @@ describe('groupTurns and displayRows (AL-279, grouped output)', () => {
     const opened = displayRows(groups, new Set([turnRowKey(1)]));
     expect(opened.map((row) => row.type)).toEqual(['system', 'turn-header', 'user', 'tool', 'prose', 'turn-end', 'turn-header', 'user', 'tool', 'streaming']);
     expect(opened[1]).toMatchObject({ expanded: true });
+  });
+});
+
+describe('live text over the skeleton rows', () => {
+  const textDelta = (streamId: string, text: string, parentToolUseId: string | null = null) => event({ kind: 'text-delta', streamId, text, parentToolUseId });
+  const thinkingDelta = (streamId: string, text: string, parentToolUseId: string | null = null) => event({ kind: 'thinking-delta', streamId, text, parentToolUseId });
+  const finishedText = (streamId: string, text: string, parentToolUseId: string | null = null) => event({ kind: 'text', streamId, text, parentToolUseId });
+  const finishedThinking = (streamId: string, text: string) => event({ kind: 'thinking', streamId, text, ...lead });
+
+  /** What the stream draws: the skeleton's rows with the live text over them. */
+  function drawn(events: ReturnType<typeof event>[]) {
+    const store = createAgentOutputStore();
+    store.watch('71273');
+    store.receive(events);
+    const output = store.getState().byTicket.get('71273')!;
+    return { rows: withLiveText(outputRows(output.skeleton), liveTexts(output.events)), events: output.events, skeleton: output.skeleton };
+  }
+
+  it('draws exactly the rows folding every event would, at each point of a stream', () => {
+    const events = [
+      event({ kind: 'system', text: 'Plan approved', ...lead }),
+      thinkingDelta('th_1', 'Looking at '),
+      thinkingDelta('th_1', 'the grid'),
+      finishedThinking('th_1', 'Looking at the grid.'),
+      textDelta('m_old', 'An interrupted '),
+      event(tool('t1')),
+      textDelta('m_old', 'thought'),
+      event(tool('spawn_1', { tool: 'spawn', label: 'Spawn', detail: 'explore', stats: null })),
+      textDelta('m_sub', 'Sub-agent ', 'spawn_1'),
+      thinkingDelta('th_sub', 'Sub thinks', 'spawn_1'),
+      textDelta('m_sub', 'reading', 'spawn_1'),
+      textDelta('m_1', 'Wiring '),
+      textDelta('m_1', 'the filters'),
+      finishedText('m_1', 'Wiring the filters.'),
+      textDelta('m_2', 'Now '),
+      thinkingDelta('th_2', 'Hmm'),
+      textDelta('m_2', 'testing'),
+      thinkingDelta('th_2', ' more'),
+      // A stream id used again after its block finished is a new stream with its own row.
+      thinkingDelta('th_re', 'a'),
+      finishedThinking('th_re', 'A'),
+      event(tool('t2')),
+      thinkingDelta('th_re', 'b'),
+      thinkingDelta('th_re', 'c'),
+    ];
+    for (let count = 1; count <= events.length; count++) {
+      const so_far = events.slice(0, count);
+      expect(drawn(so_far).rows, `after ${count} events`).toEqual(outputRows(drawn(so_far).events));
+    }
+  });
+
+  it('shows a stream id reused after its block finished as a second, live row', () => {
+    const { rows } = drawn([thinkingDelta('th_re', 'a'), finishedThinking('th_re', 'A'), event(tool('t2')), thinkingDelta('th_re', 'b'), thinkingDelta('th_re', 'c')]);
+    expect(rows.map((row) => row.type)).toEqual(['thinking', 'tool', 'thinking']);
+    expect(rows[0]).toMatchObject({ text: 'A', live: false });
+    expect(rows[2]).toMatchObject({ text: 'bc', live: true });
+  });
+
+  it('keeps every row but the one being written, and the list itself when nothing changed', () => {
+    const store = createAgentOutputStore();
+    store.watch('71273');
+    store.receive([event(tool('t1')), event({ kind: 'text', streamId: 'm_0', text: 'Done.', ...lead }), textDelta('m_2', 'Wir')]);
+    const before = store.getState().byTicket.get('71273')!;
+    const baseRows = outputRows(before.skeleton);
+    const rows = withLiveText(baseRows, liveTexts(before.events));
+
+    store.receive([textDelta('m_2', 'ing the grid')]);
+    const after = store.getState().byTicket.get('71273')!;
+    // Nothing structural changed, so the rows the stream folds are the same list.
+    expect(after.skeleton).toBe(before.skeleton);
+    const next = withLiveText(baseRows, liveTexts(after.events));
+    expect(next[0]).toBe(rows[0]);
+    expect(next[1]).toBe(rows[1]);
+    expect(next[2]).toMatchObject({ type: 'streaming', text: 'Wiring the grid', live: true });
+    expect(next[2]).not.toBe(rows[2]);
+    expect(withLiveText(baseRows, new Map())).toBe(baseRows);
+  });
+
+  it('leaves a finished block’s text alone, and shows an unfinished older stream in full', () => {
+    const { rows } = drawn([thinkingDelta('th_1', 'a'), thinkingDelta('th_1', 'b'), finishedThinking('th_1', 'The final thought.'), textDelta('m_1', 'Half '), event(tool('t1')), textDelta('m_1', 'done')]);
+    expect(rows[0]).toMatchObject({ type: 'thinking', text: 'The final thought.', live: false });
+    expect(rows[1]).toMatchObject({ type: 'streaming', text: 'Half done', live: false });
+  });
+
+  it('brings a sub-agent’s streaming line up to date on its Spawn row, with the latest line', () => {
+    const { rows } = drawn([event(tool('spawn_1', { tool: 'spawn', label: 'Spawn', detail: 'explore', stats: null, toolUseIds: ['spawn_1'] })), textDelta('m_sub', 'Found ', 'spawn_1'), textDelta('m_sub', 'four forms', 'spawn_1')]);
+    const spawn = rows[0] as Extract<OutputRow, { type: 'tool' }>;
+    expect(spawn.subagents[0]!.rows[0]).toMatchObject({ type: 'streaming', text: 'Found four forms' });
+    expect(spawn.subagents[0]!.latest).toBe('Found four forms');
+  });
+
+  it('puts the live text over grouped rows too, header rows untouched', () => {
+    const { rows } = drawn([event({ kind: 'user', messageId: null, text: 'go', priority: null, source: 'composer', ...lead }), textDelta('m_1', 'Wor'), textDelta('m_1', 'king')]);
+    const shown = withLiveText(displayRows(groupTurns(rows as OutputRow[]), new Set()), liveTexts([textDelta('m_1', 'Working now')]));
+    expect(shown.map((row) => row.type)).toEqual(['turn-header', 'user', 'streaming']);
+    expect(shown[2]).toMatchObject({ text: 'Working now' });
   });
 });
